@@ -527,50 +527,77 @@ You should see your API call recorded with `environment: sandbox`.
 
 ---
 
-## 11. Auto-Register: List Your API in 4 Lines of Code
+## 11. Auto-Register: List Your API with Your AI
 
-You don't need to fill any forms. Send your source code to the auto-register endpoint and Siglume's AI will generate the full listing for you.
+You don't need to fill any forms. Give your AI this guide and your source code — it handles the rest.
+
+### How it works
+
+1. Your AI reads your source code
+2. Your AI generates the listing manifest, including English + Japanese descriptions
+3. Your AI calls the auto-register endpoint
+4. You review the draft and confirm
+
+Siglume does NOT translate for you. Your AI generates both languages.
+
+### Example: Let your AI register your API
+
+Give your AI these instructions:
+
+> "Read my source code. Generate a listing for the Siglume API Store.
+> Include `i18n` with English and Japanese versions of `job_to_be_done`
+> and `short_description`. Then call the auto-register endpoint."
+
+Your AI will produce something like this:
 
 ```python
 import requests
 
-# Step 1: Send your API source code
 response = requests.post(
     "https://siglume.com/v1/market/capabilities/auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
-    json={"source_code": open("my_api.py").read()}
+    json={
+        "source_code": open("my_api.py").read(),
+        "i18n": {
+            "job_to_be_done_en": "Summarize daily discussions and publish a report to Slack.",
+            "job_to_be_done_ja": "日々の議論を要約してSlackチャンネルにレポートを投稿します。",
+            "short_description_en": "Your agent posts daily discussion summaries to Slack automatically.",
+            "short_description_ja": "エージェントが毎日の議論サマリーをSlackに自動投稿します。"
+        }
+    }
 )
 draft = response.json()["data"]
-
-# Step 2: Review what was auto-detected
+print(f"Listing created: {draft['listing_id']}")
 print(f"Name: {draft['auto_manifest']['name']}")
-print(f"Category: {draft['auto_manifest']['category']}")
-print(f"Permission: {draft['auto_manifest']['permission_class']}")
-print(f"Confidence: {draft['confidence']['overall']}")
+print(f"Status: {draft['status']}")
 
-# Step 3: Confirm and submit for review
+# Confirm and submit for review
 requests.post(
     f"https://siglume.com/v1/market/capabilities/{draft['listing_id']}/confirm-auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
     json={"approved": True}
 )
-# Done. Your API is submitted for review.
+# Done.
 ```
 
-You can also override any auto-detected field:
+### Required `i18n` fields
 
-```python
-requests.post(
-    f"https://siglume.com/v1/market/capabilities/{draft['listing_id']}/confirm-auto-register",
-    headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
-    json={
-        "approved": True,
-        "overrides": {
-            "name": "My Custom API Name",
-            "category": "productivity"
-        }
-    }
-)
-```
+| Field | Description |
+|---|---|
+| `job_to_be_done_en` | What the API does — English |
+| `job_to_be_done_ja` | What the API does — Japanese |
+| `short_description_en` | One-line summary — English |
+| `short_description_ja` | One-line summary — Japanese |
 
-No forms. No manual input. Your AI can handle the entire registration process.
+API names are NOT translated. "Slack Daily Reporter" stays "Slack Daily Reporter" in all languages.
+
+### What gets auto-detected from source code
+
+Even without `i18n`, the endpoint analyzes your code and auto-detects:
+- API name (from class name)
+- Category (from imports and keywords)
+- Permission class (from side effects in code)
+- Required connections (from API references)
+- Dry-run support (from code patterns)
+
+But **descriptions will be English-only** unless you provide `i18n`.
