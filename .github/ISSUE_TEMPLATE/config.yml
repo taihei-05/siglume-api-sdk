@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Bounty Board
+    url: https://github.com/siglume/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
+    about: See the list of apps we're looking for community developers to build

@@ -1,0 +1,1053 @@
+openapi: 3.1.0
+info:
+  title: Siglume Agent API Store - Developer API
+  version: 0.1.0-beta
+  description: |
+    API for building, publishing, and managing agent apps on the Siglume Agent API Store.
+
+    An agent app is a power-up kit that gives a Siglume AI agent new capabilities.
+    Developers use this API to:
+    - Publish app listings to the catalog
+    - Manage connected accounts for external services
+    - Test apps in sandbox mode
+    - Track usage and execution metrics
+    - Submit listings for review
+    - Inspect developer portal readiness
+
+    ## Authentication
+    All endpoints require a valid user authentication token.
+    Runtime responses are wrapped in a common envelope:
+    `{ "data": ..., "meta": { "request_id": "...", "trace_id": "..." }, "error": null }`
+
+    ## Permission Classes
+    Apps are classified into 4 permission tiers:
+    - read-only: Search and retrieve data
+    - recommendation: Compare and suggest
+    - action: External state changes (requires dry-run support)
+    - payment: Financial transactions (requires approval)
+
+    ## Environments
+    - sandbox: For testing with stub providers
+    - live: Production execution
+
+servers:
+  - url: /v1
+    description: API v1
+
+paths:
+  /market/capabilities:
+    get:
+      operationId: listAppCatalog
+      summary: List app catalog
+      description: Browse published agent apps. Use mine=true to see your own listings.
+      parameters:
+        - name: mine
+          in: query
+          schema: { type: boolean, default: false }
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, pending_review, changes_requested, published, active, paused, archived] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: cursor
+          in: query
+          description: Opaque pagination cursor returned by a previous request
+          schema: { type: string }
+      responses:
+        '200':
+          description: App listings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingPageEnvelope'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: createAppListing
+      summary: Create new app listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppListingRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict - duplicate capability_key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/capabilities/{listingId}:
+    get:
+      operationId: getAppListing
+      summary: Get app listing details
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: App listing detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: updateAppListing
+      summary: Update app listing
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppListingRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/capabilities/{listingId}/submit-review:
+    post:
+      operationId: submitAppListingForReview
+      summary: Submit app listing for review
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Submission blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/developer/portal:
+    get:
+      operationId: getDeveloperPortalSummary
+      summary: Get developer portal summary
+      responses:
+        '200':
+          description: Developer portal summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeveloperPortalSummaryEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/access-grants:
+    get:
+      operationId: listAccessGrants
+      summary: List your app licenses
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: agent_id
+          in: query
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Access grants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessGrantPageEnvelope'
+
+  /market/access-grants/{grantId}/bind-agent:
+    post:
+      operationId: bindAgentToGrant
+      summary: Install app on an agent
+      parameters:
+        - name: grantId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindAgentRequest'
+      responses:
+        '200':
+          description: Bound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrantBindingEnvelope'
+        '404':
+          description: Grant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/connected-accounts:
+    get:
+      operationId: listConnectedAccounts
+      summary: List connected external accounts
+      parameters:
+        - name: provider_key
+          in: query
+          schema: { type: string }
+        - name: environment
+          in: query
+          schema: { type: string, enum: [sandbox, live] }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Connected accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountPageEnvelope'
+    post:
+      operationId: createConnectedAccount
+      summary: Connect an external account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectedAccountRequest'
+      responses:
+        '201':
+          description: Connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountEnvelope'
+
+  /market/sandbox/sessions:
+    post:
+      operationId: createSandboxSession
+      summary: Create sandbox test session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id, capability_key]
+              properties:
+                agent_id: { type: string }
+                capability_key: { type: string }
+      responses:
+        '201':
+          description: Sandbox session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxSessionEnvelope'
+
+  /market/usage:
+    get:
+      operationId: listUsageEvents
+      summary: Query usage events
+      parameters:
+        - name: capability_key
+          in: query
+          schema: { type: string }
+        - name: agent_id
+          in: query
+          schema: { type: string }
+        - name: outcome
+          in: query
+          schema: { type: string }
+        - name: environment
+          in: query
+          schema: { type: string, enum: [sandbox, live] }
+        - name: period_key
+          in: query
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Usage events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageEventPageEnvelope'
+
+  /market/capability-approvals/challenge:
+    post:
+      operationId: requestExecutionApproval
+      summary: Request execution approval
+      description: For action/payment apps, request owner approval before execution.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalChallengeRequest'
+      responses:
+        '201':
+          description: Approval requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalChallengeEnvelope'
+
+  /market/support-cases:
+    get:
+      operationId: listSupportCases
+      summary: List your support cases
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: capability_key
+          in: query
+          schema: { type: string }
+        - name: agent_id
+          in: query
+          schema: { type: string }
+        - name: environment
+          in: query
+          schema: { type: string, enum: [sandbox, live] }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Support cases
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportCasePageEnvelope'
+    post:
+      operationId: createSupportCase
+      summary: Create a support case
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportCaseRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportCaseEnvelope'
+
+components:
+  schemas:
+    EnvelopeMeta:
+      type: object
+      required: [request_id, trace_id]
+      properties:
+        request_id: { type: string }
+        trace_id: { type: string }
+
+    ErrorEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          type: 'null'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
+
+    AppListingRequest:
+      type: object
+      required: [capability_key, name, category, price_model, price_value_minor]
+      properties:
+        capability_key: { type: string, minLength: 1, maxLength: 128 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string }
+        job_to_be_done: { type: string }
+        short_description: { type: string }
+        category: { type: string, enum: [commerce, booking, crm, finance, document, communication, monitoring, other] }
+        permission_class: { type: string, enum: [read-only, recommendation, action, payment] }
+        approval_mode: { type: string, enum: [auto, budget-bounded, always-ask, deny] }
+        dry_run_supported: { type: boolean, default: false }
+        required_connected_accounts: { type: array, items: { type: string } }
+        permission_scopes: { type: array, items: { type: string } }
+        price_model: { type: string, enum: [free, monthly, one_time, bundle, usage_based, per_action] }
+        price_value_minor: { type: integer, minimum: 0 }
+        currency: { type: string, default: JPY }
+        docs_url: { type: string }
+        support_contact: { type: string }
+        input_shape_summary: { type: string }
+        output_shape_summary: { type: string }
+        compatibility_tags: { type: array, items: { type: string } }
+        example_prompts: { type: array, items: { type: string } }
+        latency_tier: { type: string }
+        data_sensitivity_tier: { type: string }
+        usage_limit_hint: { type: object }
+        supported_categories: { type: array, items: { type: string } }
+        disclosure: { type: object }
+        public_safe_status: { type: string }
+        evidence: { type: object }
+        metadata: { type: object }
+        execution_policy: { type: object }
+        policy_acceptance: { type: boolean, default: false }
+        mock_result: { type: object }
+        merchant_ref: { type: string }
+        disclosure_label: { type: string }
+        fulfillment_kind: { type: string }
+        result_summary: { type: string }
+        receipt_summary: { type: string }
+        sandbox_support: { type: string }
+        status: { type: string }
+        visibility: { type: string }
+
+    AppListingPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppListing'
+        next_cursor: { type: string, nullable: true }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    AppListingPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/AppListingPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    AppListing:
+      type: object
+      properties:
+        id: { type: string }
+        listing_id: { type: string }
+        listing_kind: { type: string }
+        capability_key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        job_to_be_done: { type: string }
+        category: { type: string }
+        permission_class: { type: string }
+        approval_mode: { type: string }
+        dry_run_supported: { type: boolean }
+        price_model: { type: string }
+        price_value_minor: { type: integer }
+        currency: { type: string }
+        fulfillment_kind: { type: string }
+        status: { type: string }
+        visibility: { type: string }
+        short_description: { type: string }
+        docs_url: { type: string }
+        support_contact: { type: string }
+        required_connected_accounts: { type: array, items: { type: string } }
+        permission_scopes: { type: array, items: { type: string } }
+        compatibility_tags: { type: array, items: { type: string } }
+        latency_tier: { type: string }
+        data_sensitivity_tier: { type: string }
+        usage_limit_hint: { type: object }
+        example_prompts: { type: array, items: { type: string } }
+        public_safe_status: { type: string }
+        result_summary: { type: string }
+        receipt_summary: { type: string }
+        sandbox_support: { type: string }
+        seller_user_id: { type: string }
+        owner_user_id: { type: string }
+        seller_onboarding_id: { type: string }
+        seller_onboarding_status: { type: string }
+        submission_blockers: { type: array, items: { type: string } }
+        submitted_at: { type: string, format: date-time }
+        reviewed_at: { type: string, format: date-time }
+        published_at: { type: string, format: date-time }
+        review_note: { type: string }
+        review_status: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AppListingEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/AppListing'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    BindAgentRequest:
+      type: object
+      required: [agent_id]
+      properties:
+        agent_id: { type: string }
+        binding_status: { type: string, default: active }
+
+    ConnectedAccountRequest:
+      type: object
+      required: [provider_key, account_role]
+      properties:
+        provider_key: { type: string }
+        account_role: { type: string }
+        external_account_ref: { type: string }
+        display_name: { type: string }
+        environment: { type: string, enum: [sandbox, live], default: live }
+        connection_status: { type: string, default: connected }
+        scopes: { type: array, items: { type: string } }
+        metadata: { type: object }
+
+    ApprovalChallengeRequest:
+      type: object
+      required: [agent_id, capability_key, task_type]
+      properties:
+        agent_id: { type: string }
+        capability_key: { type: string }
+        task_type: { type: string }
+        source_type: { type: string }
+        amount_minor: { type: integer, minimum: 0 }
+        currency: { type: string }
+        execution_kind: { type: string, enum: [dry_run, quote, action, payment] }
+        dry_run: { type: boolean, default: false }
+        environment: { type: string, enum: [sandbox, live], default: live }
+        request_hash: { type: string }
+        idempotency_key: { type: string }
+        metadata: { type: object }
+
+    AccessGrant:
+      type: object
+      properties:
+        id: { type: string }
+        access_grant_id: { type: string }
+        owner_user_id: { type: string }
+        capability_listing_id: { type: string }
+        linked_order_id: { type: string, nullable: true }
+        grant_status: { type: string, enum: [active, revoked, expired] }
+        billing_model: { type: string }
+        usage_limit: { type: object }
+        policy: { type: object }
+        revocable: { type: boolean }
+        metadata: { type: object }
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        capability:
+          type: object
+          nullable: true
+        bindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityBinding'
+
+    AccessGrantPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessGrant'
+        next_cursor: { type: string, nullable: true }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    AccessGrantPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/AccessGrantPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    CapabilityBinding:
+      type: object
+      properties:
+        id: { type: string }
+        binding_id: { type: string }
+        access_grant_id: { type: string }
+        agent_id: { type: string }
+        binding_status: { type: string, enum: [active, paused, removed] }
+        created_by_user_id: { type: string, nullable: true }
+        disabled_at: { type: string, format: date-time, nullable: true }
+        selected_connected_accounts: { type: object }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    GrantBindingResult:
+      type: object
+      properties:
+        binding:
+          $ref: '#/components/schemas/CapabilityBinding'
+        access_grant:
+          $ref: '#/components/schemas/AccessGrant'
+
+    GrantBindingEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/GrantBindingResult'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ConnectedAccount:
+      type: object
+      properties:
+        id: { type: string }
+        connected_account_id: { type: string }
+        owner_user_id: { type: string }
+        provider_key: { type: string }
+        account_role: { type: string }
+        external_account_ref: { type: string }
+        display_name: { type: string }
+        environment: { type: string, enum: [sandbox, live] }
+        connection_status: { type: string }
+        scopes: { type: array, items: { type: string } }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ConnectedAccountPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectedAccount'
+        next_cursor: { type: string, nullable: true }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    ConnectedAccountEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ConnectedAccount'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ConnectedAccountPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ConnectedAccountPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    UsageEvent:
+      type: object
+      properties:
+        id: { type: string }
+        usage_event_id: { type: string }
+        access_grant_id: { type: string }
+        capability_listing_id: { type: string }
+        capability_key: { type: string }
+        agent_id: { type: string }
+        owner_user_id: { type: string }
+        environment: { type: string, enum: [sandbox, live] }
+        task_type: { type: string }
+        source_type: { type: string, nullable: true }
+        units_consumed: { type: integer }
+        outcome: { type: string, enum: [success, denied, error, timeout] }
+        execution_kind: { type: string, enum: [dry_run, quote, action, payment] }
+        permission_class: { type: string }
+        approval_mode: { type: string }
+        latency_ms: { type: integer }
+        request_hash: { type: string, nullable: true }
+        idempotency_key: { type: string, nullable: true }
+        trace_id: { type: string, nullable: true }
+        period_key: { type: string }
+        receipt: { type: object }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+
+    UsageEventPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageEvent'
+        next_cursor: { type: string, nullable: true }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    UsageEventPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/UsageEventPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    SupportCase:
+      type: object
+      properties:
+        id: { type: string }
+        support_case_id: { type: string }
+        reporter_user_id: { type: string }
+        capability_listing_id: { type: string, nullable: true }
+        access_grant_id: { type: string, nullable: true }
+        agent_id: { type: string, nullable: true }
+        capability_key: { type: string, nullable: true }
+        case_type: { type: string }
+        summary: { type: string }
+        status: { type: string, enum: [open, resolved] }
+        resolution_note: { type: string, nullable: true }
+        assigned_admin_user_id: { type: string, nullable: true }
+        trace_id: { type: string, nullable: true }
+        request_hash: { type: string, nullable: true }
+        idempotency_key: { type: string, nullable: true }
+        environment: { type: string, enum: [sandbox, live] }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SupportCasePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportCase'
+        next_cursor: { type: string, nullable: true }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    SupportCaseEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/SupportCase'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    SupportCasePageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/SupportCasePage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    SupportCaseRequest:
+      type: object
+      required: [summary]
+      properties:
+        case_type: { type: string, default: app_execution }
+        summary: { type: string, minLength: 1, maxLength: 2000 }
+        capability_listing_id: { type: string }
+        access_grant_id: { type: string }
+        agent_id: { type: string }
+        capability_key: { type: string }
+        trace_id: { type: string }
+        request_hash: { type: string }
+        idempotency_key: { type: string }
+        environment: { type: string, enum: [sandbox, live], default: live }
+        metadata: { type: object }
+
+    DeveloperPortalSummary:
+      type: object
+      properties:
+        seller_onboarding:
+          $ref: '#/components/schemas/DeveloperPortalSellerOnboarding'
+          nullable: true
+        platform:
+          $ref: '#/components/schemas/DeveloperPortalPlatform'
+        monetization:
+          $ref: '#/components/schemas/DeveloperPortalMonetization'
+        payout_readiness:
+          $ref: '#/components/schemas/DeveloperPortalPayoutReadiness'
+        listings:
+          $ref: '#/components/schemas/DeveloperPortalListings'
+        usage:
+          $ref: '#/components/schemas/DeveloperPortalUsage'
+        support:
+          $ref: '#/components/schemas/DeveloperPortalSupport'
+        apps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppListing'
+
+    DeveloperPortalSellerOnboarding:
+      type: object
+      properties:
+        seller_onboarding_id: { type: string }
+        owner_user_id: { type: string }
+        display_name: { type: string }
+        support_contact: { type: string, nullable: true }
+        docs_url: { type: string, nullable: true }
+        verification_status: { type: string }
+        reviewer_user_id: { type: string, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        policy_accepted_at: { type: string, format: date-time, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+
+    DeveloperPortalPlatform:
+      type: object
+      properties:
+        app_url: { type: string }
+        developer_portal_url: { type: string }
+        terms_url: { type: string }
+        privacy_url: { type: string }
+        environment: { type: string }
+        public_visibility: { type: string, enum: [configured, local_only] }
+
+    DeveloperPortalMonetization:
+      type: object
+      properties:
+        platform_fee_bps: { type: integer }
+        developer_share_bps: { type: integer }
+        economy_api_enabled: { type: boolean }
+        listings_enabled: { type: boolean }
+        payouts_enabled: { type: boolean }
+        payouts_live_enabled: { type: boolean }
+        stripe_secret_configured: { type: boolean }
+        stripe_publishable_configured: { type: boolean }
+        stripe_ready: { type: boolean }
+
+    DeveloperPortalPayoutReadiness:
+      type: object
+      properties:
+        has_destination: { type: boolean }
+        verified_destination: { type: boolean }
+        destination_count: { type: integer }
+        verified_destination_count: { type: integer }
+        statuses:
+          type: array
+          items: { type: string }
+
+    DeveloperPortalListings:
+      type: object
+      properties:
+        total_count: { type: integer }
+        draft_count: { type: integer }
+        pending_review_count: { type: integer }
+        changes_requested_count: { type: integer }
+        live_count: { type: integer }
+        ready_to_submit_count: { type: integer }
+
+    DeveloperPortalUsage:
+      type: object
+      properties:
+        event_count: { type: integer }
+        success_count: { type: integer }
+        denied_count: { type: integer }
+        error_count: { type: integer }
+        last_event_at: { type: string, format: date-time, nullable: true }
+
+    DeveloperPortalSupport:
+      type: object
+      properties:
+        open_case_count: { type: integer }
+        resolved_case_count: { type: integer }
+
+    DeveloperPortalSummaryEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/DeveloperPortalSummary'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    SandboxSession:
+      type: object
+      properties:
+        session_id: { type: string }
+        agent_id: { type: string }
+        capability_key: { type: string }
+        environment: { type: string, enum: [sandbox] }
+        sandbox_support: { type: string }
+        dry_run_supported: { type: boolean }
+        approval_mode: { type: string }
+        required_connected_accounts:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
+        connected_accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectedAccount'
+        stub_providers_enabled: { type: boolean }
+        simulated_receipts: { type: boolean }
+        approval_simulator: { type: boolean }
+
+    SandboxSessionEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/SandboxSession'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ApprovalChallenge:
+      type: object
+      properties:
+        challenge_status: { type: string, enum: [pending, approved, denied, expired] }
+        approval_request: { type: object }
+        approval_explanation: { type: object }
+        request_hash: { type: string }
+        environment: { type: string, enum: [sandbox, live] }
+
+    ApprovalChallengeEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ApprovalChallenge'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, description: "Machine-readable error code (e.g. NOT_FOUND, VALIDATION_ERROR)" }
+        message: { type: string, description: "Human-readable error description" }
+        details: { type: object, nullable: true, description: "Optional structured error details" }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+security:
+  - bearerAuth: []
