@@ -48,14 +48,11 @@ class Environment(str, Enum):
 class PriceModel(str, Enum):
     """Pricing models for agent APIs.
 
-    Public production beta currently publishes free listings only.
-    The other models are part of the forward contract for the paid phase,
-    where platform fee is planned to be 6.6% and developers keep 93.4%.
+    Two options: free or subscription (USD).
+    Platform fee: 6.6%. Developer keeps 93.4%.
     """
-    FREE = "free"              # Current beta lane. No charge. Can convert to paid later.
-    MONTHLY = "monthly"        # Planned post-beta subscription model.
-    ONE_TIME = "one_time"      # Planned post-beta buy-once model.
-    BUNDLE = "bundle"          # Planned post-beta package or credit model.
+    FREE = "free"                    # No charge.
+    SUBSCRIPTION = "subscription"    # Monthly recurring (USD).
     USAGE_BASED = "usage_based"  # Planned post-beta per-use model.
     PER_ACTION = "per_action"  # Planned post-beta per-successful-action model.
 
@@ -88,7 +85,7 @@ class AppManifest:
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # in minor currency units (e.g. cents/yen)
-    currency: str = "JPY"
+    currency: str = "USD"
     short_description: str = ""
     docs_url: str = ""
     support_contact: str = ""
@@ -132,7 +129,7 @@ class ExecutionResult:
     execution_kind: ExecutionKind = ExecutionKind.DRY_RUN
     units_consumed: int = 1
     amount_minor: int = 0                  # cost in minor units if applicable
-    currency: str = "JPY"
+    currency: str = "USD"
     provider_status: str = "ok"            # ok, error, timeout, rate_limited
     error_message: str | None = None
     fallback_applied: bool = False
