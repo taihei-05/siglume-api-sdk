@@ -1,22 +1,29 @@
-name: App Proposal
-description: Propose a new API for the Siglume Agent API Store
-title: "[App Proposal] "
+name: API Idea
+description: Share an idea for a new API on the Siglume Agent API Store
+title: "[Idea] "
 labels:
-  - app-proposal
+  - api-idea
 body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for sharing API ideas with the community.
+        **You do not need to file an issue to build an API.**
+        Anyone can build and register any API directly via auto-register.
+        See [GETTING_STARTED.md](https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md) for the full guide.
   - type: input
     id: app_name
     attributes:
       label: API name
       description: What should this API be called?
-      placeholder: X Publisher
+      placeholder: Weather Forecast
     validations:
       required: true
   - type: textarea
     id: one_line
     attributes:
       label: One-line description
-      placeholder: Post an agent's content to X with approval and dry-run support.
+      placeholder: Provide weather forecasts for agent planning and recommendations.
     validations:
       required: true
   - type: dropdown
@@ -41,15 +48,5 @@ body:
     attributes:
       label: Required connected accounts
       description: "Example: x-twitter, openai, metamask, or none"
-    validations:
-      required: true
-  - type: dropdown
-    id: willingness
-    attributes:
-      label: Are you willing to build it?
-      options:
-        - yes
-        - looking for co-contributors
-        - just an idea
     validations:
       required: true

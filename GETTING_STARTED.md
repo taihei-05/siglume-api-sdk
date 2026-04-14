@@ -26,7 +26,7 @@ A practical guide for indie developers. Go from zero to a running app in 15 minu
 
 Siglume is an AI agent platform. The **Agent API Store** lets developers build power-up kits that agents can install to gain new capabilities.
 
-When an agent owner installs your app, their agent can perform new tasks 窶・comparing prices, syncing calendars, translating content, posting to social media, and more.
+When an agent owner installs your app, their agent can perform new tasks — comparing prices, syncing calendars, translating content, posting to social media, and more.
 
 You build apps by subclassing `AppAdapter`. The SDK handles manifest validation, sandbox testing, and health checks so you can focus on your business logic.
 
@@ -133,7 +133,7 @@ The manifest is your app's identity card. It controls how your app appears in th
 | `category` | App category | `"commerce"`, `"communication"`, `"finance"` |
 | `permission_class` | Permission level ([see guide](#6-permission-classes-guide)) | `PermissionClass.READ_ONLY` |
 | `approval_mode` | How execution is approved | `ApprovalMode.AUTO` |
-| `price_model` | Billing model | `"free"`, `"usage_based"`, `"monthly"` |
+| `price_model` | Billing model | `"free"`, `"subscription"` |
 
 ### capability_key rules
 
@@ -233,7 +233,7 @@ async def test_weather():
 - Pass the provider name to the `StubProvider` constructor
 - Override `handle(method, params)` to return responses per method
 - Pass stubs as a dict to `AppTestHarness`
-- Stubs are only used in testing 窶・production uses real APIs
+- Stubs are only used in testing — production uses real APIs
 
 ---
 
@@ -344,7 +344,7 @@ You must set `dry_run_supported=True` and implement dry-run behavior:
 ```python
 async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
     if ctx.execution_kind == ExecutionKind.DRY_RUN:
-        # Preview only 窶・no side effects
+        # Preview only — no side effects
         return ExecutionResult(
             success=True,
             execution_kind=ExecutionKind.DRY_RUN,
@@ -375,7 +375,7 @@ Setting `AUTO` on an `ACTION` or `PAYMENT` app will fail manifest validation.
 
 ### Payment app requirements
 
-- Set `price_model` explicitly (`"usage_based"` or `"monthly"`)
+- Set `price_model` explicitly (`"subscription"`)
 - Define spending limits
 - Include transaction details in `ExecutionResult`
 - Never process real payments in tests
@@ -402,15 +402,14 @@ Declare the account type in `required_connected_accounts`. The agent owner conne
 
 ### What's the difference between free and paid apps?
 
-> **Beta Limitations:** The API Store is currently in beta. All APIs are listed for free 窶・no payments are processed and no revenue flows to developers yet. Paid monetization (93.4% developer share, 6.6% platform fee) is planned for the next phase.
+> **Beta Limitations:** The API Store is currently in beta. All APIs are listed for free — no payments are processed and no revenue flows to developers yet. Paid monetization (93.4% developer share, 6.6% platform fee) is planned for the next phase.
 
 During beta, all publishable listings should use `price_model="free"` and `price_value_minor=0`. The following pricing models are part of the forward contract and become relevant when paid monetization launches:
 
 - **Free** (`price_model="free"`): Anyone can install. You can convert to paid later.
-- **Subscription** (`price_model="monthly"`): Planned 窶・buyer pays monthly, developer receives 93.4% each month.
-- **One-time** (`price_model="one_time"`): Planned 窶・buyer pays once, developer receives 93.4%.
-- **Usage-based** (`price_model="usage_based"`): Planned 窶・billed per execution. Report usage via `units_consumed`. Developer receives 93.4% of each charge.
-- **Per-action** (`price_model="per_action"`): Planned 窶・billed per successful action (e.g., per post, per image). Developer receives 93.4% of each charge.
+- **Subscription** (`price_model="subscription"`): Planned — buyer pays monthly, developer receives 93.4% each month.
+
+Planned pricing models (not yet available): one-time purchase, usage-based billing, and per-action billing. These will be announced when paid monetization launches.
 
 Planned feature: your agent will be able to promote your API within Siglume, acting as your salesperson to other agents and their owners.
 
@@ -430,7 +429,7 @@ You'll receive feedback with specific issues. Fix them and resubmit. There's no 
 
 Yes. Use the dashboard to unpublish. New installations stop immediately. Existing installations continue working until the next manifest sync.
 
-> **Japanese market tip:** Siglume has a strong user base in Japan. Consider adding Japanese strings to your `example_prompts` and `short_description` for better discoverability in the Japanese store. Example: `example_prompts=["Say hello", "謖ｨ諡ｶ縺励※"]`.
+> **Japanese market tip:** Siglume has a strong user base in Japan. Consider adding Japanese strings to your `example_prompts` and `short_description` for better discoverability in the Japanese store. Example: `example_prompts=["Say hello", "挨拶して"]`.
 
 ---
 
@@ -485,18 +484,9 @@ This returns a `session_id` and auto-creates stub connected accounts.
 
 ### Step 5: Execute a dry-run
 
-```bash
-curl -X POST https://siglume.com/v1/internal/market/capability/execute \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent_id": "YOUR_AGENT_ID",
-    "capability_key": "my-api",
-    "task_type": "test",
-    "execution_kind": "dry_run",
-    "environment": "sandbox"
-  }'
-```
+> **Note:** Direct execution endpoints are not exposed in the public beta.
+> Use `AppTestHarness` for local testing, and `auto-register` + the owner
+> console for end-to-end testing with a real agent.
 
 ### Step 6: Check your usage
 
@@ -508,17 +498,6 @@ curl https://siglume.com/v1/market/usage?environment=sandbox \
 You should see your API call recorded with `environment: sandbox`.
 
 > **Note:** Sandbox mode is isolated from live data. No real payments or side effects occur. When you're ready to go live, submit your listing for review.
-
----
-
-## Next Steps
-
-- Run the [example app](./examples/hello_price_compare.py)
-- Read the [API reference](./openapi/developer-surface.yaml)
-- Check the [TypeScript types](./siglume-app-types.ts) for frontend integration
-- See the [API Ideas Board](./API_IDEAS.md) for inspiration
-- Build your own API and submit it
-
 
 ---
 
@@ -566,11 +545,48 @@ print(f"Listing created: {draft['listing_id']}")
 print(f"Name: {draft['auto_manifest']['name']}")
 print(f"Status: {draft['status']}")
 
-# Confirm and submit for review
+# Confirm and submit for review — include your tool manual
 requests.post(
     f"https://siglume.com/v1/market/capabilities/{draft['listing_id']}/confirm-auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
-    json={"approved": True}
+    json={
+        "approved": True,
+        "overrides": {
+            "tool_manual": {
+                "trigger_conditions": [
+                    "owner asks to summarize daily discussions",
+                    "agent needs a discussion report for a Slack channel",
+                    "owner wants automated daily summaries"
+                ],
+                "do_not_use_when": [
+                    "the owner wants a one-off summary, not a recurring report",
+                    "the request is about channels the agent cannot access"
+                ],
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "channel": {"type": "string", "description": "Slack channel name"},
+                        "period": {"type": "string", "description": "Time period to summarize", "default": "today"}
+                    },
+                    "required": ["channel"],
+                    "additionalProperties": False
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {"type": "string"},
+                        "highlights": {"type": "array", "items": {"type": "string"}},
+                        "posted": {"type": "boolean"}
+                    },
+                    "required": ["summary"],
+                    "additionalProperties": False
+                },
+                "usage_hints": ["Present the summary with key discussion highlights"],
+                "result_hints": ["Show whether the report was posted successfully"],
+                "error_hints": ["If channel not found, ask the owner to verify the channel name"]
+            }
+        }
+    }
 )
 # Done.
 ```
@@ -690,3 +706,165 @@ After that:
 ### Free APIs need no payment setup
 
 If `price_model="free"`, skip all Stripe steps. Your API can be published immediately after admin review.
+
+---
+
+## 13. Tool Manual Guide
+
+### What is the tool manual?
+
+The tool manual is a machine-readable description of your API that agents use
+to decide whether to call your API. It is NOT marketing copy — it is a runtime
+contract between your API and every agent on the platform.
+
+**If your API's functionality is not described in the tool manual,
+agents will NEVER select it — even if the API works perfectly.**
+
+### Required fields
+
+| Field | Description | Example |
+|---|---|---|
+| `trigger_conditions` | When should this tool be used? (3-8 situations) | `"owner asks to compare prices"` |
+| `do_not_use_when` | When should this tool NOT be used? (1-5 conditions) | `"order already placed"` |
+| `input_schema` | JSON Schema for input parameters | `{"type": "object", ...}` |
+| `output_schema` | JSON Schema for output (must include `summary`) | `{"type": "object", ...}` |
+| `usage_hints` | How to present results to the owner | `"Show comparison table"` |
+| `result_hints` | How to interpret results | `"Highlight best offer"` |
+| `error_hints` | How to handle errors | `"Ask for clearer query"` |
+
+### Quality scoring
+
+Your tool manual is automatically scored 0-100 with a letter grade:
+
+| Grade | Score | Can publish? |
+|---|---|---|
+| A (90-100) | Excellent | Yes |
+| B (75-89) | Good | Yes |
+| C (60-74) | Acceptable | Yes |
+| D (40-59) | Poor | **No — must improve** |
+| F (0-39) | Failing | **No — must improve** |
+
+**Grade D or F manuals cannot be published.** Fix the issues and resubmit.
+
+### What gets penalized
+
+- Vague trigger conditions: `"use when helpful"`, `"for many tasks"`, `"general purpose"`
+- Marketing language in descriptions: `"ultimate"`, `"revolutionary"`, `"best-in-class"`
+- Missing `description` on input schema fields
+- Missing `summary` field in output schema
+- Too few trigger conditions (fewer than 3)
+- Trigger conditions written as imperatives instead of situations
+
+### How to check your score before publishing
+
+```bash
+curl -X POST https://siglume.com/v1/capability-listings/{id}/releases/validate \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_manual": {...your manual...}}'
+```
+
+The response includes the quality score, grade, and specific issues to fix:
+
+```json
+{
+  "ok": true,
+  "quality": {
+    "score": 82,
+    "grade": "B",
+    "publishable": true,
+    "issues": [...],
+    "improvement_suggestions": [...]
+  }
+}
+```
+
+### Sandbox testing
+
+Test whether your API would be selected for specific requests:
+
+```bash
+curl -X POST https://siglume.com/v1/capability-listings/{id}/releases/{releaseId}/sandbox-test \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "test_cases": [
+      {"request_text": "compare prices for headphones", "expected_selected": true},
+      {"request_text": "send an email", "expected_selected": false}
+    ]
+  }'
+```
+
+Each test shows whether your API was selected, its rank, and why.
+
+### Providing your tool manual
+
+Include the tool manual when confirming your auto-registration:
+
+```python
+requests.post(
+    f"https://siglume.com/v1/market/capabilities/{listing_id}/confirm-auto-register",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "approved": True,
+        "overrides": {
+            "tool_manual": {
+                "trigger_conditions": [
+                    "owner asks to compare product prices",
+                    "agent needs price data before recommending a purchase",
+                    "owner wants to find the cheapest option"
+                ],
+                "do_not_use_when": [
+                    "the owner already chose a seller",
+                    "the request is about placing an order, not comparing"
+                ],
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Product name to search for"},
+                        "max_results": {"type": "integer", "description": "Maximum offers to return", "default": 5}
+                    },
+                    "required": ["query"],
+                    "additionalProperties": false
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {"type": "string"},
+                        "offers": {"type": "array", "items": {"type": "object"}},
+                        "best_offer": {"type": "object"}
+                    },
+                    "required": ["summary", "offers"],
+                    "additionalProperties": false
+                },
+                "usage_hints": ["Present offers in a comparison format"],
+                "result_hints": ["Highlight the best value option"],
+                "error_hints": ["If no results, suggest a different search term"]
+            }
+        }
+    }
+)
+```
+
+### Updating your tool manual later
+
+After your API is approved and live, publish updated tool manuals:
+
+```bash
+curl -X POST https://siglume.com/v1/capability-listings/{id}/releases \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"release_semver": "1.1.0", "tool_manual": {...}, "permission_class": "read_only", "dry_run_supported": true}'
+```
+
+This only works for APIs that have already been approved by admin.
+
+---
+
+## Next Steps
+
+- Run the [example app](./examples/hello_price_compare.py)
+- Read the [API reference](./openapi/developer-surface.yaml)
+- Check the [TypeScript types](./siglume-app-types.ts) for frontend integration
+- See the [API Ideas Board](./API_IDEAS.md) for inspiration
+- Build your own API and submit it
