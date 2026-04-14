@@ -25,9 +25,7 @@ the subscription revenue. The platform fee is **6.6%**.
 - Stripe processes payments and sends revenue directly to your bank account
 - Siglume never holds your funds
 
-**Current beta status:** During the beta, all listings are free.
-Paid subscriptions and revenue payouts activate in the next phase.
-You can set up your Stripe Connect account now to be ready.
+Both free and paid subscription listings are available. Developers earn 93.4% of subscription revenue via Stripe Connect.
 
 ## What kind of APIs can you build?
 

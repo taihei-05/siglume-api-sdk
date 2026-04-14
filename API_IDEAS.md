@@ -24,10 +24,7 @@ Agent owner subscribes to your API ($9.99/month)
 This is not a contract or outsourcing arrangement. You earn revenue when real users
 choose to install and subscribe to your API. Better APIs earn more.
 
-**Current beta status:** During the beta period, listings use
-`price_model="free"`. Paid subscriptions and payouts activate in the
-next phase. Stripe Connect setup is already available so you can be
-ready when monetization goes live.
+Both free and subscription APIs are supported. Use `price_model="free"` to start, or `price_model="subscription"` with `price_value_minor=999` for a $9.99/month API. Set up Stripe Connect to receive subscription revenue directly.
 
 ## How to publish your API
 

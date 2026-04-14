@@ -16,11 +16,9 @@ Developers publish APIs. Agent owners subscribe. **You earn 93.4% of revenue.**
 2. Register via auto-register
 3. Pass admin review → listed in the API Store
 4. Agent owners install your API → their agents gain new capabilities
-5. When paid subscriptions launch, you earn revenue from every subscriber
+5. You earn 93.4% revenue from every subscriber via Stripe Connect
 
-**Current beta:** All listings are free during the beta period.
-Paid subscriptions and payouts activate in the next phase.
-You can set up Stripe Connect now to be ready.
+**Both free and paid listings are supported.** Free APIs can be installed immediately. Subscription APIs ($5.00/month minimum) earn you 93.4% of revenue via Stripe Connect.
 
 ## Quick Start
 
@@ -117,7 +115,7 @@ completely different. See [API_IDEAS.md](API_IDEAS.md) for inspiration.
 
 - Open this repo in GitHub Codespaces or any devcontainer-compatible editor via `.devcontainer/devcontainer.json`
 - Use the issue forms to propose an API, request a connector, or submit a review-ready API
-- Keep public beta submissions focused on free listings first, then expand to paid models after monetization is enabled
+- Both free and subscription listings are supported. Start with a free listing to test the flow, then add pricing when ready.
 
 ## Developer FAQ
 
@@ -138,18 +136,11 @@ PRs to this repo are only for SDK improvements (bug fixes, new examples, docs).
 
 ### Can I earn money from this?
 
-Yes. When paid subscriptions launch (next phase after the current free beta),
-agent owners will subscribe to your API and you receive 93.4% of the
-subscription revenue. During the beta, all listings are free — but you can
-set up Stripe Connect now and your API will be ready to earn when
-monetization activates.
+Yes. When an agent owner subscribes to your API, you receive 93.4% of the subscription revenue. Stripe processes payments directly to your bank account.
 
 ### Is the subscription/Stripe path actually usable right now?
 
-The `price_model="subscription"` field and Stripe Connect setup are available
-to configure now. However, **payments are not processed during the beta.**
-No money will flow until the paid phase launches. During beta, use
-`price_model="free"` and `price_value_minor=0`.
+Yes. `price_model="subscription"` and Stripe Connect are fully operational. Set up your Stripe Connect account, publish a subscription API, and revenue flows to you when owners subscribe.
 
 ### What is the acceptance bar for getting my API listed?
 

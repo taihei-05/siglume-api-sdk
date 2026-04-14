@@ -402,12 +402,12 @@ Declare the account type in `required_connected_accounts`. The agent owner conne
 
 ### What's the difference between free and paid apps?
 
-> During the beta, all listings are free. Paid subscriptions and revenue payouts activate in the next phase. You can set up Stripe Connect now to be ready.
+> Both free and subscription listings are supported. Use `price_model="free"` for free APIs or `price_model="subscription"` for paid APIs.
 
-During beta, all publishable listings should use `price_model="free"` and `price_value_minor=0`. The following pricing models are part of the forward contract and become relevant when paid monetization launches:
+Use `price_model="free"` for free APIs. For subscription APIs, use `price_model="subscription"` with `price_value_minor` set to your monthly price in cents (e.g., 999 for $9.99/month). Minimum subscription price is $5.00/month (500 cents). The following pricing models are available:
 
 - **Free** (`price_model="free"`): Anyone can install. You can convert to paid later.
-- **Subscription** (`price_model="subscription"`): Monthly billing. Available to configure now; payments activate when the paid phase launches. Developer receives 93.4% each month.
+- **Subscription** (`price_model="subscription"`): Monthly billing. Fully operational. Developer receives 93.4% each month via Stripe Connect.
 
 Additional pricing models under consideration for future phases: one-time purchase, usage-based billing, per-action billing.
 
