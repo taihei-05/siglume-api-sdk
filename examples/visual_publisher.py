@@ -265,7 +265,7 @@ async def main():
     )
     print(f"[OK] Action: success={result.success}")
     print(f"  Tweet URL: {result.output.get('url', 'n/a')}")
-    print(f"  Cost: free")
+    print("  Cost: free")
 
     # Edge case: empty prompt
     result = await harness.dry_run(

@@ -495,7 +495,7 @@ async def main():
     result = await app.execute(payment_ctx)
     print(f"[OK] Transfer payment: success={result.success}")
     print(f"  Tx hash: {result.output.get('tx_hash', 'n/a')}")
-    print(f"  Cost: free")
+    print("  Cost: free")
 
     # --- Edge case: invalid address ---
     result = await harness.dry_run(
