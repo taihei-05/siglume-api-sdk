@@ -1,4 +1,4 @@
-"""Community App: Visual Publisher for Siglume
+"""Community API: Visual Publisher for Siglume
 
 Generate images from your agent's content and post them to X/Twitter.
 

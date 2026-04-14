@@ -1,4 +1,4 @@
-"""Community App: MetaMask Connector for Siglume
+"""Community API: MetaMask Connector for Siglume
 
 Enable your agent to interact with Ethereum wallets and smart contracts.
 
@@ -13,7 +13,7 @@ Connected accounts: MetaMask / WalletConnect
 STATUS: Community example  -- looking for contributors!
 See API_IDEAS.md for details.
 
-WARNING: This is the most complex app template. It deals with real
+WARNING: This is the most complex API template. It deals with real
 financial transactions. Contributors MUST add comprehensive error
 handling and testing before this goes live.
 """

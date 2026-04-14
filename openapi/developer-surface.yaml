@@ -5,9 +5,9 @@ info:
   description: |
     API for building, publishing, and managing agent apps on the Siglume Agent API Store.
 
-    An agent app is a power-up kit that gives a Siglume AI agent new capabilities.
+    An agent API is a power-up kit that gives a Siglume AI agent new capabilities.
     Developers use this API to:
-    - Publish app listings to the catalog
+    - Publish API listings to the catalog
     - Manage connected accounts for external services
     - Test apps in sandbox mode
     - Track usage and execution metrics
@@ -38,8 +38,8 @@ paths:
   /market/capabilities:
     get:
       operationId: listAppCatalog
-      summary: List app catalog
-      description: Browse published agent apps. Use mine=true to see your own listings.
+      summary: List API catalog
+      description: Browse published agent APIs. Use mine=true to see your own listings.
       parameters:
         - name: mine
           in: query
@@ -75,7 +75,11 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: createAppListing
-      summary: Create new app listing
+      summary: "Create new API listing (internal — use auto-register instead)"
+      description: |
+        Deprecated for external use. Use POST /market/capabilities/auto-register instead.
+      deprecated: true
+      tags: [Capabilities]
       requestBody:
         required: true
         content:
@@ -108,10 +112,124 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
+
+  /market/capabilities/auto-register:
+    post:
+      operationId: autoRegisterApi
+      summary: Register a new API via source code analysis
+      description: |
+        The primary way to create a new API listing. Send your source code
+        and the platform analyzes it to generate the listing manifest.
+        This is the only supported path for creating new listings.
+      tags: [Capabilities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_code]
+              properties:
+                source_code:
+                  type: string
+                  description: Python source code of your API
+                source_url:
+                  type: string
+                  description: GitHub URL (alternative to source_code)
+                i18n:
+                  type: object
+                  description: Bilingual texts (job_to_be_done_en, job_to_be_done_ja, short_description_en, short_description_ja)
+                capability_key:
+                  type: string
+                  description: Override auto-detected capability key
+                name:
+                  type: string
+                  description: Override auto-detected name
+                price_model:
+                  type: string
+                  enum: [free, subscription]
+                  description: Pricing model
+                price_value_minor:
+                  type: integer
+                  description: Price in cents (e.g., 999 for $9.99/month). Minimum 500 for subscriptions.
+      responses:
+        '201':
+          description: Draft listing created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  listing_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [draft]
+                  auto_manifest:
+                    type: object
+                  confidence:
+                    type: object
+                  review_url:
+                    type: string
+
+  /market/capabilities/{listingId}/confirm-auto-register:
+    post:
+      operationId: confirmAutoRegister
+      summary: Confirm auto-registered listing and submit for review
+      description: |
+        Confirms the auto-registered listing, runs quality check on the tool manual,
+        creates a CapabilityRelease, and submits for admin review.
+        Include tool_manual in overrides for best quality score.
+      tags: [Capabilities]
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved:
+                  type: boolean
+                  description: Must be true to confirm
+                overrides:
+                  type: object
+                  description: Override auto-detected fields including tool_manual
+                  properties:
+                    tool_manual:
+                      type: object
+                      description: Machine-readable tool manual for agent selection
+                    name:
+                      type: string
+                    job_to_be_done:
+                      type: string
+      responses:
+        '200':
+          description: Listing confirmed and submitted for review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  listing_id:
+                    type: string
+                  status:
+                    type: string
+                  release:
+                    type: object
+                  quality:
+                    type: object
+
   /market/capabilities/{listingId}:
     get:
       operationId: getAppListing
-      summary: Get app listing details
+      summary: Get API listing details
       parameters:
         - name: listingId
           in: path
@@ -132,7 +250,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
     put:
       operationId: updateAppListing
-      summary: Update app listing
+      summary: Update API listing
       parameters:
         - name: listingId
           in: path
@@ -160,7 +278,7 @@ paths:
   /market/capabilities/{listingId}/submit-review:
     post:
       operationId: submitAppListingForReview
-      summary: Submit app listing for review
+      summary: Submit API listing for review
       description: |
         Move a listing from draft into the review queue.
 
@@ -213,7 +331,7 @@ paths:
   /market/access-grants:
     get:
       operationId: listAccessGrants
-      summary: List your app licenses
+      summary: List your API licenses
       parameters:
         - name: status
           in: query
@@ -238,7 +356,7 @@ paths:
   /market/access-grants/{grantId}/bind-agent:
     post:
       operationId: bindAgentToGrant
-      summary: Install app on an agent
+      summary: Install API on an agent
       parameters:
         - name: grantId
           in: path
@@ -466,7 +584,7 @@ components:
         permission_scopes: { type: array, items: { type: string } }
         price_model:
           type: string
-          enum: [free, monthly, one_time, bundle, usage_based, per_action]
+          enum: [free, subscription, one_time, bundle, usage_based, per_action]
           description: Public production beta currently publishes only free listings. Other models remain part of the forward contract for later monetization phases.
         price_value_minor:
           type: integer

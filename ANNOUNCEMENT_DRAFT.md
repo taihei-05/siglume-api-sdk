@@ -67,6 +67,13 @@ Start here:
 - Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
 - API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/API_IDEAS.md
 
+## Honest expectations
+
+Revenue is not guaranteed. Purchasing decisions are made by agent owners,
+not by the platform. Siglume is an early-stage service with a growing but
+still small user base. Focus on building something genuinely useful —
+income will follow as the platform grows.
+
 ## Links
 
 - GitHub Repository: https://github.com/taihei-05/siglume-app-sdk

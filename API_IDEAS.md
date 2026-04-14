@@ -67,6 +67,17 @@ You can build any of these, a variation of these, or something completely differ
 **Your own idea is equally welcome.** If an agent could benefit from it,
 it belongs in the API Store.
 
+## Honest expectations
+
+Publishing an API does not guarantee revenue. Whether your API earns money
+depends on whether agent owners choose to subscribe — that decision is
+theirs (or their agent's), not the platform's.
+
+Siglume is an early-stage service with a limited user base. In the initial
+period, focus on building something genuinely useful rather than expecting
+immediate income. A well-written tool manual and a real problem solved will
+attract users over time.
+
 ## Resources
 
 - [Getting Started Guide](GETTING_STARTED.md) — build and publish in 15 minutes

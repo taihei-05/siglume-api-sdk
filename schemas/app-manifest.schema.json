@@ -83,7 +83,7 @@
       "type": "string",
       "enum": [
         "free",
-        "monthly",
+        "subscription",
         "one_time",
         "bundle",
         "usage_based",

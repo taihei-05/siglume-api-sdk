@@ -1,6 +1,6 @@
-"""Sample Agent App: Price Comparison Helper.
+"""Sample Agent API: Price Comparison Helper.
 
-A read-only app that demonstrates how to build a Siglume agent app.
+A read-only API that demonstrates how to build a Siglume agent API.
 When installed on an agent, it enables the agent to compare product prices
 across multiple sources.
 

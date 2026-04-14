@@ -134,10 +134,21 @@ Your API gets listed when it passes these three checks:
 2. **Tool manual quality** — grade C or above (0-100 scoring, D/F blocks publishing)
 3. **Admin review** — behavior matches description, permissions are appropriate
 
+## Important: revenue is not guaranteed
+
+Publishing an API does not guarantee revenue. Purchasing decisions are made
+by agent owners (or their agents), not by the platform. Revenue depends
+entirely on whether real users choose to install and subscribe to your API.
+
+This is an early-stage service with a limited user base. In the initial
+period, do not expect significant income. Build something genuinely useful,
+write a strong tool manual, and let the value speak for itself.
+
 ## Project status
 
-This is an early-stage project (v0.1.0, alpha). The SDK and platform are
-actively evolving. Start with a small read-only API to learn the flow.
+This is an early-stage project (v0.1.0, alpha) with a growing but still
+small user base. The SDK and platform are actively evolving. Start with
+a small read-only API to learn the flow.
 
 ## License
 

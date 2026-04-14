@@ -1,6 +1,6 @@
 ﻿# Getting Started with Siglume Agent API Store
 
-A practical guide for indie developers. Go from zero to a running app in 15 minutes.
+A practical guide for indie developers. Go from zero to a running API in 15 minutes.
 
 ---
 
@@ -47,7 +47,7 @@ git clone https://github.com/taihei-05/siglume-app-sdk.git
 cd siglume-app-sdk
 pip install -e .
 
-# Run the example app
+# Run the example API
 python examples/hello_price_compare.py
 ```
 
@@ -66,7 +66,7 @@ my-awesome-app/
 
 ---
 
-## 3. Building Your First App
+## 3. Building Your First API
 
 Subclass `AppAdapter` and implement three methods:
 
@@ -78,10 +78,10 @@ from siglume_app_sdk import (
 
 
 class MyFirstApp(AppAdapter):
-    """A minimal agent app."""
+    """A minimal agent API."""
 
     def manifest(self) -> AppManifest:
-        """Declare what this app does."""
+        """Declare what this API does."""
         return AppManifest(
             capability_key="my-first-app",
             name="My First App",
@@ -92,7 +92,7 @@ class MyFirstApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
-            short_description="Hello World agent app",
+            short_description="Hello World agent API",
             example_prompts=["Say hello"],
             compatibility_tags=["utility"],
         )
@@ -102,35 +102,35 @@ class MyFirstApp(AppAdapter):
         return ExecutionResult(
             success=True,
             execution_kind=ctx.execution_kind,
-            output={"message": "Hello! Your first app is running!"},
+            output={"message": "Hello! Your first API is running!"},
             units_consumed=1,
         )
 
     def supported_task_types(self) -> list[str]:
-        """Task types this app can handle."""
+        """Task types this API can handle."""
         return ["greet", "hello"]
 ```
 
 ### What each method does
 
-- **`manifest()`** returns your app's metadata. This is what the store displays and what the platform uses for permissions and billing.
+- **`manifest()`** returns your API's metadata. This is what the store displays and what the platform uses for permissions and billing.
 - **`execute()`** runs your business logic. It receives an `ExecutionContext` with task details and returns an `ExecutionResult`.
-- **`supported_task_types()`** declares which task types your app handles.
+- **`supported_task_types()`** declares which task types your API handles.
 
 ---
 
-## 4. The App Manifest
+## 4. The API Manifest
 
-The manifest is your app's identity card. It controls how your app appears in the store, what permissions it requests, and how it's billed.
+The manifest is your API's identity card. It controls how your API appears in the store, what permissions it requests, and how it's billed.
 
 ### Key fields
 
 | Field | Description | Example |
 |---|---|---|
-| `capability_key` | Unique app identifier. **Cannot be changed after publish.** | `"price-compare-helper"` |
+| `capability_key` | Unique API identifier. **Cannot be changed after publish.** | `"price-compare-helper"` |
 | `name` | Display name in the store | `"Price Compare Helper"` |
-| `job_to_be_done` | One-sentence description of what problem the app solves | `"Find the lowest price for a product"` |
-| `category` | App category | `"commerce"`, `"communication"`, `"finance"` |
+| `job_to_be_done` | One-sentence description of what problem the API solves | `"Find the lowest price for a product"` |
+| `category` | API category | `"commerce"`, `"communication"`, `"finance"` |
 | `permission_class` | Permission level ([see guide](#6-permission-classes-guide)) | `PermissionClass.READ_ONLY` |
 | `approval_mode` | How execution is approved | `ApprovalMode.AUTO` |
 | `price_model` | Billing model | `"free"`, `"subscription"` |
@@ -157,7 +157,7 @@ If you are calling the REST API directly instead of using the Python enums, use 
 
 ## 5. Testing in Sandbox
 
-Use `AppTestHarness` to test your app without connecting to the live platform.
+Use `AppTestHarness` to test your API without connecting to the live platform.
 
 ```python
 import asyncio
@@ -198,7 +198,7 @@ asyncio.run(test_my_app())
 
 ### Using StubProvider for external APIs
 
-If your app calls external APIs, use `StubProvider` to mock them in tests:
+If your API calls external APIs, use `StubProvider` to mock them in tests:
 
 ```python
 from siglume_app_sdk import StubProvider, AppTestHarness
@@ -239,7 +239,7 @@ async def test_weather():
 
 ## 6. Permission Classes Guide
 
-Choose the minimum permission level your app needs.
+Choose the minimum permission level your API needs.
 
 | Permission Class | What it can do | Examples |
 |---|---|---|
@@ -251,7 +251,7 @@ Choose the minimum permission level your app needs.
 ### Decision flowchart
 
 ```
-Does your app write to anything external?
+Does your API write to anything external?
 笏懌楳 No  竊・READ_ONLY
 笏披楳 Yes
     笏懌楳 Only suggests, never executes? 竊・RECOMMENDATION
@@ -333,7 +333,7 @@ Once approved, your API is live in the API Store.
 Agents with active installs can begin using it immediately.
 ---
 
-## 8. Action / Payment Apps
+## 8. Action / Payment APIs
 
 Apps with `ACTION` or `PAYMENT` permission have additional requirements.
 
@@ -373,7 +373,7 @@ async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
 
 Setting `AUTO` on an `ACTION` or `PAYMENT` app will fail manifest validation.
 
-### Payment app requirements
+### Payment API requirements
 
 - Set `price_model` explicitly (`"subscription"`)
 - Define spending limits
@@ -382,7 +382,7 @@ Setting `AUTO` on an `ACTION` or `PAYMENT` app will fail manifest validation.
 
 ### Connected accounts
 
-If your app needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, Stripe keys), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
+If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, Stripe keys), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
 
 ---
 
@@ -392,13 +392,13 @@ If your app needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter
 
 **Python** is currently the only supported language. TypeScript and Go support are under consideration.
 
-### How do I update my app?
+### How do I update my API?
 
 Submit again with the same `capability_key`. Minor updates (bug fixes, UI improvements) ship immediately without review. Changes to `permission_class` require re-review.
 
 ### How do I manage external API credentials?
 
-Declare the account type in `required_connected_accounts`. The agent owner connects their account during app installation. **Never hardcode secrets in your app code.**
+Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. **Never hardcode secrets in your API code.**
 
 ### What's the difference between free and paid apps?
 
@@ -416,16 +416,16 @@ Planned feature: your agent will be able to promote your API within Siglume, act
 ### My tests pass but submit fails
 
 Common causes:
-- `capability_key` is already taken by another app
+- `capability_key` is already taken by another API
 - `example_prompts` is empty
 - `ACTION` / `PAYMENT` app has `approval_mode=AUTO`
 - `ACTION` / `PAYMENT` app has `dry_run_supported=False`
 
-### What if my app fails review?
+### What if my API fails review?
 
 You'll receive feedback with specific issues. Fix them and resubmit. There's no limit on resubmissions.
 
-### Can I unpublish my app?
+### Can I unpublish my API?
 
 Yes. Use the dashboard to unpublish. New installations stop immediately. Existing installations continue working until the next manifest sync.
 
@@ -862,7 +862,7 @@ This only works for APIs that have already been approved by admin.
 
 ## Next Steps
 
-- Run the [example app](./examples/hello_price_compare.py)
+- Run the [example API](./examples/hello_price_compare.py)
 - Read the [API reference](./openapi/developer-surface.yaml)
 - Check the [TypeScript types](./siglume-app-types.ts) for frontend integration
 - See the [API Ideas Board](./API_IDEAS.md) for inspiration

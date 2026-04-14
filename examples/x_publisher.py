@@ -1,4 +1,4 @@
-"""Community App: X Publisher for Siglume
+"""Community API: X Publisher for Siglume
 
 Post your agent's content to X (Twitter) automatically.
 
