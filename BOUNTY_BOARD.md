@@ -1,81 +1,54 @@
-# Community API Contribution Board
+# API Ideas Board
 
-We are looking for developers to build the first wave of agent APIs for the
-Siglume Agent API Store. Build an API, get it listed in the controlled beta,
-and gain early users.
+The Siglume Agent API Store is an open platform.
+**Anyone can build and publish any API they want.**
 
-> **Important:** This is NOT a paid development contract or outsourcing request.
-> There is no guaranteed payment for building an API.
-> Publishing is free. No upfront payment. No guaranteed sales.
-> Revenue is only from future platform sales when paid monetization launches
-> (planned: 6.6% platform fee, 93.4% to developer).
+There is no application process, no assignment, and no exclusive claim on any idea.
+If you want to build an API, build it and register it. Multiple developers can
+build APIs with similar functionality — each gets its own listing with its own
+unique `capability_key`.
 
-## How This Works
+## How to publish your API
 
-1. Pick a starter API from the list below.
-2. Fork the SDK repo and build it with `AppAdapter`.
-3. Test it with `AppTestHarness` in sandbox mode.
-4. Submit a PR with your implementation.
-5. Pass review and get listed in the API Store.
-6. During beta, accepted listings are published as free APIs.
-7. After beta, paid pricing and agent-driven sales will follow.
+1. Build your API using the SDK (`AppAdapter`)
+2. Test it locally with `AppTestHarness`
+3. Register it via `POST /v1/market/capabilities/auto-register`
+4. Confirm with your tool manual → quality check runs automatically
+5. Wait for admin review → published to the API Store
 
-## Key Starter APIs
+**There is no PR review process for API listings.** You register directly
+on the platform. See [GETTING_STARTED.md](GETTING_STARTED.md) for the full guide.
 
-### 1. X Publisher
+## Example API ideas
 
-| | |
-|---|---|
-| Difficulty | Medium |
-| Permission Class | ACTION |
-| Required Accounts | X/Twitter OAuth |
-| Starter Code | [examples/x_publisher.py](examples/x_publisher.py) |
-| Status | Looking for contributors |
+These are examples of APIs that would be useful on the platform.
+They are **not assignments or bounties** — they are inspiration.
+You can build any of these, a variation of these, or something completely different.
 
-Post your agent's content to X/Twitter with formatting, hashtags, and scheduling.
+| Idea | Permission | Description |
+|---|---|---|
+| X/Twitter Publisher | ACTION | Post agent content to X with formatting and approval |
+| Visual Content Publisher | ACTION | Generate images from agent analysis and publish |
+| Wallet Connector | PAYMENT | Balance checks, transaction quotes, wallet actions |
+| Calendar Sync | ACTION | Create events from agent recommendations |
+| Translation Hub | READ_ONLY | Translate agent content across languages |
+| Price Comparison | READ_ONLY | Compare product prices across retailers |
+| News Digest | READ_ONLY | Aggregate and summarize news sources |
+| Email Sender | ACTION | Draft and send emails with owner approval |
 
-### 2. Visual Publisher
+**Your own idea is equally welcome.** If an agent could benefit from it,
+it belongs in the API Store.
 
-| | |
-|---|---|
-| Difficulty | Medium-Hard |
-| Permission Class | ACTION |
-| Required Accounts | X/Twitter OAuth, Image generation API |
-| Starter Code | [examples/visual_publisher.py](examples/visual_publisher.py) |
-| Status | Looking for contributors |
+## Important: this is not paid work
 
-Generate images from agent content and post with captions and alt text.
-
-### 3. MetaMask Connector
-
-| | |
-|---|---|
-| Difficulty | Hard |
-| Permission Class | PAYMENT |
-| Required Accounts | MetaMask/EVM wallet |
-| Starter Code | [examples/metamask_connector.py](examples/metamask_connector.py) |
-| Status | Looking for contributors |
-
-Connect wallets for balance checks, transaction quotes, and (with approval) execution.
-Start with Phase 1 (read-only balance checks) before attempting transactions.
-
-## Other Ideas Welcome
-
-Have an API idea? Open an issue with:
-- API name and one-line description
-- Which permission class it needs
-- What external accounts it requires
-
-## About This Program
-
-- **This is not paid outsourcing.** No bounty amount is guaranteed.
-- **Publishing is free.** You build an API, submit a PR, and if accepted it gets listed.
-- **No guaranteed sales.** Revenue depends on real users installing your API.
-- **Future revenue model (not yet active):** 6.6% platform fee, developer keeps 93.4%.
-- **All decisions happen on GitHub.** No private payments or external settlements.
+> - There is no bounty, no contract, and no guaranteed payment.
+> - Publishing is free. Registration is free.
+> - Revenue comes from users installing your API (when paid monetization launches).
+> - Planned revenue model: 6.6% platform fee, 93.4% to developer.
+> - During the current beta, all listings are free (`price_model="free"`).
 
 ## Resources
 
-- [Getting Started Guide](GETTING_STARTED.md)
+- [Getting Started Guide](GETTING_STARTED.md) — build and publish in 15 minutes
 - [SDK Reference](siglume_app_sdk.py)
 - [API Spec](openapi/developer-surface.yaml)

@@ -85,17 +85,19 @@ siglume-app-sdk/
 | `AppTestHarness` | Sandbox test runner for validation and dry-run testing |
 | `StubProvider` | Mock external APIs for testing |
 
-## Community Apps Wanted
+## Build any API you want
 
-We are actively looking for contributors to build:
+The Agent API Store is an open platform. Anyone can build and publish
+any API they want. Here are some ideas to get you started:
 
-- X Publisher
-- Visual Publisher
-- MetaMask Connector
+- X/Twitter Publisher
+- Visual Content Publisher
+- Wallet Connector
 - Calendar Sync
 - Translation Hub
 
-Have an idea? Open an issue or submit a PR.
+These are examples, not assignments. Build any of these, or something
+completely different. See [BOUNTY_BOARD.md](BOUNTY_BOARD.md) for details.
 
 ## Contributor Workflow
 

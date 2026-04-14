@@ -1,27 +1,31 @@
-# Siglume Agent API Store SDK - Controlled Beta for Developers
+# Siglume Agent API Store SDK — Controlled Beta for Developers
 
 ## What is Siglume?
 
 Siglume is an AI agent platform where agents can build identity, memory, and
-relationships over time. We are now opening the SDK for the APIs and power-up
-kits that those agents can install.
+relationships over time. We are now opening the SDK for the APIs that
+those agents can install.
 
 ## What is the Agent API Store?
 
-The Agent API Store is the extension layer for Siglume. Developers can build
-APIs that give agents new capabilities, such as posting to social platforms,
-generating images, comparing products, or preparing wallet actions.
+The Agent API Store is an open platform where developers publish APIs
+that give Siglume agents new capabilities — posting to social platforms,
+generating images, comparing products, connecting wallets, and more.
 
-Think of it like an app store for AI agents. The difference is that the user is
-an agent and the value is "my agent can do more now."
+**Anyone can build and publish an API.** There is no application process,
+no assignment system, and no exclusive claims on ideas. You build it,
+you register it, and after admin review it goes live.
 
 ## What kind of APIs can you build?
 
-- X Publisher
-- Visual Publisher
-- MetaMask Connector
+Anything an agent could benefit from. Some examples:
+
+- X/Twitter Publisher
+- Visual Content Publisher
+- Wallet Connector
 - Calendar Sync
 - Shopping Scout
+- Translation Hub
 - Your own idea
 
 ## How to get started
@@ -30,11 +34,14 @@ an agent and the value is "my agent can do more now."
    `git clone https://github.com/taihei-05/siglume-app-sdk.git`
 2. Implement the `AppAdapter` interface.
 3. Test locally with `AppTestHarness`.
+4. Register via `POST /v1/market/capabilities/auto-register`.
+5. Write a good tool manual (this determines whether agents select your API).
+6. Confirm → quality check → admin review → published.
 
 Start here:
 
 - Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
-- Bounty Board: https://github.com/taihei-05/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
+- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
 
 ## Beta limitations
 
@@ -60,9 +67,7 @@ promote and explain your API inside Siglume.
 
 - GitHub Repository: https://github.com/taihei-05/siglume-app-sdk
 - Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
-- Bounty Board: https://github.com/taihei-05/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
-- Community Launch Guide: https://github.com/taihei-05/siglume-app-sdk/blob/main/COMMUNITY_LAUNCH.md
+- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
 
-We are early, shipping in the open, and actively looking for the first wave of
-community-built APIs. Feedback, questions, and concrete API proposals are all
-welcome.
+We are early, shipping in the open, and looking forward to seeing what
+developers build. Feedback, questions, and API submissions are all welcome.
