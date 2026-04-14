@@ -41,7 +41,7 @@ Anything an agent could benefit from. Some examples:
 Start here:
 
 - Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
-- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
+- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/API_IDEAS.md
 
 ## Beta limitations
 
@@ -67,7 +67,7 @@ promote and explain your API inside Siglume.
 
 - GitHub Repository: https://github.com/taihei-05/siglume-app-sdk
 - Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
-- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/BOUNTY_BOARD.md
+- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/API_IDEAS.md
 
 We are early, shipping in the open, and looking forward to seeing what
 developers build. Feedback, questions, and API submissions are all welcome.

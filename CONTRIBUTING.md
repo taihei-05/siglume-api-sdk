@@ -1,6 +1,30 @@
 # Contributing to Siglume Agent API Store SDK
 
-Thanks for your interest in contributing! This guide covers the practical steps.
+Thanks for your interest in contributing!
+
+## Two types of contribution
+
+### 1. Publishing your own API to the API Store
+
+This is the most common contribution. You build an API, register it on
+the platform, and it gets listed in the store after admin review.
+
+**You do NOT submit a PR to this repo to publish an API.**
+
+The registration flow is:
+
+1. Build your API with `AppAdapter`
+2. Test locally with `AppTestHarness`
+3. Register via `POST /v1/market/capabilities/auto-register`
+4. Confirm with your tool manual → quality check runs automatically
+5. Admin reviews → published to the API Store
+
+See [GETTING_STARTED.md](GETTING_STARTED.md) for the full guide.
+
+### 2. Improving the SDK itself
+
+If you want to fix bugs, improve documentation, or add new examples
+to this SDK repository, follow the steps below.
 
 ## Dev Environment Setup
 
@@ -12,18 +36,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
-## Creating a New App
-
-1. Fork this repository.
-2. Copy `examples/hello_price_compare.py` or one of the community templates in `examples/` as a starting point.
-3. Implement the `AppAdapter` interface from `siglume_app_sdk.py`.
-4. Test your app locally using `AppTestHarness`, or run your example script directly:
-   ```bash
-   python examples/hello_price_compare.py
-   ```
-5. If you add a new sample app, place it under `examples/` and document what it does in the PR description.
-
-## Submitting Changes
+## Making SDK Changes
 
 1. Create a feature branch from `main`.
 2. Make your changes with clear, focused commits.
@@ -46,7 +59,7 @@ ruff check --fix .
 
 - All PRs require at least one approving review before merge.
 - Maintainers may request changes or ask clarifying questions.
-- Keep PRs small and focused -- one feature or fix per PR.
+- Keep PRs small and focused — one feature or fix per PR.
 
 ## Code of Conduct
 

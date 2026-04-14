@@ -8,13 +8,17 @@ A practical guide for indie developers. Go from zero to a running app in 15 minu
 
 1. [What is Siglume Agent API Store?](#1-what-is-siglume-agent-api-store)
 2. [Quick Start](#2-quick-start)
-3. [Building Your First App](#3-building-your-first-app)
-4. [The App Manifest](#4-the-app-manifest)
+3. [Building Your First API](#3-building-your-first-app)
+4. [The API Manifest](#4-the-app-manifest)
 5. [Testing in Sandbox](#5-testing-in-sandbox)
 6. [Permission Classes Guide](#6-permission-classes-guide)
-7. [Submitting Your App](#7-submitting-your-app)
-8. [Action / Payment Apps](#8-action--payment-apps)
+7. [Publishing Your API](#7-publishing-your-api)
+8. [Action / Payment APIs](#8-action--payment-apps)
 9. [FAQ](#9-faq)
+10. [Testing with a Real Agent](#10-testing-with-a-real-siglume-agent-sandbox-mode)
+11. [Auto-Register](#11-auto-register-list-your-api-with-your-ai)
+12. [Pricing and Payouts](#12-pricing-and-payouts)
+13. [Tool Manual Guide](#13-tool-manual-guide)
 
 ---
 
@@ -264,27 +268,26 @@ Does your app write to anything external?
 
 ---
 
-## 7. Submitting Your App
+## 7. Publishing Your API
 
 ### The path to publishing
 
 ```
-1. Pass sandbox tests
-   竊・2. Submit for review
-   竊・3. Siglume team reviews (3-5 business days)
-   竊・4. Published to the store
+1. Build and test locally (AppTestHarness)
+2. Register via auto-register endpoint
+3. Write your tool manual (CRITICAL - see Section 13)
+4. Confirm with tool manual - quality check runs automatically
+5. Admin reviews (3-5 business days)
+6. Published to the API Store
 ```
 
-### Step 1: Run sandbox tests locally
+### Step 1: Run local tests
 
-There is no packaged SDK CLI yet. For now, validate your app with `AppTestHarness`
-or by running an example-style script:
+Validate your API with `AppTestHarness` before registering:
 
 ```python
 import asyncio
-
 from siglume_app_sdk import AppTestHarness
-
 
 async def main():
     harness = AppTestHarness(MyFirstApp())
@@ -295,47 +298,39 @@ async def main():
     result = await harness.dry_run(task_type="greet")
     assert result.success, result
 
-
 asyncio.run(main())
 ```
 
-All checks must pass:
-- Manifest validation
-- Health check
-- Dry run succeeds
-- All supported task types execute successfully
+All checks must pass: manifest validation, health check, dry run succeeds.
 
-### Step 2: Create the store listing
+### Step 2: Register via auto-register
 
-Create your app listing in the Siglume developer portal (`/owner/apps`) or call the
-listing API directly. Draft listings can be updated repeatedly while you prepare the
-manifest, pricing, support contact, and sandbox evidence.
+The **only** way to create a new API listing is via the auto-register endpoint.
+There is no manual form or developer portal for listing creation.
 
-### Step 3: Submit for review
+See [Section 11](#11-auto-register-list-your-api-with-your-ai) for the full flow.
 
-Submit from the developer portal, or call:
+### Step 3: Write your tool manual and confirm
 
-```http
-POST /v1/market/capabilities/{listing_id}/submit-review
-```
+Include your tool manual in the `confirm-auto-register` call.
+The tool manual determines whether agents select your API -- it is the
+most important thing you write. See [Section 13](#13-tool-manual-guide).
 
-Beta rule for the current public production lane:
+A quality check runs automatically at confirmation time:
+- Grade C or above: your API proceeds to admin review
+- Grade D or F: you must improve the tool manual before it can be published
 
-- Free listings can move into review without a verified payout destination
-- Paid pricing models can still live in draft manifests, but public beta review and publish should use `price_model="free"` and `price_value_minor=0`
-- Seller onboarding approval still happens before the listing is published
-
-### Step 4: Review
+### Step 4: Admin review
 
 The Siglume team verifies:
-- App behavior matches the manifest description
-- Permissions are used appropriately
+- API behavior matches the description
+- Permissions are appropriate
 - User data is handled safely
 
-### Step 5: Publish
+### Step 5: Published
 
-Once approved, your app is automatically published to the store.
-
+Once approved, your API is live in the API Store.
+Agents with active installs can begin using it immediately.
 ---
 
 ## 8. Action / Payment Apps
@@ -521,7 +516,7 @@ You should see your API call recorded with `environment: sandbox`.
 - Run the [example app](./examples/hello_price_compare.py)
 - Read the [API reference](./openapi/developer-surface.yaml)
 - Check the [TypeScript types](./siglume-app-types.ts) for frontend integration
-- See the [Contribution Board](./BOUNTY_BOARD.md) for APIs we're looking for
+- See the [API Ideas Board](./API_IDEAS.md) for inspiration
 - Build your own API and submit it
 
 

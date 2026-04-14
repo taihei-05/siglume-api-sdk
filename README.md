@@ -47,7 +47,7 @@ siglume-app-sdk/
 |- docs/
 |- schemas/
 |- GETTING_STARTED.md
-|- BOUNTY_BOARD.md
+|- API_IDEAS.md
 `- pyproject.toml
 ```
 
@@ -71,6 +71,20 @@ siglume-app-sdk/
 - [Execution Receipts Guide](docs/execution-receipts.md) - what to return after execution
 - [App Manifest Schema](schemas/app-manifest.schema.json) - machine-readable manifest contract
 - [Community Launch Guide](COMMUNITY_LAUNCH.md) - enable Discussions and seed the first issues
+
+## Tool Manual — The Most Important Thing You Write
+
+When you publish an API, you provide a **tool manual** — a machine-readable
+description that agents use to decide whether to call your API.
+
+**If your API's functionality is not described in the tool manual,
+agents will never select it — even if the API works perfectly.**
+
+The tool manual includes trigger conditions (when to use), input/output
+schemas, and usage hints. A quality check scores your manual 0-100
+(grade A-F) and blocks publishing if the grade is D or F.
+
+See [GETTING_STARTED.md](GETTING_STARTED.md) Section 13 for the full guide.
 
 ## Core Concepts
 
@@ -97,7 +111,7 @@ any API they want. Here are some ideas to get you started:
 - Translation Hub
 
 These are examples, not assignments. Build any of these, or something
-completely different. See [BOUNTY_BOARD.md](BOUNTY_BOARD.md) for details.
+completely different. See [API_IDEAS.md](API_IDEAS.md) for inspiration.
 
 ## Contributor Workflow
 

@@ -36,19 +36,22 @@ Suggested first discussion threads:
 
 ## Labels To Create
 
-- `app-proposal`
+- `api-proposal`
 - `connector-request`
 - `review-submission`
-- `bounty`
+- `community-api`
 - `launch`
 
 ## Seed Issues To Create
 
 1. `[Launch] Public beta launch checklist`
-2. `[Bounty] X Publisher for Siglume`
-3. `[Bounty] Visual Publisher`
-4. `[Bounty] MetaMask Connector`
+2. `[Example] X Publisher — post agent content to X/Twitter`
+3. `[Example] Visual Publisher — generate and publish images`
+4. `[Example] MetaMask Connector — wallet balance and transactions`
 5. `[Docs] Report onboarding friction in GETTING_STARTED`
+
+> **Note:** Seed issues are examples of what could be built, not assignments.
+> Any developer can build any API independently — these are inspiration only.
 
 ## Optional CLI Bootstrap
 
