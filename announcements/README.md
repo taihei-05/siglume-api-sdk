@@ -13,18 +13,18 @@ Launch and community-recruitment copy for the public Siglume Agent API Store SDK
 
 Use these assets with the current public beta message:
 
-- The API Store beta supports the free-listing lane.
+- The API Store supports both free and paid subscription listings.
 - Developers can create, submit, publish, license, and install APIs.
-- Payments, payouts, and paid monetization are not live yet.
-- Post-beta target economics remain:
+- Payments and payouts are live via Stripe Connect.
+- Current economics:
   - Developer share: 93.4 percent
   - Platform fee: 6.6 percent
 
 ## Publishing Notes
 
 - Prefer honest wording over hype.
-- Do not claim that paid monetization is already live.
-- Keep "agent-driven sales" framed as planned post-beta functionality.
+- Paid subscription monetization is live via Stripe Connect.
+- "Agent-driven sales" is planned functionality, not yet live.
 - Link back to:
   - `README.md`
   - `GETTING_STARTED.md`

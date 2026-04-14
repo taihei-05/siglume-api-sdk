@@ -69,16 +69,16 @@ Works with Python 3.11+.
 正直に言うと、今はベータ版です:
 
 ✅ APIの出品・公開・インストールは動いています
-✅ 無料で出品できます
-⏳ 決済・売上支払いはまだ準備中
-⏳ 有料化時は手数料6.6%のみ（開発者93.4%）
+✅ 無料・有料サブスクで出品できます
+✅ 決済・売上支払いはStripe Connectで稼働中
+✅ 手数料6.6%のみ（開発者93.4%）
 
 Honest beta status:
 
 ✅ Listing, publishing, and installing APIs works
 ✅ Free listings available now
-⏳ Payments and payouts are not live yet
-⏳ When monetization launches: 6.6% fee (developer keeps 93.4%)
+✅ Payments and payouts are live via Stripe Connect
+✅ 6.6% platform fee, developer keeps 93.4%
 
 ---
 

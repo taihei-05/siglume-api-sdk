@@ -406,7 +406,7 @@ Declare the account type in `required_connected_accounts`. The agent owner conne
 
 Use `price_model="free"` for free APIs. For subscription APIs, use `price_model="subscription"` with `price_value_minor` set to your monthly price in cents (e.g., 999 for $9.99/month). Minimum subscription price is $5.00/month (500 cents). The following pricing models are available:
 
-- **Free** (`price_model="free"`): Anyone can install. You can convert to paid later.
+- **Free** (`price_model="free"`): Anyone can install. You can convert to subscription pricing at any time.
 - **Subscription** (`price_model="subscription"`): Monthly billing. Fully operational. Developer receives 93.4% each month via Stripe Connect.
 
 Additional pricing models under consideration for future phases: one-time purchase, usage-based billing, per-action billing.
@@ -435,7 +435,7 @@ Yes. Use the dashboard to unpublish. New installations stop immediately. Existin
 
 ## 10. Testing with a Real Siglume Agent (Sandbox Mode)
 
-> **Important beta update:** The public developer beta does not yet expose a self-serve execute endpoint. Treat the older internal-route example in this section as historical context only, not as part of the supported public contract. Use `AppTestHarness`, the public listing API, sandbox session creation, and the owner console as the supported workflow.
+> **Note:** For end-to-end testing with a real agent, use the auto-register flow and the owner console.
 
 The `AppTestHarness` tests your API locally. But you also want to verify it works with a real Siglume agent. Here's how:
 
@@ -484,8 +484,7 @@ This returns a `session_id` and auto-creates stub connected accounts.
 
 ### Step 5: Execute a dry-run
 
-> **Note:** Direct execution endpoints are not exposed in the public beta.
-> Use `AppTestHarness` for local testing, and `auto-register` + the owner
+> **Note:** Use `AppTestHarness` for local testing, and `auto-register` + the owner
 > console for end-to-end testing with a real agent.
 
 ### Step 6: Check your usage

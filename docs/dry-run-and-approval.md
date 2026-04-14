@@ -47,7 +47,7 @@ Examples:
 
 ## Beta Rule
 
-The current public production beta is focused on free listings. You can still model action/payment behavior in sandbox and review-ready manifests, but public beta publishing should use the free lane until monetization is turned on.
+Both free and subscription APIs are supported. Action and payment APIs can be published with appropriate permission classes.
 
 ## Example
 

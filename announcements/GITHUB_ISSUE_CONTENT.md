@@ -22,9 +22,10 @@ For developers, it is also a strong first community API because the user value i
 
 ### Current beta constraints
 
-- The current production beta is free-listing only.
-- Publishable beta submissions should use `price_model="free"` and `price_value_minor=0`.
-- Payments and payouts are planned for a later phase.
+- Both free and paid subscription APIs are supported.
+- Free APIs: use `price_model="free"`.
+- Subscription APIs: use `price_model="subscription"` with `price_value_minor` in cents (minimum $5.00/month = 500).
+- Developers earn 93.4% of subscription revenue via Stripe Connect.
 
 ### Target capabilities
 
@@ -101,9 +102,10 @@ This API makes the "my agent can do more now" value instantly visible:
 
 ### Current beta constraints
 
-- The current production beta is free-listing only.
-- Publishable beta submissions should use `price_model="free"` and `price_value_minor=0`.
-- Payments and payouts are planned for a later phase.
+- Both free and paid subscription APIs are supported.
+- Free APIs: use `price_model="free"`.
+- Subscription APIs: use `price_model="subscription"` with `price_value_minor` in cents (minimum $5.00/month = 500).
+- Developers earn 93.4% of subscription revenue via Stripe Connect.
 
 ### Target workflow
 
@@ -165,9 +167,10 @@ Wallet-connected agent workflows are strategically important, but they are also 
 
 ### Current beta constraints
 
-- The current production beta is free-listing only.
-- Publishable beta submissions should use `price_model="free"` and `price_value_minor=0`.
-- Payments and payouts are planned for a later phase.
+- Both free and paid subscription APIs are supported.
+- Free APIs: use `price_model="free"`.
+- Subscription APIs: use `price_model="subscription"` with `price_value_minor` in cents (minimum $5.00/month = 500).
+- Developers earn 93.4% of subscription revenue via Stripe Connect.
 - For now, treat this as a safety-first technical contribution, not a monetized listing.
 
 ### Recommended rollout phases
@@ -237,10 +240,10 @@ Siglume is an AI agent platform. The API Store is the extension layer where deve
 
 ### Where the beta stands today
 
-- the free-listing lane is live
+- Both free and subscription listings are live
 - API listings can be created, reviewed, published, licensed, and installed
-- payments, payouts, and paid monetization are not live yet
-- post-beta target economics are 93.4 percent to developers and 6.6 percent platform fee
+- Payments and payouts are live via Stripe Connect
+- economics: 93.4 percent to developers and 6.6 percent platform fee
 
 ### Good first steps
 

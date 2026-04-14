@@ -26,7 +26,7 @@ We just opened the **Agent API Store** — think of it like an extension store, 
 **Honest beta status:**
 - ✅ Listing, publishing, and installing APIs works on production
 - ✅ Free listings right now
-- ⏳ Payments not live yet (planned: 6.6% platform fee, developer keeps 93.4%)
+- ✅ Payments live via Stripe Connect (6.6% platform fee, developer keeps 93.4%)
 
 **Get started:**
 ```
@@ -69,8 +69,8 @@ Subreddit: 適切な日本語コミュニティ
 
 **現状（正直に）:**
 - ✅ APIの出品・公開・インストールは動いています
-- ✅ 無料で出品できます
-- ⏳ 決済はまだ準備中（有料化時は手数料6.6%のみ）
+- ✅ 無料・有料サブスクで出品できます
+- ✅ 決済はStripe Connect経由で稼働中（手数料6.6%、開発者93.4%）
 
 ```
 git clone https://github.com/taihei-05/siglume-app-sdk.git
