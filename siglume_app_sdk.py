@@ -48,13 +48,16 @@ class Environment(str, Enum):
 class PriceModel(str, Enum):
     """Pricing models for agent APIs.
 
-    Two options: free or subscription (USD).
+    Live: free, subscription (USD).
+    Planned: one_time, bundle, usage_based, per_action.
     Platform fee: 6.6%. Developer keeps 93.4%.
     """
     FREE = "free"                    # No charge.
     SUBSCRIPTION = "subscription"    # Monthly recurring (USD).
-    USAGE_BASED = "usage_based"  # Planned post-beta per-use model.
-    PER_ACTION = "per_action"  # Planned post-beta per-successful-action model.
+    ONE_TIME = "one_time"            # Planned: single purchase.
+    BUNDLE = "bundle"                # Planned: bundled package.
+    USAGE_BASED = "usage_based"      # Planned: per-use metering.
+    PER_ACTION = "per_action"        # Planned: per-successful-action.
 
 
 class AppCategory(str, Enum):
@@ -136,6 +139,316 @@ class ExecutionResult:
     needs_approval: bool = False           # true if action needs owner approval
     approval_prompt: str | None = None     # human-readable approval request
     receipt_summary: dict[str, Any] = field(default_factory=dict)
+
+
+# ── Tool Manual Types ──
+# A ToolManual is the machine-readable contract that tells an LLM when and
+# how to invoke an agent API.  The Siglume runtime validates these on
+# release publish; the SDK mirrors the canonical types so developers get
+# feedback locally before submission.
+
+class ToolManualPermissionClass(str, Enum):
+    """Permission classes valid inside a tool manual.
+
+    NOTE: The wire values use underscores (read_only), which differs from
+    AppManifest.permission_class that uses hyphens (read-only).
+    ToolManual omits the "recommendation" tier.
+    """
+    READ_ONLY = "read_only"
+    ACTION = "action"
+    PAYMENT = "payment"
+
+
+class SettlementMode(str, Enum):
+    STRIPE_CHECKOUT = "stripe_checkout"
+    STRIPE_PAYMENT_INTENT = "stripe_payment_intent"
+
+
+@dataclass
+class ToolManual:
+    """Machine-readable contract describing when/how an LLM should use an API.
+
+    Stored as JSON in CapabilityRelease.tool_manual_jsonb on the platform.
+    Developers build this locally and submit it during release publish or
+    via the confirm-auto-register endpoint.
+    """
+    # ── Required (all permission classes) ──
+    tool_name: str                                      # 3-64 chars, [A-Za-z0-9_]
+    job_to_be_done: str                                 # 10-500 chars
+    summary_for_model: str                              # 10-300 chars, factual
+    trigger_conditions: list[str]                       # 3-8 items, 10-200 chars each
+    do_not_use_when: list[str]                          # 1-5 items
+    permission_class: ToolManualPermissionClass = ToolManualPermissionClass.READ_ONLY
+    dry_run_supported: bool = False
+    requires_connected_accounts: list[str] = field(default_factory=list)
+    input_schema: dict[str, Any] = field(default_factory=dict)   # JSON Schema (type=object)
+    output_schema: dict[str, Any] = field(default_factory=dict)  # must include "summary"
+    usage_hints: list[str] = field(default_factory=list)
+    result_hints: list[str] = field(default_factory=list)
+    error_hints: list[str] = field(default_factory=list)
+
+    # ── Required for action / payment ──
+    approval_summary_template: str | None = None
+    preview_schema: dict[str, Any] | None = None        # JSON Schema
+    idempotency_support: bool | None = None              # must be True for action/payment
+    side_effect_summary: str | None = None
+
+    # ── Required for payment only ──
+    quote_schema: dict[str, Any] | None = None           # JSON Schema
+    currency: str | None = None                          # must be "USD"
+    settlement_mode: SettlementMode | None = None
+    refund_or_cancellation_note: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to the dict format expected by the platform API."""
+        d: dict[str, Any] = {
+            "tool_name": self.tool_name,
+            "job_to_be_done": self.job_to_be_done,
+            "summary_for_model": self.summary_for_model,
+            "trigger_conditions": self.trigger_conditions,
+            "do_not_use_when": self.do_not_use_when,
+            "permission_class": self.permission_class.value,
+            "dry_run_supported": self.dry_run_supported,
+            "requires_connected_accounts": self.requires_connected_accounts,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "usage_hints": self.usage_hints,
+            "result_hints": self.result_hints,
+            "error_hints": self.error_hints,
+        }
+        if self.permission_class in (
+            ToolManualPermissionClass.ACTION,
+            ToolManualPermissionClass.PAYMENT,
+        ):
+            d["approval_summary_template"] = self.approval_summary_template or ""
+            d["preview_schema"] = self.preview_schema or {}
+            d["idempotency_support"] = bool(self.idempotency_support)
+            d["side_effect_summary"] = self.side_effect_summary or ""
+        if self.permission_class == ToolManualPermissionClass.PAYMENT:
+            d["quote_schema"] = self.quote_schema or {}
+            d["currency"] = self.currency or "USD"
+            d["settlement_mode"] = (
+                self.settlement_mode.value if self.settlement_mode else ""
+            )
+            d["refund_or_cancellation_note"] = (
+                self.refund_or_cancellation_note or ""
+            )
+        return d
+
+
+@dataclass
+class ToolManualIssue:
+    """A single issue found during tool-manual validation or quality scoring."""
+    code: str                       # e.g. "MISSING_FIELD", "trigger_specificity"
+    message: str                    # human-readable description
+    field: str | None = None        # e.g. "trigger_conditions[2]"
+    severity: str = "error"         # "error" | "warning" | "critical" | "suggestion"
+    suggestion: str | None = None   # actionable fix hint (quality scoring only)
+
+
+@dataclass
+class ToolManualQualityReport:
+    """Result of quality scoring a tool manual (content quality, not just structure)."""
+    overall_score: int              # 0-100
+    grade: str                      # A / B / C / D / F
+    issues: list[ToolManualIssue] = field(default_factory=list)
+    keyword_coverage_estimate: int = 0
+    improvement_suggestions: list[str] = field(default_factory=list)
+
+
+# ── Tool Manual Validation (server-mirror) ──
+# Client-side mirror of the authoritative server validator at
+# agent_sns.application.capability_runtime.tool_manual_validator.
+# Catches common structural mistakes before a network round-trip.
+# The server is always authoritative — keep rule sets in sync.
+
+_TOOL_NAME_RE = re.compile(r'^[A-Za-z0-9_]{3,64}$')
+
+_PLATFORM_INJECTED_FIELDS = frozenset({
+    "execution_id", "trace_id", "connected_account_id",
+    "dry_run", "idempotency_key", "budget_snapshot",
+})
+
+_COMPOSITION_KEYWORDS = frozenset({"oneOf", "anyOf", "allOf"})
+
+
+def validate_tool_manual(
+    manual: dict[str, Any] | ToolManual,
+) -> tuple[bool, list[ToolManualIssue]]:
+    """Validate a tool manual locally (client-side).
+
+    Returns ``(ok, issues)`` where *ok* is True when no errors were found.
+
+    **Server mirror** — this function mirrors the validation rules in the
+    Siglume runtime (``tool_manual_validator.validate_tool_manual``).  The
+    server is always authoritative; this SDK copy catches the most common
+    structural mistakes before a network round-trip.
+
+    **Keeping in sync** — if the server validator adds or changes rules,
+    this function must be updated to match.  A CI job that compares the
+    rule sets (field names, regex, length bounds) is recommended to prevent
+    silent drift.  See ``schemas/tool-manual.schema.json`` for the
+    machine-readable contract.
+    """
+    if isinstance(manual, ToolManual):
+        manual = manual.to_dict()
+
+    issues: list[ToolManualIssue] = []
+
+    def _err(code: str, msg: str, fld: str | None = None) -> None:
+        issues.append(ToolManualIssue(code=code, message=msg, field=fld, severity="error"))
+
+    def _warn(code: str, msg: str, fld: str | None = None) -> None:
+        issues.append(ToolManualIssue(code=code, message=msg, field=fld, severity="warning"))
+
+    if not isinstance(manual, dict):
+        _err("INVALID_ROOT", "tool manual must be a dict")
+        return False, issues
+
+    # ── required fields ──
+    required = [
+        "tool_name", "job_to_be_done", "summary_for_model",
+        "trigger_conditions", "do_not_use_when", "permission_class",
+        "dry_run_supported", "requires_connected_accounts",
+        "input_schema", "output_schema",
+        "usage_hints", "result_hints", "error_hints",
+    ]
+    for f in required:
+        if f not in manual:
+            _err("MISSING_FIELD", f"required field '{f}' is missing", f)
+
+    # ── tool_name ──
+    tn = manual.get("tool_name", "")
+    if isinstance(tn, str) and tn:
+        if not _TOOL_NAME_RE.match(tn):
+            _err("INVALID_TOOL_NAME",
+                 "tool_name must be alphanumeric + underscore, 3-64 chars", "tool_name")
+
+    # ── string length checks ──
+    for fld, mn, mx in [
+        ("job_to_be_done", 10, 500),
+        ("summary_for_model", 10, 300),
+    ]:
+        v = manual.get(fld)
+        if isinstance(v, str) and (len(v) < mn or len(v) > mx):
+            _err("INVALID_TYPE", f"{fld} must be {mn}-{mx} characters", fld)
+
+    # ── list checks ──
+    tc = manual.get("trigger_conditions")
+    if isinstance(tc, list):
+        if len(tc) < 3:
+            _err("TOO_FEW_ITEMS", "trigger_conditions needs at least 3 items",
+                 "trigger_conditions")
+        elif len(tc) > 8:
+            _err("TOO_MANY_ITEMS", "trigger_conditions allows at most 8 items",
+                 "trigger_conditions")
+        for i, item in enumerate(tc):
+            if isinstance(item, str) and (len(item) < 10 or len(item) > 200):
+                _err("ITEM_TOO_SHORT" if len(item) < 10 else "ITEM_TOO_LONG",
+                     f"trigger_conditions[{i}] must be 10-200 chars",
+                     f"trigger_conditions[{i}]")
+
+    dnu = manual.get("do_not_use_when")
+    if isinstance(dnu, list):
+        if len(dnu) < 1:
+            _err("TOO_FEW_ITEMS", "do_not_use_when needs at least 1 item",
+                 "do_not_use_when")
+        elif len(dnu) > 5:
+            _err("TOO_MANY_ITEMS", "do_not_use_when allows at most 5 items",
+                 "do_not_use_when")
+
+    # ── permission_class ──
+    pc = manual.get("permission_class")
+    valid_pcs = {"read_only", "action", "payment"}
+    if isinstance(pc, str) and pc not in valid_pcs:
+        # Detect common mistake: copying hyphenated value from AppManifest
+        if pc in ("read-only", "recommendation"):
+            _err("INVALID_PERMISSION_CLASS",
+                 f"ToolManual uses underscored values ({sorted(valid_pcs)}), "
+                 f"not the hyphenated AppManifest form '{pc}'",
+                 "permission_class")
+        else:
+            _err("INVALID_PERMISSION_CLASS",
+                 f"permission_class must be one of {sorted(valid_pcs)}",
+                 "permission_class")
+
+    # ── action/payment extra fields ──
+    if pc in ("action", "payment"):
+        for fld in ["approval_summary_template", "preview_schema",
+                     "idempotency_support", "side_effect_summary"]:
+            if not manual.get(fld):
+                _err("MISSING_FIELD",
+                     f"'{fld}' is required for permission_class='{pc}'", fld)
+        if manual.get("idempotency_support") is not True:
+            _err("IDEMPOTENCY_REQUIRED",
+                 "idempotency_support must be true for action/payment",
+                 "idempotency_support")
+
+    if pc == "payment":
+        for fld in ["quote_schema", "currency", "settlement_mode",
+                     "refund_or_cancellation_note"]:
+            if not manual.get(fld):
+                _err("MISSING_FIELD",
+                     f"'{fld}' is required for permission_class='payment'", fld)
+        if manual.get("currency") and manual["currency"] != "USD":
+            _err("INVALID_CURRENCY", "currency must be 'USD'", "currency")
+        sm = manual.get("settlement_mode")
+        valid_sm = {"stripe_checkout", "stripe_payment_intent"}
+        if isinstance(sm, str) and sm not in valid_sm:
+            _err("INVALID_SETTLEMENT_MODE",
+                 f"settlement_mode must be one of {sorted(valid_sm)}",
+                 "settlement_mode")
+
+    # ── input_schema ──
+    inp = manual.get("input_schema")
+    if isinstance(inp, dict):
+        if inp.get("type") != "object":
+            _err("INPUT_SCHEMA", "Root type must be 'object'", "input_schema")
+        if inp.get("additionalProperties") is not False:
+            _err("INPUT_SCHEMA",
+                 "additionalProperties must be false", "input_schema")
+        # composition keywords forbidden
+        for kw in _COMPOSITION_KEYWORDS:
+            if kw in inp:
+                _err("INPUT_SCHEMA",
+                     f"Composition keyword '{kw}' is not allowed in beta",
+                     f"input_schema.{kw}")
+        # platform-injected fields
+        props = inp.get("properties", {})
+        if isinstance(props, dict):
+            for pf in _PLATFORM_INJECTED_FIELDS & set(props):
+                _warn("INPUT_SCHEMA",
+                      f"'{pf}' is platform-injected; remove from input_schema",
+                      f"input_schema.properties.{pf}")
+
+    # ── output_schema ──
+    out = manual.get("output_schema")
+    if isinstance(out, dict):
+        # must have at least one required key
+        out_req = out.get("required")
+        if not isinstance(out_req, list) or len(out_req) == 0:
+            _err("OUTPUT_SCHEMA",
+                 "output_schema must have at least one stable required key",
+                 "output_schema.required")
+        oprops = out.get("properties", {})
+        if isinstance(oprops, dict) and "summary" not in oprops:
+            _err("OUTPUT_SCHEMA",
+                 "output_schema must include a 'summary' property",
+                 "output_schema.properties")
+        # payment-specific output checks
+        if pc == "payment":
+            if isinstance(out_req, list):
+                if "amount_usd" not in out_req:
+                    _err("OUTPUT_SCHEMA",
+                         "Payment output_schema must require 'amount_usd'",
+                         "output_schema.required")
+                if "currency" not in out_req:
+                    _err("OUTPUT_SCHEMA",
+                         "Payment output_schema must require 'currency'",
+                         "output_schema.required")
+
+    ok = not any(i.severity == "error" for i in issues)
+    return ok, issues
 
 
 @dataclass

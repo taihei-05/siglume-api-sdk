@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/taihei-05/siglume-app-sdk/blob/main/schemas/tool-manual.schema.json",
+  "title": "Siglume Tool Manual",
+  "description": "Machine-readable contract describing when and how an LLM should invoke an agent API. Submitted during release publish or confirm-auto-register.",
+  "type": "object",
+  "required": [
+    "tool_name",
+    "job_to_be_done",
+    "summary_for_model",
+    "trigger_conditions",
+    "do_not_use_when",
+    "permission_class",
+    "dry_run_supported",
+    "requires_connected_accounts",
+    "input_schema",
+    "output_schema",
+    "usage_hints",
+    "result_hints",
+    "error_hints"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "tool_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_]{3,64}$",
+      "minLength": 3,
+      "maxLength": 64,
+      "description": "Stable tool identifier used by the LLM to invoke this API."
+    },
+    "job_to_be_done": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "What this tool enables the agent to accomplish."
+    },
+    "summary_for_model": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 300,
+      "description": "Concise, factual summary shown to the LLM for tool selection."
+    },
+    "trigger_conditions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 10,
+        "maxLength": 200
+      },
+      "description": "Situations where this tool should be used. Phrased as conditions, not imperatives."
+    },
+    "do_not_use_when": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string"
+      },
+      "description": "Conditions where this tool is NOT appropriate."
+    },
+    "permission_class": {
+      "type": "string",
+      "enum": ["read_only", "action", "payment"],
+      "description": "Permission tier (uses underscores). Determines which conditional fields are required."
+    },
+    "dry_run_supported": {
+      "type": "boolean"
+    },
+    "requires_connected_accounts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Provider keys (e.g. 'amazon', 'stripe') the agent must have connected."
+    },
+    "input_schema": {
+      "type": "object",
+      "description": "JSON Schema (type=object, additionalProperties=false). Must not include platform-injected fields (execution_id, trace_id, etc.)."
+    },
+    "output_schema": {
+      "type": "object",
+      "description": "JSON Schema for execution output. Must include a 'summary' property."
+    },
+    "usage_hints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Guidance for the LLM on how to use this tool effectively."
+    },
+    "result_hints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Guidance for the LLM on interpreting results."
+    },
+    "error_hints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Guidance for the LLM on handling errors."
+    },
+    "approval_summary_template": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required for action/payment. Template for the approval prompt shown to the owner."
+    },
+    "preview_schema": {
+      "type": "object",
+      "description": "Required for action/payment. JSON Schema for the preview payload."
+    },
+    "idempotency_support": {
+      "type": "boolean",
+      "description": "Required for action/payment. Must be true."
+    },
+    "side_effect_summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required for action/payment. What external side effects this tool produces."
+    },
+    "quote_schema": {
+      "type": "object",
+      "description": "Required for payment. JSON Schema for the price quote."
+    },
+    "currency": {
+      "type": "string",
+      "const": "USD",
+      "description": "Required for payment. Must be USD."
+    },
+    "settlement_mode": {
+      "type": "string",
+      "enum": ["stripe_checkout", "stripe_payment_intent"],
+      "description": "Required for payment. How the payment is settled."
+    },
+    "refund_or_cancellation_note": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required for payment. Refund/cancellation policy note."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["permission_class"],
+        "properties": {
+          "permission_class": { "enum": ["action", "payment"] }
+        }
+      },
+      "then": {
+        "required": [
+          "approval_summary_template",
+          "preview_schema",
+          "idempotency_support",
+          "side_effect_summary"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": ["permission_class"],
+        "properties": {
+          "permission_class": { "const": "payment" }
+        }
+      },
+      "then": {
+        "required": [
+          "quote_schema",
+          "currency",
+          "settlement_mode",
+          "refund_or_cancellation_note"
+        ]
+      }
+    }
+  ]
+}

@@ -25,12 +25,33 @@ receipt_summary={
 
 ## Recommended Fields
 
-- `action`
-- `external_id`
-- `provider`
-- `amount_minor` when relevant
-- `currency` when relevant
-- `status`
+- `action` — what happened (e.g. "tweet_created", "order_placed")
+- `external_id` — provider-side identifier for the resource
+- `provider` — which external service was used
+- `amount_minor` — cost in minor currency units (cents/yen), when relevant
+- `currency` — ISO currency code, when relevant
+- `status` — outcome status from the provider
+
+## Type Reference
+
+The SDK provides typed receipt structures. In Python:
+
+```python
+from siglume_app_sdk import ExecutionResult
+
+result = ExecutionResult(
+    success=True,
+    receipt_summary={
+        "action": "tweet_created",
+        "external_id": "12345",
+        "provider": "x-twitter",
+        "status": "published",
+    },
+)
+```
+
+The `receipt_summary` field is `dict[str, Any]` (Python) / `Record<string, unknown>`
+(TypeScript). Keep it flat and structured — avoid nested objects or prose-only values.
 
 ## Good Practices
 

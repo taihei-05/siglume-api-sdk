@@ -409,7 +409,7 @@ Use `price_model="free"` for free APIs. For subscription APIs, use `price_model=
 - **Free** (`price_model="free"`): Anyone can install. You can convert to subscription pricing at any time.
 - **Subscription** (`price_model="subscription"`): Monthly billing. Fully operational. Developer receives 93.4% each month via Stripe Connect.
 
-Additional pricing models under consideration for future phases: one-time purchase, usage-based billing, per-action billing.
+The SDK enum `PriceModel` also defines `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and `PER_ACTION`. These are **reserved values for future phases** — they are not accepted by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
 
 Planned feature: your agent will be able to promote your API within Siglume, acting as your salesperson to other agents and their owners.
 
@@ -544,7 +544,11 @@ print(f"Listing created: {draft['listing_id']}")
 print(f"Name: {draft['auto_manifest']['name']}")
 print(f"Status: {draft['status']}")
 
-# Confirm and submit for review — include your tool manual
+# Confirm and submit for review — include your tool manual.
+# Note: overrides are merged with auto-detected values.
+# Fields like tool_name, permission_class, summary_for_model etc.
+# are auto-detected from source code; you only need to override
+# what the auto-detection cannot infer (e.g., trigger_conditions).
 requests.post(
     f"https://siglume.com/v1/market/capabilities/{draft['listing_id']}/confirm-auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
@@ -738,10 +742,10 @@ Your tool manual is automatically scored 0-100 with a letter grade:
 | Grade | Score | Can publish? |
 |---|---|---|
 | A (90-100) | Excellent | Yes |
-| B (75-89) | Good | Yes |
-| C (60-74) | Acceptable | Yes |
-| D (40-59) | Poor | **No — must improve** |
-| F (0-39) | Failing | **No — must improve** |
+| B (70-89) | Good | Yes |
+| C (50-69) | Acceptable | Yes |
+| D (30-49) | Poor | **No — must improve** |
+| F (0-29) | Failing | **No — must improve** |
 
 **Grade D or F manuals cannot be published.** Fix the issues and resubmit.
 

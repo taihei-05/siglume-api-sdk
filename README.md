@@ -52,6 +52,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 Both free and paid subscription APIs are supported.
 Stripe Connect payments are fully operational.
 
+> **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
+> and `PER_ACTION`. These are **reserved for future phases** and are not accepted
+> by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
+
 ---
 
 ## The tool manual — the most important thing you write
@@ -112,6 +116,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Dry Run and Approval](docs/dry-run-and-approval.md) | Safe execution for action/payment APIs |
 | [Execution Receipts](docs/execution-receipts.md) | What to return after execution |
 | [API Manifest Schema](schemas/app-manifest.schema.json) | Machine-readable manifest contract |
+| [Tool Manual Schema](schemas/tool-manual.schema.json) | Machine-readable tool manual contract |
 
 ## SDK core concepts
 
@@ -123,6 +128,10 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | `ExecutionResult` | Output and usage data returned from `execute()` |
 | `PermissionClass` | `READ_ONLY`, `RECOMMENDATION`, `ACTION`, `PAYMENT` |
 | `ApprovalMode` | `AUTO`, `ALWAYS_ASK`, `BUDGET_BOUNDED` |
+| `ToolManual` | Machine-readable contract for agent tool selection |
+| `ToolManualIssue` | Single validation or quality issue |
+| `ToolManualQualityReport` | Quality score (0-100, grade A-F) |
+| `validate_tool_manual()` | Client-side validation (mirrors server rules) |
 | `AppTestHarness` | Local sandbox test runner |
 | `StubProvider` | Mock external APIs for testing |
 

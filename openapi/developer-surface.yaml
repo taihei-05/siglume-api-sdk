@@ -203,8 +203,7 @@ paths:
                   description: Override auto-detected fields including tool_manual
                   properties:
                     tool_manual:
-                      type: object
-                      description: Machine-readable tool manual for agent selection
+                      $ref: '#/components/schemas/ToolManual'
                     name:
                       type: string
                     job_to_be_done:
@@ -1171,6 +1170,79 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ErrorResponse'
             - type: 'null'
+
+    ToolManual:
+      type: object
+      additionalProperties: false
+      description: |
+        Machine-readable contract describing when and how an LLM should invoke
+        an agent API. Canonical schema: schemas/tool-manual.schema.json.
+      required:
+        - tool_name
+        - job_to_be_done
+        - summary_for_model
+        - trigger_conditions
+        - do_not_use_when
+        - permission_class
+        - dry_run_supported
+        - requires_connected_accounts
+        - input_schema
+        - output_schema
+        - usage_hints
+        - result_hints
+        - error_hints
+      properties:
+        tool_name:
+          type: string
+          pattern: "^[A-Za-z0-9_]{3,64}$"
+          description: Stable tool identifier (3-64 chars, alphanumeric + underscore)
+        job_to_be_done:
+          type: string
+          minLength: 10
+          maxLength: 500
+        summary_for_model:
+          type: string
+          minLength: 10
+          maxLength: 300
+          description: Concise, factual summary for LLM tool selection
+        trigger_conditions:
+          type: array
+          minItems: 3
+          maxItems: 8
+          items: { type: string, minLength: 10, maxLength: 200 }
+          description: Situations where this tool should be used
+        do_not_use_when:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items: { type: string }
+        permission_class:
+          type: string
+          enum: [read_only, action, payment]
+          description: "Permission tier (underscore form, NOT the hyphenated AppManifest form)"
+        dry_run_supported: { type: boolean }
+        requires_connected_accounts:
+          type: array
+          items: { type: string }
+        input_schema:
+          type: object
+          description: "JSON Schema (type=object, additionalProperties=false). No platform-injected fields."
+        output_schema:
+          type: object
+          description: "JSON Schema. Must include 'summary' property and at least one required key."
+        usage_hints: { type: array, items: { type: string } }
+        result_hints: { type: array, items: { type: string } }
+        error_hints: { type: array, items: { type: string } }
+        # Conditional: required for action / payment
+        approval_summary_template: { type: string, minLength: 1 }
+        preview_schema: { type: object }
+        idempotency_support: { type: boolean, description: "Must be true for action/payment" }
+        side_effect_summary: { type: string, minLength: 1 }
+        # Conditional: required for payment only
+        quote_schema: { type: object }
+        currency: { type: string, enum: [USD], description: "Must be USD" }
+        settlement_mode: { type: string, enum: [stripe_checkout, stripe_payment_intent] }
+        refund_or_cancellation_note: { type: string, minLength: 1 }
 
     ErrorResponse:
       type: object

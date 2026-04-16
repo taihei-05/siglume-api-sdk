@@ -7,7 +7,7 @@ export type PermissionClass = "read-only" | "recommendation" | "action" | "payme
 export type ApprovalMode = "auto" | "budget-bounded" | "always-ask" | "deny";
 export type ExecutionKind = "dry_run" | "quote" | "action" | "payment";
 export type Environment = "sandbox" | "live";
-export type PriceModel = "free" | "monthly" | "one_time" | "bundle" | "usage_based" | "per_action";
+export type PriceModel = "free" | "subscription" | "one_time" | "bundle" | "usage_based" | "per_action";
 export type AppCategory = "commerce" | "booking" | "crm" | "finance" | "document" | "communication" | "monitoring" | "other";
 
 export interface ConnectedAccountRef {
@@ -104,4 +104,65 @@ export interface CapabilityBinding {
   agent_id: string;
   binding_status: string;
   created_by_user_id?: string;
+}
+
+// ── Tool Manual Types ──
+// Machine-readable contract describing when/how an LLM should invoke an API.
+
+/**
+ * Permission classes valid inside a tool manual.
+ * Uses underscores (read_only) — differs from AppManifest which uses hyphens (read-only).
+ * The "recommendation" tier is not applicable to tool manuals.
+ */
+export type ToolManualPermissionClass = "read_only" | "action" | "payment";
+
+export type SettlementMode = "stripe_checkout" | "stripe_payment_intent";
+
+export interface ToolManual {
+  // Required (all permission classes)
+  tool_name: string;                          // 3-64 chars, [A-Za-z0-9_]
+  job_to_be_done: string;                     // 10-500 chars
+  summary_for_model: string;                  // 10-300 chars, factual
+  trigger_conditions: string[];               // 3-8 items, 10-200 chars each
+  do_not_use_when: string[];                  // 1-5 items
+  permission_class: ToolManualPermissionClass;
+  dry_run_supported: boolean;
+  requires_connected_accounts: string[];
+  input_schema: Record<string, unknown>;      // JSON Schema (type=object)
+  output_schema: Record<string, unknown>;     // must include "summary" property
+  usage_hints: string[];
+  result_hints: string[];
+  error_hints: string[];
+
+  // Required for action / payment
+  approval_summary_template?: string;
+  preview_schema?: Record<string, unknown>;
+  idempotency_support?: boolean;              // must be true for action/payment
+  side_effect_summary?: string;
+
+  // Required for payment only
+  quote_schema?: Record<string, unknown>;
+  currency?: string;                          // must be "USD"
+  settlement_mode?: SettlementMode;
+  refund_or_cancellation_note?: string;
+}
+
+export type ToolManualIssueSeverity = "error" | "warning" | "critical" | "suggestion";
+
+export interface ToolManualIssue {
+  code: string;
+  message: string;
+  field?: string;
+  severity: ToolManualIssueSeverity;
+  suggestion?: string;
+}
+
+export type ToolManualGrade = "A" | "B" | "C" | "D" | "F";
+
+export interface ToolManualQualityReport {
+  overall_score: number;                      // 0-100
+  grade: ToolManualGrade;
+  issues: ToolManualIssue[];
+  keyword_coverage_estimate: number;
+  improvement_suggestions: string[];
 }
