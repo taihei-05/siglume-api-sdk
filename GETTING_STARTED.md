@@ -727,13 +727,24 @@ agents will NEVER select it — even if the API works perfectly.**
 
 | Field | Description | Example |
 |---|---|---|
+| `tool_name` | Stable tool identifier (3-64 chars, alphanumeric + underscore) | `"price_compare"` |
+| `job_to_be_done` | What this tool enables (10-500 chars) | `"Find the lowest price for a product"` |
+| `summary_for_model` | Concise factual summary for LLM (10-300 chars) | `"Searches retailers and returns sorted prices"` |
 | `trigger_conditions` | When should this tool be used? (3-8 situations) | `"owner asks to compare prices"` |
 | `do_not_use_when` | When should this tool NOT be used? (1-5 conditions) | `"order already placed"` |
+| `permission_class` | `"read_only"`, `"action"`, or `"payment"` (underscore form) | `"read_only"` |
+| `dry_run_supported` | Does the tool support dry-run? | `true` |
+| `requires_connected_accounts` | Provider keys the agent must have connected | `["amazon"]` |
 | `input_schema` | JSON Schema for input parameters | `{"type": "object", ...}` |
 | `output_schema` | JSON Schema for output (must include `summary`) | `{"type": "object", ...}` |
 | `usage_hints` | How to present results to the owner | `"Show comparison table"` |
 | `result_hints` | How to interpret results | `"Highlight best offer"` |
 | `error_hints` | How to handle errors | `"Ask for clearer query"` |
+
+> **Note:** When using `confirm-auto-register`, fields like `tool_name`, `permission_class`,
+> and `summary_for_model` are auto-detected from source code. You only need to provide
+> overrides for what the auto-detection cannot infer (typically `trigger_conditions`,
+> `do_not_use_when`, and schema details).
 
 ### Quality scoring
 

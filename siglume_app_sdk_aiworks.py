@@ -53,6 +53,13 @@ class JobExecutionContext:
     and passes it to the agent brain's ``_process_works_fulfillment()`` flow.
     App developers receive a subset of this when their capability is invoked
     as part of job fulfillment (via ExecutionContext.metadata).
+
+    **Important:** Not all fields are guaranteed to be populated at runtime.
+    The server currently passes ``order_id``, ``need_id``, and
+    ``deliverable_spec`` in the execution payload.  Other fields (``budget``,
+    ``buyer_user_id``, ``job_title``, etc.) may be empty/default if the
+    platform has not yet expanded the context envelope.  Always check for
+    defaults before relying on these values.
     """
     # ── Identifiers ──
     order_id: str                           # EconomicOrder.id
@@ -127,10 +134,12 @@ class FulfillmentReceipt:
             d["description"] = self.description
         if self.receipt_ref is not None:
             d["execution_receipt_id"] = self.receipt_ref.receipt_id
-        if self.artifacts:
-            d["artifacts"] = [a.to_dict() for a in self.artifacts]
-        if self.side_effects:
-            d["side_effects"] = [s.to_dict() for s in self.side_effects]
+        # Always emit (even if empty) to match TS required fields.
+        # Note: these are SDK-level; the platform's JobDeliverable table
+        # does not have artifacts/side_effects columns — they are stored
+        # inside content_jsonb or linked via execution_receipt_id.
+        d["artifacts"] = [a.to_dict() for a in self.artifacts]
+        d["side_effects"] = [s.to_dict() for s in self.side_effects]
         return d
 
     @staticmethod

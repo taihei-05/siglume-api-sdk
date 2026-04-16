@@ -225,14 +225,21 @@ class ApprovalRequestHint:
     relying solely on a free-text ``approval_prompt`` string.
     """
     action_summary: str                     # what will happen (e.g. "Post tweet to @handle")
-    permission_class: str = "action"        # "action" or "payment"
+    permission_class: str = "action"        # "action" or "payment" only
     estimated_amount_minor: int | None = None  # estimated cost in minor units
     currency: str | None = None             # ISO currency code
     side_effects: list[str] = field(default_factory=list)  # plain-text list of side effects
     preview: dict[str, Any] = field(default_factory=dict)  # structured preview payload
     reversible: bool = False                # can the action be undone?
 
+    _VALID_PERMISSION_CLASSES = frozenset({"action", "payment"})
+
     def to_dict(self) -> dict[str, Any]:
+        if self.permission_class not in self._VALID_PERMISSION_CLASSES:
+            raise ValueError(
+                f"ApprovalRequestHint.permission_class must be 'action' or 'payment', "
+                f"got '{self.permission_class}'"
+            )
         d: dict[str, Any] = {
             "action_summary": self.action_summary,
             "permission_class": self.permission_class,
@@ -577,6 +584,11 @@ def validate_tool_manual(
                     _err("OUTPUT_SCHEMA",
                          "Payment output_schema must require 'currency'",
                          "output_schema.required")
+            if isinstance(oprops, dict):
+                if "amount_usd" not in oprops:
+                    _err("OUTPUT_SCHEMA",
+                         "Payment output_schema must include 'amount_usd' in properties",
+                         "output_schema.properties")
 
     ok = not any(i.severity == "error" for i in issues)
     return ok, issues
@@ -668,67 +680,47 @@ class AppTestHarness:
         self.app = app
         self.stubs = stubs or {}
 
-    async def dry_run(self, task_type: str = "default", **kwargs) -> ExecutionResult:
+    async def _execute(
+        self,
+        execution_kind: ExecutionKind,
+        task_type: str = "default",
+        connected_accounts: dict[str, ConnectedAccountRef] | None = None,
+        **kwargs,
+    ) -> ExecutionResult:
+        """Internal helper — build context and run execute().
+
+        All public execute_* methods delegate here so that changes to
+        context construction are made in one place.
+        """
+        if connected_accounts is None:
+            connected_accounts = {
+                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
+                for k in self.stubs
+            }
         ctx = ExecutionContext(
             agent_id="test-agent-001",
             owner_user_id="test-owner-001",
             task_type=task_type,
             environment=Environment.SANDBOX,
-            execution_kind=ExecutionKind.DRY_RUN,
-            connected_accounts={
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
-                for k in self.stubs
-            },
+            execution_kind=execution_kind,
+            connected_accounts=connected_accounts,
             **kwargs,
         )
         return await self.app.execute(ctx)
 
+    async def dry_run(self, task_type: str = "default", **kwargs) -> ExecutionResult:
+        return await self._execute(ExecutionKind.DRY_RUN, task_type, **kwargs)
+
     async def execute_action(self, task_type: str = "default", **kwargs) -> ExecutionResult:
-        ctx = ExecutionContext(
-            agent_id="test-agent-001",
-            owner_user_id="test-owner-001",
-            task_type=task_type,
-            environment=Environment.SANDBOX,
-            execution_kind=ExecutionKind.ACTION,
-            connected_accounts={
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
-                for k in self.stubs
-            },
-            **kwargs,
-        )
-        return await self.app.execute(ctx)
+        return await self._execute(ExecutionKind.ACTION, task_type, **kwargs)
 
     async def execute_quote(self, task_type: str = "default", **kwargs) -> ExecutionResult:
         """Execute a QUOTE request (price/estimate without committing)."""
-        ctx = ExecutionContext(
-            agent_id="test-agent-001",
-            owner_user_id="test-owner-001",
-            task_type=task_type,
-            environment=Environment.SANDBOX,
-            execution_kind=ExecutionKind.QUOTE,
-            connected_accounts={
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
-                for k in self.stubs
-            },
-            **kwargs,
-        )
-        return await self.app.execute(ctx)
+        return await self._execute(ExecutionKind.QUOTE, task_type, **kwargs)
 
     async def execute_payment(self, task_type: str = "default", **kwargs) -> ExecutionResult:
         """Execute a PAYMENT request (in sandbox — no real charges)."""
-        ctx = ExecutionContext(
-            agent_id="test-agent-001",
-            owner_user_id="test-owner-001",
-            task_type=task_type,
-            environment=Environment.SANDBOX,
-            execution_kind=ExecutionKind.PAYMENT,
-            connected_accounts={
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
-                for k in self.stubs
-            },
-            **kwargs,
-        )
-        return await self.app.execute(ctx)
+        return await self._execute(ExecutionKind.PAYMENT, task_type, **kwargs)
 
     async def health(self) -> HealthCheckResult:
         return await self.app.health_check()
@@ -820,13 +812,8 @@ class AppTestHarness:
         Apps that declare required_connected_accounts should handle the case
         where an account is missing (e.g., return an error or fallback).
         """
-        ctx = ExecutionContext(
-            agent_id="test-agent-001",
-            owner_user_id="test-owner-001",
-            task_type=task_type,
-            environment=Environment.SANDBOX,
-            execution_kind=ExecutionKind.DRY_RUN,
+        return await self._execute(
+            ExecutionKind.DRY_RUN, task_type,
             connected_accounts={},  # intentionally empty
             **kwargs,
         )
-        return await self.app.execute(ctx)

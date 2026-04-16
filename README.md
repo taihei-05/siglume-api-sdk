@@ -122,7 +122,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 
 | Component | What it does |
 |---|---|
-| `AppAdapter` | Base class. Implement `manifest()`, `execute()`, `supported_task_types()` |
+| `AppAdapter` | Base class. Implement `manifest()` and `execute()` (required); `supported_task_types()` is optional |
 | `AppManifest` | Metadata, permissions, pricing |
 | `ExecutionContext` | Task details passed to `execute()` |
 | `ExecutionResult` | Output and usage data returned from `execute()` |
