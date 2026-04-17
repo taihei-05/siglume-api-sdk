@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phase 1 (server contract shape) + Phase 2 (Solidity contracts + projector) shipped. Deploy + real integrations pending.
+**Status:** Phase 1 (server contract shape) + Phase 2 (Solidity contracts + projector) + Phase 3 (deploy script + on-chain indexer) shipped. Real tx submission + Turnkey/Safe/Pimlico/0x integration pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -45,15 +45,25 @@ Behind the default-on `economy_web3_adapter_enabled` flag:
 - **Hardhat tests** (`test/Web3Payments.test.js`): 4 passing — fee split, monthly cap, escrow release/refund, unsupported-token reject.
 - **Backend projector** (`packages/shared-python/agent_sns/application/web3_projector.py`): updates `chain_cursor`, reflects `chain_receipt`, projects `payment_mandate` success/failure retries, and projects minimal plan / partner state from on-chain events. Invoked admin-side via `/v1/admin/market/web3/project`.
 
-### Still mock or pending (work in progress)
+### Phase 3 — deploy flow + on-chain indexer (shipped)
+
+- **Hardhat deploy script** (`packages/contracts/web3-payments/scripts/deploy.js`) writes a per-network manifest to `packages/contracts/web3-payments/deployments/<network>.json`. Networks: `polygon` (mainnet), `polygonAmoy` (testnet), plus local Hardhat.
+- **Backend manifest loader** (`packages/shared-python/agent_sns/application/web3_contracts.py`) reads that JSON so the backend knows the deployed addresses + ABIs without hardcoding.
+- **On-chain indexer** (`packages/shared-python/agent_sns/application/web3_indexer.py`) — JSON-RPC-based poller that pulls `eth_getLogs` for events emitted by `SubscriptionHub` / `AdsBillingHub` / `WorksEscrowHub` / `FeeVault`, advances `chain_cursor`, writes `chain_receipt`, and feeds mandate-state projection. Still admin-triggered rather than a resident daemon.
+- **Admin API additions**:
+  - `GET /v1/admin/market/web3/contracts` — returns the loaded deployment manifest (addresses + network + deploy tx).
+  - `POST /v1/admin/market/web3/sync` — runs one indexer pass against the configured RPC.
+- **Settings + `.env.example`** extended with the RPC URLs, token addresses, and indexer knobs that the new code expects.
+
+### Still pending (work in progress)
 
 - `web3_wallet_provider = "mock_embedded"` — real **Turnkey / Safe / Pimlico** integration pending.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
-- **Contract deploy scripts** (mainnet + Amoy) — not yet in repo.
-- **Chain indexer daemon** — admin-trigger projector exists; a continuous indexer that streams block events into `chain_cursor` is not yet wired.
+- **Real tx submission** — mandate create / cancel still writes mock "tx hashes". The indexer can read real chain state when deployed, but no production code path is producing real signed transactions yet.
+- **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 - **Stripe flow replacement** — existing Stripe paths still live; on-chain cutover of the customer-facing paid flows has not happened yet.
 
-Treat the current server surface as **complete contract-shape + local Solidity body**, but **execution still routes through mocks** until deploy + real relayer + real indexer land. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are not affected.
+The server can now deploy the 4 hubs to Polygon (or Amoy for staging) and read the resulting event stream on demand. The remaining gap is **writing** to those contracts from a real relayer backed by real key material (Turnkey / Safe / Pimlico). Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
 
 ## What still works today
 
