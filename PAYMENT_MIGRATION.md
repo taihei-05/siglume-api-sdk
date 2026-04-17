@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–8 shipped. Phase 8 flips the Plan pricing UI off Stripe Checkout — Plus / Pro buttons now create a Web3 mandate and execute it via the embedded wallet in-flow. First Stripe-less customer purchase path on the platform. API Store + Partner buy flows, real Turnkey/Safe signer adapter, and real 0x swap still pending.
+**Status:** Phases 1–9 shipped. Phase 9 extends the Stripe-less cutover from Plan (Phase 8) to **Partner subscriptions** and **API Store paid purchases**, so all three of Siglume's platform-billing surfaces now route through Web3 mandate + embedded-wallet execute. Provider is still `mock_embedded` (real funds do not move), but the subscription-purchase axis is end-to-end Web3. Tool-execution settlement (the `SettlementMode` axis SDK v0.2.0 gates on) is **not yet moved** — still Stripe server-side.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -110,27 +110,60 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **Why this is the biggest milestone so far:** this is the first point on the platform where a **real customer purchase flow does not touch Stripe at all**. A logged-in user clicking Plus or Pro now goes purchase → mandate → execute → tx_hash → submitted receipt → (eventually finalized), fully inside the Web3 pipeline. The fact that `mock_embedded` is still the provider underneath means no real funds move yet, but the *shape of the cutover* is proven end-to-end for the first real customer-facing surface.
 
+### Phase 9 — Partner + API Store purchase flows join the Plan cutover (shipped)
+
+- **`mock_embedded` auto-reflection into projector** (`web3_payments.py`, `web3_projector.py`) — under the mock provider, mandate execute now flows directly through the projector, so local runs land plan / partner updates and API Store access grants end-to-end.
+- **Partner Dashboard Billing** (`partner_api.py`, `PartnerDashboard.tsx`, `lib/partner-api.ts`) routes through Web3 mandate create + embedded-wallet execute instead of Stripe Checkout. `has_subscription` now reads Web3 mandate state.
+- **API Store paid purchase** (`marketplace_capabilities.py`, `OwnerCapabilitiesPage.tsx`, `ApiDetailPage.tsx`, `lib/types.ts`) — if the seller has a verified Polygon payout wallet, the buy path goes through Web3 mandate; mock execute auto-creates the access grant and the UI handles a new `web3_submitted` state.
+- **Indexer payload enriched** (`web3_indexer.py`) — emitted events now carry `listing_id` / `capability_key` so real-chain sync can project API Store state identically to the mock path.
+- **Dev deploy manifest** (`packages/contracts/web3-payments/deployments/amoy.json`) — **placeholder** so local mock tx-planning works. To be replaced with a real deploy manifest before any mainnet exposure.
+- **Tests**: backend `test_web3_payment_foundation.py` → 12 passed (was 10), `apps/web` build → pass, Python compile → pass.
+
+**Why this is a large milestone for publishers:** Plan (Phase 8), Partner (Phase 9), and **paid API Store purchase** (Phase 9) — the three platform-billing surfaces — are all on Web3 mandate flows now. For the SDK specifically, this means the earlier "paid-subscription publish is paused" caveat is no longer true for sellers with a verified Polygon payout wallet; they can register, have buyers purchase via Web3 mandate, and land an access grant via the mock projector. What's still missing is real tx submission and the corresponding tool-execution-axis changes (see below).
+
 ### Still pending (work in progress)
 
-- **API Store + Partner buy-flow UI cutover** — per Codex's plan, API Store purchase-start UI and Partner flow are the next to move from Stripe to Web3 mandate + escrow, following the same pattern Phase 8 applied to Plan. **This is the phase that triggers SDK v0.2.0 evaluation** because it puts the on-chain settlement path under the *tool-execution* axis the SDK's `SettlementMode` enum gates.
+- **AI Works escrow cutover** — per Codex's plan, AI Works escrow execution is the next surface to join the Web3 wallet flow, following the same pattern Phase 9 applied to Partner and API Store paid purchase.
+- **Tool-execution Axis 2 migration** — this is the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not a Codex target yet, but a separate coordination that will reach us when it does.
 - **Real Turnkey / Safe adapter** — provider abstraction names `delegated_http` and `turnkey_safe_http`; the live one is still `mock_embedded`. Swapping to a real signer produces real Polygon broadcasts without changing the API surface.
+- **Replace `amoy.json` placeholder manifest** — Codex added a dev-only deployment manifest so local mock tx-plans work. Must be replaced with a real testnet deploy manifest before any chain exposure.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 
-Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration. The `SettlementMode` enum stays frozen at `stripe_checkout` / `stripe_payment_intent` in SDK v0.1.x until the API Store buy-flow cutover lands.
+Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
+
+## Two axes, only one of them moved
+
+The migration has two distinct axes. Phase 9 completes **one of them** (subscription purchase) under the mock provider but leaves the **other** (tool-execution settlement) on Stripe. Both are described here so SDK users aren't confused.
+
+**Axis 1 — Subscription purchase (Web3 as of Phase 9, mock-backed):**
+
+- How a buyer acquires access to a Plan / Partner subscription / API Store listing.
+- Previously: Stripe Checkout hosted page.
+- Now: Web3 mandate + embedded-wallet execute + access-grant projection.
+- Governed by: platform server logic + `payment_mandate` model. **Not surfaced through the SDK's tool-manual contract.**
+- SDK impact: none to the tool-manual API. A subscription-pricing API (`price_model="subscription"`) declares its price; the platform chooses the billing rail.
+
+**Axis 2 — Tool-execution settlement (still Stripe):**
+
+- How a `permission_class="payment"` tool charges the owner during the tool's own execution (e.g. "buy this headset for me" run).
+- Governed by: SDK's `SettlementMode` enum on `ToolManual` — `stripe_checkout` or `stripe_payment_intent`.
+- Still Stripe server-side (`VALID_SETTLEMENT_MODES = {"stripe_checkout", "stripe_payment_intent"}`).
+- SDK v0.2.0 (breaking-enum release) fires when **this** axis moves, not the one above.
 
 ## What still works today
 
 - Everything in the **READ_ONLY** and **ACTION** permission classes — publishing, registering, executing, receipts, tool-manual validation.
 - **Free** listings (`price_model="free"`) — unaffected by the payment change.
+- **Paid subscription publish** (`price_model="subscription"`) — **no longer paused** for sellers with a verified Polygon payout wallet (as of Phase 9). Buyers purchase via Web3 mandate under the mock provider; access grants land automatically.
+- **`PAYMENT` permission class tools** — authorable today using `settlement_mode="stripe_checkout"` or `"stripe_payment_intent"`. Axis 2 has not moved.
 - SDK types, validators, and examples for non-payment flows — stable.
-- The existing SDK v0.1.x — no breaking change is needed for non-payment APIs.
+- The existing SDK v0.1.x — no breaking change required yet.
 
 ## What is paused / changing
 
-- **`price_model="subscription"` publish flow** — the onboarding step that required a Stripe Connect account is being replaced by Polygon address registration at `/owner/publish`. Until the real wallet integration ships, new paid subscription publish is paused server-side.
-- **`SettlementMode` enum values** (`stripe_checkout`, `stripe_payment_intent`) — the **tool-execution** settlement mode (how a PAYMENT-class tool charges the owner at execution time) is a separate axis from the developer-payout change. Codex has **not** changed this enum yet; it remains frozen in SDK v0.1.x. A coordinated server+SDK update will add on-chain values when the buyer-side is also migrated.
-- **`examples/metamask_connector.py`** — the current "bring your own MetaMask + direct-sign transaction" stub does **not** match the new embedded-smart-wallet + platform-gas model. It will be rewritten once the real wallet integration is available.
+- **`SettlementMode` enum values** (`stripe_checkout`, `stripe_payment_intent`) — still frozen in SDK v0.1.x. Codex has **not** added a Web3 value to `VALID_SETTLEMENT_MODES`. A coordinated server+SDK update will add on-chain values when Axis 2 migrates — that is the SDK v0.2.0 trigger.
+- **`examples/metamask_connector.py`** — the current "bring your own MetaMask + direct-sign transaction" stub does **not** match the new embedded-smart-wallet + platform-gas model. It will be rewritten once the real wallet integration is available and the Axis 2 migration is specified.
 - Any doc text that reads "Stripe Connect" as the live mechanism — being rewritten as this migration progresses.
 
 ## Why Polygon, specifically
