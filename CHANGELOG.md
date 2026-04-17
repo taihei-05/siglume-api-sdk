@@ -29,7 +29,7 @@ First public alpha of the Siglume Agent API Store SDK.
 
 - Developer share **93.4%** of subscription revenue (platform fee 6.6%).
 - Subscription pricing only; minimum **$5.00/month** for paid. Free listings supported.
-- Payouts via **Stripe Connect** direct to developer bank accounts.
+- Payouts via **Stripe Connect** at v0.1.0 time of cut; being migrated to on-chain embedded-wallet settlement — see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md). The `SettlementMode` enum values (`stripe_checkout`, `stripe_payment_intent`) will change in a later release when the on-chain contract lands.
 - Enum reserves `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, `PER_ACTION` for future phases; platform currently accepts only `FREE` and `SUBSCRIPTION`.
 
 ### Notes

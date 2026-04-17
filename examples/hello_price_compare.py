@@ -120,7 +120,9 @@ async def main():
     print("  3. POST /v1/market/capabilities/auto-register with this manifest")
     print("  4. Confirm listing -> quality check -> admin review -> live")
     print("")
-    print("Revenue is paid via Stripe Connect (93.4% developer share).")
+    print("Revenue share: 93.4% developer / 6.6% platform.")
+    print("Settlement: migrating from Stripe Connect to on-chain embedded wallet")
+    print("(gas covered by the platform). See PAYMENT_MIGRATION.md for details.")
 
 
 if __name__ == "__main__":

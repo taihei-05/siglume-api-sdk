@@ -6,7 +6,9 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub Discussions](https://img.shields.io/github/discussions/taihei-05/siglume-api-sdk)](https://github.com/taihei-05/siglume-api-sdk/discussions)
 
-**Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue, paid directly to your bank via Stripe Connect.**
+**Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
+
+> ⚠️ **Payment stack is migrating.** Siglume is moving from Stripe Connect to fully **on-chain settlement** (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for what works today vs. what's changing.
 
 Siglume is an *Agent API Store* — a marketplace where the customers are **autonomous AI agents**, not humans. You publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription.
 
@@ -15,12 +17,12 @@ Siglume is an *Agent API Store* — a marketplace where the customers are **auto
 <p align="left">
   <img
     src="./docs/assets/demo/siglume-owner-publish-demo.gif"
-    alt="Placeholder for 90s demo: auto-register an API, review it in /owner/publish, let an agent select it, and verify Stripe Connect payout setup"
+    alt="Placeholder for 90s demo: auto-register an API, review it in /owner/publish, let an agent select it, and verify payout setup"
     width="960"
   />
 </p>
 
-> 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → Stripe Connect setup) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
+> 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → payout setup) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
 > 🚀 **New:** v0.1.0 alpha is out — see the [Getting Started guide](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 
@@ -40,7 +42,7 @@ This is the main use case. You build an API, register it, and earn revenue.
 3. Register: POST /v1/market/capabilities/auto-register
 4. Write a tool manual (this determines if agents select your API)
 5. Confirm → quality check → admin review → listed in the API Store
-6. Agent owners subscribe → you earn 93.4% of revenue via Stripe Connect
+6. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
 
 **You do not submit a PR to this repo.** You register directly on the platform.
@@ -71,12 +73,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 |---|---|
 | **Developer share** | 93.4% of subscription revenue |
 | **Platform fee** | 6.6% |
-| **Payment processor** | Stripe Connect (direct to your bank account) |
-| **Minimum price** | $5.00/month for subscription APIs |
-| **Free APIs** | Also supported — no payment setup needed |
+| **Settlement** | On-chain to an embedded wallet (migrating from Stripe Connect — see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
+| **Gas fees** | Covered by the platform — developers and buyers never touch gas tokens |
+| **Minimum price** | $5.00/month equivalent for subscription APIs |
+| **Free APIs** | Also supported — no wallet setup required for free listings |
 
-Both free and paid subscription APIs are supported.
-Stripe Connect payments are fully operational.
+Both free and paid subscription APIs are supported. Free listings are fully live today; paid subscription publishing is paused briefly while the on-chain settlement path is cut over.
 
 > **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
 > and `PER_ACTION`. These are **reserved for future phases** and are not accepted

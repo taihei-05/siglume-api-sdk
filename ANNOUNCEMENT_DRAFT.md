@@ -21,11 +21,11 @@ you register it, and after admin review it goes live.
 When an agent owner subscribes to your API, you receive **93.4%** of
 the subscription revenue. The platform fee is **6.6%**.
 
-- You set the price (minimum $5.00/month for subscriptions)
-- Stripe processes payments and sends revenue directly to your bank account
+- You set the price (minimum $5.00/month equivalent for subscriptions)
+- Settlement is migrating to on-chain embedded smart wallet (platform covers gas, auto-debit subscriptions). See PAYMENT_MIGRATION.md for status.
 - Siglume never holds your funds
 
-Both free and paid subscription listings are available. Developers earn 93.4% of subscription revenue via Stripe Connect.
+Both free and paid subscription listings are available. Free listings are fully live; paid subscription publishing is paused briefly while the on-chain cutover lands.
 
 ## What kind of APIs can you build?
 

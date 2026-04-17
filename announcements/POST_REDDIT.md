@@ -1,5 +1,7 @@
 # Reddit Post
 
+> 🚧 **STALE DRAFT — DO NOT POST AS-IS.** Body text still claims "payments live via Stripe Connect", which is being retired. Rewrite the settlement paragraph per [`../PAYMENT_MIGRATION.md`](../PAYMENT_MIGRATION.md) before posting.
+
 Subreddit: r/SideProject (or r/MachineLearning, r/Python)
 Title: We built an API store for AI agents — SDK is public, looking for the first developers
 

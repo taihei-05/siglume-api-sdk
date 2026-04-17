@@ -10,11 +10,23 @@ The `jurisdiction` field is also the basis for the country-flag icon the
 Agent API Store renders next to each listing — an instant visual cue of
 where the API is "from".
 
+> 🔄 **Payment-stack migration notice.** This document still references
+> Stripe Connect in several places. The platform is transitioning to
+> on-chain embedded-wallet settlement; the compliance surface there
+> differs (e.g. country-scoped payout rails are replaced by wallet-based
+> settlement). See [PAYMENT_MIGRATION.md](../PAYMENT_MIGRATION.md) for
+> the current cutover state. The **jurisdiction declaration requirement
+> itself is unchanged** — consumer-protection, tax, and data-residency
+> obligations continue to apply regardless of the settlement mechanism.
+
 ## Why this is required
 
-- **Payments**: Stripe Connect destination charges and refund rules vary by
-  country; a US-jurisdiction API settles under US Card-Act-style rules, a
-  JP-jurisdiction API under 資金決済法.
+- **Payments**: the legacy Stripe Connect payout rails had per-country
+  destination-charge and refund rules (a US-jurisdiction API settled
+  under US Card-Act-style rules, a JP-jurisdiction API under 資金決済法).
+  On-chain settlement shifts the mechanics, but cross-border consumer
+  protection, chargeback equivalents, and refund-note obligations still
+  track the declared jurisdiction.
 - **Consumer protection**: CA residents get CCPA, EU residents get GDPR,
   JP residents get 特定商取引法. The platform surfaces this so owners can
   evaluate risk before subscribing.
@@ -111,7 +123,7 @@ manual = ToolManual(
     approval_summary_template="Charge ${amount} to {card}?",
     preview_schema={...},
     idempotency_support=True,
-    side_effect_summary="Creates a Stripe payment intent for the owner.",
+    side_effect_summary="Debits the owner's connected wallet via the platform's payment adapter.",
     quote_schema={...},
     currency="USD",
     settlement_mode=SettlementMode.STRIPE_PAYMENT_INTENT,
@@ -132,8 +144,11 @@ If `AppManifest.jurisdiction = "US"`, a payment tool cannot set
   time.
 - **JSON schemas** (`schemas/app-manifest.schema.json`,
   `schemas/tool-manual.schema.json`) enforce `pattern: ^[A-Z]{2}(-[A-Z0-9]{1,3})?$`.
-- **Platform-side**: the review step checks the declared jurisdiction against
-  the developer's Stripe Connect onboarding country. Mismatches surface as a
+- **Platform-side**: the review step checks the declared jurisdiction for
+  consistency with the developer's payout setup (historically the Stripe
+  Connect onboarding country; during the on-chain migration this will move
+  to a wallet/account-level declaration — see
+  [PAYMENT_MIGRATION.md](../PAYMENT_MIGRATION.md)). Mismatches surface as a
   quality-report warning.
 
 ## Applicable regulations
@@ -160,8 +175,9 @@ dollars. This is enforced:
 - The platform's registration endpoint rejects non-USD payloads with a 422
   (`CURRENCY_NOT_SUPPORTED`).
 
-Why: Stripe Connect destination charges, platform-fee accounting, the 93.4% /
-6.6% revenue split, and the $5.00/month minimum for subscription APIs all
+Why: the payout rail (Stripe Connect today, on-chain embedded wallet after
+cutover), platform-fee accounting, the 93.4% / 6.6% revenue split, and the
+$5.00/month minimum for subscription APIs all
 operate in USD. Mixing currencies would fragment payouts and break the fee
 model.
 
@@ -189,5 +205,7 @@ A: Changing it is a breaking change to your terms of service. Create a new
 version (bump `version` in the manifest) and re-submit for review.
 
 **Q: What if I don't know what to put?**
-A: Use the country where your Stripe Connect account is registered. That's
-where you're invoicing from, so that's your jurisdiction.
+A: Use the country where you are a legal resident for tax and invoicing
+purposes. That's your jurisdiction. (Historically the answer was tied to
+your Stripe Connect onboarding country; with the on-chain migration this
+becomes a direct self-declaration rather than inferred from payout rails.)
