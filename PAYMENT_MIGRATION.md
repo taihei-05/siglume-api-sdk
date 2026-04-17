@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–13 shipped. Phase 13 makes the `delegated_http` broker **RPC-aware**: `/health` reports live RPC status and `/transactions/execute` validates each prepared call against the chain with `eth_getCode` + `eth_estimateGas` + fee quote before returning (still a mock tx hash, but the pre-submit checks are real). All five platform surfaces remain on Web3; SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–14 shipped. Phase 14 adds a user-visible `GET /v1/market/web3/provider-status` endpoint plus `aa_stack` readiness in the broker `/health`, so Owner Wallet can see the full runtime wiring (broker, bundler, manifest, contracts). Turnkey / Pimlico / entry point / safe module env slots are now in place — the scaffolding for real signing is ready; only the implementation remains. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -182,9 +182,21 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **SDK-side impact: none.** The new simulation block flows through `POST /v1/market/web3/transactions/execute` which the SDK does not currently wrap; consumers see it only in the Owner GUI for now.
 
+### Phase 14 — user-visible provider-status + AA-stack readiness (shipped)
+
+- **New user endpoint** `GET /v1/market/web3/provider-status` (`marketplace_api.py`, `web3_payments.py`, `schemas.py`) returns the platform's live Web3 wiring: active provider, `supported_tokens`, `manifest_loaded`, `manifest_path`, `deployment_network`, and the deployed `contracts` map.
+- **Broker `/health`** (`web3_wallet_broker_api.py`) now also reports an `aa_stack` block — readiness of Turnkey config, Pimlico bundler, paymaster, entry point, and safe module.
+- **Env slots** for Turnkey / Pimlico / entry point / safe module (`settings.py`, `.env.example`). The scaffolding is fully in place; Phase 15 just fills these with real credentials and swaps the mock internals for live HTTP calls.
+- **Owner GUI** (`OwnerWalletPage.tsx`, `lib/api.ts`, `lib/types.ts`) surfaces provider runtime: broker health, manifest path, contract addresses, aa-stack details. Developers can now see at a glance which provider is active and whether the AA stack is wired.
+- **Tests**: `test_web3_wallet_broker_api.py` → 3 passed, `test_web3_payment_foundation.py` → 14 passed (was 13), `apps/web` build → pass, Python compile → pass.
+
+**Significance: operational readiness is now visible.** Up through Phase 13, the stack was "ready for Turnkey/Safe/Pimlico to drop in" but opaque to non-admin users. Phase 14 exposes that readiness — which token list is allowlisted, which network manifest is loaded, which contract addresses are registered — to the owner surface. This is the last step before the real-signer phase; afterwards the same surfaces will show green checks against real production values.
+
+**SDK-side impact: none.** `provider-status` is a platform-level readiness endpoint, not part of the SDK's AppManifest / ToolManual developer contract. SDK consumers continue to be unaffected by this migration.
+
 ### Still pending (work in progress)
 
-- **Turnkey + Safe + Pimlico implementation as the `turnkey_safe_http` broker variant** — Codex's explicit next step. Phase 12 froze the HTTP contract; Phase 13 added real-RPC validation. The remaining change is signing and broadcasting real transactions.
+- **Turnkey + Safe + Pimlico real signer inside `turnkey_safe_http`** — Codex's explicit next target. Phase 12 froze the HTTP contract, Phase 13 added real-RPC validation, Phase 14 exposed readiness of Turnkey / Pimlico / paymaster / entry point / safe module. Phase 15 is the drop-in: fill env with real credentials, replace the mock `/transactions/execute` internals with actual signing + broadcasting.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
