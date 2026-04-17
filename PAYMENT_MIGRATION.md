@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–7 shipped. Phase 7 wires wallets to Siglume login, adds broker-health monitoring, and lands the first Stripe→Web3 cutover backend (`/v1/me/plan/web3-mandate`). Real Turnkey/Safe signer adapter + real 0x swap + the Plan-pricing UI switch still pending.
+**Status:** Phases 1–8 shipped. Phase 8 flips the Plan pricing UI off Stripe Checkout — Plus / Pro buttons now create a Web3 mandate and execute it via the embedded wallet in-flow. First Stripe-less customer purchase path on the platform. API Store + Partner buy flows, real Turnkey/Safe signer adapter, and real 0x swap still pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -100,15 +100,24 @@ The significance: the developer-facing one-click flow is now complete in shape. 
 
 The significance: Phase 7 is the **first phase that actually starts dismantling Stripe** instead of just building around it. Wallets exist for every logged-in user by default, ops can see broker health, and the Plan-pricing backend can route to Web3 the moment the UI button flips.
 
+### Phase 8 — Plan pricing UI cuts over to Web3 mandate + embedded-wallet execute (shipped)
+
+- **`PlanSection` (pricing + settings surfaces)** in `apps/web/src/app/App.tsx` now routes Plus / Pro subscription purchases through `POST /v1/me/plan/web3-mandate` → embedded-wallet `execute` in a single flow. Stripe Checkout is no longer opened for Plan subscriptions.
+- **`POST /v1/me/plan/web3-cancel`** (`presentation/api.py`) — matching cancel entrypoint for Plan Web3 mandates.
+- Frontend API clients added: `createPlanWeb3Mandate` and `cancelPlanWeb3Mandate` (`apps/web/src/lib/api.ts`).
+- Admin broker-health API from Phase 7 stays, so monitoring is in place when `mock_embedded` is swapped for `turnkey_safe_http`.
+- **Tests**: backend `test_web3_payment_foundation.py` → 10 passed, `apps/web` build → pass, Python compile → pass.
+
+**Why this is the biggest milestone so far:** this is the first point on the platform where a **real customer purchase flow does not touch Stripe at all**. A logged-in user clicking Plus or Pro now goes purchase → mandate → execute → tx_hash → submitted receipt → (eventually finalized), fully inside the Web3 pipeline. The fact that `mock_embedded` is still the provider underneath means no real funds move yet, but the *shape of the cutover* is proven end-to-end for the first real customer-facing surface.
+
 ### Still pending (work in progress)
 
-- **Plan pricing UI switch** — `POST /v1/me/plan/web3-mandate` exists (Phase 7), but the pricing buttons still open Stripe Checkout. The next phase flips the UI so Plan subscription purchases go through `web3-mandate` + embedded-wallet execute, skipping Stripe entirely.
-- **Real Turnkey / Safe adapter** — provider abstraction now names `delegated_http` and `turnkey_safe_http` alongside `mock_embedded`, but the live one remains `mock_embedded`. Swapping to a real signer replaces the deterministic hash with a real broadcast — without changing the API surface that consumers (Owner GUI / SDK) see.
+- **API Store + Partner buy-flow UI cutover** — per Codex's plan, API Store purchase-start UI and Partner flow are the next to move from Stripe to Web3 mandate + escrow, following the same pattern Phase 8 applied to Plan. **This is the phase that triggers SDK v0.2.0 evaluation** because it puts the on-chain settlement path under the *tool-execution* axis the SDK's `SettlementMode` enum gates.
+- **Real Turnkey / Safe adapter** — provider abstraction names `delegated_http` and `turnkey_safe_http`; the live one is still `mock_embedded`. Swapping to a real signer produces real Polygon broadcasts without changing the API surface.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
-- **Tool-execution Stripe flows** — the customer-facing *tool-execution* `SettlementMode` axis is still stripe-only (`stripe_checkout` / `stripe_payment_intent`). The Plan-pricing cutover (above) is the first Stripe removal; tool-execution is expected to follow.
 
-Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
+Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration. The `SettlementMode` enum stays frozen at `stripe_checkout` / `stripe_payment_intent` in SDK v0.1.x until the API Store buy-flow cutover lands.
 
 ## What still works today
 
