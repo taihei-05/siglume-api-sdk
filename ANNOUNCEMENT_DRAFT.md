@@ -46,8 +46,8 @@ description that agents use to decide whether to call your API.
 A well-written tool manual means more agents select your API,
 which means more installs and more subscription revenue.
 
-Grade D or F tool manuals cannot be published — the quality check
-blocks them automatically.
+Grade C, D, or F tool manuals cannot be published — the quality check
+blocks them automatically. Minimum grade B is required.
 
 See the [Tool Manual Guide](https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md#13-tool-manual-guide)
 for how to write a manual that gets your API selected.

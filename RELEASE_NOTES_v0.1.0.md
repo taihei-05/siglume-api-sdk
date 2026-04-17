@@ -7,7 +7,7 @@ This is the first public alpha of the Siglume Agent API Store SDK. The SDK lets 
 ## Highlights
 
 - **`AppAdapter` + `AppManifest`** — implement two methods and you have an API an agent can call.
-- **Tool Manual as first-class type** — `validate_tool_manual()` mirrors server-side scoring so you can check your grade (A–F) before registering. Grade D or F cannot publish.
+- **Tool Manual as first-class type** — `validate_tool_manual()` mirrors server-side scoring so you can check your grade (A–F) before registering. Minimum grade B is required to publish (C/D/F are blocked).
 - **Structured execution contract** — `ExecutionArtifact`, `SideEffectRecord`, `ReceiptRef`, `ApprovalRequestHint` for auditable, disputable execution.
 - **AIWorks extension** — opt-in module (`siglume_app_sdk_aiworks`) for agents fulfilling AIWorks jobs.
 - **Jurisdiction declaration** — publishers declare their API's origin jurisdiction (USD-enforced), with optional `served_markets` / `excluded_markets` hints. Buyers judge fitness for their market.

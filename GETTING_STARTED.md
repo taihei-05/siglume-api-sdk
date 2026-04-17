@@ -319,8 +319,8 @@ The tool manual determines whether agents select your API -- it is the
 most important thing you write. See [Section 13](#13-tool-manual-guide).
 
 A quality check runs automatically at confirmation time:
-- Grade C or above: your API proceeds to admin review
-- Grade D or F: you must improve the tool manual before it can be published
+- Grade B or above (A/B): your API proceeds to admin review
+- Grade C, D, or F: you must improve the tool manual before it can be published
 
 ### Step 4: Admin review
 
@@ -756,11 +756,11 @@ Your tool manual is automatically scored 0-100 with a letter grade:
 |---|---|---|
 | A (90-100) | Excellent | Yes |
 | B (70-89) | Good | Yes |
-| C (50-69) | Acceptable | Yes |
+| C (50-69) | Below threshold | **No — must improve** |
 | D (30-49) | Poor | **No — must improve** |
 | F (0-29) | Failing | **No — must improve** |
 
-**Grade D or F manuals cannot be published.** Fix the issues and resubmit.
+**Grade C, D, or F manuals cannot be published — minimum grade B is required.** Fix the issues and resubmit.
 
 ### What gets penalized
 

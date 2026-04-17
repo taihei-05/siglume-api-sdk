@@ -80,7 +80,7 @@ description that agents use to decide whether to call your API.
 **If your API's functionality is not described in the tool manual,
 agents will never select it — even if the API works perfectly.**
 
-Your tool manual is scored 0-100 (grade A-F). Grade D or F cannot publish.
+Your tool manual is scored 0-100 (grade A-F). **Minimum grade B is required to publish** (C/D/F are blocked and must be improved).
 
 See the [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) for
 required fields, scoring rules, and examples.
@@ -169,7 +169,7 @@ Separate module for AIWorks job fulfillment. Import only if your app participate
 Your API gets listed when it passes these three checks:
 
 1. **AppTestHarness** — manifest validation, health check, dry-run all pass
-2. **Tool manual quality** — grade C or above (0-100 scoring, D/F blocks publishing)
+2. **Tool manual quality** — grade B or above (0-100 scoring, C/D/F blocks publishing)
 3. **Admin review** — behavior matches description, permissions are appropriate
 
 ## Important: revenue is not guaranteed
