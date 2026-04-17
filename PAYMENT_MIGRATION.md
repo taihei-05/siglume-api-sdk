@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–9 shipped. Phase 9 extends the Stripe-less cutover from Plan (Phase 8) to **Partner subscriptions** and **API Store paid purchases**, so all three of Siglume's platform-billing surfaces now route through Web3 mandate + embedded-wallet execute. Provider is still `mock_embedded` (real funds do not move), but the subscription-purchase axis is end-to-end Web3. Tool-execution settlement (the `SettlementMode` axis SDK v0.2.0 gates on) is **not yet moved** — still Stripe server-side.
+**Status:** Phases 1–10 shipped. Phase 10 brings **AI Works escrow** (fund + release + refund) onto the Web3 wallet flow, so Plan / Partner / API Store / AI Works — the four platform-billing surfaces — are all Stripe-less under the mock provider. Ads (AdsBillingHub) is the last remaining surface. Tool-execution settlement (the `SettlementMode` axis SDK v0.2.0 gates on) is **not yet moved** — still Stripe server-side.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -121,12 +121,25 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **Why this is a large milestone for publishers:** Plan (Phase 8), Partner (Phase 9), and **paid API Store purchase** (Phase 9) — the three platform-billing surfaces — are all on Web3 mandate flows now. For the SDK specifically, this means the earlier "paid-subscription publish is paused" caveat is no longer true for sellers with a verified Polygon payout wallet; they can register, have buyers purchase via Web3 mandate, and land an access grant via the mock projector. What's still missing is real tx submission and the corresponding tool-execution-axis changes (see below).
 
+### Phase 10 — AI Works escrow on the Web3 wallet flow (shipped)
+
+- **`WorksEscrowHub` tx plan** in `web3_tx_plans.py` — prepared calldata for `fundEscrow` and `releaseEscrow` on the deployed hub.
+- **`fund_works_order()`** (`works_service.py`) is now Web3-first: if the seller has a verified Polygon payout wallet, a `works_escrow` mandate is created; under `mock_embedded` it auto-executes and the order lands at `funds_locked`.
+- **`accept_works_delivery()`** (`works_service.py`) switches from Stripe release to on-chain release — uses the stored `web3_escrow_id` to issue the `releaseEscrow` tx. `mock_embedded` progresses through `settled` / `completed`.
+- **Generic prepared-tx executor** in `web3_payments.py` + `services.py` — the backend can now send, register a receipt for, and mock-project *any* prepared `transaction_request`, not just mandate-derived ones. This is the abstraction that made escrow fund/release drop in cleanly.
+- **Projector + indexer** (`web3_projector.py`, `web3_indexer.py`) project three new Works events: `works_escrow_funded`, `works_escrow_released`, `works_escrow_refunded`.
+- **Works Order Detail UI** (`WorksOrderDetailPage.tsx`) is no longer redirect-based — it receives the returned tx hash and refreshes with a notice in place.
+- **Dev manifest** (`amoy.json`) extended with the `works_escrow_hub` entry.
+- **Tests**: a new Works unit test walks the full `fund → submit deliverable → accept` cycle under `mock_embedded`; `test_web3_payment_foundation.py` → 13 passed (was 12). `apps/web` build → pass. Python compile → pass.
+
+**Significance for the AIWorks SDK extension:** the SDK's AIWorks module (`siglume_api_sdk_aiworks.py`) exposes `JobExecutionContext`, `FulfillmentReceipt`, `DeliverableSpec`, `BudgetSnapshot`. **None of these change** — the escrow mechanics are entirely server-side (seller's payout wallet decides whether Web3 path kicks in). An agent that fulfils AIWorks jobs today continues to use the same fulfillment contract; the platform routes the funds through Web3 escrow rather than Stripe escrow behind the scenes.
+
 ### Still pending (work in progress)
 
-- **AI Works escrow cutover** — per Codex's plan, AI Works escrow execution is the next surface to join the Web3 wallet flow, following the same pattern Phase 9 applied to Partner and API Store paid purchase.
+- **Ads cutover (`AdsBillingHub`)** — the last platform surface still routing through Stripe. Per Codex's plan, daily settled-ad charges will go on-chain via `AdsBillingHub` next.
 - **Tool-execution Axis 2 migration** — this is the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not a Codex target yet, but a separate coordination that will reach us when it does.
 - **Real Turnkey / Safe adapter** — provider abstraction names `delegated_http` and `turnkey_safe_http`; the live one is still `mock_embedded`. Swapping to a real signer produces real Polygon broadcasts without changing the API surface.
-- **Replace `amoy.json` placeholder manifest** — Codex added a dev-only deployment manifest so local mock tx-plans work. Must be replaced with a real testnet deploy manifest before any chain exposure.
+- **Replace `amoy.json` placeholder manifest** — Codex added a dev-only deployment manifest so local mock tx-plans work. Phase 10 extended it with `works_escrow_hub`. Must be replaced with a real testnet deploy manifest before any chain exposure.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 
