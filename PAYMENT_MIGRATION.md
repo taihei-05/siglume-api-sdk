@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–25 shipped. Phase 25 closes the **live-submit landing loop**: a new `POST /v1/market/web3/receipts/{receipt_id}/finalize` route (backed by `finalize_chain_receipt()` in `web3_payments.py`) takes a receipt that has already resolved `userOpHash → tx_hash` and syncs the block range around that tx into the projector. The Owner Wallet receipts list gains a **Finalize sync** button so ops can drive a pending receipt all the way to finalized state from the GUI. Paired with Phase 24's signer probe, the end-to-end real-submit-then-land path is now fully buttoned-up on the platform side. **Caveat unchanged:** the real Turnkey + Pimlico + Amoy run against a populated `amoy.json` has still not happened. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–26 shipped. Phase 26 collapses the whole landing walk into **one button**: `POST /v1/market/web3/receipts/{receipt_id}/await-finality` (backed by `await_chain_receipt_finality()` in `web3_payments.py`) runs refresh → confirmation wait → finalize sync in a single call, and Owner Wallet gets a matching **Await finality** button. From the GUI, a pending receipt goes *Await finality → Finalize sync* (or just *Await finality* alone, since it now encompasses both) to reach terminal projected state. **Caveat unchanged:** the real Turnkey + Pimlico + Amoy run against a populated `amoy.json` has still not happened. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-17
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -342,9 +342,22 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **SDK-side impact: none.** `finalize` is a platform operational surface on `chain_receipt`; it does not cross into the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 26 — one-button await finality (shipped, still not validated on Amoy)
+
+- **`await_chain_receipt_finality()`** in `web3_payments.py` — orchestrates the three-step landing in a single call: `refresh_chain_receipt_status()` (Phase 17) → poll for `confirmed` → `finalize_chain_receipt()` (Phase 25). One round trip from the caller's perspective.
+- **Public route** `POST /v1/market/web3/receipts/{receipt_id}/await-finality` (`presentation/marketplace_api.py`); service binding in `services.py`; schemas in `presentation/schemas.py`; TS types in `apps/web/src/lib/types.ts`; client in `apps/web/src/lib/api.ts`.
+- **Owner GUI** (`OwnerWalletPage.tsx`) — each receipt row now also has an **Await finality** button. One click walks the receipt from `submitted (placeholder tx_hash)` all the way to `finalized + projector-reflected` without the operator having to drive Refresh and Finalize sync separately.
+- **Tests**: `test_web3_payment_foundation.py` → 15 passed (was 14, +1 for the new await-finality path), `test_web3_wallet_broker_api.py` → 8 passed, `apps/web` build → pass, Python compile → pass.
+
+**Significance: the ops story for a real Amoy run shrinks to three GUI clicks.** Validate signer → Execute → Await finality. Phases 17 and 25 added the individual stages as separate buttons (Refresh, Finalize sync); Phase 26 keeps those available but fuses them for the common case where an operator just wants to land a userOp with minimum friction. The separation still matters for debugging — if finality stalls partway, the individual buttons let you inspect each stage — but the happy path is now a single click.
+
+**Caveat, still called out explicitly by Codex:** *the real Turnkey + Pimlico + Amoy chain has still not been run end-to-end against real infrastructure.* `amoy.json` remains a placeholder; Phase 27 is the Amoy run itself — real deploy manifest, `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true`, and walking Validate signer → Execute → Await finality from Owner Wallet against a live bundler.
+
+**SDK-side impact: none.** `await-finality` is a platform operational surface on `chain_receipt`; it does not cross into the SDK's AppManifest / ToolManual developer contract.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–25 wired the Turnkey HTTP signer, a signer-validate probe, and a receipt-finalize endpoint; every platform step a real userOp would traverse is now implemented and GUI-drivable. The next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with a real `amoy.json` and walking one userOp through the full *execute → refresh → finalize* loop on-chain. Until that run passes, "real landing works" is a code claim, not a proven claim.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–26 wired the Turnkey HTTP signer, a signer-validate probe, a receipt-finalize endpoint, and a one-button await-finality orchestrator; every platform step a real userOp would traverse is now implemented and collapses into three GUI clicks (Validate signer → Execute → Await finality). The next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with a real `amoy.json` and walking those three clicks on-chain. Until that run passes, "real landing works" is a code claim, not a proven claim.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
