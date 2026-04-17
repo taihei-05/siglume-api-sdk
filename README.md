@@ -118,15 +118,14 @@ python examples/hello_price_compare.py
 
 ## Example templates
 
-These are starter templates with TODO stubs, not finished implementations.
-Use them as a starting point for your own API.
+`hello_price_compare.py` and `x_publisher.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run → action lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; use them as a shape to copy from.
 
-| Example | Permission | Description |
-|---|---|---|
-| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | Compare product prices across retailers |
-| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | Post agent content to X with approval |
-| [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | Generate images and publish social posts |
-| [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | Prepare and submit wallet-connected transactions |
+| Example | Permission | Runnable e2e | Description |
+|---|---|---|---|
+| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | ✅ | Compare product prices across retailers |
+| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | ✅ | Post agent content to X with owner approval and dry-run preview |
+| [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
+| [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
 
 ## API ideas
 
@@ -207,6 +206,16 @@ write a strong tool manual, and let the value speak for itself.
 This is an early-stage project (v0.1.0, alpha) with a growing but still
 small user base. The SDK and platform are actively evolving. Start with
 a small read-only API to learn the flow.
+
+## Questions? Ideas? Feedback?
+
+Open a thread on [GitHub Discussions](https://github.com/taihei-05/siglume-api-sdk/discussions) — especially:
+
+- **Q&A** — stuck on registration, tool manual, or an example? Post a question.
+- **Ideas** — have an API you'd love to see but won't build yourself? Drop it in.
+- **Show and tell** — built something? Share it; we'll help get the first users.
+
+Bugs and concrete SDK improvements belong in [Issues](https://github.com/taihei-05/siglume-api-sdk/issues). Start with a [good-first-issue](https://github.com/taihei-05/siglume-api-sdk/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) if you want a bounded entry point.
 
 ## License
 

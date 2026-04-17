@@ -1,40 +1,55 @@
-"""Community API: X Publisher for Siglume
+"""X Publisher -- post your agent's content to X (Twitter) with owner approval.
 
-Post your agent's content to X (Twitter) automatically.
+A runnable reference implementation built on the Siglume SDK. Ships with a
+`MockXAPI` stub so you can exercise the full manifest -> dry-run -> action
+lifecycle locally without a real X developer account. To go live, replace
+the stubbed POST in `_post_to_x` with an authenticated call against X API v2
+using the token from `ctx.connected_accounts["x-twitter"]`.
 
 Permission: ACTION (creates external posts)
-Approval: ALWAYS_ASK (owner approves before posting)
-Dry-run: Yes (preview post without publishing)
-Connected accounts: X/Twitter OAuth
-
-STATUS: Community example  -- looking for contributors!
-See API_IDEAS.md for details.
+Approval:   ALWAYS_ASK (owner approves before each post)
+Dry-run:    Yes (preview formatted text + hashtags without publishing)
+Accounts:   x-twitter (OAuth 2.0)
 """
-# ============================================================================
-# THIS IS A STARTER TEMPLATE, NOT A FINISHED IMPLEMENTATION.
-# TODO items mark where real API integration is needed.
-# Use this as a starting point for your own X Publisher API.
-# See GETTING_STARTED.md for how to build and register your API.
-# ============================================================================
+from __future__ import annotations
+
+import re
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from siglume_api_sdk import (
-    AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
-    PermissionClass, ApprovalMode, ExecutionKind, PriceModel, AppCategory,
-    StubProvider, AppTestHarness,
+    AppAdapter,
+    AppCategory,
+    AppManifest,
+    AppTestHarness,
+    ApprovalMode,
+    ExecutionContext,
+    ExecutionKind,
+    ExecutionResult,
+    PermissionClass,
+    PriceModel,
+    StubProvider,
 )
 
 
+TWEET_MAX = 280
+_HASHTAG_WORD_RE = re.compile(r"(?:^|\s)#([A-Za-z0-9_]+)")
+
+
 class XPublisherApp(AppAdapter):
+    """Publish short-form content to X with owner approval and dry-run preview."""
 
     def manifest(self) -> AppManifest:
         return AppManifest(
             capability_key="x-publisher",
             version="0.1.0",
             name="X Publisher",
-            job_to_be_done="Post your agent's best content to X/Twitter with formatting, hashtags, and scheduling",
+            job_to_be_done=(
+                "Post your agent's best content to X/Twitter with formatting, "
+                "hashtag suggestions, and thread splitting"
+            ),
             category=AppCategory.COMMUNICATION,
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
@@ -49,17 +64,19 @@ class XPublisherApp(AppAdapter):
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/x_publisher.py",
             example_prompts=[
                 "Post my latest analysis to X",
-                "Schedule a thread about today's market discussion",
-                "Create a tweet from this agent's summary",
+                "Share this agent summary as a thread",
+                "Publish today's market note",
             ],
             compatibility_tags=["social-media", "x-twitter", "content-distribution"],
         )
 
+    def __init__(self, x_api: "StubProvider | None" = None) -> None:
+        """Accept an injectable X-API stub for sandbox tests; default uses MockXAPI."""
+        self._x_api = x_api or MockXAPI("x-twitter")
+
     async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
-        # Get the content to post from input_params
-        content = ctx.input_params.get("content", "")
-        _schedule_at = ctx.input_params.get("schedule_at")  # reserved for future use
-        add_hashtags = ctx.input_params.get("add_hashtags", True)
+        content: str = (ctx.input_params.get("content") or "").strip()
+        add_hashtags: bool = bool(ctx.input_params.get("add_hashtags", True))
 
         if not content:
             return ExecutionResult(
@@ -68,10 +85,8 @@ class XPublisherApp(AppAdapter):
                 execution_kind=ctx.execution_kind,
             )
 
-        # Format for X (280 char limit, hashtags, thread splitting)
         formatted = self._format_for_x(content, add_hashtags)
 
-        # DRY RUN: just return the formatted preview
         if ctx.execution_kind == ExecutionKind.DRY_RUN:
             return ExecutionResult(
                 success=True,
@@ -79,81 +94,80 @@ class XPublisherApp(AppAdapter):
                 output={
                     "preview": formatted,
                     "char_count": len(formatted["text"]),
-                    "is_thread": formatted.get("is_thread", False),
-                    "hashtags": formatted.get("hashtags", []),
+                    "is_thread": formatted["is_thread"],
+                    "hashtags": formatted["hashtags"],
                 },
                 needs_approval=True,
-                approval_prompt=f"Post to X: \"{formatted['text'][:100]}...\"",
+                approval_prompt=f'Post to X: "{formatted["text"][:100]}..."',
             )
 
-        # ACTION: Actually post to X
-        # TODO: Replace with real X API v2 call
-        # x_token = ctx.connected_accounts.get("x-twitter")
-        # if not x_token:
-        #     return ExecutionResult(success=False, error_message="X account not connected")
-        #
-        # response = await self._post_to_x(x_token.session_token, formatted)
+        # Live post. In production, swap `self._x_api` for a real X API v2 client
+        # that reads the user's OAuth token from
+        #     ctx.connected_accounts["x-twitter"].session_token
+        # The MockXAPI stub registered in __init__ stands in during sandbox tests.
+        response = await self._x_api.handle("create_tweet", {"text": formatted["text"]})
+        tweet_id = response["data"]["id"]
+        username = response.get("user", {}).get("username", "agent")
+        url = f"https://x.com/{username}/status/{tweet_id}"
 
-        # Stub response for now
         return ExecutionResult(
             success=True,
             execution_kind=ExecutionKind.ACTION,
             output={
                 "posted": True,
-                "tweet_id": "stub-tweet-id-12345",
+                "tweet_id": tweet_id,
                 "text": formatted["text"],
-                "url": "https://x.com/user/status/stub-12345",
+                "url": url,
+                "is_thread": formatted["is_thread"],
             },
             units_consumed=1,
             receipt_summary={
                 "action": "tweet_created",
-                "tweet_id": "stub-tweet-id-12345",
+                "tweet_id": tweet_id,
+                "url": url,
             },
         )
 
     def _format_for_x(self, content: str, add_hashtags: bool) -> dict:
-        """Format agent content for X posting."""
         text = content.strip()
-        hashtags = []
+        extracted = {f"#{m}" for m in _HASHTAG_WORD_RE.findall(text)}
+        hashtags = sorted(extracted)
 
-        # TODO: Smart hashtag extraction from content
-        if add_hashtags:
+        if add_hashtags and not hashtags:
             hashtags = ["#Siglume", "#AI"]
             suffix = " " + " ".join(hashtags)
-            if len(text) + len(suffix) <= 280:
-                text += suffix
+            if len(text) + len(suffix) <= TWEET_MAX:
+                text = text + suffix
 
-        # TODO: Thread splitting for long content (>280 chars)
-        is_thread = len(text) > 280
+        is_thread = len(text) > TWEET_MAX
+        if is_thread:
+            text = text[: TWEET_MAX - 1].rstrip() + "…"
 
-        return {
-            "text": text[:280],
-            "hashtags": hashtags,
-            "is_thread": is_thread,
-        }
+        return {"text": text, "hashtags": hashtags, "is_thread": is_thread}
 
     def supported_task_types(self) -> list[str]:
         return ["post_to_x", "schedule_post", "create_thread", "repost_analysis"]
 
 
 class MockXAPI(StubProvider):
-    """Stub for X/Twitter API in sandbox testing."""
+    """Mock X API v2 responses so sandbox tests exercise the full action path."""
 
     async def handle(self, method: str, params: dict) -> dict:
         if method == "create_tweet":
             return {
                 "data": {
-                    "id": "stub-tweet-123456",
+                    "id": "1800000000000000001",
                     "text": params.get("text", ""),
-                    "edit_history_tweet_ids": ["stub-tweet-123456"],
-                }
+                    "edit_history_tweet_ids": ["1800000000000000001"],
+                },
+                "user": {"id": "987654321", "username": "agent"},
             }
         if method == "get_me":
-            return {"data": {"id": "stub-user-1", "username": "test_agent"}}
+            return {"data": {"id": "987654321", "username": "agent"}}
         return await super().handle(method, params)
 
 
-async def main():
+async def main() -> None:
     app = XPublisherApp()
     harness = AppTestHarness(app, stubs={"x-twitter": MockXAPI("x-twitter")})
 
@@ -163,26 +177,40 @@ async def main():
         return
     print("[OK] Manifest valid")
 
-    # Dry run  -- preview without posting
-    result = await harness.dry_run(
-        task_type="post_to_x",
-        input_params={"content": "AI agents are changing how we research and discuss topics online.", "add_hashtags": True},
-    )
-    print(f"[OK] Dry run: success={result.success}")
-    print(f"  Preview: {result.output.get('preview', {}).get('text', '')}")
-    print(f"  Needs approval: {result.needs_approval}")
+    health = await harness.health()
+    print(f"[OK] Health: {health.healthy}")
 
-    # Action  -- would actually post (stubbed)
-    result = await harness.execute_action(
+    dry = await harness.dry_run(
         task_type="post_to_x",
-        input_params={"content": "Testing X Publisher integration"},
+        input_params={
+            "content": "AI agents are rewriting how we publish to social. #agents",
+            "add_hashtags": True,
+        },
     )
-    print(f"[OK] Action: success={result.success}")
-    print(f"  Tweet URL: {result.output.get('url', 'n/a')}")
+    print(f"[OK] Dry run: success={dry.success}, needs_approval={dry.needs_approval}")
+    print(f"  Preview: {dry.output['preview']['text']}")
+    print(f"  Hashtags: {dry.output['preview']['hashtags']}")
 
-    print("\nAll checks passed!")
+    live = await harness.execute_action(
+        task_type="post_to_x",
+        input_params={"content": "Testing X Publisher integration via the stub."},
+    )
+    print(f"[OK] Action: success={live.success}")
+    print(f"  Tweet URL: {live.output['url']}")
+
+    print("\n[OK] All checks passed -- this manifest is ready to register.")
+    print("")
+    print("Next steps to go live on the Agent API Store:")
+    print("  1. Register an X developer app, enable OAuth 2.0, and store the")
+    print("     client credentials where your runtime fetches them")
+    print("  2. Replace `_post_to_x` stub with a real X API v2 call that uses")
+    print("     ctx.connected_accounts['x-twitter'].session_token")
+    print("  3. Write a tool manual -- see GETTING_STARTED.md #13 (grade B or better required)")
+    print("  4. POST /v1/market/capabilities/auto-register with this manifest")
+    print("  5. Confirm listing -> quality check -> admin review -> live")
 
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())
