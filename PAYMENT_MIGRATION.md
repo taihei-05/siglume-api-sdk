@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–15 shipped. Phase 15 threads an **ERC-4337 `submission_outline`** through the broker's `simulate` / `execute` responses — naming the exact entry point / safe module / bundler / paymaster that will be invoked, listing any missing requirements, and flagging `ready_for_real_submission`. The stack now describes its would-be real send in full; Phase 16 replaces the outline with the actual signing + broadcasting. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–16 shipped. Phase 16 promotes **ERC-4337 `user_operation_hash` to first-class** in the broker response, execute result, and `chain_receipt` — alongside new `submission_kind` and `submitted_hash` fields. This is the data-shape scaffolding for the real Pimlico flow (`eth_sendUserOperation` → userOpHash → `eth_getUserOperationReceipt` → tx_hash). SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -205,9 +205,23 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **SDK-side impact: none.** The outline flows through the existing `/v1/market/web3/transactions/execute` response and is consumed by the Owner GUI only; no SDK contract change.
 
+### Phase 16 — `user_operation_hash` as a first-class field (shipped)
+
+- **Broker `/transactions/execute`** (`web3_wallet_broker_api.py`) now returns `user_operation_hash` in addition to the prior `tx_hash`.
+- **Backend execute result + `chain_receipt`** (`web3_payments.py`) thread through three new fields:
+  - `submission_kind` — distinguishes regular EOA-style tx submission from ERC-4337 userOp submission
+  - `submitted_hash` — the hash that was actually broadcast (could be a userOpHash or tx_hash depending on `submission_kind`)
+  - `user_operation_hash` — the AA-specific hash returned from the bundler
+- **API schema** (`presentation/schemas.py`) and **frontend types** (`apps/web/src/lib/types.ts`) updated to carry the new shape.
+- **Tests**: `test_web3_wallet_broker_api.py` → 3 passed, `test_web3_payment_foundation.py` → 14 passed, `apps/web` build → pass, Python compile → pass.
+
+**Significance: the receipt model now speaks ERC-4337's two-stage lifecycle natively.** Under the real Pimlico flow, a `POST eth_sendUserOperation` returns a userOpHash immediately; the bundler later includes the userOp in an on-chain bundle, and `eth_getUserOperationReceipt` resolves that userOpHash to a tx_hash once mined. With Phase 16 the platform can represent both stages without collapsing them into a single ambiguous "hash" field. The mock broker still fills both with deterministic values, but the shape no longer blocks the real implementation.
+
+**SDK-side impact: none.** These fields surface inside `/v1/market/web3/transactions/execute` and `chain_receipt`, neither of which is part of the SDK's AppManifest / ToolManual developer contract.
+
 ### Still pending (work in progress)
 
-- **Replace `submission_outline` with actual Turnkey + Safe + Pimlico submission** — Codex's explicit next step (Phase 16). Phase 12 froze the HTTP contract, Phase 13 added real-RPC validation, Phase 14 exposed readiness, Phase 15 described the exact submission path. Phase 16 makes it happen: sign via Turnkey, bundle via Pimlico, sponsor gas via paymaster, submit to entry point, return a real tx hash.
+- **Real Pimlico `eth_sendUserOperation` / `eth_getUserOperationReceipt`** — the data shape is now in place (Phase 16). The broker internals will actually call the Pimlico bundler, receive a real userOpHash, and later resolve it to a real tx_hash via `eth_getUserOperationReceipt`. Real Turnkey signing feeds into the same flow.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
