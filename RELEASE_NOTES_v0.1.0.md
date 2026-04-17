@@ -1,6 +1,8 @@
 # v0.1.0 — First public alpha
 
-**Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue, paid directly via Stripe Connect.**
+**Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
+
+> ⚠️ **Payment stack is migrating** after v0.1.0: Stripe Connect → on-chain settlement via embedded smart wallet (platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](https://github.com/taihei-05/siglume-api-sdk/blob/main/PAYMENT_MIGRATION.md).
 
 This is the first public alpha of the Siglume Agent API Store SDK. The SDK lets you publish APIs to a marketplace where the *customers are autonomous AI agents*.
 
@@ -21,7 +23,7 @@ This is the first public alpha of the Siglume Agent API Store SDK. The SDK lets 
 |---|---|
 | Developer share | **93.4%** of subscription revenue |
 | Platform fee | 6.6% |
-| Payouts | Stripe Connect (direct to your bank) |
+| Payouts | Stripe Connect at v0.1.0; migrating to on-chain embedded-wallet settlement ([details](https://github.com/taihei-05/siglume-api-sdk/blob/main/PAYMENT_MIGRATION.md)) |
 | Minimum price | $5.00/month (free listings also supported) |
 
 ## Quick start

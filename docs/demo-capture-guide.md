@@ -13,8 +13,11 @@ The current beta separates buyer and seller flows:
 - `/owner/receipts` is the execution audit trail
 
 For the current beta, do not present live payout settlement as already
-available. Show Stripe Connect payout setup or connected state instead. Paid
-monetization is still documented as a later phase.
+available. The payment stack is migrating from Stripe Connect to on-chain
+embedded-wallet settlement (see `PAYMENT_MIGRATION.md`) — during the
+transition, show payout **setup / connected state** (whichever the UI
+currently renders on `/owner/publish` → `Settings`), not a live payout event.
+Paid monetization is still documented as a later phase.
 
 ## Recommended demo flow
 
@@ -30,8 +33,9 @@ because viewers can understand the job-to-be-done in a single glance.
 5. Open `/owner/installed-tools` and create an execution intent for the app.
 6. Open `/owner/receipts` and show the receipt summary, approval state, and
    step details if available.
-7. Return to `/owner/publish`, open the `Settings` tab, and show the Stripe
-   Connect setup or connected state.
+7. Return to `/owner/publish`, open the `Settings` tab, and show the current
+   payout setup or connected state (legacy Stripe Connect card or the new
+   embedded-wallet card — whichever the UI renders during the migration).
 
 Optional: if you want a public-store establishing shot, prepend a 2-3 second
 cut of `/owner/apps` before the seller flow. Do not use `/owner/apps` as the
@@ -114,14 +118,14 @@ Voiceover:
 ### 82s-90s
 
 Screen:
-Return to `/owner/publish`, switch to `Settings`, and show the Stripe Connect
-section.
+Return to `/owner/publish`, switch to `Settings`, and show the payout section
+(Stripe Connect card or on-chain embedded-wallet card, whichever is current).
 
 On-screen text:
 `6. Verify payout setup`
 
 Voiceover:
-`When paid monetization is enabled, this is where payout readiness connects through Stripe Connect.`
+`When paid monetization is enabled, this is where your payout wallet connects. The platform is transitioning to on-chain settlement with gas covered; see PAYMENT_MIGRATION.md for the cutover timeline.`
 
 ## Short README GIF
 
@@ -130,7 +134,7 @@ three beats:
 
 1. `/owner/publish` overview
 2. `Sandbox` result or `/owner/installed-tools` execute click
-3. `/owner/receipts` or Stripe Connect setup state
+3. `/owner/receipts` or payout setup state
 
 This keeps the README lightweight while still proving the flow.
 
@@ -144,7 +148,7 @@ This keeps the README lightweight while still proving the flow.
 - Use `125%-150%` browser zoom so text stays readable.
 - Move the cursor slowly and disable notifications.
 - Blur personal data, external account identifiers, and anything tied to a
-  real Stripe destination.
+  real payout destination (bank account or wallet address).
 
 ## Export the README GIF
 
@@ -174,7 +178,7 @@ docs/assets/demo/siglume-owner-publish-demo.gif
   <a href="https://www.loom.com/share/REPLACE_WITH_YOUR_90S_VIDEO_URL">
     <img
       src="./docs/assets/demo/siglume-owner-publish-demo.gif"
-      alt="Demo: auto-register an API, review it in the developer portal, let an agent select it, and verify Stripe Connect payout setup"
+      alt="Demo: auto-register an API, review it in the developer portal, let an agent select it, and verify payout setup"
       width="960"
     />
   </a>

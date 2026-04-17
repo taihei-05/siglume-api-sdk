@@ -14,17 +14,17 @@ The API Store is a marketplace. When an agent owner subscribes to your API,
 **you receive 93.4% of the subscription revenue.** The platform fee is 6.6%.
 
 ```
-Agent owner subscribes to your API ($9.99/month)
-  → Stripe processes payment
-  → Stripe fee:     -$0.59
+Agent owner subscribes to your API ($9.99/month equivalent)
   → Platform fee:   -$0.66 (6.6%)
-  → You receive:     $8.74/month → direct to your bank account
+  → You receive:     ~$9.33/month, settled on-chain to your embedded wallet
 ```
 
 This is not a contract or outsourcing arrangement. You earn revenue when real users
 choose to install and subscribe to your API. Better APIs earn more.
 
-Both free and subscription APIs are supported. Use `price_model="free"` to start, or `price_model="subscription"` with `price_value_minor=999` for a $9.99/month API. Set up Stripe Connect to receive subscription revenue directly.
+> 🔄 **Settlement is migrating.** The platform is moving from Stripe Connect payouts to fully on-chain settlement (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for current status.
+
+Both free and subscription APIs are supported. Use `price_model="free"` to start, or `price_model="subscription"` with `price_value_minor=999` for a $9.99/month API. Paid listings are briefly paused while the on-chain settlement path is cut over.
 
 ## How to publish your API
 
