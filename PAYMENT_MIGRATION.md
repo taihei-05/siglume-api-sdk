@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–16 shipped. Phase 16 promotes **ERC-4337 `user_operation_hash` to first-class** in the broker response, execute result, and `chain_receipt` — alongside new `submission_kind` and `submitted_hash` fields. This is the data-shape scaffolding for the real Pimlico flow (`eth_sendUserOperation` → userOpHash → `eth_getUserOperationReceipt` → tx_hash). SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–17 shipped. Phase 17 closes the **userOpHash → tx_hash resolve path**: a new broker `POST /transactions/status` (backed by `eth_getUserOperationReceipt` + `eth_getTransactionReceipt`) returns status / confirmations / resolved tx_hash; backend `refresh_chain_receipt_status()` updates a submitted `chain_receipt` in place; Owner GUI exposes a "Refresh status" button on pending receipts. The complete ERC-4337 two-stage lifecycle now flows end-to-end in shape. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -219,13 +219,26 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **SDK-side impact: none.** These fields surface inside `/v1/market/web3/transactions/execute` and `chain_receipt`, neither of which is part of the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 17 — userOpHash → tx_hash resolve path (shipped)
+
+- **Broker `POST /transactions/status`** (`web3_wallet_broker_api.py`) — queries `eth_getUserOperationReceipt` first, falls back to `eth_getTransactionReceipt`, and returns `status` / `tx_hash` / `user_operation_hash` / `confirmations`.
+- **Backend `refresh_chain_receipt_status()`** (`web3_payments.py`, `services.py`) — looks up a previously submitted `chain_receipt`, asks the broker for the latest status, and if the userOp has been bundled it updates the receipt's `tx_hash` / confirmation state in place.
+- **User-facing route** `POST /v1/market/web3/receipts/{receipt_id}/refresh` (`marketplace_api.py`, `presentation/schemas.py`) — owner-initiated re-resolve for a single receipt.
+- **Owner GUI** (`OwnerWalletPage.tsx`, `lib/api.ts`, `lib/types.ts`) — each pending receipt row gets a "Refresh status" button; once the broker returns `confirmed`, the card updates without a reload.
+- **Receipt / execution tracking** carries `submission_kind`, `submitted_hash`, and `user_operation_hash` throughout the lifecycle.
+- **Tests**: `test_web3_wallet_broker_api.py` → 3 passed, `test_web3_payment_foundation.py` → 14 passed, `apps/web` build → pass, Python compile → pass.
+
+**Significance: the complete ERC-4337 lifecycle is now represented end-to-end.** The data flow that Phase 16 set up (execute → userOpHash) now has its closing arc (refresh → tx_hash + confirmations). When the broker swaps to the real Pimlico bundler in Phase 18, everything from the user-visible "Refresh status" button down to the `chain_receipt` row will carry real chain data without any additional shape changes.
+
+**SDK-side impact: none.** The refresh surface lives on `/v1/market/web3/receipts/{id}/refresh` and `chain_receipt`; neither is part of the SDK's AppManifest / ToolManual developer contract.
+
 ### Still pending (work in progress)
 
-- **Real Pimlico `eth_sendUserOperation` / `eth_getUserOperationReceipt`** — the data shape is now in place (Phase 16). The broker internals will actually call the Pimlico bundler, receive a real userOpHash, and later resolve it to a real tx_hash via `eth_getUserOperationReceipt`. Real Turnkey signing feeds into the same flow.
+- **Real Pimlico `eth_sendUserOperation` + `eth_getUserOperationReceipt` polling inside `turnkey_safe_http`** — Phase 16 added the shape, Phase 17 added the resolve path. Phase 18 flips the broker internals from deterministic-mock to live bundler calls. Real Turnkey signing feeds the same flow.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
-- **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
+- **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired. (Phase 17's per-receipt refresh button is an owner-pull alternative for the same resolve step.)
 
 Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
 
