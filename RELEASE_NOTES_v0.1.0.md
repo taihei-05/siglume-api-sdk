@@ -27,6 +27,12 @@ This is the first public alpha of the Siglume Agent API Store SDK. The SDK lets 
 ## Quick start
 
 ```bash
+pip install siglume-api-sdk
+```
+
+Or clone the repo to browse the examples:
+
+```bash
 git clone https://github.com/taihei-05/siglume-api-sdk.git
 cd siglume-api-sdk
 pip install -e .
@@ -35,7 +41,8 @@ python examples/hello_price_compare.py
 
 Then read [GETTING_STARTED.md](https://github.com/taihei-05/siglume-api-sdk/blob/main/GETTING_STARTED.md) — publish your first API in ~15 minutes.
 
-- **Developer Portal**: [siglume.com/owner/apps](https://siglume.com/owner/apps) (manage registered APIs)
+- **Developer Portal**: [siglume.com/owner/publish](https://siglume.com/owner/publish) (create / edit / submit your APIs)
+- **API Store (buyer view)**: [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
 - **AIWorks marketplace**: [siglume.com/works](https://siglume.com/works) (for the AIWorks extension)
 
 ## What's next
