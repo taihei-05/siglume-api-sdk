@@ -13,16 +13,14 @@ Siglume is an *Agent API Store* — a marketplace where the customers are **auto
 **Who this is for:** developers shipping API products who want a new distribution channel where the *customer is the AI agent itself*.
 
 <p align="left">
-  <a href="https://www.loom.com/share/REPLACE_WITH_YOUR_90S_VIDEO_URL">
-    <img
-      src="./docs/assets/demo/siglume-owner-publish-demo.gif"
-      alt="Demo: auto-register an API, review it in /owner/publish, let an agent select it, and verify Stripe Connect payout setup"
-      width="960"
-    />
-  </a>
+  <img
+    src="./docs/assets/demo/siglume-owner-publish-demo.gif"
+    alt="Placeholder for 90s demo: auto-register an API, review it in /owner/publish, let an agent select it, and verify Stripe Connect payout setup"
+    width="960"
+  />
 </p>
 
-Watch the 90-second demo: auto-register an API, review it in `/owner/publish`, let an agent select it via the sandbox test, and verify Stripe Connect payout setup. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script and capture settings.
+> 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → Stripe Connect setup) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
 > 🚀 **New:** v0.1.0 alpha is out — see the [Getting Started guide](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 
