@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–29 shipped. Phase 29 starts on Codex's own priority #2 — **standing indexer daemon foundation + admin GUI for Web3 ops**: a new `Admin Settlement Ops` page surfaces manifest state, indexer status, lag, last run, and exposes manual sync / cycle buttons to drive the indexer from the browser. The daemon itself is scaffolded (`web3_indexer_daemon.py`) with wiring for scheduled cycles; admins can now validate Web3 runtime without shelling into the backend. **Real Amoy run remains blocked by env injection** — Codex's dev shell has no Turnkey / Pimlico / Polygon RPC credentials yet, even though the SDK-side operator has now populated a local `.env` with all required values (Turnkey API + wallet `0xd24CC09c30cA7859E9aC28C22518d2AC38abF7a3`, Pimlico bundler/paymaster URL, Polygon Amoy Infura RPC) and handed the go-ahead to Codex to run hardhat deploy + real Amoy completion. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–30 shipped. Phase 30 tightens the live path from several angles at once: Hardhat `deploy.js` now auto-deploys Mock USDC / JPYC when no token env is set (and falls back `initialOwner` to `AGENT_SNS_WEB3_TURNKEY_SIGN_WITH`), so Amoy deploy no longer requires pre-existing token addresses. The broker switched from hand-rolled Turnkey stamping to the **official `@turnkey/api-key-stamper`** via a new `turnkey-helper.js` shim consumed from `web3_wallet_broker_api.py`. Broker detail errors are now transparent all the way to API / GUI — Turnkey failure reasons surface in the Validate signer response instead of a generic 502. Provider-status correctly reports `network=amoy, chain_id=80002`. **The one remaining hard blocker is Turnkey credentials mismatch**: `signer/validate` returns `turnkey whoami failed: public key could not be found in organization or its parent organization`. The official `@turnkey/api-key-stamper` reproduces the same 401, confirming this is a credentials issue (public key in `.env` not matching the API key registered in the Turnkey organization), not an implementation bug. Once the operator re-pairs `AGENT_SNS_WEB3_TURNKEY_ORGANIZATION_ID` / `API_PUBLIC_KEY` / `API_PRIVATE_KEY` to an actual live API key in the org, Codex will drive Validate signer → deploy → Execute + await end-to-end. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-17
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -448,9 +448,54 @@ That run is the next checkpoint, and the blocker that was "env not injected" has
 
 **SDK-side impact: none.** The admin panel and indexer daemon are platform operational surfaces; they do not cross into the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 30 — Amoy deploy self-sufficiency, official Turnkey stamper, transparent errors (shipped, live run blocked on credentials)
+
+Codex's first real attempt to complete an Amoy run exposed a pile of latent gaps. Phase 30 closes the code-side gaps (`TurnKey stamp implementation correctness`, `Amoy deploy requiring pre-existing token addresses`, `broker failures hidden behind 502`, `provider-status network mis-reported`) and leaves a single remaining blocker for the operator.
+
+- **Hardhat `deploy.js` auto-bootstraps tokens** (`packages/contracts/web3-payments/scripts/deploy.js:1`): if USDC / JPYC env addresses are unset, the script now deploys fresh Mock USDC / Mock JPYC as part of the same run and wires them into the manifest. `initialOwner` falls back to `AGENT_SNS_WEB3_TURNKEY_SIGN_WITH` so the standard Turnkey wallet ends up owning the mocks. Amoy deploy no longer requires pre-existing token contracts.
+- **Official Turnkey stamper adopted** (`packages/contracts/web3-payments/scripts/turnkey-helper.js` + `web3_wallet_broker_api.py`): the hand-rolled P-256 X-Stamp generator is retired in favor of `@turnkey/api-key-stamper`, Turnkey's officially-maintained signing library. This removes an entire class of "did we format the stamp right" failure modes.
+- **Transparent Turnkey error bubbles to GUI** (`packages/shared-python/agent_sns/application/web3_payments.py`): whatever Turnkey sends back as a detail reason now rides the API response out to Validate signer / Execute + await. Operator sees the actual error string instead of a generic 502.
+- **Provider-status reports Amoy correctly** — `/v1/market/web3/provider-status` now returns `network=amoy, chain_id=80002` when live env is loaded against Amoy.
+- **Tests**: `test_web3_wallet_broker_api.py` → 8 passed, `test_web3_payment_foundation.py` → 18 passed, Hardhat `Web3Payments.test.js` → 4 passing, `apps/web` build → pass.
+
+**Hard blocker surfaced by this phase — credentials mismatch:**
+
+With everything else wired, running `POST /v1/market/web3/signer/validate` against a live broker returns:
+
+```
+turnkey whoami failed: public key could not be found in organization or its parent organization
+```
+
+Codex verified this reproduces with the **official `@turnkey/api-key-stamper`** — same 401 / SIGNATURE_INVALID. The implementation is correct; what's wrong is the credentials triple in `.env`:
+
+- `AGENT_SNS_WEB3_TURNKEY_ORGANIZATION_ID`
+- `AGENT_SNS_WEB3_TURNKEY_API_PUBLIC_KEY`
+- `AGENT_SNS_WEB3_TURNKEY_API_PRIVATE_KEY`
+
+The org_id / api_public_key / api_private_key currently in `.env` do not map to a live API key registered in the Turnkey organization. Typical root causes: public key in env does not correspond to the private key (copy-paste error), API key was deleted in Dashboard, private key was regenerated but public key was not re-copied, or the key was created under a different organization.
+
+**Soft blockers also noted:**
+
+- `AGENT_SNS_WEB3_DEPLOYER_PRIVATE_KEY` is still empty — matters if running Hardhat deploy via EOA; not a blocker if deployment pivots to userOp-via-broker. Turnkey signer run has priority for now.
+- `AGENT_SNS_WEB3_DELEGATED_WALLET_API_URL` unset for the SDK-side operator's local broker; Codex can run broker locally without this populated on the operator's side.
+- Token env unset — now handled automatically by Phase 30's Mock deploy path, no longer a blocker.
+
+**The one action remaining on the SDK-side operator:**
+
+Re-pair the three Turnkey env variables to an actually-live API key in the organization. Concretely: open Turnkey Dashboard → Users → Root user → API Keys, verify which public key is registered for the `siglume` API key, confirm the private key in `.env` matches that public key (re-creating the API key if either half is wrong), and re-paste both halves into `.env` cleanly. Once `signer/validate` returns 200, Codex drives the remainder (deploy → Execute + await → return userOpHash / tx_hash / block / confirmations / elapsed / gas POL).
+
+**Codex confirmed unchanged:**
+
+- Phase 27 telemetry fields are wired but have not yet recorded a real value (no live run has completed)
+- `_VALID_PRICE_MODELS` unchanged, `USAGE_BASED` / `PER_ACTION` still reserved
+- `VALID_SETTLEMENT_MODES` unchanged — **SDK v0.2.0 breaking trigger has not fired**
+- `amoy.json` remains a placeholder; Phase 30's self-sufficient deploy will replace it on first successful live run
+
+**SDK-side impact: none.** The stamper swap and deploy self-sufficiency are platform-internal; the error-transparency change rides on existing response shapes. No AppManifest / ToolManual contract change.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–29 wired the Turnkey HTTP signer, signer-validate probe, receipt-finalize endpoint, one-button await-finality orchestrator, `await_finality: true` threading into customer purchase flows, observation layer, and an admin GUI panel over a standing indexer daemon. As of this phase the SDK-side operator has populated a local `.env` with real Turnkey + Pimlico + Polygon credentials and handed Codex the faucet-deploy-complete checklist. Blocker shifts to the Codex-side dev/deploy environment receiving that env and executing the hardhat deploy + live run. Metrics capture is automatic once the run lands.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–30 wired the Turnkey HTTP signer, signer-validate probe, receipt-finalize endpoint, one-button await-finality orchestrator, `await_finality: true` threading into customer flows, observation layer, admin GUI over a standing indexer daemon, and in Phase 30 specifically: official Turnkey stamper, self-sufficient Amoy deploy, and transparent broker errors. Single remaining blocker is re-pairing the three `AGENT_SNS_WEB3_TURNKEY_*` env values to a valid API key in the Turnkey organization. Once Validate signer returns 200, Codex drives deploy → Execute + await end-to-end with metrics capture automatic.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
