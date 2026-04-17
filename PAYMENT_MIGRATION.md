@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–24 shipped. Phase 24 adds a **signer-probe surface**: a broker `/turnkey/validate` endpoint, an app-level `validate_web3_signer()`, a public route `POST /v1/market/web3/signer/validate`, and an Owner GUI **Validate signer** button that surfaces live/mock state, signer mode, and activity status. The existing single-call `/transactions/execute` is upgraded so it internally auto-signs an unsigned `user_operation_draft` before `eth_sendUserOperation` whenever live signing is enabled. **Caveat unchanged:** the Turnkey + Pimlico + Amoy chain is wired but has not yet been exercised end-to-end against real infrastructure — `amoy.json` is still a placeholder. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–25 shipped. Phase 25 closes the **live-submit landing loop**: a new `POST /v1/market/web3/receipts/{receipt_id}/finalize` route (backed by `finalize_chain_receipt()` in `web3_payments.py`) takes a receipt that has already resolved `userOpHash → tx_hash` and syncs the block range around that tx into the projector. The Owner Wallet receipts list gains a **Finalize sync** button so ops can drive a pending receipt all the way to finalized state from the GUI. Paired with Phase 24's signer probe, the end-to-end real-submit-then-land path is now fully buttoned-up on the platform side. **Caveat unchanged:** the real Turnkey + Pimlico + Amoy run against a populated `amoy.json` has still not happened. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-17
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -329,9 +329,22 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **SDK-side impact: none.** Signer validation is an operational surface for the platform; the probe response does not touch AppManifest / ToolManual. Auto-sign is a broker-internal convenience; no externally-visible shape change.
 
+### Phase 25 — receipt finalize endpoint + Owner GUI "Finalize sync" (shipped, still not validated on Amoy)
+
+- **`finalize_chain_receipt()`** in `web3_payments.py` — takes a `chain_receipt` that has already had its `userOpHash` resolved to a `tx_hash` (via Phase 17's refresh), looks up the block around that tx, runs one indexer pass over that block range, and flushes the resulting events through the projector so the receipt reaches its terminal projected state.
+- **Public route** `POST /v1/market/web3/receipts/{receipt_id}/finalize` (`presentation/marketplace_api.py`); schemas in `presentation/schemas.py`; TS types in `apps/web/src/lib/types.ts`; client in `apps/web/src/lib/api.ts`.
+- **Owner GUI** (`OwnerWalletPage.tsx`) — each receipt row in the receipts list now has a **Finalize sync** button alongside the Phase-17 Refresh button. Running them in sequence (Refresh → Finalize) walks a live-submitted userOp from `submitted (placeholder tx_hash)` → `submitted (real tx_hash, confirmations)` → `finalized + projector-reflected` purely from the GUI.
+- **Tests**: `test_web3_payment_foundation.py` → 14 passed, `test_web3_wallet_broker_api.py` → 8 passed, `apps/web` build → pass, Python compile → pass.
+
+**Significance: the live-submit landing loop is now closed and GUI-drivable.** Before Phase 25, the resolve side (Phase 17) upgraded a placeholder tx_hash into a real one, but the projector still depended on the admin-side indexer sweep (`POST /v1/admin/market/web3/sync`) to catch up. Phase 25 gives each receipt its own "sync the block around me into the projector" button, so a single real-submit can be driven all the way through in the GUI without admin access. Combined with Phase 24's signer probe, the ops story for a real Amoy run is: *validate signer → execute → refresh → finalize → done, all from Owner Wallet.*
+
+**Caveat, still called out explicitly by Codex:** *the real Turnkey + Pimlico + Amoy chain has still not been run end-to-end against real infrastructure.* `amoy.json` remains a placeholder; Phase 26 is the Amoy end-to-end run itself — turn on `LIVE_SIGN_ENABLED` + `LIVE_SUBMIT_ENABLED` against a real deploy, broadcast a real userOp, then walk Refresh → Finalize in the GUI and confirm the receipt lands projected.
+
+**SDK-side impact: none.** `finalize` is a platform operational surface on `chain_receipt`; it does not cross into the SDK's AppManifest / ToolManual developer contract.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–24 wired the Turnkey HTTP signer and a signer-validate probe; the next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with a real `amoy.json` and confirming `userOpHash → tx_hash → projector finalization` actually lands on-chain. Until that run passes, "real signing is possible" is a code claim, not a proven claim.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–25 wired the Turnkey HTTP signer, a signer-validate probe, and a receipt-finalize endpoint; every platform step a real userOp would traverse is now implemented and GUI-drivable. The next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with a real `amoy.json` and walking one userOp through the full *execute → refresh → finalize* loop on-chain. Until that run passes, "real landing works" is a code claim, not a proven claim.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
