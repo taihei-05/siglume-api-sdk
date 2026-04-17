@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–6 shipped (contract shape → Solidity → deploy+indexer → calldata planning → submit endpoint → one-click execute via mock_embedded). Real Turnkey/Safe signer adapter + real 0x swap still pending.
+**Status:** Phases 1–7 shipped. Phase 7 wires wallets to Siglume login, adds broker-health monitoring, and lands the first Stripe→Web3 cutover backend (`/v1/me/plan/web3-mandate`). Real Turnkey/Safe signer adapter + real 0x swap + the Plan-pricing UI switch still pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -91,14 +91,24 @@ The backend pipeline is now full end-to-end once a signer exists. The missing la
 
 The significance: the developer-facing one-click flow is now complete in shape. The same API surface (`POST /transactions/execute`) will broadcast real Polygon transactions once the mock provider is swapped for a Turnkey/Safe-backed adapter — consumers (Owner GUI, SDK if we ever expose it) do not change.
 
+### Phase 7 — login-wired wallet bootstrap + broker health + first Stripe-cutover backend (shipped)
+
+- **Auto-bootstrap on login** (`apps/web/src/app/App.tsx`, `lib/api.ts`) — after Siglume login and on existing-session resume, the frontend automatically provisions the user's embedded Polygon wallet. The wallet is no longer "create-on-first-visit" of `/owner/credits`; it's tied to the normal Siglume auth lifecycle.
+- **Delegated-broker health admin API** (`web3_payments.py`, `services.py`, `schemas.py`, `marketplace_api.py`) — reports which provider is live (`mock_embedded` / `delegated_http` / `turnkey_safe_http`) and whether the broker's `/health` endpoint is reachable. This is the operational surface for the Phase-8 provider swap.
+- **`POST /v1/me/plan/web3-mandate`** (`presentation/api.py`, frontend client in `lib/api.ts`) — the first Stripe-replacement endpoint: create a Plan (subscription-tier) `payment_mandate` via Web3 instead of Stripe Checkout. Backend is live; the pricing UI button is still on Stripe Checkout for now, but the switchover is the next phase.
+- **Tests**: backend `test_web3_payment_foundation.py` → 10 passed (was 8), Hardhat → 4 passing, `apps/web` build → pass.
+
+The significance: Phase 7 is the **first phase that actually starts dismantling Stripe** instead of just building around it. Wallets exist for every logged-in user by default, ops can see broker health, and the Plan-pricing backend can route to Web3 the moment the UI button flips.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey / Safe adapter** — the `execute_web3_transaction` endpoint is one-click-shaped, but under `mock_embedded` it returns a deterministic hash instead of broadcasting. Swapping the provider to a real signer (Turnkey-backed Safe smart account, Pimlico bundler for gas sponsorship) replaces the mock without changing the API surface that the Owner GUI or SDK consumes.
+- **Plan pricing UI switch** — `POST /v1/me/plan/web3-mandate` exists (Phase 7), but the pricing buttons still open Stripe Checkout. The next phase flips the UI so Plan subscription purchases go through `web3-mandate` + embedded-wallet execute, skipping Stripe entirely.
+- **Real Turnkey / Safe adapter** — provider abstraction now names `delegated_http` and `turnkey_safe_http` alongside `mock_embedded`, but the live one remains `mock_embedded`. Swapping to a real signer replaces the deterministic hash with a real broadcast — without changing the API surface that consumers (Owner GUI / SDK) see.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
-- **Stripe flow replacement** — existing Stripe paths still live; on-chain cutover of the customer-facing paid flows has not happened yet.
+- **Tool-execution Stripe flows** — the customer-facing *tool-execution* `SettlementMode` axis is still stripe-only (`stripe_checkout` / `stripe_payment_intent`). The Plan-pricing cutover (above) is the first Stripe removal; tool-execution is expected to follow.
 
-The server supports the full *plan → execute (one-click) → finalize* receipt lifecycle end-to-end; only the broadcast step is mock. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
+Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
 
 ## What still works today
 
