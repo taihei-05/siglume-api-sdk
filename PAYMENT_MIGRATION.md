@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–21 shipped. Phase 21 extracts signing preparation into its own **`POST /v1/market/web3/transactions/prepare-signing`** endpoint — signers can now fetch just the signing-ready data (simulation + hydrated draft + turnkey signing outline) without running full `simulate` / `execute` logic. The external-signer workflow is now three clean calls: prepare-signing → sign externally → execute-prepared. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–22 shipped. Phase 22 wires the signing call itself: new broker `POST /transactions/sign` + public `POST /v1/market/web3/transactions/sign-prepared`. The platform-managed signing path is now three API calls — `prepare-signing` → `sign-prepared` → `execute-prepared` — with a **`mock_turnkey_http`** signer standing where real Turnkey HTTP will plug in. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -285,9 +285,26 @@ This is the shape the Phase 22 Turnkey HTTP adapter will consume: it will call `
 
 **SDK-side impact: none.** The new endpoint is a platform-level signer integration surface; it does not touch the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 22 — signing call itself is now an API (shipped)
+
+- **Broker `POST /transactions/sign`** (`web3_wallet_broker_api.py`) — consumes a `hydrated_user_operation_draft`, produces a signature via the configured signer (today: `mock_turnkey_http`, deterministic), and returns a `signed_transaction_request`.
+- **`sign_prepared_web3_transaction()`** in `web3_payments.py` + public route **`POST /v1/market/web3/transactions/sign-prepared`** (`marketplace_api.py`) — platform-side wrapper so callers can sign without talking to the broker directly.
+- **Schemas** (`presentation/schemas.py`), **TS types** (`apps/web/src/lib/types.ts`), **client** (`apps/web/src/lib/api.ts`) updated.
+- **Tests**: `test_web3_wallet_broker_api.py` → 4 passed, `test_web3_payment_foundation.py` → 14 passed, `apps/web` build → pass, Python compile → pass.
+
+**Significance: the platform-managed happy path is now a clean three-call sequence** — one HTTP round-trip per step, no overloaded endpoints, and a named provider (`mock_turnkey_http`) that will be swapped for the real Turnkey HTTP implementation:
+
+1. `prepare-signing` — "what do I sign?"
+2. `sign-prepared` — "sign it for me" (platform-held key path)
+3. `execute-prepared` — "submit the signed result"
+
+The external-signer path (Phase 19) remains available for cases where the key isn't platform-held — callers can skip step 2 and produce the signature themselves. Now there are two coherent signer integration models: **platform-managed** (new with Phase 22) and **bring-your-own** (already available). Both run through the same `execute-prepared` submission path.
+
+**SDK-side impact: none.** `sign-prepared` is another platform signer-integration surface; it does not cross into the SDK's AppManifest / ToolManual developer contract.
+
 ### Still pending (work in progress)
 
-- **Turnkey HTTP adapter** that calls `prepare-signing`, produces a signature using `turnkey_signing_outline`, and submits via `execute-prepared` — Phase 22 closes this last gap and ends the mock era on the happy path.
+- **Swap `mock_turnkey_http` signer for real Turnkey HTTP** — Phase 22 wired the signer as its own call backed by a deterministic mock. Phase 23 replaces the mock with a real Turnkey HTTP client that produces actual signatures. After that, `LIVE_SUBMIT_ENABLED=true` + real Turnkey signer + existing Phase-18 broker bundler submit = real Polygon transactions end-to-end.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
