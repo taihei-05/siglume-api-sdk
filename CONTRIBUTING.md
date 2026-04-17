@@ -36,6 +36,22 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
+## Dev Container (optional)
+
+This repository includes a `.devcontainer/` configuration.
+Opening this project in Vs Code or Github Codespaces
+automatically detects the configuration and sets up
+ready-to-use development environment.
+
+The container uses Python 3.11 and installs the SDK
+in editable mode automatically. Recommended VS Code
+extensions such as Python, Pylance, and YAML support
+are also included.
+
+Use the Dev Container if you want a quick, zero-setup
+environment. You can still use the local virtual
+environment setup above if you prefer manual setup.
+
 ## Making SDK Changes
 
 1. Create a feature branch from `main`.
