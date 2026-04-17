@@ -23,30 +23,47 @@ where the API is "from".
 - **Data residency**: HIPAA-equivalent regimes, GDPR adequacy decisions,
   and Japan's 個人情報保護法 each have residency implications.
 
-## Two concepts — don't confuse them
+## Why only origin, not buyer-country enforcement
 
-Two distinct fields govern country scope. They answer different questions:
+The platform deliberately does **not** model a "served countries" allowlist
+or "excluded countries" blocklist on the API itself. Whether an API is
+**fit for a buyer's country and use case** is the buyer's judgment — the
+platform cannot adjudicate this in general.
 
-| Field            | Question answered                                          | Whose perspective   |
-| ---------------- | ---------------------------------------------------------- | ------------------- |
-| `jurisdiction`   | "Under which country's law are **you** offering this API?" | Seller (developer)  |
-| `served_markets` | "Which countries can legitimately **use** this API?"       | Buyer (agent owner) |
+Example: a seismic-calculation API built to US building codes (IBC) is
+probably not valid for a Japanese structural engineer filing under
+建築基準法, but it may still be useful as a reference or for a comparative
+study. Whether it's appropriate is context-dependent and the buyer is
+the only party with enough information to decide.
 
-A **US-based developer** (`jurisdiction: "US"`) building a GDPR-compliant
-translation tool might set `served_markets: ["US", "GB", "DE", "FR", ...]` —
-US is their governing law but the tool is globally usable.
+What the platform does:
 
-A **US-based developer** building a HIPAA-only health-records API must set
-`served_markets: ["US"]` — the tool is only fit for the US healthcare
-context, not EU (where it might violate GDPR) or Japan (where 個人情報保護法
-may differ).
+- **Forces sellers to declare `jurisdiction`** so the buyer sees an
+  unambiguous flag on every listing.
+- **Renders the ISO country code as a flag icon** on the API Store card
+  and detail page so the country of origin is visible at a glance.
 
-A **Japan-based developer** (`jurisdiction: "JP"`) building a crypto-wallet
-integration that's banned in China would set `excluded_markets: ["CN"]`.
+What the platform does NOT do:
 
-When `served_markets` or `excluded_markets` is set, you **must** add
-`restriction_reason` so subscribers understand why. The SDK will emit a
-warning if you omit it.
+- Block subscriptions based on the buyer's country.
+- Claim the API is valid for any particular regulatory regime.
+- Validate `applicable_regulations` claims — those are advisory.
+
+The buyer, not the platform, is responsible for determining regulatory
+fitness in their jurisdiction of use.
+
+## Flag icon rendering
+
+The platform converts `jurisdiction` to a flag emoji using the Regional
+Indicator Symbols for the first two letters of the code:
+
+- `"US"` → 🇺🇸
+- `"JP"` → 🇯🇵
+- `"US-CA"` → 🇺🇸 (sub-regions collapse to the parent country flag;
+  the text label still shows the full `"US-CA"`)
+
+If `jurisdiction` is missing or malformed, no flag is shown — which is
+why the SDK and the platform both require a valid value at registration.
 
 ## Where to declare it
 
@@ -124,12 +141,12 @@ If `AppManifest.jurisdiction = "US"`, a payment tool cannot set
 `applicable_regulations` is advisory only — the platform does **not** audit
 compliance claims. Use it to signal intent. Common values:
 
-| Region            | Tag                                      |
-| ----------------- | ---------------------------------------- |
-| US federal        | `CCPA`, `COPPA`, `HIPAA`, `GLBA`         |
-| EU / EEA          | `GDPR`, `DSA`, `DMA`                     |
-| UK                | `UK-GDPR`, `DPA-2018`                    |
-| Japan             | `資金決済法`, `特定商取引法`, `個人情報保護法` |
+| Region | Tag |
+| --- | --- |
+| US federal | `CCPA`, `COPPA`, `HIPAA`, `GLBA` |
+| EU / EEA | `GDPR`, `DSA`, `DMA` |
+| UK | `UK-GDPR`, `DPA-2018` |
+| Japan | `資金決済法`, `特定商取引法`, `個人情報保護法` |
 | Global / industry | `PCI-DSS`, `SOC2`, `ISO27001`, `ISO27701` |
 
 ## Currency is USD regardless of jurisdiction

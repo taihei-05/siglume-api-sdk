@@ -49,24 +49,6 @@ export interface AppManifest {
   applicable_regulations?: string[];
   /** Optional data-residency ISO code. Defaults to `jurisdiction`. */
   data_residency?: string;
-  /**
-   * Optional allowlist of ISO 3166-1 alpha-2 country codes where this API is
-   * legitimately usable. If omitted, the API is offered worldwide.
-   * Distinct from `jurisdiction` (seller's governing law) — this is about the
-   * buyer's country of use.
-   */
-  served_markets?: string[];
-  /**
-   * Optional blocklist of ISO 3166-1 alpha-2 country codes. Evaluated after
-   * `served_markets` if both are present.
-   */
-  excluded_markets?: string[];
-  /**
-   * Optional short explanation of why markets are restricted (shown on the
-   * store listing). Strongly recommended when `served_markets` or
-   * `excluded_markets` is set.
-   */
-  restriction_reason?: string;
   short_description: string;
   docs_url: string;
   support_contact: string;

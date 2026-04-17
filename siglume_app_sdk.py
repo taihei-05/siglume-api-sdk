@@ -108,15 +108,11 @@ class AppManifest:
     jurisdiction: str = ""                 # must be explicitly set; ISO 3166-1 alpha-2 (e.g. "US", "JP", "US-CA")
     applicable_regulations: list[str] = field(default_factory=list)  # e.g. ["GDPR", "CCPA", "資金決済法"]
     data_residency: str | None = None      # ISO code; defaults to jurisdiction if None
-    # Market availability — where the API can legitimately be USED by buyers.
-    # Distinct from `jurisdiction` which is the seller's governing law.
-    # - served_markets: allowlist. If set, only these countries can subscribe.
-    #                   Empty list = worldwide (developer accepts risk).
-    # - excluded_markets: blocklist, evaluated after served_markets.
-    # - restriction_reason: short note shown on the store listing to explain why.
-    served_markets: list[str] = field(default_factory=list)
-    excluded_markets: list[str] = field(default_factory=list)
-    restriction_reason: str | None = None
+    # NOTE: The SDK intentionally does NOT model served_markets / excluded_markets.
+    # Whether this API is valid for a buyer's country/use-case (e.g. seismic
+    # calculation under JP vs US building codes) is the buyer's judgment,
+    # not something the platform enforces. The platform surfaces `jurisdiction`
+    # as a flag icon so buyers can make informed decisions.
     short_description: str = ""
     docs_url: str = ""
     support_contact: str = ""
@@ -152,33 +148,6 @@ class AppManifest:
             raise ValueError(
                 f"AppManifest.data_residency must be ISO 3166-1 alpha-2 "
                 f"(optionally -subregion), got: {self.data_residency!r}"
-            )
-        for code in self.served_markets:
-            if not _JURISDICTION_PATTERN.match(code):
-                raise ValueError(
-                    f"AppManifest.served_markets entries must be ISO 3166-1 "
-                    f"alpha-2 codes, got: {code!r}"
-                )
-        for code in self.excluded_markets:
-            if not _JURISDICTION_PATTERN.match(code):
-                raise ValueError(
-                    f"AppManifest.excluded_markets entries must be ISO 3166-1 "
-                    f"alpha-2 codes, got: {code!r}"
-                )
-        if self.restriction_reason is not None and len(self.restriction_reason) > 500:
-            raise ValueError(
-                "AppManifest.restriction_reason must be <= 500 characters"
-            )
-        # Encourage explanation when markets are restricted
-        if (self.served_markets or self.excluded_markets) and not self.restriction_reason:
-            # Not a hard error — the platform may still accept — but developers
-            # are strongly encouraged to explain the restriction.
-            import warnings as _w
-            _w.warn(
-                "AppManifest has served_markets or excluded_markets set but "
-                "no restriction_reason. Subscribers will see a blocked/filtered "
-                "listing without context. Consider adding restriction_reason.",
-                stacklevel=2,
             )
 
 
