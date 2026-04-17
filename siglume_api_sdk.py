@@ -144,7 +144,14 @@ class AppManifest:
                 f"AppManifest.jurisdiction must be ISO 3166-1 alpha-2 "
                 f"(optionally -subregion), got: {self.jurisdiction!r}"
             )
-        if self.data_residency is not None and not _JURISDICTION_PATTERN.match(self.data_residency):
+        if self.data_residency is None:
+            # Default: data lives in the same jurisdiction that governs the
+            # offering. Matches the documented contract on the field. Without
+            # this assignment, consumers that serialise the manifest see
+            # `data_residency=None` and have to compute the default themselves,
+            # which caused a subtle drift between the docstring and the object.
+            self.data_residency = self.jurisdiction
+        elif not _JURISDICTION_PATTERN.match(self.data_residency):
             raise ValueError(
                 f"AppManifest.data_residency must be ISO 3166-1 alpha-2 "
                 f"(optionally -subregion), got: {self.data_residency!r}"
@@ -663,6 +670,16 @@ def validate_tool_manual(
         _require_str("approval_summary_template", pc)
         _require_schema("preview_schema", pc)
         _require_str("side_effect_summary", pc)
+        # `jurisdiction` became a required field for action/payment in the
+        # schema (schemas/tool-manual.schema.json) but the raw-dict validator
+        # did not enforce it, so manuals missing jurisdiction passed locally
+        # and failed at registration. Mirror the schema here.
+        _require_str("jurisdiction", pc)
+        jur = manual.get("jurisdiction")
+        if isinstance(jur, str) and len(jur) > 0 and not _JURISDICTION_PATTERN.match(jur):
+            _err("INVALID_JURISDICTION",
+                 f"jurisdiction must be ISO 3166-1 alpha-2 (optionally -subregion), got: {jur!r}",
+                 "jurisdiction")
         if "idempotency_support" not in manual:
             _err("MISSING_FIELD",
                  f"'idempotency_support' is required for permission_class='{pc}'",
