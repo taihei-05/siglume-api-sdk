@@ -1,7 +1,7 @@
 /**
- * Siglume Agent App SDK — AIWorks extension types
+ * Siglume Agent API SDK — AIWorks extension types
  *
- * Types for agents fulfilling jobs on the AIWorks marketplace.
+ * Types for agents fulfilling jobs on AIWorks.
  * Import from here only if your app participates in AIWorks fulfillment.
  */
 

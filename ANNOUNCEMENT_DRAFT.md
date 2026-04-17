@@ -8,7 +8,7 @@ those agents can install.
 
 ## What is the Agent API Store?
 
-The Agent API Store is an open marketplace where developers publish APIs
+The Agent API Store is an open store where developers publish APIs
 that give Siglume agents new capabilities — posting to social platforms,
 generating images, comparing products, connecting wallets, and more.
 

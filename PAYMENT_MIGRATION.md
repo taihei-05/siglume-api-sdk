@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phase 1 (server contract shape) + Phase 2 (Solidity contracts + projector) + Phase 3 (deploy script + on-chain indexer) shipped. Real tx submission + Turnkey/Safe/Pimlico/0x integration pending.
+**Status:** Phase 1 (server contract shape) + Phase 2 (Solidity contracts + projector) + Phase 3 (deploy script + on-chain indexer) + Phase 4 (real contract calldata planning) shipped. Signing + submission via Turnkey/Safe/Pimlico + real 0x swap pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -55,15 +55,25 @@ Behind the default-on `economy_web3_adapter_enabled` flag:
   - `POST /v1/admin/market/web3/sync` — runs one indexer pass against the configured RPC.
 - **Settings + `.env.example`** extended with the RPC URLs, token addresses, and indexer knobs that the new code expects.
 
+### Phase 4 — real contract calldata planning (shipped)
+
+- **Transaction planner** (`packages/shared-python/agent_sns/application/web3_tx_plans.py`) builds real EVM calldata for `SubscriptionHub` and `AdsBillingHub` using the Phase 3 deployment manifest. Output per mandate includes `to`, `selector`, `data`, and `expected_event`.
+- **`create_payment_mandate` / `cancel_payment_mandate`** in `web3_payments.py` now return a `transaction_request` (create) and `cancel_transaction_request` (cancel) alongside the usual mandate payload. These are contract-ready: signing them and broadcasting to Polygon would move real funds.
+- **Owner GUI** (`OwnerWalletPage.tsx`) renders the `transaction_request` + `cancel_transaction_request` so a developer can inspect the exact calldata before the signer layer lands.
+- **Schema** (`presentation/schemas.py`) — the new plan shape is now part of the API response contract.
+- **Tests**: backend `test_web3_payment_foundation.py` → 6 passed (was 4), Hardhat → 4 passing, `apps/web` build → pass.
+
+The server now knows how to call the real contracts. The only missing layer is the signer + submitter — which is the next phase.
+
 ### Still pending (work in progress)
 
-- `web3_wallet_provider = "mock_embedded"` — real **Turnkey / Safe / Pimlico** integration pending.
+- **Signer + submitter** — `transaction_request` payloads are currently generated but not signed and not broadcast. **Turnkey / Safe / Pimlico** integration is the next phase; until it lands, mandates are still "planned" rather than "settled".
+- `web3_wallet_provider = "mock_embedded"` — real wallet provisioning is gated on the same Turnkey / Safe / Pimlico work.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
-- **Real tx submission** — mandate create / cancel still writes mock "tx hashes". The indexer can read real chain state when deployed, but no production code path is producing real signed transactions yet.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 - **Stripe flow replacement** — existing Stripe paths still live; on-chain cutover of the customer-facing paid flows has not happened yet.
 
-The server can now deploy the 4 hubs to Polygon (or Amoy for staging) and read the resulting event stream on demand. The remaining gap is **writing** to those contracts from a real relayer backed by real key material (Turnkey / Safe / Pimlico). Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
+The server can now (1) deploy the 4 hubs, (2) read event streams from them, and (3) produce contract-ready calldata for mandate create/cancel. Remaining gap = (4) actually signing and submitting those transactions through a custodial / AA stack. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
 
 ## What still works today
 

@@ -1,9 +1,9 @@
-"""Siglume Agent App SDK — AIWorks extension.
+"""Siglume Agent API SDK — AIWorks extension.
 
-Types for agents fulfilling jobs on the AIWorks marketplace.
+Types for agents fulfilling jobs on AIWorks.
 This module is intentionally separate from the core SDK: AIWorks-specific
 concepts (need_id, order_id, deliverable_spec) do not belong in the
-general-purpose Store SDK.
+general-purpose Agent API Store SDK.
 
 Import from here only if your app participates in AIWorks fulfillment.
 """

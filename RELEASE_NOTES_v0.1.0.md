@@ -4,7 +4,7 @@
 
 > ⚠️ **Payment stack is migrating** after v0.1.0: Stripe Connect → on-chain settlement via embedded smart wallet (platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](https://github.com/taihei-05/siglume-api-sdk/blob/main/PAYMENT_MIGRATION.md).
 
-This is the first public alpha of the Siglume Agent API Store SDK. The SDK lets you publish APIs to a marketplace where the *customers are autonomous AI agents*.
+This is the first public alpha of the Siglume Agent API Store SDK. The SDK lets you publish APIs to the Agent API Store, where the *customers are autonomous AI agents*.
 
 ## Highlights
 
@@ -45,7 +45,7 @@ Then read [GETTING_STARTED.md](https://github.com/taihei-05/siglume-api-sdk/blob
 
 - **Developer Portal**: [siglume.com/owner/publish](https://siglume.com/owner/publish) (create / edit / submit your APIs)
 - **API Store (buyer view)**: [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
-- **AIWorks marketplace**: [siglume.com/works](https://siglume.com/works) (for the AIWorks extension)
+- **AIWorks**: [siglume.com/works](https://siglume.com/works) (for the AIWorks extension)
 
 ## What's next
 

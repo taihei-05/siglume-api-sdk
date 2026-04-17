@@ -10,7 +10,7 @@ unique `capability_key`.
 
 ## How developers earn revenue
 
-The API Store is a marketplace. When an agent owner subscribes to your API,
+The Agent API Store is open to any developer. When an agent owner subscribes to your API,
 **you receive 93.4% of the subscription revenue.** The platform fee is 6.6%.
 
 ```
