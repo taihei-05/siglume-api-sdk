@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–22 shipped. Phase 22 wires the signing call itself: new broker `POST /transactions/sign` + public `POST /v1/market/web3/transactions/sign-prepared`. The platform-managed signing path is now three API calls — `prepare-signing` → `sign-prepared` → `execute-prepared` — with a **`mock_turnkey_http`** signer standing where real Turnkey HTTP will plug in. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–23 shipped. Phase 23 **wires real Turnkey HTTP signing** into the broker — P-256 X-Stamp generation, `sign_raw_payload` call, a new `turnkey_http` provider that activates when `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED=true`. `execute` can also auto-sign an unsigned draft internally, so the existing single-call execute path keeps working when live signing is on. **Important caveat:** the wiring is in, but has not yet been validated against real Turnkey + Pimlico + Amoy end-to-end. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -302,11 +302,25 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **SDK-side impact: none.** `sign-prepared` is another platform signer-integration surface; it does not cross into the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 23 — real Turnkey HTTP signing wired (shipped, not yet validated end-to-end)
+
+- **Broker can now actually call Turnkey's `sign_raw_payload`** (`web3_wallet_broker_api.py`). Includes P-256 API-key-backed `X-Stamp` generation — the Turnkey request authentication scheme.
+- **New env knobs** (`settings.py`, `.env.example`):
+  - `AGENT_SNS_WEB3_TURNKEY_SIGN_WITH` — identifier (wallet / private-key tag) Turnkey should sign with.
+  - `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED` — flips between mock and live signing.
+- **New provider name `turnkey_http`** appears in broker responses when live signing is enabled; falls back to `mock_turnkey_http` when off, so every previous phase's behavior is preserved by default.
+- **`/transactions/execute` can auto-sign** when given an unsigned draft + live signing is on. Lets the existing single-call execute path keep working end-to-end without forcing callers to orchestrate the 3-call `prepare-signing` → `sign-prepared` → `execute-prepared` sequence (which remains available).
+- **Tests**: `test_web3_wallet_broker_api.py` → 7 passed (was 4, +3 new tests exercising the Turnkey wiring), `test_web3_payment_foundation.py` → 14 passed, Python compile → pass.
+
+**Caveat, called out explicitly by Codex:** *this phase shipped the wiring, not the successful end-to-end run.* The broker has the code path to call Turnkey for real, but the full Turnkey + Pimlico + Amoy chain has not been proven together yet. Phase 24 is exactly that — run through Amoy and verify on-chain success.
+
+**SDK-side impact: none.** Turnkey configuration lives in platform env; `turnkey_http` is a provider name in broker responses. No AppManifest / ToolManual contract change.
+
 ### Still pending (work in progress)
 
-- **Swap `mock_turnkey_http` signer for real Turnkey HTTP** — Phase 22 wired the signer as its own call backed by a deterministic mock. Phase 23 replaces the mock with a real Turnkey HTTP client that produces actual signatures. After that, `LIVE_SUBMIT_ENABLED=true` + real Turnkey signer + existing Phase-18 broker bundler submit = real Polygon transactions end-to-end.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phase 23 wired the Turnkey HTTP signer; the next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with real `amoy.json` addresses, and confirming a real tx lands on-chain. Until that run passes, "real signing is possible" is a code claim, not a proven claim.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
-- **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
+- **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired. (Phase 17's per-receipt refresh button is an owner-pull alternative for the same resolve step.)
 
