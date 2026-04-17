@@ -1,5 +1,6 @@
 # Siglume Agent API Store SDK
 
+[![PyPI](https://img.shields.io/pypi/v/siglume-api-sdk.svg)](https://pypi.org/project/siglume-api-sdk/)
 [![CI](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -35,7 +36,8 @@ This is the main use case. You build an API, register it, and earn revenue.
 **You do not submit a PR to this repo.** You register directly on the platform.
 No permission needed. No issue to claim. Just build and register.
 
-- **Developer Portal** → [siglume.com/owner/apps](https://siglume.com/owner/apps) (manage your registered APIs)
+- **Developer Portal** → [siglume.com/owner/publish](https://siglume.com/owner/publish) (create / edit / submit your APIs)
+- **API Store (buyer view)** → [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
 - **Getting Started** → [GETTING_STARTED.md](GETTING_STARTED.md) (step-by-step, ~15 min)
 
 ### Improve the SDK itself
@@ -88,6 +90,14 @@ required fields, scoring rules, and examples.
 ---
 
 ## Quick start
+
+Install from PyPI:
+
+```bash
+pip install siglume-api-sdk
+```
+
+Or clone the repo to browse the examples:
 
 ```bash
 git clone https://github.com/taihei-05/siglume-api-sdk.git

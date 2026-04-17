@@ -42,7 +42,13 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 ### Install and run
 
 ```bash
-# Clone the SDK (PyPI package coming soon)
+# Install from PyPI
+pip install siglume-api-sdk
+```
+
+Or clone the repo to browse the examples:
+
+```bash
 git clone https://github.com/taihei-05/siglume-api-sdk.git
 cd siglume-api-sdk
 pip install -e .
@@ -50,8 +56,6 @@ pip install -e .
 # Run the example API
 python examples/hello_price_compare.py
 ```
-
-> **Note:** `pip install siglume-api-sdk` will be available on PyPI in a future release. Use the local install for now.
 
 ### Project structure
 
