@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–17 shipped. Phase 17 closes the **userOpHash → tx_hash resolve path**: a new broker `POST /transactions/status` (backed by `eth_getUserOperationReceipt` + `eth_getTransactionReceipt`) returns status / confirmations / resolved tx_hash; backend `refresh_chain_receipt_status()` updates a submitted `chain_receipt` in place; Owner GUI exposes a "Refresh status" button on pending receipts. The complete ERC-4337 two-stage lifecycle now flows end-to-end in shape. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–18 shipped. Phase 18 adds the **live-submit receiving path**: when a caller supplies a `prebuilt_user_operation` in `transaction_request.metadata_jsonb` and `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED=true`, the broker actually invokes `eth_sendUserOperation` on the bundler and returns the real userOpHash. DB's `tx_hash NOT NULL` constraint is handled via a placeholder tx_hash + `tx_hash_is_placeholder=true` that Phase 17's refresh flow later replaces. The signer side (generating `prebuilt_user_operation` via Turnkey/Safe) is the next phase. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -232,9 +232,23 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **SDK-side impact: none.** The refresh surface lives on `/v1/market/web3/receipts/{id}/refresh` and `chain_receipt`; neither is part of the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 18 — live-submit receiving path (shipped)
+
+- **Broker live submit branch** (`web3_wallet_broker_api.py`): when `transaction_request.metadata_jsonb.prebuilt_user_operation` is present AND `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED=true`, the broker actually invokes `eth_sendUserOperation` on the configured bundler and holds the returned userOpHash.
+- **Placeholder tx_hash handling**: the DB's existing `tx_hash NOT NULL` constraint is preserved by issuing a placeholder `tx_hash` and flagging `tx_hash_is_placeholder=true` on the receipt; Phase 17's refresh flow later swaps the placeholder for the real tx_hash once `eth_getUserOperationReceipt` resolves.
+- **Backend** (`web3_payments.py`) threads `tx_hash_is_placeholder` through receipts and execution results.
+- **Owner GUI** (`OwnerWalletPage.tsx`) displays the placeholder state clearly so users see the receipt is pending resolution.
+- **Settings** (`settings.py`, `.env.example`) — new `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED` flag (default off). Turning this on without the bundler env correctly populated would fail the `missing_requirements` check from Phase 15's `submission_outline`, so live submit cannot accidentally fire in an under-configured environment.
+- **Broker health + `submission_outline`** gain four new fields: `live_submission_enabled`, `prebuilt_user_operation_present`, `live_submission_attempted`, `used_placeholder_tx_hash` — observability for operators to know exactly what path a given execute took.
+- **Tests**: `test_web3_wallet_broker_api.py` → 4 passed (was 3), `test_web3_payment_foundation.py` → 14 passed, `apps/web` build → pass, Python compile → pass.
+
+**Significance: the broker can now submit real transactions to a live bundler.** What's still missing is the **generator** of `prebuilt_user_operation` — that requires Turnkey/Safe to actually sign, which is Phase 19. Once both sides are live, `LIVE_SUBMIT_ENABLED=true` + real signer = real Polygon transactions. The placeholder tx_hash pattern means no schema migration is needed for the cutover; the DB shape absorbed the asynchronous resolve model cleanly.
+
+**SDK-side impact: none.** `metadata_jsonb.prebuilt_user_operation` is a server-side execution-metadata field, not part of the SDK's AppManifest / ToolManual contract. `tx_hash_is_placeholder` is on `chain_receipt`, also internal.
+
 ### Still pending (work in progress)
 
-- **Real Pimlico `eth_sendUserOperation` + `eth_getUserOperationReceipt` polling inside `turnkey_safe_http`** — Phase 16 added the shape, Phase 17 added the resolve path. Phase 18 flips the broker internals from deterministic-mock to live bundler calls. Real Turnkey signing feeds the same flow.
+- **Turnkey/Safe-backed `prebuilt_user_operation` generator** — Phase 18 ships the receiver (broker hits bundler when given a prebuilt userOp). Phase 19 ships the sender: Turnkey signs, Safe module wraps, the platform populates `metadata_jsonb.prebuilt_user_operation`, and `LIVE_SUBMIT_ENABLED=true` ends the mock era for the happy path.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
