@@ -45,7 +45,7 @@ Starter code included for all three.
 始め方は3ステップ:
 
 ```
-git clone https://github.com/taihei-05/siglume-app-sdk.git
+git clone https://github.com/taihei-05/siglume-api-sdk.git
 pip install -e .
 python examples/hello_price_compare.py
 ```
@@ -55,7 +55,7 @@ Python 3.11+ で動きます。
 Get started in 3 steps:
 
 ```
-git clone https://github.com/taihei-05/siglume-app-sdk.git
+git clone https://github.com/taihei-05/siglume-api-sdk.git
 pip install -e .
 python examples/hello_price_compare.py
 ```
@@ -84,7 +84,7 @@ Honest beta status:
 
 ## Tweet 5 (CTA)
 
-GitHub: https://github.com/taihei-05/siglume-app-sdk
+GitHub: https://github.com/taihei-05/siglume-api-sdk
 本番: https://siglume.com
 
 Issue に3つのバウンティを出しています。
@@ -92,7 +92,7 @@ Issue に3つのバウンティを出しています。
 
 一緒にAIエージェントの未来を作りませんか？
 
-GitHub: https://github.com/taihei-05/siglume-app-sdk
+GitHub: https://github.com/taihei-05/siglume-api-sdk
 Live: https://siglume.com
 
 3 bounties are open in Issues.

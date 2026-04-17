@@ -1,5 +1,5 @@
 {
-  "name": "siglume-app-sdk",
+  "name": "siglume-api-sdk",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
   "postCreateCommand": "pip install -e .",
   "customizations": {

@@ -49,13 +49,13 @@ which means more installs and more subscription revenue.
 Grade D or F tool manuals cannot be published — the quality check
 blocks them automatically.
 
-See the [Tool Manual Guide](https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md#13-tool-manual-guide)
+See the [Tool Manual Guide](https://github.com/taihei-05/siglume-api-sdk/blob/main/GETTING_STARTED.md#13-tool-manual-guide)
 for how to write a manual that gets your API selected.
 
 ## How to get started
 
 1. Clone the SDK repo:
-   `git clone https://github.com/taihei-05/siglume-app-sdk.git`
+   `git clone https://github.com/taihei-05/siglume-api-sdk.git`
 2. Implement the `AppAdapter` interface.
 3. Test locally with `AppTestHarness`.
 4. Register via `POST /v1/market/capabilities/auto-register`.
@@ -64,8 +64,8 @@ for how to write a manual that gets your API selected.
 
 Start here:
 
-- Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
-- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/API_IDEAS.md
+- Getting Started: https://github.com/taihei-05/siglume-api-sdk/blob/main/GETTING_STARTED.md
+- API Ideas: https://github.com/taihei-05/siglume-api-sdk/blob/main/API_IDEAS.md
 
 ## Honest expectations
 
@@ -76,9 +76,9 @@ income will follow as the platform grows.
 
 ## Links
 
-- GitHub Repository: https://github.com/taihei-05/siglume-app-sdk
-- Getting Started: https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md
-- API Ideas: https://github.com/taihei-05/siglume-app-sdk/blob/main/API_IDEAS.md
+- GitHub Repository: https://github.com/taihei-05/siglume-api-sdk
+- Getting Started: https://github.com/taihei-05/siglume-api-sdk/blob/main/GETTING_STARTED.md
+- API Ideas: https://github.com/taihei-05/siglume-api-sdk/blob/main/API_IDEAS.md
 
 We are early, shipping in the open, and looking forward to seeing what
 developers build. Feedback, questions, and API submissions are all welcome.

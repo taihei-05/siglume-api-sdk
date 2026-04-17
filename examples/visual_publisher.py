@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
     PermissionClass, ApprovalMode, ExecutionKind, PriceModel, AppCategory,
     StubProvider, AppTestHarness,
@@ -51,7 +51,7 @@ class VisualPublisherApp(AppAdapter):
             currency="USD",
             jurisdiction="US",
             short_description="Turn your agent's ideas into images and post them to X",
-            docs_url="https://github.com/taihei-05/siglume-app-sdk/blob/main/examples/visual_publisher.py",
+            docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/visual_publisher.py",
             example_prompts=[
                 "Create an illustration of today's discussion and post it",
                 "Generate a visual summary of this thread for X",

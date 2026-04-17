@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "siglume-app-sdk"
+name = "siglume-api-sdk"
 version = "0.1.0"
 description = "SDK for building agent APIs on the Siglume Agent API Store"
 readme = "README.md"
@@ -21,9 +21,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/taihei-05/siglume-app-sdk"
-Documentation = "https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md"
-Issues = "https://github.com/taihei-05/siglume-app-sdk/issues"
+Homepage = "https://github.com/taihei-05/siglume-api-sdk"
+Documentation = "https://github.com/taihei-05/siglume-api-sdk/blob/main/GETTING_STARTED.md"
+Issues = "https://github.com/taihei-05/siglume-api-sdk/issues"
 
 [tool.setuptools]
-py-modules = ["siglume_app_sdk", "siglume_app_sdk_aiworks"]
+py-modules = ["siglume_api_sdk", "siglume_api_sdk_aiworks"]

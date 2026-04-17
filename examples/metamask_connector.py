@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
     PermissionClass, ApprovalMode, ExecutionKind, PriceModel, AppCategory,
     ConnectedAccountRef, StubProvider, AppTestHarness, HealthCheckResult,
@@ -78,7 +78,7 @@ class MetaMaskConnectorApp(AppAdapter):
             jurisdiction="US",
             applicable_regulations=["BSA"],  # US Bank Secrecy Act — MSB rules
             short_description="Connect your agent to Ethereum wallets for on-chain actions",
-            docs_url="https://github.com/taihei-05/siglume-app-sdk/blob/main/examples/metamask_connector.py",
+            docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/metamask_connector.py",
             example_prompts=[
                 "Check my ETH balance",
                 "Send 0.1 ETH to 0xAbC...123",

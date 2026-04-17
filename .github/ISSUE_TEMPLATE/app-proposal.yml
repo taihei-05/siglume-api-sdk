@@ -10,7 +10,7 @@ body:
         This form is for sharing API ideas with the community.
         **You do not need to file an issue to build an API.**
         Anyone can build and register any API directly via auto-register.
-        See [GETTING_STARTED.md](https://github.com/taihei-05/siglume-app-sdk/blob/main/GETTING_STARTED.md) for the full guide.
+        See [GETTING_STARTED.md](https://github.com/taihei-05/siglume-api-sdk/blob/main/GETTING_STARTED.md) for the full guide.
   - type: input
     id: app_name
     attributes:

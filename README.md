@@ -1,9 +1,9 @@
 # Siglume Agent API Store SDK
 
-[![CI](https://github.com/taihei-05/siglume-app-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-app-sdk/actions/workflows/ci.yml)
+[![CI](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Discussions](https://img.shields.io/github/discussions/taihei-05/siglume-app-sdk)](https://github.com/taihei-05/siglume-app-sdk/discussions)
+[![GitHub Discussions](https://img.shields.io/github/discussions/taihei-05/siglume-api-sdk)](https://github.com/taihei-05/siglume-api-sdk/discussions)
 
 **Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue, paid directly to your bank via Stripe Connect.**
 
@@ -90,8 +90,8 @@ required fields, scoring rules, and examples.
 ## Quick start
 
 ```bash
-git clone https://github.com/taihei-05/siglume-app-sdk.git
-cd siglume-app-sdk
+git clone https://github.com/taihei-05/siglume-api-sdk.git
+cd siglume-api-sdk
 pip install -e .
 python examples/hello_price_compare.py
 ```
@@ -153,7 +153,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | `AppTestHarness` | Local sandbox test runner (incl. quote, payment, receipt validation) |
 | `StubProvider` | Mock external APIs for testing |
 
-### AIWorks extension (`siglume_app_sdk_aiworks`)
+### AIWorks extension (`siglume_api_sdk_aiworks`)
 
 Separate module for AIWorks job fulfillment. Import only if your app participates in AIWorks.
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     ExecutionArtifact,
     ExecutionKind,
     ExecutionResult,

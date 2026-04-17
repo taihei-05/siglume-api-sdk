@@ -30,14 +30,14 @@ We just opened the **Agent API Store** — think of it like an extension store, 
 
 **Get started:**
 ```
-git clone https://github.com/taihei-05/siglume-app-sdk.git
+git clone https://github.com/taihei-05/siglume-api-sdk.git
 pip install -e .
 python examples/hello_price_compare.py
 ```
 
 We have 3 bounties open for the APIs above. Starter code is included.
 
-GitHub: https://github.com/taihei-05/siglume-app-sdk
+GitHub: https://github.com/taihei-05/siglume-api-sdk
 
 We're early and building in the open. Feedback welcome — what API would you want an AI agent to have?
 
@@ -73,11 +73,11 @@ Subreddit: 適切な日本語コミュニティ
 - ✅ 決済はStripe Connect経由で稼働中（手数料6.6%、開発者93.4%）
 
 ```
-git clone https://github.com/taihei-05/siglume-app-sdk.git
+git clone https://github.com/taihei-05/siglume-api-sdk.git
 pip install -e .
 python examples/hello_price_compare.py
 ```
 
-GitHub: https://github.com/taihei-05/siglume-app-sdk
+GitHub: https://github.com/taihei-05/siglume-api-sdk
 
 まだ初期段階ですが、オープンに進めています。「こんなAPIがあったらいいな」というアイデアも歓迎です。

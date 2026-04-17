@@ -43,15 +43,15 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 
 ```bash
 # Clone the SDK (PyPI package coming soon)
-git clone https://github.com/taihei-05/siglume-app-sdk.git
-cd siglume-app-sdk
+git clone https://github.com/taihei-05/siglume-api-sdk.git
+cd siglume-api-sdk
 pip install -e .
 
 # Run the example API
 python examples/hello_price_compare.py
 ```
 
-> **Note:** `pip install siglume-app-sdk` will be available on PyPI in a future release. Use the local install for now.
+> **Note:** `pip install siglume-api-sdk` will be available on PyPI in a future release. Use the local install for now.
 
 ### Project structure
 
@@ -71,7 +71,7 @@ my-awesome-app/
 Subclass `AppAdapter` and implement three methods:
 
 ```python
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
     PermissionClass, ApprovalMode, ExecutionKind, AppCategory, PriceModel,
 )
@@ -163,7 +163,7 @@ Use `AppTestHarness` to test your API without connecting to the live platform.
 
 ```python
 import asyncio
-from siglume_app_sdk import AppTestHarness
+from siglume_api_sdk import AppTestHarness
 
 
 async def test_my_app():
@@ -203,7 +203,7 @@ asyncio.run(test_my_app())
 If your API calls external APIs, use `StubProvider` to mock them in tests:
 
 ```python
-from siglume_app_sdk import StubProvider, AppTestHarness
+from siglume_api_sdk import StubProvider, AppTestHarness
 
 
 class MockWeatherAPI(StubProvider):
@@ -289,7 +289,7 @@ Validate your API with `AppTestHarness` before registering:
 
 ```python
 import asyncio
-from siglume_app_sdk import AppTestHarness
+from siglume_api_sdk import AppTestHarness
 
 async def main():
     harness = AppTestHarness(MyFirstApp())
@@ -801,7 +801,7 @@ You can also validate your tool manual locally before hitting the server,
 using the `validate_tool_manual()` function in the SDK:
 
 ```python
-from siglume_app_sdk import validate_tool_manual
+from siglume_api_sdk import validate_tool_manual
 
 my_manual = {
     "api_name": "structural-calc",
@@ -913,6 +913,6 @@ This only works for APIs that have already been approved by admin.
 
 - Run the [example API](./examples/hello_price_compare.py)
 - Read the [API reference](./openapi/developer-surface.yaml)
-- Check the [TypeScript types](./siglume-app-types.ts) for frontend integration
+- Check the [TypeScript types](./siglume-api-types.ts) for frontend integration
 - See the [API Ideas Board](./API_IDEAS.md) for inspiration
 - Build your own API and submit it

@@ -30,7 +30,7 @@ receipt_summary={
 Use the typed execution contract for machine-readable, auditable receipts:
 
 ```python
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     ExecutionResult, ExecutionKind,
     ExecutionArtifact, SideEffectRecord,
 )
@@ -112,7 +112,7 @@ Opaque reference to a `CapabilityExecutionReceipt`. **Set by the runtime, not by
 Structured context for the owner approval dialog. Return this when `needs_approval=True`.
 
 ```python
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     ExecutionResult, ExecutionKind, ApprovalRequestHint,
 )
 

@@ -11,7 +11,7 @@ import type {
   ExecutionResult,
   ReceiptRef,
   SideEffectRecord,
-} from "./siglume-app-types";
+} from "./siglume-api-types";
 
 export interface DeliverableSpec {
   description: string;

@@ -16,10 +16,10 @@ Two GitHub setup steps still require maintainer auth on the live repo:
 
 ## Current Repo URLs
 
-- Repo: `https://github.com/taihei-05/siglume-app-sdk`
-- New issue chooser: `https://github.com/taihei-05/siglume-app-sdk/issues/new/choose`
-- Labels: `https://github.com/taihei-05/siglume-app-sdk/labels`
-- Settings: `https://github.com/taihei-05/siglume-app-sdk/settings`
+- Repo: `https://github.com/taihei-05/siglume-api-sdk`
+- New issue chooser: `https://github.com/taihei-05/siglume-api-sdk/issues/new/choose`
+- Labels: `https://github.com/taihei-05/siglume-api-sdk/labels`
+- Settings: `https://github.com/taihei-05/siglume-api-sdk/settings`
 
 ## Enable Discussions
 

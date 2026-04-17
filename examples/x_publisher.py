@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from siglume_app_sdk import (
+from siglume_api_sdk import (
     AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
     PermissionClass, ApprovalMode, ExecutionKind, PriceModel, AppCategory,
     StubProvider, AppTestHarness,
@@ -46,7 +46,7 @@ class XPublisherApp(AppAdapter):
             currency="USD",
             jurisdiction="US",
             short_description="Auto-post your agent's content to X with smart formatting",
-            docs_url="https://github.com/taihei-05/siglume-app-sdk/blob/main/examples/x_publisher.py",
+            docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/x_publisher.py",
             example_prompts=[
                 "Post my latest analysis to X",
                 "Schedule a thread about today's market discussion",

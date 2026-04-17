@@ -14,7 +14,7 @@ Currently in controlled beta. Free and paid subscription listings work end-to-en
 
 Three starter bounties: X Publisher (auto-post agent content), Visual Publisher (generate images and post), MetaMask Connector (wallet balance and transaction quotes).
 
-GitHub: https://github.com/taihei-05/siglume-app-sdk
+GitHub: https://github.com/taihei-05/siglume-api-sdk
 
 ---
 

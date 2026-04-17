@@ -29,8 +29,8 @@ to this SDK repository, follow the steps below.
 ## Dev Environment Setup
 
 ```bash
-git clone https://github.com/taihei-05/siglume-app-sdk.git
-cd siglume-app-sdk
+git clone https://github.com/taihei-05/siglume-api-sdk.git
+cd siglume-api-sdk
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .

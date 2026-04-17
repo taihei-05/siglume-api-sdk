@@ -1,5 +1,5 @@
 param(
-    [string]$Repo = "taihei-05/siglume-app-sdk"
+    [string]$Repo = "taihei-05/siglume-api-sdk"
 )
 
 Set-StrictMode -Version Latest

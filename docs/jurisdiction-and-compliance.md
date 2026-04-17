@@ -70,7 +70,7 @@ why the SDK and the platform both require a valid value at registration.
 ### AppManifest (required, app-level)
 
 ```python
-from siglume_app_sdk import AppManifest, PermissionClass, PriceModel, AppCategory
+from siglume_api_sdk import AppManifest, PermissionClass, PriceModel, AppCategory
 
 manifest = AppManifest(
     capability_key="acme-translator",
@@ -102,7 +102,7 @@ different legal scopes (e.g. an action tool that's US-only plus a read-only
 tool usable worldwide).
 
 ```python
-from siglume_app_sdk import ToolManual, ToolManualPermissionClass, SettlementMode
+from siglume_api_sdk import ToolManual, ToolManualPermissionClass, SettlementMode
 
 manual = ToolManual(
     tool_name="charge_subscription",

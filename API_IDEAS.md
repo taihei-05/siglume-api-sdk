@@ -81,5 +81,5 @@ attract users over time.
 ## Resources
 
 - [Getting Started Guide](GETTING_STARTED.md) — build and publish in 15 minutes
-- [SDK Reference](siglume_app_sdk.py)
+- [SDK Reference](siglume_api_sdk.py)
 - [API Spec](openapi/developer-surface.yaml)
