@@ -1,7 +1,7 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–23 shipped. Phase 23 **wires real Turnkey HTTP signing** into the broker — P-256 X-Stamp generation, `sign_raw_payload` call, a new `turnkey_http` provider that activates when `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED=true`. `execute` can also auto-sign an unsigned draft internally, so the existing single-call execute path keeps working when live signing is on. **Important caveat:** the wiring is in, but has not yet been validated against real Turnkey + Pimlico + Amoy end-to-end. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
-**Last updated:** 2026-04-18
+**Status:** Phases 1–24 shipped. Phase 24 adds a **signer-probe surface**: a broker `/turnkey/validate` endpoint, an app-level `validate_web3_signer()`, a public route `POST /v1/market/web3/signer/validate`, and an Owner GUI **Validate signer** button that surfaces live/mock state, signer mode, and activity status. The existing single-call `/transactions/execute` is upgraded so it internally auto-signs an unsigned `user_operation_draft` before `eth_sendUserOperation` whenever live signing is enabled. **Caveat unchanged:** the Turnkey + Pimlico + Amoy chain is wired but has not yet been exercised end-to-end against real infrastructure — `amoy.json` is still a placeholder. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Last updated:** 2026-04-17
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
 
@@ -316,9 +316,22 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **SDK-side impact: none.** Turnkey configuration lives in platform env; `turnkey_http` is a provider name in broker responses. No AppManifest / ToolManual contract change.
 
+### Phase 24 — signer-validate probe + auto-sign on execute (shipped, still not validated on Amoy)
+
+- **Broker signer probe** `POST /turnkey/validate` (`web3_wallet_broker_api.py`) — lightweight readiness check against the configured Turnkey environment. Reports `live` vs `mock`, which `sign_with` identifier is in use, and a compact activity-status block.
+- **App-level wrapper** `validate_web3_signer()` in `web3_payments.py` + `services.py` — same probe callable from the main API.
+- **Public route** `POST /v1/market/web3/signer/validate` (`marketplace_api.py`). Schemas in `presentation/schemas.py`; TS types in `apps/web/src/lib/types.ts`; client in `apps/web/src/lib/api.ts`.
+- **Owner GUI** (`OwnerWalletPage.tsx`) adds a **Validate signer** button that displays live/mock, signer mode, and activity status inline — so ops can confirm the platform is talking to Turnkey correctly before anyone attempts a real submit.
+- **Auto-sign on single-call execute** (`web3_wallet_broker_api.py`): when `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED=true` and the execute payload arrives with an unsigned `user_operation_draft`, the broker now signs it internally before calling `eth_sendUserOperation`. The explicit three-call `prepare-signing` → `sign-prepared` → `execute-prepared` path from Phase 22 remains available; auto-sign just closes the gap for the simpler single-call path.
+- **Tests**: `test_web3_wallet_broker_api.py` → 8 passed (was 7), `test_web3_payment_foundation.py` → 14 passed, `apps/web` build → pass, Python compile → pass.
+
+**Caveat, still called out explicitly by Codex:** *the full Turnkey + Pimlico + Amoy chain has still not been run against real infrastructure.* `amoy.json` remains a placeholder; `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED` and `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED` have not yet been flipped on together against a real deploy. Phase 25 is that end-to-end run: real deploy manifest, real credentials, real Amoy userOpHash → tx_hash → projector finalization.
+
+**SDK-side impact: none.** Signer validation is an operational surface for the platform; the probe response does not touch AppManifest / ToolManual. Auto-sign is a broker-internal convenience; no externally-visible shape change.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phase 23 wired the Turnkey HTTP signer; the next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with real `amoy.json` addresses, and confirming a real tx lands on-chain. Until that run passes, "real signing is possible" is a code claim, not a proven claim.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–24 wired the Turnkey HTTP signer and a signer-validate probe; the next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with a real `amoy.json` and confirming `userOpHash → tx_hash → projector finalization` actually lands on-chain. Until that run passes, "real signing is possible" is a code claim, not a proven claim.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
