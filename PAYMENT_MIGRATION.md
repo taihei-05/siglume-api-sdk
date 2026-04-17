@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–11 shipped. Phase 11 brings **Ads billing** onto the Web3 wallet flow (`AdsBillingHub.chargeAdSpend`), so **all five platform surfaces — Plan / Ads / Partner / API Store / AI Works — are Stripe-less under the mock provider**. Axis 1 (subscription-purchase / billing) is complete in shape. Axis 2 (tool-execution `SettlementMode`) is still Stripe server-side, so the SDK's v0.2.0 breaking release is still on hold. Real Turnkey / Safe / Pimlico / 0x integration is the next phase Codex is targeting.
+**Status:** Phases 1–12 shipped. Phase 12 adds a **local `delegated_http` wallet broker app** — a separate FastAPI service speaking the same HTTP contract (`/wallets/provision`, `/transactions/execute`) that a real Turnkey + Safe + Pimlico adapter will later implement. All five platform surfaces remain on Web3 under the mock provider; the v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -151,11 +151,27 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 - Server `_VALID_PRICE_MODELS` = `{"free", "subscription"}` — Ads billing uses `AdsBillingHub` as a partner-spend settlement path; it does **not** unlock the SDK's `PriceModel.USAGE_BASED` / `PER_ACTION` reserved values for API Store listings.
 - SDK AIWorks module (`siglume_api_sdk_aiworks.py`) types remain stable.
 
+### Phase 12 — local `delegated_http` wallet broker app (shipped)
+
+- **New FastAPI app** `web3_wallet_broker_api.py` exposes:
+  - `GET /health` (API-key protected if configured)
+  - `POST /wallets/provision`
+  - `POST /transactions/execute`
+- Locally, the endpoints return **deterministic** smart-wallet addresses and tx hashes — same shape as `mock_embedded`, but out-of-process and over HTTP. This lets the platform exercise the `delegated_http` provider end-to-end without needing real signing yet.
+- **Boot entry points**: `bootstrap.py` exposes the broker app factory; `apps/api/app/wallet_broker.py` is the uvicorn target (`uvicorn apps.api.app.wallet_broker:app`).
+- **Tests**: `test_web3_wallet_broker_api.py` → 2 passed (health API-key protection + deterministic provision/execute); `test_web3_payment_foundation.py` → 13 passed; Python compile → pass.
+- `.env.example` documents the new configuration knobs for broker selection.
+
+**Significance: the Turnkey / Safe / Pimlico drop-in point is now concrete.** Before Phase 12, swapping `mock_embedded` for a real adapter was an abstract "provider swap" with no defined HTTP contract. Now there is a specific HTTP API that the future adapter will implement — same request / response shapes, real key material behind the scenes. The platform never sees the difference beyond tx_hash content changing from deterministic mock to real chain data.
+
+**SDK-side impact: still none.** The broker is an internal platform component. SDK consumers interact with `/v1/market/web3/*` endpoints exposed by the main API, not with the broker directly.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey / Safe / Pimlico / 0x integration** — this is Codex's next target per their Phase-11 note. Provider abstraction names `delegated_http` and `turnkey_safe_http`; the live one is still `mock_embedded`. Swapping to a real signer produces real Polygon broadcasts **without changing the consumer-facing API surface** that any of the five platform flows rely on.
-- **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not a Codex target yet.
-- **Replace `amoy.json` placeholder manifest** — dev-only, now covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
+- **Turnkey + Safe + Pimlico implementation behind the `delegated_http` broker** — this is Codex's explicit next target. The HTTP contract is frozen in Phase 12; Phase 13 replaces the deterministic-mock internals with a real signer. No consumer-facing API surface change when this lands.
+- **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
+- **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
+- **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 
 Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
