@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–28 shipped. Phase 28 lands the **observation layer** that makes the forthcoming real Amoy run legible: `chain_receipt` gains first-class telemetry (`actual_gas_used`, `actual_gas_cost_wei`, `actual_gas_cost_pol`, `last_status_checked_at`, `execute_to_confirmed_ms`, `await_finality_elapsed_ms`); await-finality responses carry `started_at` / `completed_at` / `elapsed_ms`; the contract manifest exposes `manifest_generated_at` / `manifest_last_modified_at` / `manifest_placeholder_suspected` so the platform knows when `amoy.json` is still the placeholder. Owner Wallet surfaces all three: manifest placeholder state, gas POL actually spent, and confirm / await elapsed seconds. Plan + Partner already route through execute + `await_finality=True` so these numbers will appear on every real customer purchase. **Caveat unchanged and explicitly re-confirmed:** the local shell still has *no* live Turnkey / Pimlico / Polygon RPC credentials, so the real Amoy run has still not happened — but when it does, every metric previously requested by the SDK side (userOpHash / resolved tx_hash / block / confirmations / elapsed / gas POL / signer activity / manifest placeholder) is now captured by the running code. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–29 shipped. Phase 29 starts on Codex's own priority #2 — **standing indexer daemon foundation + admin GUI for Web3 ops**: a new `Admin Settlement Ops` page surfaces manifest state, indexer status, lag, last run, and exposes manual sync / cycle buttons to drive the indexer from the browser. The daemon itself is scaffolded (`web3_indexer_daemon.py`) with wiring for scheduled cycles; admins can now validate Web3 runtime without shelling into the backend. **Real Amoy run remains blocked by env injection** — Codex's dev shell has no Turnkey / Pimlico / Polygon RPC credentials yet, even though the SDK-side operator has now populated a local `.env` with all required values (Turnkey API + wallet `0xd24CC09c30cA7859E9aC28C22518d2AC38abF7a3`, Pimlico bundler/paymaster URL, Polygon Amoy Infura RPC) and handed the go-ahead to Codex to run hardhat deploy + real Amoy completion. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-17
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -408,9 +408,49 @@ Rationale: land live once → harden 24h ops → then tackle Axis 2 as the first
 
 **SDK-side impact: none.** All telemetry fields ride on platform-side surfaces (`chain_receipt`, `/v1/market/web3/receipts/{id}/await-finality`, contract manifest loader). No AppManifest / ToolManual contract change.
 
+### Phase 29 — Admin Settlement Ops Web3 panel + standing indexer daemon foundation (shipped)
+
+Codex moved on their own priority #2 (standing indexer daemon = 24h ops foundation). Phase 29 delivers the admin-facing half: visibility and manual control from the GUI, with the daemon scaffolding in place for the resident process.
+
+- **Admin Settlement Ops page — Web3 runtime panel** (`apps/web/src/app/pages/AdminSettlementOpsPage.tsx`):
+  - Manifest state (addresses loaded, placeholder suspected flag)
+  - Indexer status (running / idle / error)
+  - Indexer lag (blocks behind chain head)
+  - Last run timestamp
+  - **Manual Sync** button — one-shot indexer pass against the configured RPC
+  - **Indexer Cycle** button — kick one daemon cycle from the GUI
+- **Admin Web3 client + types** (`apps/web/src/lib/api.ts`, `apps/web/src/lib/types.ts`) — wraps four admin endpoints:
+  - `GET /v1/admin/market/web3/contracts` — loaded deployment manifest (Phase 3 surface)
+  - `GET /v1/admin/market/web3/indexer/status` — daemon status + lag (new)
+  - `POST /v1/admin/market/web3/sync` — one-shot indexer pass (Phase 3 surface)
+  - `POST /v1/admin/market/web3/indexer/run` — single daemon cycle (new)
+- **Daemon scaffolding** (`packages/shared-python/agent_sns/application/web3_indexer_daemon.py`, new) — structured loop around the existing indexer with schedulable cycles; `services.py` binding; `marketplace_api.py` admin routes; `presentation/schemas.py` response shapes; `settings.py` + `.env.example` gain daemon knobs (cycle interval, concurrency lock, etc.).
+- **Tests**: `test_web3_payment_foundation.py` → 18 passed (was 16, +2 for daemon scaffold + admin status paths), `apps/web` build → pass.
+
+**Significance: operations can now see and steer Web3 infra without an SSH session.** Up through Phase 17, per-receipt refresh gave owners a self-service resolve path for their own receipts. Phase 29 gives admins the *fleet-wide* equivalent: a single screen that says "your indexer is N blocks behind, last ran M minutes ago, click to run again." This is the scaffolding under Codex's stated priority #2; the resident daemon itself runs next, now that the observability and manual controls are in place to watch it.
+
+**Env injection status on the SDK-side operator's local:** the SDK-side operator (not Codex) has populated their own `.env` with:
+
+- Turnkey: `ORGANIZATION_ID=cdf1add6-1cb6-4186-ac44-293fbfebbb98`, full API key pair, `SIGN_WITH=0xd24CC09c30cA7859E9aC28C22518d2AC38abF7a3`, `LIVE_SIGN_ENABLED=true`
+- Pimlico: bundler + paymaster RPC URLs for `polygon-amoy`
+- Polygon: Amoy + mainnet RPCs (Infura)
+- `WALLET_PROVIDER=turnkey_http`, `BROKER_LIVE_SUBMIT_ENABLED=true`
+
+And has handed the go-ahead to Codex to:
+
+1. Faucet test POL into the deployer wallet
+2. `npx hardhat run scripts/deploy.js --network polygonAmoy` — replace `amoy.json` placeholder with real addresses
+3. Small test POL transfer to the Turnkey wallet as a safety net against gas-sponsorship edge cases
+4. Walk Validate signer → Execute + Await finality from a real customer surface
+5. Report userOpHash / tx_hash / block / confirmations / elapsed / gas POL
+
+That run is the next checkpoint, and the blocker that was "env not injected" has now shifted from the SDK-side operator to the Codex-side dev shell / deploy environment.
+
+**SDK-side impact: none.** The admin panel and indexer daemon are platform operational surfaces; they do not cross into the SDK's AppManifest / ToolManual developer contract.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–28 wired the Turnkey HTTP signer, a signer-validate probe, a receipt-finalize endpoint, a one-button await-finality orchestrator, `await_finality: true` threading into customer purchase flows, and the receipt-telemetry / manifest-placeholder observation layer that will record what the Amoy run emits. What is blocked: Codex's local dev shell has none of the `AGENT_SNS_WEB3_TURNKEY_*` / `AGENT_SNS_WEB3_PIMLICO_*` / `AGENT_SNS_WEB3_*_RPC_URL` credentials populated yet. Once those are injected, the run is "walk Validate signer → Execute + await from a real customer surface" — metrics capture will happen automatically via the Phase 28 fields.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–29 wired the Turnkey HTTP signer, signer-validate probe, receipt-finalize endpoint, one-button await-finality orchestrator, `await_finality: true` threading into customer purchase flows, observation layer, and an admin GUI panel over a standing indexer daemon. As of this phase the SDK-side operator has populated a local `.env` with real Turnkey + Pimlico + Polygon credentials and handed Codex the faucet-deploy-complete checklist. Blocker shifts to the Codex-side dev/deploy environment receiving that env and executing the hardhat deploy + live run. Metrics capture is automatic once the run lands.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
