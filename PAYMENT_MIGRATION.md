@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–5 shipped (contract shape → Solidity → deploy+indexer → calldata planning → submit endpoint with manual tx_hash paste). Automated Turnkey/Safe signing + broadcasting + real 0x swap still pending.
+**Status:** Phases 1–6 shipped (contract shape → Solidity → deploy+indexer → calldata planning → submit endpoint → one-click execute via mock_embedded). Real Turnkey/Safe signer adapter + real 0x swap still pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -81,15 +81,24 @@ Behind the default-on `economy_web3_adapter_enabled` flag:
 
 The backend pipeline is now full end-to-end once a signer exists. The missing layer is automating step 2–3.
 
+### Phase 6 — one-click execute via `mock_embedded` (shipped)
+
+- **Wallet provider abstraction** in `web3_payments.py` extended so a configured provider can execute a `transaction_request` in-process. Under `mock_embedded`, this generates a deterministic `tx_hash` from the prepared request and auto-registers the `submitted` receipt — collapsing steps 2, 3, and 4 of the manual-paste flow into a single call.
+- **`execute_web3_transaction()`** application method + `services.py` binding + **`POST /v1/market/web3/transactions/execute`** API (`presentation/schemas.py`).
+- **`web3_projector.py`** tightened so the auto-submitted receipts are still correctly overwritten by the subsequent finalized event (same lifecycle as manually-pasted submits).
+- **Owner GUI** (`OwnerWalletPage.tsx`) now shows an **"Execute in embedded wallet"** button next to each `transaction_request` — one click runs create/cancel against the mock provider and lands a receipt. The manual `tx_hash` paste path remains as a fallback.
+- **Tests**: backend `test_web3_payment_foundation.py` → 8 passed (was 7), Hardhat → 4 passing, `apps/web` build → pass.
+
+The significance: the developer-facing one-click flow is now complete in shape. The same API surface (`POST /transactions/execute`) will broadcast real Polygon transactions once the mock provider is swapped for a Turnkey/Safe-backed adapter — consumers (Owner GUI, SDK if we ever expose it) do not change.
+
 ### Still pending (work in progress)
 
-- **Automated signer + broadcaster** — the submit endpoint exists, but the bridge from `transaction_request` to a signed, broadcast tx is **manual** today (paste the hash in the Owner GUI). **Turnkey / Safe / Pimlico** integration replaces this manual step with a browser-initiated signing flow that auto-reports the hash back to `POST /v1/market/web3/transactions/submit`.
-- `web3_wallet_provider = "mock_embedded"` — real wallet provisioning is gated on the same Turnkey / Safe / Pimlico work.
+- **Real Turnkey / Safe adapter** — the `execute_web3_transaction` endpoint is one-click-shaped, but under `mock_embedded` it returns a deterministic hash instead of broadcasting. Swapping the provider to a real signer (Turnkey-backed Safe smart account, Pimlico bundler for gas sponsorship) replaces the mock without changing the API surface that the Owner GUI or SDK consumes.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 - **Stripe flow replacement** — existing Stripe paths still live; on-chain cutover of the customer-facing paid flows has not happened yet.
 
-The server now supports the full *plan → submit → finalize* receipt lifecycle. The remaining gap is the **browser-side signer** that consumes a `transaction_request` and submits automatically. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
+The server supports the full *plan → execute (one-click) → finalize* receipt lifecycle end-to-end; only the broadcast step is mock. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
 
 ## What still works today
 
