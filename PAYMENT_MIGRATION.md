@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phase 1 (server contract shape) + Phase 2 (Solidity contracts + projector) + Phase 3 (deploy script + on-chain indexer) + Phase 4 (real contract calldata planning) shipped. Signing + submission via Turnkey/Safe/Pimlico + real 0x swap pending.
+**Status:** Phases 1–5 shipped (contract shape → Solidity → deploy+indexer → calldata planning → submit endpoint with manual tx_hash paste). Automated Turnkey/Safe signing + broadcasting + real 0x swap still pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -63,17 +63,33 @@ Behind the default-on `economy_web3_adapter_enabled` flag:
 - **Schema** (`presentation/schemas.py`) — the new plan shape is now part of the API response contract.
 - **Tests**: backend `test_web3_payment_foundation.py` → 6 passed (was 4), Hardhat → 4 passing, `apps/web` build → pass.
 
-The server now knows how to call the real contracts. The only missing layer is the signer + submitter — which is the next phase.
+### Phase 5 — submit endpoint + submitted→finalized receipt flow (shipped)
+
+- **`submit_web3_transaction()`** in `web3_payments.py` accepts `{ mandate_id, action, tx_hash }` and registers a `submitted` `chain_receipt`. This is the hand-off: once a signer broadcasts a Phase 4 `transaction_request`, the resulting tx hash is registered here.
+- **Projector enhancement** in `web3_projector.py`: when a final event (from the indexer) arrives with the same `tx_hash`, it overwrites `receipt_kind` / `reference` / `principal_user_id` and advances the receipt from `submitted` to `finalized`. This gives a clean two-stage lifecycle: *user broadcasts → submitted → chain confirms → finalized*.
+- **API**: `POST /v1/market/web3/transactions/submit` (shape in `presentation/schemas.py` — `Web3TransactionSubmitRequest` / `Web3TransactionSubmitResponse`).
+- **Owner GUI** (`OwnerWalletPage.tsx`) now shows a `tx_hash` input + Submit button directly under each `transaction_request`, so a developer can paste a hash returned by an external Smart Wallet and register it.
+- **Tests**: backend `test_web3_payment_foundation.py` → 7 passed (was 6), Hardhat → 4 passing, `apps/web` build → pass.
+
+**Shape of the current end-to-end (manual-paste) flow:**
+
+1. Developer requests mandate create/cancel → backend returns `transaction_request` with `to / selector / data / expected_event`.
+2. External wallet signs & broadcasts (today: browser extension / manual; next phase: Turnkey/Safe auto).
+3. Developer pastes returned `tx_hash` into the Owner GUI.
+4. Backend registers `submitted` receipt.
+5. Indexer later sees the finalized event on-chain → projector upgrades receipt to `finalized`.
+
+The backend pipeline is now full end-to-end once a signer exists. The missing layer is automating step 2–3.
 
 ### Still pending (work in progress)
 
-- **Signer + submitter** — `transaction_request` payloads are currently generated but not signed and not broadcast. **Turnkey / Safe / Pimlico** integration is the next phase; until it lands, mandates are still "planned" rather than "settled".
+- **Automated signer + broadcaster** — the submit endpoint exists, but the bridge from `transaction_request` to a signed, broadcast tx is **manual** today (paste the hash in the Owner GUI). **Turnkey / Safe / Pimlico** integration replaces this manual step with a browser-initiated signing flow that auto-reports the hash back to `POST /v1/market/web3/transactions/submit`.
 - `web3_wallet_provider = "mock_embedded"` — real wallet provisioning is gated on the same Turnkey / Safe / Pimlico work.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 - **Stripe flow replacement** — existing Stripe paths still live; on-chain cutover of the customer-facing paid flows has not happened yet.
 
-The server can now (1) deploy the 4 hubs, (2) read event streams from them, and (3) produce contract-ready calldata for mandate create/cancel. Remaining gap = (4) actually signing and submitting those transactions through a custodial / AA stack. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
+The server now supports the full *plan → submit → finalize* receipt lifecycle. The remaining gap is the **browser-side signer** that consumes a `transaction_request` and submits automatically. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are still not affected.
 
 ## What still works today
 
