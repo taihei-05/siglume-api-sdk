@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phase 1 shipped server-side (mock). Real integrations in progress.
+**Status:** Phase 1 (server contract shape) + Phase 2 (Solidity contracts + projector) shipped. Deploy + real integrations pending.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -23,21 +23,37 @@ The headline numbers are unchanged: **developer share remains 93.4%**, platform 
 
 ## Server-side state (2026-04-18)
 
-Shipped behind the default-on `economy_web3_adapter_enabled` flag:
+### Phase 1 — API / DB / GUI shape (shipped, mock-backed)
+
+Behind the default-on `economy_web3_adapter_enabled` flag:
 
 - **DB**: `user_wallet`, `payment_mandate`, `chain_receipt`, `chain_cursor` tables (migration `0044_web3_payment_foundation`).
-- **Provider**: `polygon_wallet` canonical settlement-provider key (aliases: `polygon`, `web3`, `web3_wallet`, `onchain`, `on_chain`). Payout destinations can store a Polygon address with checksum validation.
+- **Provider**: `polygon_wallet` canonical settlement-provider key (aliases: `polygon`, `web3`, `web3_wallet`, `onchain`, `on_chain`). Payout destinations store a Polygon address with checksum validation.
 - **API**: `/v1/market/web3/*` endpoints for wallet lookup, token list, swap quote, mandate CRUD, and receipt listing.
+- **Admin API**: `/v1/admin/market/web3/project` triggers the projector (see Phase 2).
 - **Owner GUI**: `/owner/credits` (OwnerWalletPage) shows the Polygon Smart Wallet, active mandates, receipts, and swap quotes. `/owner/publish` Settings tab accepts a Polygon address for payout.
 
-Still mock or stubbed (work in progress):
+### Phase 2 — Solidity contracts + backend projector (shipped)
+
+- **Smart contracts** in `packages/contracts/web3-payments/` (Solidity 0.8.24, OpenZeppelin):
+  - `SubscriptionHub` — mandate-based recurring charges; `Cadence` enum (Daily/Monthly), per-charge `maxAmountMinor`, `feeBps` split to `FeeVault`, `purposeHash` for intent binding, `nextChargeAt` gating.
+  - `AdsBillingHub` — metered ad-style billing (supports the `USAGE_BASED` / `PER_ACTION` price axis that was previously reserved in the SDK enum).
+  - `WorksEscrowHub` — AIWorks escrow with release / refund paths.
+  - `FeeVault` — protocol fee custody (the 6.6% platform fee lives here on-chain).
+  - `base/AllowedTokens` — token allowlist; only native Polygon USDC and official Polygon JPYC are expected to be allowlisted.
+  - `base/RelayerAuthorizable` — relayer auth base enabling platform-sponsored gas.
+- **Hardhat tests** (`test/Web3Payments.test.js`): 4 passing — fee split, monthly cap, escrow release/refund, unsupported-token reject.
+- **Backend projector** (`packages/shared-python/agent_sns/application/web3_projector.py`): updates `chain_cursor`, reflects `chain_receipt`, projects `payment_mandate` success/failure retries, and projects minimal plan / partner state from on-chain events. Invoked admin-side via `/v1/admin/market/web3/project`.
+
+### Still mock or pending (work in progress)
 
 - `web3_wallet_provider = "mock_embedded"` — real **Turnkey / Safe / Pimlico** integration pending.
 - Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
-- **12-confirmation projector** (chain-cursor → chain-receipt settlement) is not yet wired.
-- Actual settlement smart contract body is not yet deployed.
+- **Contract deploy scripts** (mainnet + Amoy) — not yet in repo.
+- **Chain indexer daemon** — admin-trigger projector exists; a continuous indexer that streams block events into `chain_cursor` is not yet wired.
+- **Stripe flow replacement** — existing Stripe paths still live; on-chain cutover of the customer-facing paid flows has not happened yet.
 
-Treat the current server surface as **contract-shape preview**, not live payment execution. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are not affected by any of this.
+Treat the current server surface as **complete contract-shape + local Solidity body**, but **execution still routes through mocks** until deploy + real relayer + real indexer land. Free listings and non-payment flows (READ_ONLY / ACTION without charge) are not affected.
 
 ## What still works today
 
