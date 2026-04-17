@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–27 shipped. Phase 27 pulls `await_finality` **into the execute path itself**: the Plan subscription flow (`App.tsx`), the Partner Web3 subscription flow (`PartnerDashboard.tsx`), and new Owner Wallet **Execute + await** / **Execute cancel + await** buttons all pass `await_finality: true` to `execute_web3_transaction()`, so a customer purchase now walks `execute → refresh → confirmed → finalize sync` as a single action without the operator ever touching a separate button. All five platform surfaces (Plan / Ads / Partner / API Store / AI Works) keep their Web3 path, and customer-facing Plan + Partner flows now land in projected-finalized state on the first click. **Caveat unchanged:** the real Turnkey + Pimlico + Amoy run against a populated `amoy.json` has still not happened. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
+**Status:** Phases 1–28 shipped. Phase 28 lands the **observation layer** that makes the forthcoming real Amoy run legible: `chain_receipt` gains first-class telemetry (`actual_gas_used`, `actual_gas_cost_wei`, `actual_gas_cost_pol`, `last_status_checked_at`, `execute_to_confirmed_ms`, `await_finality_elapsed_ms`); await-finality responses carry `started_at` / `completed_at` / `elapsed_ms`; the contract manifest exposes `manifest_generated_at` / `manifest_last_modified_at` / `manifest_placeholder_suspected` so the platform knows when `amoy.json` is still the placeholder. Owner Wallet surfaces all three: manifest placeholder state, gas POL actually spent, and confirm / await elapsed seconds. Plan + Partner already route through execute + `await_finality=True` so these numbers will appear on every real customer purchase. **Caveat unchanged and explicitly re-confirmed:** the local shell still has *no* live Turnkey / Pimlico / Polygon RPC credentials, so the real Amoy run has still not happened — but when it does, every metric previously requested by the SDK side (userOpHash / resolved tx_hash / block / confirmations / elapsed / gas POL / signer activity / manifest placeholder) is now captured by the running code. SDK v0.2.0 breaking release is still on hold because Axis 2 has not moved.
 **Last updated:** 2026-04-17
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -369,9 +369,48 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **SDK-side impact: none.** The `await_finality` flag lives inside `/v1/market/web3/transactions/execute` request options and `chain_receipt` state; it does not cross into the SDK's AppManifest / ToolManual developer contract.
 
+### Phase 28 — observation layer for the forthcoming Amoy run (shipped, live env still not injected)
+
+Codex's direct response to the SDK-side request for observation fields the Amoy run will emit. Every metric the SDK side asked for is now first-class on the data model:
+
+- **`chain_receipt` telemetry** (`web3_payments.py`, `presentation/schemas.py`, `apps/web/src/lib/types.ts`):
+  - `actual_gas_used` — gas units consumed by the userOp once bundled on-chain
+  - `actual_gas_cost_wei` — raw wei cost (paymaster-sponsored)
+  - `actual_gas_cost_pol` — same amount in POL, convenience view for cost tracking
+  - `last_status_checked_at` — last time refresh probed the bundler / RPC
+  - `execute_to_confirmed_ms` — wall-clock ms from `execute` return to `confirmed`
+  - `await_finality_elapsed_ms` — wall-clock ms the await-finality orchestrator spent
+- **Await-finality response** (`web3_payments.py`, `presentation/schemas.py`):
+  - `started_at` / `completed_at` / `elapsed_ms` — per-invocation timing, so a stalled finalize is visible against a successful one
+- **Manifest placeholder detection** (`packages/shared-python/agent_sns/application/web3_contracts.py`, `web3_payments.py`):
+  - `manifest_generated_at` — when the Hardhat deploy script stamped the manifest
+  - `manifest_last_modified_at` — file mtime
+  - `manifest_placeholder_suspected` — heuristic flag: true when the loaded manifest still looks like the hand-written placeholder rather than a real deploy
+- **Owner Wallet surfacing** (`OwnerWalletPage.tsx`):
+  - Manifest placeholder state shown prominently
+  - Gas POL actually spent displayed per receipt
+  - Confirm / await elapsed seconds visible inline
+- **Plan + Partner flows** confirmed routing through `execute + await_finality=True` (a continuation of Phase 27, re-verified alongside the telemetry change so the new fields populate on real customer purchases)
+
+**Tests**: `test_web3_payment_foundation.py` → 16 passed, `test_web3_wallet_broker_api.py` → 8 passed, `apps/web` build → pass, Python compile → pass.
+
+**Explicit current state (from Codex):** the local shell still has *no* live credentials — `AGENT_SNS_WEB3_TURNKEY_*` (API URL / organization id / public key / private key / sign_with / live-sign-enabled), `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED`, `AGENT_SNS_WEB3_PIMLICO_BUNDLER_RPC_URL`, `AGENT_SNS_WEB3_PIMLICO_PAYMASTER_RPC_URL`, `AGENT_SNS_WEB3_POLYGON_RPC_URL`, `AGENT_SNS_WEB3_AMOY_RPC_URL` are all unset in the dev shell. The real Amoy run has therefore still not happened. What Phase 28 *does* guarantee is that the moment live env is injected and a real userOp lands, the metrics the SDK side asked for are captured without further code changes.
+
+**Confirmed priority order (Codex private opinion shared 2026-04-17):**
+
+1. Real Amoy end-to-end run (Phase 27 completion)
+2. Standing indexer daemon — 24h operational foundation
+3. Axis 2 migration design kickoff (SDK v0.2.0 drafting can start here in parallel)
+4. 0x real swap execution
+5. Mainnet (Polygon 137) cutover
+
+Rationale: land live once → harden 24h ops → then tackle Axis 2 as the first post-hardening workstream. SDK v0.2.0 drafting aligns with step 3.
+
+**SDK-side impact: none.** All telemetry fields ride on platform-side surfaces (`chain_receipt`, `/v1/market/web3/receipts/{id}/await-finality`, contract manifest loader). No AppManifest / ToolManual contract change.
+
 ### Still pending (work in progress)
 
-- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–27 wired the Turnkey HTTP signer, a signer-validate probe, a receipt-finalize endpoint, a one-button await-finality orchestrator, and `await_finality: true` threading into customer purchase flows. Every platform step a real userOp would traverse is implemented and — for Plan and Partner — collapses into the purchase click itself. The next run is turning `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true` against Polygon Amoy with a real `amoy.json` and walking Validate signer → Execute + await from a real customer surface on-chain. Until that run passes, "real landing works" is a code claim, not a proven claim.
+- **Real Turnkey + Pimlico + Amoy end-to-end validation** — Phases 23–28 wired the Turnkey HTTP signer, a signer-validate probe, a receipt-finalize endpoint, a one-button await-finality orchestrator, `await_finality: true` threading into customer purchase flows, and the receipt-telemetry / manifest-placeholder observation layer that will record what the Amoy run emits. What is blocked: Codex's local dev shell has none of the `AGENT_SNS_WEB3_TURNKEY_*` / `AGENT_SNS_WEB3_PIMLICO_*` / `AGENT_SNS_WEB3_*_RPC_URL` credentials populated yet. Once those are injected, the run is "walk Validate signer → Execute + await from a real customer surface" — metrics capture will happen automatically via the Phase 28 fields.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
