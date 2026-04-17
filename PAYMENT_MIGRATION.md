@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–10 shipped. Phase 10 brings **AI Works escrow** (fund + release + refund) onto the Web3 wallet flow, so Plan / Partner / API Store / AI Works — the four platform-billing surfaces — are all Stripe-less under the mock provider. Ads (AdsBillingHub) is the last remaining surface. Tool-execution settlement (the `SettlementMode` axis SDK v0.2.0 gates on) is **not yet moved** — still Stripe server-side.
+**Status:** Phases 1–11 shipped. Phase 11 brings **Ads billing** onto the Web3 wallet flow (`AdsBillingHub.chargeAdSpend`), so **all five platform surfaces — Plan / Ads / Partner / API Store / AI Works — are Stripe-less under the mock provider**. Axis 1 (subscription-purchase / billing) is complete in shape. Axis 2 (tool-execution `SettlementMode`) is still Stripe server-side, so the SDK's v0.2.0 breaking release is still on hold. Real Turnkey / Safe / Pimlico / 0x integration is the next phase Codex is targeting.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -134,13 +134,28 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 
 **Significance for the AIWorks SDK extension:** the SDK's AIWorks module (`siglume_api_sdk_aiworks.py`) exposes `JobExecutionContext`, `FulfillmentReceipt`, `DeliverableSpec`, `BudgetSnapshot`. **None of these change** — the escrow mechanics are entirely server-side (seller's payout wallet decides whether Web3 path kicks in). An agent that fulfils AIWorks jobs today continues to use the same fulfillment contract; the platform routes the funds through Web3 escrow rather than Stripe escrow behind the scenes.
 
+### Phase 11 — Ads billing joins the Web3 wallet flow (shipped)
+
+- **Ads billing Web3 mode** across `ad_api.py` — `profile`, `billing`, `setup`, `activate`, `settle`, campaign create/update, and impression ingest are all Web3-aware; partners with a verified Polygon payout wallet settle through `AdsBillingHub`.
+- **`chargeAdSpend(...)`** tx plan added to `web3_tx_plans.py` for the `AdsBillingHub` hub.
+- **`mock_embedded`** path extended in `web3_payments.py` / `web3_projector.py` / `web3_indexer.py` so a local Ads settlement walks fund → charge → receipt end-to-end.
+- **Ads GUI** (`apps/web/src/lib/ad-api.ts`, `apps/web/src/app/AdDashboard.tsx`) now exposes wallet setup, mandate activate, and an on-chain "Settle current spend" button.
+- **Dev manifest** (`amoy.json`) extended with `AdsBillingHub` — still a placeholder, still to be replaced with real deploy addresses before chain exposure.
+- **Tests**: `test_ad_campaigns.py` integration → 5 passed, `test_web3_payment_foundation.py` → 13 passed, `apps/web` build → pass, Python compile → pass.
+
+**Completion of Axis 1:** with Ads in place, every platform-level settlement path on Siglume (Plan, Partner, API Store paid, AI Works escrow, Ads) runs the same Web3 pipeline under the mock provider. The variety of surfaces (subscription, one-off purchase, escrow, metered/daily) are all served by the same primitives — payment mandate + transaction_request + projector. Nothing customer-facing is expected to break when the mock provider is swapped for a real Turnkey / Safe adapter; only the underlying `tx_hash` changes from deterministic mock to real chain.
+
+**Confirmed unchanged (SDK-side):**
+
+- Server `VALID_SETTLEMENT_MODES` = `{"stripe_checkout", "stripe_payment_intent"}` — Axis 2 has **not** moved.
+- Server `_VALID_PRICE_MODELS` = `{"free", "subscription"}` — Ads billing uses `AdsBillingHub` as a partner-spend settlement path; it does **not** unlock the SDK's `PriceModel.USAGE_BASED` / `PER_ACTION` reserved values for API Store listings.
+- SDK AIWorks module (`siglume_api_sdk_aiworks.py`) types remain stable.
+
 ### Still pending (work in progress)
 
-- **Ads cutover (`AdsBillingHub`)** — the last platform surface still routing through Stripe. Per Codex's plan, daily settled-ad charges will go on-chain via `AdsBillingHub` next.
-- **Tool-execution Axis 2 migration** — this is the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not a Codex target yet, but a separate coordination that will reach us when it does.
-- **Real Turnkey / Safe adapter** — provider abstraction names `delegated_http` and `turnkey_safe_http`; the live one is still `mock_embedded`. Swapping to a real signer produces real Polygon broadcasts without changing the API surface.
-- **Replace `amoy.json` placeholder manifest** — Codex added a dev-only deployment manifest so local mock tx-plans work. Phase 10 extended it with `works_escrow_hub`. Must be replaced with a real testnet deploy manifest before any chain exposure.
-- Swap quote endpoint returns deterministic mocks — real **0x** execution pending.
+- **Real Turnkey / Safe / Pimlico / 0x integration** — this is Codex's next target per their Phase-11 note. Provider abstraction names `delegated_http` and `turnkey_safe_http`; the live one is still `mock_embedded`. Swapping to a real signer produces real Polygon broadcasts **without changing the consumer-facing API surface** that any of the five platform flows rely on.
+- **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not a Codex target yet.
+- **Replace `amoy.json` placeholder manifest** — dev-only, now covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure.
 - **Resident chain indexer daemon** — admin trigger (`POST /v1/admin/market/web3/sync`) exists; a long-running process that advances `chain_cursor` continuously is not yet wired.
 
 Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
