@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–41 shipped. Phase 41 pushes two of the three mainnet-prerequisite warnings forward. **WARNING #7 preflight paymaster balance gate** lands: Pimlico sponsorship policy can be active *and* `deposit < threshold` still returns fail from `/v1/admin/market/web3/preflight` — closing the "sponsorship OK but no actual money" silent-stall pattern. Threshold is env-configured. **WARNING #6 dual-rail reconciliation** gets its first surface: admin API + client for manual-trigger reconciliation (auto-schedule next). Progress remains on `recovery-2026-04-18`; main still untouched. Next: WARNING #9 payout rename body (frontend-by-frontend migration) + WARNING #10 WorksEscrowHub v2 with dispute-timeout design.
+**Status:** Phases 1–42 shipped. **Phase 42 closes all three mainnet-prerequisite warnings at the code level.** WARNING #5 resident-daemon wiring complete (compose healthcheck + CLI healthcheck + admin health endpoint); WARNING #6 dual-rail reconciliation complete (nightly scheduler path + manual run API + health API + preflight gate); WARNING #7 preflight resilience complete (known-revoked Turnkey keys + Pimlico paymaster balance threshold + Polygon RPC chain-head freshness + 0x live route probe + blocker reason output). Phase 39 reviewer's 0x `erc20_approve` scale regression also fixed (`build_erc20_approve_transaction_request` now builds in token-native units). Codex also repaired a preflight IndentationError introduced earlier. The `recovery-2026-04-18` branch is now **code-complete for mainnet launch prerequisites**. What's left on the 15-item list: WARNING #9 payout rename body (frontend-by-frontend migration, ongoing), WARNING #10 v2 WorksEscrowHub with dispute timeout (new contract deploy), INFO #11-15. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -943,6 +943,81 @@ Two of the three remaining mainnet-prerequisite warnings advance.
 **Branch state:** `recovery-2026-04-18` still accumulating; main untouched. Merge decision remains operator call. Mainnet-launch-critical residual gap is WARNING #5 daemon residency + WARNING #6 nightly batch + WARNING #7 remaining checks.
 
 **SDK-side impact: none.** Server + frontend + config. No AppManifest / ToolManual contract change.
+
+### Phase 42 — all three mainnet-prerequisite WARNINGs closed at code level ✅ (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+The three items that were gating mainnet launch readiness are now code-complete.
+
+**WARNING #5 — resident daemon wiring COMPLETE:**
+
+- `infra/compose/docker-compose.yml` + `docker-compose.prod.yml` — `web3-indexer` scheduler service with compose-level healthcheck
+- `apps/worker/app/main.py` — scheduler entry point
+- CLI healthcheck: `py -3.11 -m apps.api.app.web3_indexer --healthcheck` (exit code reflects liveness)
+- Admin endpoint `GET /v1/admin/market/web3/indexer/health` renders lag/stale/severity
+- No longer a "run it yourself" thing — the daemon comes up with the deploy and reports its own liveness
+
+**WARNING #6 — dual-rail reconciliation COMPLETE:**
+
+- Nightly scheduler path (cron cadence, configurable)
+- Manual-run API (Phase 41 shipped this; Phase 42 adds the scheduled path)
+- Health API for reconciliation job (`dual_rail_health`)
+- Preflight gates on reconciliation health (fail if last run is stale or reported drift)
+- (Dashboard `AdminSettlementOpsPage.tsx` renders the status)
+
+**WARNING #7 — preflight resilience COMPLETE:**
+
+The preflight now checks all five defensive conditions in a single `/v1/admin/market/web3/preflight` response:
+
+- Known-revoked Turnkey keys (list lookup)
+- Pimlico paymaster balance vs env-configured threshold (Phase 41 landed this)
+- Polygon RPC chain-head freshness (latest block timestamp within N seconds)
+- 0x live route probe (a real quote call, not just a ping)
+- Blocker reason output per failing check (not a generic "fail")
+
+Operator gets a clear "fix this to unblock mainnet launch" readout.
+
+**Phase 39 reviewer regression fix:**
+
+- `build_erc20_approve_transaction_request` (`web3_tx_plans.py`) — now calls `token_minor_to_native_amount` so approve calldata is in token-native units; matches every other tx builder. Unblocks live 0x swap path without the `ERC20InsufficientAllowance` revert.
+
+**Preflight IndentationError repair:**
+
+- Codex also fixed a regression introduced earlier that broke preflight Python import. Tests re-green afterward.
+
+**Tests (broad sweep after Phase 42):**
+
+- `test_api_store_cutover_routes.py` + `test_plan_billing_cutover.py` + `test_web3_wallet_broker_api.py` → **12 integration passed**
+- `test_web3_payment_foundation.py` + `test_tool_use_axis2.py` → **39 unit passed**
+- `apps/web` build → pass, `py_compile` → pass
+
+**Codex's recommended operator Safe config:**
+
+- Chain: Polygon mainnet
+- Threshold: **2-of-3**
+- Signers:
+  1. Operator primary hardware wallet
+  2. Finance / ops hardware wallet
+  3. Emergency backup hardware wallet
+- **Codex is deliberately excluded from the signer set** for institutional separation
+
+**Remaining operator actions to reach merge-ready:**
+
+1. Create the 2-of-3 operator Safe on Polygon mainnet
+2. Populate `.env.prod` (mainnet URLs + real token addresses + `AGENT_SNS_WEB3_OPERATOR_SAFE_ADDRESS` = the Safe address from step 1)
+3. Run preflight against mainnet config
+4. Final merge-ready smoke
+
+Codex's ETA: 1-2 hours from step 1 to merge-ready smoke.
+
+**Remaining on the 15-item list after Phase 42:**
+
+- WARNING #9 rename body (frontend-by-frontend `stripe_*` → `payout_*` migration; alias contract preserved in backend) — **next Codex focus**
+- WARNING #10 v2 WorksEscrowHub with 90-day dispute timeout (new deploy + migration, not upgradable — design pass needed)
+- INFO #11-15 (SDK v0.3.0 deprecation deferred; `.env.prod.example` likely already touched; Privacy Policy micro-updates; indexer SLO doc; DMARC/SPF/DKIM + DPO contact)
+
+**Branch state:** `recovery-2026-04-18` is now **"mainnet-launch-prerequisites code-complete"**. Main still untouched. The gating items to flip from code-complete → merge-ready are operator-side (Safe creation, `.env.prod`, preflight run).
+
+**SDK-side impact: none.** Server + frontend + config + infra-compose. No AppManifest / ToolManual contract change.
 
 ### Still pending (work in progress)
 
