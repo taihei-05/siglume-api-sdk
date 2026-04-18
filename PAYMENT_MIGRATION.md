@@ -710,16 +710,16 @@ The migration has two distinct axes. Phase 9 completes **one of them** (subscrip
 
 - Everything in the **READ_ONLY** and **ACTION** permission classes — publishing, registering, executing, receipts, tool-manual validation.
 - **Free** listings (`price_model="free"`) — unaffected by the payment change.
-- **Paid subscription publish** (`price_model="subscription"`) — **no longer paused** for sellers with a verified Polygon payout wallet (as of Phase 9). Buyers purchase via Web3 mandate under the mock provider; access grants land automatically.
-- **`PAYMENT` permission class tools** — authorable today using `settlement_mode="stripe_checkout"` or `"stripe_payment_intent"`. Axis 2 has not moved.
+- **Paid subscription publish** (`price_model="subscription"`) — publish is **open**. Phase 9 unpaused it under the mock provider; Phase 31 proved it end-to-end on real Polygon Amoy (userOpHash `0xaa55cbae...`, tx_hash `0xa04699ff...`). Register with a Polygon payout address at `/owner/publish`; buyers purchase via Web3 mandate, access grants land automatically.
+- **`PAYMENT` permission class tools** — authorable with any of the four `SettlementMode` values. `stripe_*` continues to work unchanged. `embedded_wallet_charge` is fully runtime-backed on Polygon (Phase 34). `polygon_mandate` authorizes on-chain at tool-auth time; recurring-charge dispatch is a follow-up phase.
 - SDK types, validators, and examples for non-payment flows — stable.
-- The existing SDK v0.1.x — no breaking change required yet.
+- **SDK v0.2.0** — current release, adds `polygon_mandate` + `embedded_wallet_charge` to `SettlementMode`.
 
-## What is paused / changing
+## What is changing
 
-- **`SettlementMode` enum values** (`stripe_checkout`, `stripe_payment_intent`) — still frozen in SDK v0.1.x. Codex has **not** added a Web3 value to `VALID_SETTLEMENT_MODES`. A coordinated server+SDK update will add on-chain values when Axis 2 migrates — that is the SDK v0.2.0 trigger.
-- **`examples/metamask_connector.py`** — the current "bring your own MetaMask + direct-sign transaction" stub does **not** match the new embedded-smart-wallet + platform-gas model. It will be rewritten once the real wallet integration is available and the Axis 2 migration is specified.
-- Any doc text that reads "Stripe Connect" as the live mechanism — being rewritten as this migration progresses.
+- **`examples/metamask_connector.py`** — the current "bring your own MetaMask + direct-sign transaction" stub does **not** match the embedded-smart-wallet + platform-gas model used by `polygon_mandate` / `embedded_wallet_charge`. Scheduled for rewrite once the recurring-charge dispatcher for `polygon_mandate` lands, so the example can demo a complete authorize → charge cycle.
+- **Relayer-driven recurring-charge dispatch** — `polygon_mandate` currently covers the authorize step. The scheduler that fires the periodic charge userOp against an authorized mandate is the next Web3 workstream.
+- Any residual doc text that reads "Stripe Connect" as the live mechanism for subscription purchases — being rewritten as encountered.
 
 ## Why Polygon, specifically
 
@@ -733,8 +733,9 @@ Embedded wallets + gas sponsorship mean this is **not** a "bring your own MetaMa
 ## For SDK users, right now
 
 1. **If your API is READ_ONLY / ACTION / free:** nothing to do. Keep building. The SDK's public API, validators, and examples are unchanged for your flow.
-2. **If you were about to publish a paid subscription API:** wait until the real wallet integration lands. The registration flow is already available at `/owner/publish` but accepts only Polygon addresses (not bank accounts), so Stripe-Connect-expecting onboarding scripts will fail. A coordinated SDK release will add the final types once Turnkey/Safe/Pimlico integrations are live.
-3. **If you already published a paid subscription API on a previous SDK version:** platform-side migration tooling is part of Codex's current work. No action required from you.
+2. **If you want to publish a paid subscription API:** go ahead. Paid-subscription publish is **no longer paused** as of Phase 9 (mock-backed) and proven on-chain as of Phase 31 (real Polygon Amoy completion, userOpHash `0xaa55cbae...`). Register via `/owner/publish`, providing a Polygon payout address instead of a bank account. Buyers purchase via Web3 mandate; access grants land automatically. The registration flow no longer depends on Stripe Connect.
+3. **If you want a payment-permission tool that charges on Polygon:** upgrade to SDK v0.2.0 (`pip install siglume-api-sdk>=0.2.0`) and declare `settlement_mode="polygon_mandate"` (subscription-style auto-debit) or `"embedded_wallet_charge"` (one-shot charge). `embedded_wallet_charge` is fully runtime-backed as of Phase 34; `polygon_mandate` authorizes on-chain at tool-auth time with recurring-charge dispatch in a follow-up phase.
+4. **If you already published a paid subscription API on a previous SDK version:** platform-side migration tooling is in place. No action required — existing `stripe_*` tool manuals continue to validate and run unchanged.
 
 ## Tracking
 

@@ -413,7 +413,7 @@ Declare the account type in `required_connected_accounts`. The agent owner conne
 Use `price_model="free"` for free APIs. For subscription APIs, use `price_model="subscription"` with `price_value_minor` set to your monthly price in cents (e.g., 999 for $9.99/month). Minimum subscription price is $5.00/month (500 cents). The following pricing models are available:
 
 - **Free** (`price_model="free"`): Anyone can install. You can convert to subscription pricing at any time.
-- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement is migrating from Stripe Connect to on-chain embedded-wallet auto-debit — see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md). **New paid publishes are paused during the cutover**; free listings (see above) remain fully live.
+- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement runs on Polygon on-chain embedded-wallet auto-debit (proven end-to-end on Amoy 2026-04-18 — see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md)). Register with a Polygon payout address at `/owner/publish`; buyers purchase via Web3 mandate, access grants are automatic.
 
 The SDK enum `PriceModel` also defines `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and `PER_ACTION`. These are **reserved values for future phases** — they are not accepted by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
 
@@ -663,7 +663,7 @@ You receive:            ~$9.33/month, settled directly to your wallet
 
 ### Setting up payouts (subscription APIs only)
 
-> 🔄 **This section is migrating.** The Stripe Connect onboarding flow documented below is being replaced with an on-chain embedded-wallet flow. Paid subscription **publish** is paused during the cutover. If you want to publish a paid API today, track [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for when the new flow opens. Free listings (`price_model="free"`) are unaffected and can be published now.
+> ✅ **Payouts now run on Polygon.** Paid subscription publish is **open** — proven end-to-end on Polygon Amoy (2026-04-18). Register at `/owner/publish` with a Polygon payout address; buyers purchase via Web3 mandate, access grants land automatically. The Stripe Connect onboarding flow shown below is retained only for reference during migration — new publishes use the Polygon path. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full migration log and real on-chain metrics.
 
 Historical Stripe-Connect-based flow (being retired):
 
