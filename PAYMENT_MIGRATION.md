@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–42 shipped. **Phase 42 closes all three mainnet-prerequisite warnings at the code level.** WARNING #5 resident-daemon wiring complete (compose healthcheck + CLI healthcheck + admin health endpoint); WARNING #6 dual-rail reconciliation complete (nightly scheduler path + manual run API + health API + preflight gate); WARNING #7 preflight resilience complete (known-revoked Turnkey keys + Pimlico paymaster balance threshold + Polygon RPC chain-head freshness + 0x live route probe + blocker reason output). Phase 39 reviewer's 0x `erc20_approve` scale regression also fixed (`build_erc20_approve_transaction_request` now builds in token-native units). Codex also repaired a preflight IndentationError introduced earlier. The `recovery-2026-04-18` branch is now **code-complete for mainnet launch prerequisites**. What's left on the 15-item list: WARNING #9 payout rename body (frontend-by-frontend migration, ongoing), WARNING #10 v2 WorksEscrowHub with dispute timeout (new contract deploy), INFO #11-15. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
+**Status:** Phases 1–43 shipped. **Phase 43 advances WARNING #9 payout rename and shapes scheduler healthcheck for production operation.** Backend unit tests now validate `payout_connected` / `payout_account_id` as the canonical names; frontend `DeveloperPortalMonetization` treats `stripe_ready` as an alias rather than a required field; e2e fixture rebuilt around `payout_ready`. Scheduler healthcheck (`py -3.11 -m apps.worker.app.main --healthcheck-scheduler`) now exits with a single-line error instead of a traceback so compose / systemd can surface it cleanly. Phase 42 (prior) closed all three mainnet-prerequisite warnings at the code level: WARNING #5 resident-daemon wiring, WARNING #6 dual-rail reconciliation, WARNING #7 preflight resilience (paymaster balance + chain-head freshness + 0x live route + blocker reasons). `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites** and main is still untouched. What's left: WARNING #9 rename body (frontend-by-frontend migration, in progress), WARNING #10 v2 WorksEscrowHub with 90-day dispute timeout, INFO #11-15, and a `.env.prod.example` production template. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -1018,6 +1018,41 @@ Codex's ETA: 1-2 hours from step 1 to merge-ready smoke.
 **Branch state:** `recovery-2026-04-18` is now **"mainnet-launch-prerequisites code-complete"**. Main still untouched. The gating items to flip from code-complete → merge-ready are operator-side (Safe creation, `.env.prod`, preflight run).
 
 **SDK-side impact: none.** Server + frontend + config + infra-compose. No AppManifest / ToolManual contract change.
+
+### Phase 43 — WARNING #9 payout rename advances + scheduler healthcheck production-shaped (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+Two pieces of Phase 42's "remaining after code-complete" list progressed.
+
+**WARNING #9 — `stripe_*` → `payout_*` rename, next slice:**
+
+- **Backend unit tests** — now validate `payout_connected` / `payout_account_id` as the **canonical** names. The prior `stripe_ready` / `stripe_connect_account_id` assertions were retired from the naming contract side; they survive only as read aliases.
+- **Frontend `DeveloperPortalMonetization`** — `stripe_ready` is demoted to an **alias**, not a required field. The component reads `payout_ready` as the primary signal.
+- **e2e fixture** — the developer-portal fixture now asserts `payout_ready` as the primary readiness flag. The `stripe_ready` expectation is kept only for alias-compatibility coverage.
+- Contract stance: **backend still accepts both names as input** so external callers don't break; the rename is progressing through the UI + test surface first, with the public API alias contract preserved.
+
+**Scheduler healthcheck — production-shaped:**
+
+- `py -3.11 -m apps.worker.app.main --healthcheck-scheduler` now exits with a **single-line error** instead of a Python traceback when something is wrong. Compose / systemd / container orchestration can surface the failure reason directly without log-parsing a traceback.
+- This is the liveness face of the scheduler health picture. (Freshness / drift reporting is already a separate summary endpoint.)
+
+**Tests:**
+
+- `pytest apps/api/tests/unit/test_web3_payment_foundation.py -q -k "developer_portal_summary_skips_stripe_connect_lookup_in_web3_mode or preflight or dual_rail_reconciliation"` → **8 passed**
+- `py_compile apps/worker/app/main.py` → pass
+- `npm run build` in `apps/web` → pass
+
+**Known caveat:**
+
+- Running `py -3.11 -m apps.worker.app.main --healthcheck-scheduler` against an **unmigrated local sqlite** DB still exits 1 because the DB is missing the `plan_cancel_scheduled_at` column. The difference from before: it now returns a clean healthcheck-failure signal instead of a traceback. The migrated Postgres that production compose uses is unaffected — this only shows up on a dev machine that hasn't run migrations.
+
+**Branch state:** `recovery-2026-04-18`, main still untouched. Operator merge-readiness gating items (Safe creation, `.env.prod` population, preflight pass) are unchanged from Phase 42.
+
+**Codex's next slice (declared):**
+
+1. Continue the #9 payout rename body — more of the frontend + backend surface migrated from `stripe_*` to `payout_*`, tightening the alias window.
+2. `.env.prod.example` production template for the operator populate step.
+
+**SDK-side impact: none.** Server + frontend + test + CLI-ergonomics. No AppManifest / ToolManual contract change.
 
 ### Still pending (work in progress)
 
