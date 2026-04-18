@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–33 shipped. **Phase 33 fires the SDK v0.2.0 breaking trigger.** Server `VALID_SETTLEMENT_MODES` expanded from `{stripe_checkout, stripe_payment_intent}` to `{stripe_checkout, stripe_payment_intent, polygon_mandate, embedded_wallet_charge}`, threaded through the tool runtime (resolver → dry-run preview → approval snapshot → `intent.plan_jsonb` → installed-tools API) and surfaced on the Owner Installed Tools page. SDK v0.2.0 is being released alongside this phase to mirror the enum expansion (`siglume_api_sdk.py` / `siglume-api-types.ts` / `tool-manual.schema.json` / `developer-surface.yaml` all updated). **Important scope note**: Phase 33 delivers metadata / validator / approval propagation for Axis 2. The payment-permission tool execution itself does not yet actually settle via Polygon — declaring `polygon_mandate` or `embedded_wallet_charge` is a metadata commitment that the platform validates and propagates, but the runtime charge path is a subsequent phase.
+**Status:** Phases 1–34 shipped. Phase 34 lifts the Phase 33 "metadata only" qualifier for payment-tool runtime dispatch. `capability_gateway.py` now routes `permission_class="payment"` tool executions to an actual Web3 settlement handoff when `settlement_mode ∈ {polygon_mandate, embedded_wallet_charge}`: `polygon_mandate` resolves the seller's verified Polygon payout wallet and executes an on-chain `createMandate`; `embedded_wallet_charge` builds an ERC-20 transfer prepared tx via a new `build_embedded_wallet_charge_transaction_request` helper and drives it through the embedded-wallet executor. Execution receipts (`tool_use_runtime.py`) now carry settlement metadata. `web3_payments.py` explicitly excludes tool-execution mandates from the recurring-charge projector so subscription and tool-execution lifecycles don't cross-contaminate. **Caveat (Codex, explicit):** `polygon_mandate` currently authorizes on the spot — the relayer-driven follow-up charge orchestration (platform triggers the recurring debit against the authorized mandate) is still a separate phase. **No SDK enum / schema change in Phase 34** — the v0.2.0 contract already covers the new modes; this phase is pure server-side runtime.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -627,12 +627,59 @@ Phase 33 makes the new modes **declarable and propagatable** — a tool manual w
 - `examples/metamask_connector.py` is still the old "bring your own MetaMask + direct-sign" stub. That rewrite is scheduled for when the runtime Web3 dispatch lands — otherwise the example would demo a value the platform doesn't yet actually execute.
 - No new fields on `ToolManual` beyond the enum value expansion. `accepted_payment_tokens` / `settlement_currency` / `settlement_network` are *server-side* metadata the platform derives and surfaces — SDK still declares only `settlement_mode` on the tool manual.
 
+### Phase 34 — payment tool runtime dispatches to Web3 rail ✅ (shipped 2026-04-18)
+
+Phase 33 shipped metadata / validator / approval propagation but left the runtime charge path unmoved ("declaring `polygon_mandate` is a metadata commitment, not a runtime change"). Phase 34 lifts that qualifier for the actual tool-execution path.
+
+**Shipped (server-side only — no SDK enum / schema change):**
+
+- **`capability_gateway.py` live-settlement branching**: when `permission_class == "payment"` **and** `settlement_mode ∈ {polygon_mandate, embedded_wallet_charge}`, the gateway now routes through an actual Web3 settlement handoff instead of the Stripe path.
+- **`polygon_mandate` runtime**: resolves the seller's verified Polygon payout wallet, builds and executes an on-chain `createMandate` against `SubscriptionHub` at tool-authorization time. The authorization itself lands on Polygon.
+- **`embedded_wallet_charge` runtime**: a new helper `build_embedded_wallet_charge_transaction_request()` in `web3_tx_plans.py` builds an ERC-20 `transfer` prepared tx, and the gateway drives that through the embedded-wallet executor — a direct token transfer from the buyer's smart account to the seller's payout address, resolved on-chain in the same execute call.
+- **Execution receipts carry settlement metadata** (`tool_use_runtime.py`): `settlement_mode`, `settlement_network`, `settlement_currency`, `accepted_payment_tokens`, mandate id / tx hash / chain receipt id flow into the receipt alongside the execution-side fields.
+- **Projector hygiene** (`web3_payments.py`): tool-execution mandates are now explicitly *excluded* from the recurring-charge projector — the Phase 31 subscription mandate lifecycle and the Phase 34 tool-execution mandate lifecycle use the same on-chain primitive but do not share re-charge scheduling.
+
+**Tests**: `test_tool_use_axis2.py` + `test_web3_payment_foundation.py` → **25 passed** (was 23, +2 for approve → live execute covering both modes and their receipt / settlement metadata), `py_compile` → pass.
+
+**Explicit caveat from Codex:**
+
+> 今回は SDK enum/schema の追加変更はなし
+> ただし polygon_mandate は「その場で authorize する」段で、relayer による後続 charge orchestration はまだ別です
+
+So `polygon_mandate` at Phase 34 means the mandate is *created on-chain* when the tool is authorized — the platform has the authorization in place to debit the buyer's wallet up to the mandate's cap. What is *not* yet wired is the relayer / scheduler that periodically fires the actual charge userOp against an already-authorized mandate. That is a subsequent phase.
+
+For `embedded_wallet_charge` there is no equivalent gap — it is a one-shot transfer executed at tool-call time and completes on-chain synchronously with the tool execution.
+
+**Significance — scope note now partially lifted:**
+
+The v0.2.0 release notes' scope note ("declaring the new mode is a metadata commitment, not a runtime change") was accurate *at the time of cut*. After Phase 34:
+
+- **`embedded_wallet_charge`**: fully runtime — one-shot Polygon settlement happens as part of the tool execution
+- **`polygon_mandate`**: runtime authorization happens (on-chain mandate creation), but recurring-charge dispatch is still pending
+
+For SDK developers, the v0.2.0 enum is now genuinely live — declaring `polygon_mandate` causes an on-chain side effect, not just metadata propagation.
+
+**What SDK v0.2.0 release notes should eventually be updated to reflect (not urgent):**
+
+- `embedded_wallet_charge` is fully runtime-backed now
+- `polygon_mandate` authorizes on-chain at tool authorization time; recurring dispatch follow-up phase
+- `examples/metamask_connector.py` can be rewritten once the `polygon_mandate` recurring side is live — defer to avoid churn
+
+**Codex confirmed unchanged:**
+
+- `_VALID_PRICE_MODELS` still frozen at `{free, subscription}`; `USAGE_BASED` / `PER_ACTION` remain reserved
+- `VALID_SETTLEMENT_MODES` unchanged since Phase 33 (the 4-value set). No enum addition in Phase 34
+- SDK v0.2.0 contract still correct — the only SDK-side follow-up is the release-notes wording update described above, which can wait for a v0.2.1 docs-only `.post` if desired
+
+**SDK-side impact: none in Phase 34.** No enum value added, no new field added to `ToolManual`. Phase 34 is a server-side runtime upgrade that activates the enum values v0.2.0 already declared.
+
 ### Still pending (work in progress)
 
 - ~~**Real Turnkey + Pimlico + Amoy end-to-end validation**~~ — **DONE in Phase 31** (2026-04-18). First real userOp landed on Polygon Amoy: `userOpHash=0xaa55cbae...`, `tx_hash=0xa04699ff...`, block 36829663. Telemetry fields captured live values.
 - ~~**Resident (standing) indexer daemon**~~ — **DONE in Phase 32** (2026-04-18). Running with heartbeat / stale detection; local runner `web3-indexer-afa01f3f1e7d` catching up from lag 5561 blocks at 2000/cycle.
 - ~~**Axis 2 migration design**~~ — **first vertical DONE in Phase 33** (2026-04-18). `SettlementMode` gained `polygon_mandate` + `embedded_wallet_charge`; SDK v0.2.0 cut to mirror. Metadata / validator / approval propagation live. Runtime dispatch to Polygon settlement remains for a follow-up phase.
-- **Payment-permission tool runtime dispatch to Polygon** — declared `polygon_mandate` / `embedded_wallet_charge` in a tool manual is honored through approval and snapshot surfaces today, but execution-time `charge()` does not yet fire an on-chain Polygon settlement. Next phase.
+- ~~**Payment-permission tool runtime dispatch to Polygon**~~ — **DONE in Phase 34** (2026-04-18). `embedded_wallet_charge` fully runtime-backed; `polygon_mandate` on-chain authorization happens at tool-authorization time.
+- **Relayer-driven recurring charge orchestration for `polygon_mandate`** — the authorized mandate is created on-chain at tool-authorization time, but the scheduler that periodically fires the actual charge userOp against the authorized mandate is a follow-up phase. Codex's explicit next workstream after Phase 34.
 - **Tool-execution Axis 2 migration** — still the actual SDK v0.2.0 trigger. Whenever `VALID_SETTLEMENT_MODES` on the server gains a Web3 value, SDK must follow synchronously. Not yet in Codex's roadmap.
 - **Replace `amoy.json` placeholder manifest** — dev-only, covers `subscription_hub` + `ads_billing_hub` + `works_escrow_hub` + `fee_vault`. Must be replaced with real addresses before any chain exposure (prerequisite for the Amoy end-to-end run above).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
