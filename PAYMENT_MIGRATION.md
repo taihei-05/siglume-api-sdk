@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–35 shipped. Phase 35 lands **0x real swap execution** — one of the longest-standing `Still pending` items. `web3_payments.py` now calls the 0x AllowanceHolder quote endpoint and returns both an `approve_transaction_request` (for `issues.allowance.spender`) and a `swap_transaction_request` (for the swap target), plus an `allowance_needed` flag. A new prepared-tx builder in `web3_tx_plans.py` generates the concrete ERC-20 `approve` + swap router calldata. Owner Wallet exposes a staged GUI: quote → Approve allowance → Execute swap, with provider / expiry / allowance visible at each step (deliberate over a single "swap" button for auditability). Prepared execution extended to support `await_finality`. **Caveat:** `polygon_mandate` recurring-charge dispatcher remains the single biggest pending item, alongside Stripe complete shutdown + existing-subscriber migration + 5-surface live GUI final verification + mainnet cutover.
+**Status:** Phases 1–36 shipped. Phase 36 lands the **ideal two-tier settlement spec** that has been converging since the 5-agent review: **Plan / Ads / Partner** let the user choose between Stripe (credit card) and Polygon Web3 (stablecoin) at checkout; **API Store / AI Works** are Polygon Web3-only by backend contract (Stripe fallback removed because cross-border seller payouts do not fit Stripe Connect). All five customer surfaces now have rail selection UI wired; seller onboarding uses Polygon payout wallets; Owner UI copy and the ToS / Privacy / 特商法 pages match the dual-rail reality. **Honest caveat (Codex, explicit):** some legacy Stripe code paths still exist in the repo — they are no longer reachable from new customer flows and the backend hard-requires Polygon for API Store / AI Works, but full code-level cleanup of the dead Stripe paths is a separate cleanup workstream.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -698,6 +698,64 @@ One of the longest-standing `Still pending` items closes. 0x swap quote was a de
 
 **Codex's explicit scoping note for this phase:** the migration is not production-complete yet. Phase 35 closes "one of the repo's biggest unlanded items," but the remaining gaps are: mainnet cutover, production token address pinning, Stripe complete shutdown + existing-contract migration, and final 5-surface live GUI completion verification. Codex offered to break those into an ordered plan with explicit completion criteria if the operator wants to sequence them.
 
+### Phase 36 — ideal two-tier settlement spec landed ✅ (shipped 2026-04-18)
+
+The product-level settlement spec converges after the 5-agent review and operator's "理想の仕様" decision. Two tiers, not one:
+
+| Tier | Surfaces | Settlement |
+|---|---|---|
+| **User-selectable dual-rail** | Plan, Advertising, Data Partner | Stripe (credit card) **or** Polygon Web3 (stablecoin). Rail chosen at checkout; stored on the campaign / subscription. |
+| **Web3-only (backend enforced)** | Agent API Store, AI Works | Polygon Web3 only. Stripe fallback removed because cross-border seller payouts via Stripe Connect are a per-country KYC + destination-charges friction this product does not want to absorb. |
+
+**Shipped (server + UI):**
+
+- **API Store Web3-only enforcement** (`marketplace_capabilities.py:1893`): Stripe Connect fallback removed. Purchases require a seller with a verified Polygon payout wallet; otherwise `409 Conflict`.
+- **AI Works Web3-only enforcement** (`works_service.py:1421`): Stripe escrow fallback removed. New orders flow through `WorksEscrowHub` only.
+- **Plan rail selection** (`App.tsx:1712`, `App.tsx:5612`): `pricingCheckoutRail` state + UI selector; Stripe path (`startPricingCheckout` / `upgrade`) is now reachable again, Web3 path (`startPricingSubscription` / `upgradeViaWeb3`) stays wired.
+- **Partner rail selection** (`PartnerDashboard.tsx:330`): Billing panel offers both Stripe and Polygon Web3 with `handleCheckout` routing by selection.
+- **Ads rail selection** (`AdDashboard.tsx:28`, `ad-api.ts:156`, `ad_api.py:123`): campaign-level rail choice replaces the operator-side `economy_web3_adapter_enabled` env flag. Existing `billing_mode` union extended to `"stripe" | "polygon" | "mock"`.
+- **Seller onboarding realigned** (`WorksRegisterPage.tsx:155`, `OwnerPublishPage.tsx:1044`): payout setup is Polygon-wallet-first; Stripe Connect onboarding is not triggered by new seller flows.
+- **Owner UI cleanup** (`OwnerBudgetsPage.tsx:15`, `OwnerInstalledToolsPage.tsx:374`, `OwnerPublishPage.tsx:326`, `styles.css`): "Not connected" placeholder copy removed, settlement labels clarified, internal `stripe*` copy keys renamed to `payout*` series.
+- **Legal pages updated to match** (`App.tsx:2433` area): ToS §6 JA/EN, Privacy Policy JA/EN, 特商法 JA/EN rewritten to describe dual-rail for Plan/Ads/Partner and Web3-only for API Store/AI Works. This replaces the interim transitional-provisions clauses from the earlier migration pass — the final wording reflects the implementation that actually exists.
+- **Cloud rewrite brief** produced (`docs/legal-drafts/2026-04-18-dual-rail-rewrite/cloud-request.md`) for a more polished second pass by external legal-writing Claude if desired.
+
+**Tests**: 37 passed combined:
+
+- `test_ad_campaigns.py` → 5 passed
+- `test_partner_dashboard.py` → 6 passed
+- `test_web3_payment_foundation.py` → 21 passed
+- `test_tool_use_axis2.py` → 5 passed
+- `apps/web` build → pass, `py_compile` → pass
+
+**Honest caveat from Codex (explicit, do not gloss):**
+
+> 旧 Stripe 実装のコード片 は repo 内にまだ残っています
+
+User-facing flows and backend hard-requirements match the ideal spec. But inside the repo, some legacy Stripe-era code paths still exist — dead code from the app's perspective but not yet removed. Examples: `integrations/stripe_api_store.py`, `integrations/stripe_works.py`, and older `stripe_*` model fields that the new API Store / AI Works flows never reach.
+
+Removing them is a separate cleanup workstream (low-risk, boring refactor) and is deliberately deferred: the Plan / Ads / Partner tier still uses Stripe, so not all `stripe_*` identifiers are dead — only the API Store / AI Works Stripe path is. A rushed rename would risk touching code that's still live.
+
+**Significance — the migration's product spec is now "done" in the user-visible sense:**
+
+- Every checkout that a real customer can initiate today routes correctly per this tier table
+- Every ToS / 特商法 claim matches what the running code actually does
+- Seller onboarding never sends a new seller through Stripe Connect for API Store / AI Works
+
+**Still pending (distinct from product spec, per Codex's stated next steps):**
+
+- Cleanup of dead Stripe code paths (low-risk refactor)
+- `polygon_mandate` recurring-charge dispatcher (the authorize step is done in Phase 34; the periodic-charge scheduler is the remaining piece)
+- Mainnet (Polygon 137) cutover + production paymaster funding + production token address pinning
+- 5-surface live GUI walk-through verification on real Polygon (Codex's own next step)
+- External claude.ai legal-writing pass (brief is filed at `docs/legal-drafts/2026-04-18-dual-rail-rewrite/cloud-request.md`; can run in parallel)
+
+**Codex confirmed unchanged:**
+
+- `_VALID_PRICE_MODELS` unchanged; `USAGE_BASED` / `PER_ACTION` still reserved
+- `VALID_SETTLEMENT_MODES` unchanged since Phase 33 (the 4-value set). No SDK enum change in Phase 36
+
+**SDK-side impact: none.** The Plan / Ads / Partner dual-rail UI and the API Store / AI Works Web3-only enforcement are server + frontend concerns. SDK v0.2.0's `SettlementMode` enum (4 values) already covers both tiers. No contract change needed.
+
 ### Still pending (work in progress)
 
 - ~~**Real Turnkey + Pimlico + Amoy end-to-end validation**~~ — **DONE in Phase 31** (2026-04-18). First real userOp landed on Polygon Amoy: `userOpHash=0xaa55cbae...`, `tx_hash=0xa04699ff...`, block 36829663. Telemetry fields captured live values.
@@ -708,8 +766,10 @@ One of the longest-standing `Still pending` items closes. 0x swap quote was a de
 - **Relayer-driven recurring charge orchestration for `polygon_mandate`** — the authorized mandate is created on-chain at tool-authorization time, but the scheduler that periodically fires the actual charge userOp against the authorized mandate is a follow-up phase. Codex's explicit next workstream after Phase 34.
 - ~~**Replace `amoy.json` placeholder manifest**~~ — **DONE** with the Phase 31 hardhat deploy (2026-04-18). Real Amoy addresses for `FeeVault` / `SubscriptionHub` / `AdsBillingHub` / `WorksEscrowHub` + Mock USDC / JPYC are now in the manifest (see Phase 31 section for the address table).
 - **Mainnet (Polygon 137) cutover** — Amoy flow is proven end-to-end; mainnet deploy + production paymaster funding is the remaining chain-side workstream.
-- **Stripe complete shutdown + existing-subscriber migration** — Plan / Ads / Partner may retain Stripe as a user-selectable rail during the transition; API Store / AI Works are Web3-only per product spec. Complete Stripe removal in `marketplace_capabilities.py` / `works_service.py` is a coordinated Codex workstream.
+- ~~**Stripe removal in API Store / AI Works**~~ — **DONE in Phase 36** (2026-04-18). Backend hard-requires Polygon; new seller onboarding skips Stripe Connect. Dead Stripe code paths remain for low-risk later refactor.
+- **Legacy Stripe code cleanup** — dead code paths (`integrations/stripe_api_store.py`, `integrations/stripe_works.py`, old `stripe_*` model fields) unreachable from current flows but not yet removed. Separate refactor workstream.
 - **5-surface live GUI final verification** — Codex flagged the walk-through across Plan / Ads / Partner / API Store / AI Works on real Polygon still needs final observation pass.
+- **External claude.ai legal-writing pass** — Phase 36 already aligned ToS / Privacy / 特商法 with the implementation; the cloud-request brief at `docs/legal-drafts/2026-04-18-dual-rail-rewrite/cloud-request.md` can produce a polished second pass if desired.
 
 Free listings and non-payment flows (READ_ONLY / ACTION without charge) remain unaffected throughout the migration.
 
