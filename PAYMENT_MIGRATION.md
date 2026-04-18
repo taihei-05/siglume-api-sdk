@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–46 shipped. **Phase 46 lands the read-side `stripe_*` cleanup — actual code that still reads `stripe_*` as primary is now essentially gone.** What's left of `stripe_*` in the codebase falls into three categories only: type-layer backward-compat aliases (now `@deprecated`-marked in `apps/web/src/lib/types.ts`), OpenAPI `deprecated: true` aliases, and prior-phase SDK migration records. `.env.prod.example` is further operator-hardened: required values unified to `<fill-in>`, every Pimlico / Turnkey / Safe / 0x / manifest / preflight / reconciliation entry has source + purpose in a 1-line comment, and `BROKER_LIVE_SUBMIT_ENABLED=true` / `WALLET_PROVIDER=turnkey_http` are explicitly marked as fixed values (not knobs). Every value the preflight reads is covered by the current `.env.prod.example`. Phase 45 / 44 / 43 / 42 priors hold: OpenAPI `payout_*`-primary, scheduler healthcheck DB-liveness-only, Web3 env short aliases, mainnet-prerequisite warnings #5 / #6 / #7 closed at code level. `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites**; main still untouched. What's left: WARNING #9 alias-removal cadence (a release-cadence decision, not a code task — the read-side rename is done), WARNING #10 v2 WorksEscrowHub, INFO #11-15, recovery→main merge checklist (Phase 46 operator-facing artifact still outstanding), and an eventual public-SDK-repo openapi sync + SDK patch/minor cut. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod` (now drop-in-ready from `.env.prod.example`), run preflight.
+**Status:** Phases 1–47 shipped. **Phase 47 closes preflight / env alignment and marks the Codex implementation role as handed off.** `web3_preflight_rpc_max_age_seconds` default is now 60 s and `.env.prod.example` matches. Reconciliation cadence is now documented as seconds-based-daily, with external orchestration called out as the way to pin a fixed wall-clock time (e.g., 03:00). `payout_*` primary / `stripe_*` alias stance is further sharpened in OpenAPI + frontend types. **Codex declared its implementation role complete after Phase 47** — branch is handed off in "merge-ready pending operator + release cut" state. Residual code task is `stripe_*` alias tail cleanup (release-cadence decision, not implementation). `recovery-2026-04-18` is **code-complete for mainnet launch prerequisites**; main still untouched. Remaining work is operator-side + release-side: (1) create 2-of-3 operator Safe on Polygon mainnet, (2) populate `.env.prod` from the operator-ready `.env.prod.example`, (3) run `/v1/admin/market/web3/preflight --require-ready` and verify all green, (4) merge `recovery-2026-04-18` → `main` and deploy, (5) re-sync public SDK repo `openapi/developer-surface.yaml` + cut patch release (v0.2.1, additive-only) so SDK consumers see `payout_*` primary.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -1203,6 +1203,74 @@ The WARNING #9 rename body is substantially complete at the code level. What rem
 - **Public SDK repo openapi re-sync + patch release cut** — not blocking; rides post-merge.
 
 **SDK-side impact: none new.** Phase 46 is server-read-side cleanup + `.env.prod.example` ergonomics + type `@deprecated` markers. The OpenAPI contract shape is unchanged from Phase 45 (still `payout_*` primary, `stripe_*` deprecated: true).
+
+### Phase 46b — Privacy Policy disclosures (#13 + #15) shipped silently on `recovery-2026-04-18`
+
+Between the Phase 45 and Phase 46 doc-sync windows, a commit landed on `recovery-2026-04-18` that was not called out in the phase progress reports:
+
+- `bf9186b legal(privacy): add escrow custody, no-training, DPO disclosures (#13, #15)`
+
+This closes two of the 15-item list INFOs:
+
+- **INFO #13** — Privacy Policy micro-updates (escrow custody disclosure + no-training disclosure added)
+- **INFO #15** — DMARC/SPF/DKIM + **DPO contact** disclosure added
+
+Content-wise this is a legal-text update; no server logic, no SDK contract change. Recorded here for completeness — the 15-item list close-out accounting should mark #13 and #15 as done (alongside the earlier #11 / #12 / #14 rulings Codex has made).
+
+### Phase 47 — preflight / env alignment + Codex implementation role close-out (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+Last slice of Codex's implementation workstream before role handoff.
+
+**preflight / env alignment:**
+
+- `web3_preflight_rpc_max_age_seconds` default is now **60 s** in `packages/shared-python/agent_sns/settings.py`.
+- `.env.prod.example` now lists the same 60 s value for the same key — no more default/doc drift.
+- **Reconciliation cadence semantics clarified**: the `.env.prod.example` comment makes explicit that the knob is seconds-based daily. If an operator wants a fixed wall-clock time (e.g., 03:00 local), that must be achieved via external orchestration (cron / systemd timer), not the internal scheduler. Prevents confusion about "why isn't `0 3 * * *` being honored" style questions.
+
+**`payout_*` / `stripe_*` stance — sharpened:**
+
+- `packages/contracts/sdk/openapi/developer-surface.yaml` — `payout_*` primary stays canonical, `stripe_*` remains `deprecated: true`.
+- `apps/web/src/lib/types.ts` — same alignment on the frontend-type surface. `@deprecated` markers stay on `stripe_*`.
+- No behavioral change — this is stance hardening, not migration.
+
+**Tests:**
+
+- `pytest apps/api/tests/unit/test_web3_payment_foundation.py -q -k "preflight"` → **4 passed**
+- `npm run build` in `apps/web` → pass
+
+**Files changed (2):**
+
+- `.env.prod.example`
+- `packages/shared-python/agent_sns/settings.py`
+
+**Codex role close-out:**
+
+After Phase 47, Codex formally closed out its implementation-agent role on this migration. The branch state it hands off:
+
+- **Branch**: `recovery-2026-04-18`. Main untouched.
+- **What Codex considers done**: Web3 payment foundation, preflight, indexer/daemon, dual-rail reconciliation, mainnet env + healthcheck, API Store / AI Works Web3-only cutover, Plan / Ads / Partner dual-rail, cutover-blocker / CRITICAL fixes, `payout_*` rename read-side + contract, `.env.prod.example` operator shape.
+- **Test green at handoff**: preflight slice 4 passed, `apps/web` build pass. Broader sweeps from Phase 42 (12 integration + 39 unit) still the highest-count evidence of broad green.
+- **What Codex considers "not really a code task anymore"**: `stripe_*` alias tail removal (release-cadence decision → v0.3.0).
+- **What Codex explicitly did NOT do**: no commits were pushed, no PRs opened, no merges, no deploys. Implementation-in-branch only.
+
+**What the handoff (operator / cloud) still owns:**
+
+1. Create the **2-of-3 operator Safe** on Polygon mainnet. Codex deliberately excluded from signers.
+2. Populate **`.env.prod`** from the operator-ready `.env.prod.example` template — Pimlico siglume-prod key (not siglume-dev), Turnkey prod org, Polygon mainnet RPC, native USDC / JPYC mainnet addresses, the Safe address from step 1.
+3. Run `/v1/admin/market/web3/preflight --require-ready` (or equivalent) and verify **all five checks green** — Turnkey revoked-keys list, Pimlico paymaster balance threshold, Polygon RPC chain-head freshness (60 s window), 0x live route probe, no blocker reasons.
+4. **Reviewer pass** on `recovery-2026-04-18` HEAD before merging (CLAUDE.md two-agent workflow — required for any change landing in main, no exceptions for "Codex declared done").
+5. **Merge** `recovery-2026-04-18` → `main` (decision timing is operator-side).
+6. **Deploy** from main per project CLAUDE.md non-destructive deploy procedure (git pull + docker compose build app-image + web + up -d).
+7. **Public SDK repo re-sync** — copy `openapi/developer-surface.yaml` from main-repo mirror, cut **v0.2.1 additive-only patch** so SDK consumers see `payout_*` primary. (Alias removal is a separate v0.3.0 release decision, deliberately deferred.)
+
+**Not on the handoff (deferred by design):**
+
+- **WARNING #10** — v2 WorksEscrowHub with 90-day dispute timeout. New contract deploy + migration, not upgradable. Design pass still owed.
+- **SDK v0.3.0** — alias-removal breaking release. Release-cadence decision, not blocking mainnet cutover.
+
+**Branch state at handoff:** `recovery-2026-04-18` is now the canonical reference of "Codex considers this merge-ready pending operator preflight". Main still untouched. This phase is the final Codex-authored entry in this document.
+
+**SDK-side impact: none from Phase 47 itself.** The handoff does not change any SDK surface beyond what Phase 45 already recorded. The public SDK repo sync + v0.2.1 patch cut is a post-merge deliverable, still owed.
 
 ### Still pending (work in progress)
 
