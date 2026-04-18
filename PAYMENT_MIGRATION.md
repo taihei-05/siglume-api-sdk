@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–37 shipped. Phase 37 is a polish pass on top of Phase 36's two-tier landing: legal / disclosure copy tightened, Owner UI preconditions updated to current model, old `checkout*` state renamed to `settlement*`, Partner Stripe error messages naturalized, and — most substantively — **default payout provider switched to `polygon_wallet`** across admin rollout, settings, marketplace_payouts, and schemas. The default assumption when no rail is specified is now Polygon, not Stripe. **What remains in the repo as "Stripe residue" per Codex**: mostly backend legacy aliases and existing-compat stubs, not reachable from user-facing flows. The user-visible migration is materially complete.
+**Status:** Phases 1–38 shipped. Phase 38 adds a **Web3 production preflight** surface — `GET /v1/admin/market/web3/preflight` backend endpoint + Admin Settlement Ops GUI panel + `py -3.11 -m apps.api.app.web3_preflight --require-ready` CLI. Each check (manifest / mainnet tokens / Polygon RPC / Turnkey signer / bundler / paymaster / indexer / 0x swap / operator Safe) returns pass / warn / fail with a next-action hint. This is the cutover safety gate: no mainnet deploy without a green preflight. **Important context on `recovery-2026-04-18`**: the Phase 36/37 implementation of the two-tier spec + Phase 38's preflight all live on the `recovery-2026-04-18` branch, not yet merged to main. A reviewer audit surfaced 4 CRITICAL implementation defects (decimal scale mismatch, `RowMapping` attribute access, null-safety in seller lookup, persisted `stripe_connect` default on new Works orders) that must be fixed before the branch merges.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -786,6 +786,53 @@ Translation: the remaining `stripe*` identifiers in the repo are almost all eith
 - **Existing** Stripe-settled subscribers / campaigns continue on Stripe until they voluntarily migrate or the operator force-migrates (no policy decision yet on force-migration date)
 
 **SDK-side impact: none.** `SettlementMode` enum unchanged. The default provider change is server-side; SDK consumers still see `SettlementMode.stripe_*` and `SettlementMode.polygon_mandate` / `embedded_wallet_charge` as valid declarable values, with server-side enforcement deciding which surfaces accept which values.
+
+### Phase 38 — Web3 production preflight surface (shipped 2026-04-18, on `recovery-2026-04-18` branch)
+
+The cutover-safety gate. Before any mainnet deploy, this phase lets the operator confirm every live-dependency is green.
+
+**Shipped (on `recovery-2026-04-18` branch, not yet merged to main):**
+
+- **Backend endpoint** `GET /v1/admin/market/web3/preflight` (`web3_payments.py`, `marketplace_api.py`, `schemas.py`): returns `pass` / `warn` / `fail` + a `next_action` string per check. Checks covered:
+  - `manifest` — deployment manifest loaded, real (non-placeholder) addresses
+  - `mainnet_tokens` — USDC / JPYC addresses configured + allowlisted
+  - `polygon_rpc` — `AGENT_SNS_WEB3_POLYGON_RPC_URL` / `_AMOY_RPC_URL` reachable
+  - `turnkey_signer` — live signer probe returns 200, `LIVE_SIGN_ENABLED=true`
+  - `bundler` — Pimlico bundler reachable, entry point resolves
+  - `paymaster` — Pimlico paymaster reachable + deposit balance query
+  - `indexer` — resident daemon heartbeat fresh, lag < threshold
+  - `0x_swap` — swap-quote endpoint returns a real quote
+  - `operator_safe` — operator Safe address configured (for FeeVault + admin ops)
+- **Admin GUI** — `AdminSettlementOpsPage.tsx` gains a preflight panel:
+  - Blockers (red) + Warnings (yellow) summary at top
+  - Per-check detail with next-action hint
+  - Live refresh button
+- **CLI** — `py -3.11 -m apps.api.app.web3_preflight --require-ready`:
+  - Exits non-zero if any `fail` check present — slots into CI / cutover script for gating
+  - Prints the same snapshot as the GUI
+- **Runbook updated** — `docs/project_phase_4/16_stripe_to_polygon_cutover_runbook.md` now documents the preflight as the mandatory first step before any cutover action.
+
+**Tests**: `test_web3_payment_foundation.py` + `test_tool_use_axis2.py` → **28 passed** (+2 for preflight paths), `apps/web` build → pass, `--help` smoke → pass.
+
+**Why this matters operationally:**
+
+- Without preflight: operator runs `hardhat deploy` → mainnet, discovers mid-cutover that (say) Pimlico paymaster has no deposit → customers get gas-sponsored-rejection errors
+- With preflight: `--require-ready` gates cutover with a single command, admin GUI makes on-call visibility trivial, and each failing check ships with the next action ("deposit X POL to paymaster at 0x...") instead of a cryptic error
+
+**Important: branch state disclosure**
+
+Phase 36 (two-tier landing), Phase 37 (polish + Polygon default), and Phase 38 (preflight) **all live on `recovery-2026-04-18`, not yet on `main`**. The `main` branch's most recent commit is iter 48 (doc-only mirror). The recovery branch exists because an earlier sync-loop `git stash` cycle left the WIP temporarily stranded; a rescue commit `e6b1e1c` (98 files / +24,248 lines) restored it.
+
+A reviewer audit on that recovery commit surfaced **4 CRITICAL implementation defects that must be fixed before merging to main**:
+
+1. Decimal scale mismatch — `max_amount_minor` passed raw into uint256 calldata, but contracts expect token-native units (USDC=10^6, JPYC=10^18). A $5 subscription would actually transfer $0.0005. Mock-mode invisible, real-chain silent money bug. (`web3_tx_plans.py:387, 423, 569`)
+2. `RowMapping` attribute access — `.mappings().first()` returns dict-like but code uses `.attribute` access; `AttributeError` on any default-policy paid purchase. (`marketplace_capabilities.py:1202-1213`)
+3. Null-safety — `row.metadata_jsonb.get(...)` on nullable JSON column, blocks seller payout resolution when null. (`marketplace_capabilities.py:337`)
+4. New Works orders persist `settlement_backend="stripe_connect"` at creation, only flip to `polygon_web3` in `fund_works_order`; a buyer skipping fund-step via state manipulation lands on the Stripe escrow release branch. (`works_service.py:1297`)
+
+Codex has been briefed with the full finding list + 10 WARNING-severity follow-ups. Preflight integration for findings #1 and #4 is requested as a defense-in-depth layer.
+
+**SDK-side impact: none.** Preflight is a platform-internal operational surface. No AppManifest / ToolManual contract change. SDK v0.2.0 continues as-is.
 
 ### Still pending (work in progress)
 
