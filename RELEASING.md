@@ -26,7 +26,15 @@ From the repo root on `main`:
 # Clean previous build output
 rm -rf dist/ build/ siglume_api_sdk.egg-info/
 
-# Build sdist + wheel
+# Build sdist + wheel (bash / WSL / macOS)
+python3.11 -m pip install --upgrade build
+python3.11 -m build
+```
+
+On Windows PowerShell, use the `py` launcher instead:
+
+```powershell
+Remove-Item -Recurse -Force dist, build, siglume_api_sdk.egg-info -ErrorAction SilentlyContinue
 py -3.11 -m pip install --upgrade build
 py -3.11 -m build
 ```
@@ -65,7 +73,7 @@ After this, every release is just:
 
 ```bash
 # bash / WSL / macOS
-py -3.11 -m twine upload dist/*
+python3.11 -m twine upload dist/*
 ```
 
 ```powershell
@@ -158,8 +166,11 @@ A `.post` release still increments the PyPI version, so users `pip install -U` c
 If a release is broken enough that it must be withdrawn, **yank** (don't delete — PyPI forbids deletion of a version once uploaded):
 
 ```bash
-py -3.11 -m twine yank --reason "broken: <one-line explanation>" siglume-api-sdk==X.Y.Z
+# bash / WSL / macOS
+python3.11 -m twine yank --reason "broken: <one-line explanation>" siglume-api-sdk==X.Y.Z
 ```
+
+On Windows PowerShell: `py -3.11 -m twine yank --reason "broken: <one-line explanation>" siglume-api-sdk==X.Y.Z`
 
 Yanking makes the version invisible to `pip install siglume-api-sdk` resolution (it will skip the yanked version unless explicitly pinned), but anyone who already installed it keeps working. Follow up with a fixed release (`X.Y.Z+1` or `X.Y.Z.post1`) ASAP.
 
