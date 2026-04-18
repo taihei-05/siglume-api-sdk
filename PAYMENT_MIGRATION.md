@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–34 shipped. Phase 34 lifts the Phase 33 "metadata only" qualifier for payment-tool runtime dispatch. `capability_gateway.py` now routes `permission_class="payment"` tool executions to an actual Web3 settlement handoff when `settlement_mode ∈ {polygon_mandate, embedded_wallet_charge}`: `polygon_mandate` resolves the seller's verified Polygon payout wallet and executes an on-chain `createMandate`; `embedded_wallet_charge` builds an ERC-20 transfer prepared tx via a new `build_embedded_wallet_charge_transaction_request` helper and drives it through the embedded-wallet executor. Execution receipts (`tool_use_runtime.py`) now carry settlement metadata. `web3_payments.py` explicitly excludes tool-execution mandates from the recurring-charge projector so subscription and tool-execution lifecycles don't cross-contaminate. **Caveat (Codex, explicit):** `polygon_mandate` currently authorizes on the spot — the relayer-driven follow-up charge orchestration (platform triggers the recurring debit against the authorized mandate) is still a separate phase. **No SDK enum / schema change in Phase 34** — the v0.2.0 contract already covers the new modes; this phase is pure server-side runtime.
+**Status:** Phases 1–35 shipped. Phase 35 lands **0x real swap execution** — one of the longest-standing `Still pending` items. `web3_payments.py` now calls the 0x AllowanceHolder quote endpoint and returns both an `approve_transaction_request` (for `issues.allowance.spender`) and a `swap_transaction_request` (for the swap target), plus an `allowance_needed` flag. A new prepared-tx builder in `web3_tx_plans.py` generates the concrete ERC-20 `approve` + swap router calldata. Owner Wallet exposes a staged GUI: quote → Approve allowance → Execute swap, with provider / expiry / allowance visible at each step (deliberate over a single "swap" button for auditability). Prepared execution extended to support `await_finality`. **Caveat:** `polygon_mandate` recurring-charge dispatcher remains the single biggest pending item, alongside Stripe complete shutdown + existing-subscriber migration + 5-surface live GUI final verification + mainnet cutover.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -673,12 +673,38 @@ For SDK developers, the v0.2.0 enum is now genuinely live — declaring `polygon
 
 **SDK-side impact: none in Phase 34.** No enum value added, no new field added to `ToolManual`. Phase 34 is a server-side runtime upgrade that activates the enum values v0.2.0 already declared.
 
+### Phase 35 — 0x real swap execution ✅ (shipped 2026-04-18)
+
+One of the longest-standing `Still pending` items closes. 0x swap quote was a deterministic mock since Phase 3; Phase 35 makes it a real quote against 0x API + real approve + real swap calldata.
+
+**Shipped:**
+
+- **0x AllowanceHolder integration** (`web3_payments.py:1133`): calls the 0x AllowanceHolder quote endpoint, then returns three coupled fields:
+  - `approve_transaction_request` — ERC-20 `approve` calldata targeting `issues.allowance.spender`
+  - `swap_transaction_request` — the swap itself, `transaction.to / data / value` from the 0x response
+  - `allowance_needed` — boolean flag so the caller knows whether to skip the approve step for already-allowed tokens
+- **Prepared tx builder** (`web3_tx_plans.py:268`): generates the `approve` + swap router calldata from the 0x response.
+- **Schema expansion** (`presentation/schemas.py:877`): `SwapQuoteResponse` now includes the three fields above.
+- **Prepared execution extended to `await_finality`** (`marketplace_api.py:3440`): the swap can now block until projector-finalized, matching other execute paths.
+- **Owner Wallet staged UI** (`OwnerWalletPage.tsx:1452`): quote → Approve allowance → Execute swap, with provider / expiry / allowance status visible at each step. Deliberately a 3-step flow rather than a single "Swap" button — for an owner-console audience, auditability beats ergonomics.
+- **Test**: `test_web3_payment_foundation.py` → **21 passed** (+1 — a quote fixture drives generation of the approve/swap request pair and asserts on their shape).
+
+**Implementation references** 0x primary docs (Codex noted):
+- <https://docs.0x.org/docs/0x-swap-api/additional-topics/how-to-set-your-token-allowances>
+- <https://docs.0x.org/docs/0x-swap-api/guides/swap-tokens-with-0x-swap-api>
+- <https://docs.0x.org/api-reference/api-overview>
+
+**SDK-side impact: none.** 0x integration is a platform swap-infrastructure feature; it does not cross the SDK's AppManifest / ToolManual contract.
+
+**Codex's explicit scoping note for this phase:** the migration is not production-complete yet. Phase 35 closes "one of the repo's biggest unlanded items," but the remaining gaps are: mainnet cutover, production token address pinning, Stripe complete shutdown + existing-contract migration, and final 5-surface live GUI completion verification. Codex offered to break those into an ordered plan with explicit completion criteria if the operator wants to sequence them.
+
 ### Still pending (work in progress)
 
 - ~~**Real Turnkey + Pimlico + Amoy end-to-end validation**~~ — **DONE in Phase 31** (2026-04-18). First real userOp landed on Polygon Amoy: `userOpHash=0xaa55cbae...`, `tx_hash=0xa04699ff...`, block 36829663. Telemetry fields captured live values.
 - ~~**Resident (standing) indexer daemon**~~ — **DONE in Phase 32** (2026-04-18). Running with heartbeat / stale detection; local runner `web3-indexer-afa01f3f1e7d` catching up from lag 5561 blocks at 2000/cycle.
 - ~~**Axis 2 migration design**~~ — **first vertical DONE in Phase 33** (2026-04-18). `SettlementMode` gained `polygon_mandate` + `embedded_wallet_charge`; SDK v0.2.0 cut to mirror. Metadata / validator / approval propagation live. Runtime dispatch to Polygon settlement remains for a follow-up phase.
 - ~~**Payment-permission tool runtime dispatch to Polygon**~~ — **DONE in Phase 34** (2026-04-18). `embedded_wallet_charge` fully runtime-backed; `polygon_mandate` on-chain authorization happens at tool-authorization time.
+- ~~**0x real swap execution**~~ — **DONE in Phase 35** (2026-04-18). `web3_payments.py` integrates 0x AllowanceHolder quote, returns `approve_transaction_request` + `swap_transaction_request` + `allowance_needed`. Owner Wallet exposes a staged quote → Approve allowance → Execute swap flow. Tests: foundation 21 passed.
 - **Relayer-driven recurring charge orchestration for `polygon_mandate`** — the authorized mandate is created on-chain at tool-authorization time, but the scheduler that periodically fires the actual charge userOp against the authorized mandate is a follow-up phase. Codex's explicit next workstream after Phase 34.
 - ~~**Replace `amoy.json` placeholder manifest**~~ — **DONE** with the Phase 31 hardhat deploy (2026-04-18). Real Amoy addresses for `FeeVault` / `SubscriptionHub` / `AdsBillingHub` / `WorksEscrowHub` + Mock USDC / JPYC are now in the manifest (see Phase 31 section for the address table).
 - **0x real swap execution** — swap quote endpoint still returns deterministic mocks.
