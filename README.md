@@ -124,12 +124,13 @@ python examples/hello_price_compare.py
 
 `hello_price_compare.py` and `x_publisher.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run → action lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; use them as a shape to copy from.
 
-| Example | Permission | Runnable e2e | Description |
-|---|---|---|---|
-| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | ✅ | Compare product prices across retailers |
-| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | ✅ | Post agent content to X with owner approval and dry-run preview |
-| [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
-| [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
+| Example | Permission | Description |
+|---|---|---|
+| [hello_echo.py](./examples/hello_echo.py) | `READ ONLY` | Minimal echo example that returns input parameters |
+| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | Compare product prices across retailers |
+| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | Post agent content to X with approval |
+| [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | Generate images and publish social posts |
+| [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | Prepare and submit wallet-connected transactions |
 
 ## API ideas
 
