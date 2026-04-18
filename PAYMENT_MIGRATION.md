@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–45 shipped. **Phase 45 moves `payout_*` to primary on the OpenAPI contract and normalizes `.env.prod.example` for operator populate.** `openapi/developer-surface.yaml` — the authoritative developer-surface shape — now lists `payout_connected` / `payout_account_id` / `payout_ready` (+ the full `payout_*` field family) as the primary names; the full `stripe_*` family is retained as `deprecated: true` aliases for one release window. `.env.prod.example` is now operator-ready: required / optional flagged, source of each value called out (Safe console / Turnkey / Pimlico dashboard / 0x / manifest / preflight thresholds / reconciliation cadence), all in ASCII — prior mojibake on Web3 comments cleared. Phase 44 / 43 / 42 priors hold: scheduler healthcheck is DB-liveness-only, Web3 env parser accepts short aliases (`TURNKEY_ORG_ID` / `0X_API_KEY` / `CONTRACT_MANIFEST_PATH`), three mainnet-prerequisite warnings (#5 / #6 / #7) closed at code level. `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites** with the OpenAPI contract now also `payout_*`-primary; main still untouched. What's left: WARNING #9 rename tail (further trimming `stripe_*` read-side references), WARNING #10 v2 WorksEscrowHub, INFO #11-15, and an eventual public-SDK-repo openapi sync + SDK patch/minor cut to ship the contract change to SDK consumers. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
+**Status:** Phases 1–46 shipped. **Phase 46 lands the read-side `stripe_*` cleanup — actual code that still reads `stripe_*` as primary is now essentially gone.** What's left of `stripe_*` in the codebase falls into three categories only: type-layer backward-compat aliases (now `@deprecated`-marked in `apps/web/src/lib/types.ts`), OpenAPI `deprecated: true` aliases, and prior-phase SDK migration records. `.env.prod.example` is further operator-hardened: required values unified to `<fill-in>`, every Pimlico / Turnkey / Safe / 0x / manifest / preflight / reconciliation entry has source + purpose in a 1-line comment, and `BROKER_LIVE_SUBMIT_ENABLED=true` / `WALLET_PROVIDER=turnkey_http` are explicitly marked as fixed values (not knobs). Every value the preflight reads is covered by the current `.env.prod.example`. Phase 45 / 44 / 43 / 42 priors hold: OpenAPI `payout_*`-primary, scheduler healthcheck DB-liveness-only, Web3 env short aliases, mainnet-prerequisite warnings #5 / #6 / #7 closed at code level. `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites**; main still untouched. What's left: WARNING #9 alias-removal cadence (a release-cadence decision, not a code task — the read-side rename is done), WARNING #10 v2 WorksEscrowHub, INFO #11-15, recovery→main merge checklist (Phase 46 operator-facing artifact still outstanding), and an eventual public-SDK-repo openapi sync + SDK patch/minor cut. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod` (now drop-in-ready from `.env.prod.example`), run preflight.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -1156,6 +1156,53 @@ First phase where **the SDK contract actually advances** (not just server / fixt
 - Whether that re-sync rides a patch release (v0.2.1, additive fields) or waits for a minor (v0.3.0, which could remove the `deprecated: true` aliases) is a later release-cadence decision. Current stance: **additive-only**, so a v0.2.1 patch is the lower-risk path if a cut is wanted before the deprecation window closes.
 
 **SDK-side impact: first non-trivial contract advance since Phase 33 (SettlementMode enum).** Additive only — no removed fields, no required-field flips — so existing v0.2.0 consumers keep working. Awaiting recovery→main merge + a public-SDK-repo re-sync before it's visible to SDK installs.
+
+### Phase 46 — read-side `stripe_*` cleanup essentially done + `.env.prod.example` operator-hardened (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+The WARNING #9 rename body is substantially complete at the code level. What remains of `stripe_*` is no longer "read-side code" — it's documented alias surface.
+
+**Read-side `stripe_*` — mostly gone:**
+
+- Actual service / presentation code that still reads `stripe_*` as a primary signal is essentially eliminated.
+- Residual `stripe_*` in the tree falls into three categories only:
+  1. **Type-layer backward-compat alias** (`apps/web/src/lib/types.ts`) — each `stripe_*` field now carries a `@deprecated` comment so IDE usage flags it.
+  2. **OpenAPI `deprecated: true` alias** (`packages/contracts/sdk/openapi/developer-surface.yaml`) — unchanged from Phase 45, intentionally held for one release window.
+  3. **SDK migration records** — this doc, release notes, changelog entries.
+- Alias-removal schedule remains an unresolved release-cadence decision (v0.3.0 candidate — see Phase 45 release note). **Not a code task anymore.**
+
+**OpenAPI — `payout_*` primary hardened:**
+
+- `developer-surface.yaml` calls out `payout_connected` / `payout_account_id` / `payout_ready` (plus the rest of the `payout_*` family) as the **canonical** names (not just additive primary).
+- `stripe_*` pinned to `deprecated: true` aliases.
+
+**`.env.prod.example` — operator populate hardening:**
+
+- All required secrets unified to `<fill-in>` placeholder (uniform grep target, no mixed `CHANGE_ME` / empty / `YOUR_KEY_HERE` patterns).
+- Every Pimlico / Turnkey / Safe / 0x / contract-manifest / preflight-threshold / reconciliation-cron entry carries a 1-line comment with **source** (which console produces the value) and **purpose** (what the backend does with it).
+- `BROKER_LIVE_SUBMIT_ENABLED=true` and `WALLET_PROVIDER=turnkey_http` explicitly marked as **fixed values** — operators were previously unsure whether these were knobs or constants.
+- **Preflight coverage confirmed**: every value the `/v1/admin/market/web3/preflight` endpoint reads is populated from the current `.env.prod.example`. No missing keys.
+
+**Tests:**
+
+- `pytest apps/api/tests/unit/test_web3_payment_foundation.py -q -k "developer_portal_summary_skips_stripe_connect_lookup_in_web3_mode or preflight"` → **5 passed**
+- `npm run build` in `apps/web` → pass
+
+**Files changed (2):**
+
+- `.env.prod.example`
+- `apps/web/src/lib/types.ts`
+
+**Branch state:** `recovery-2026-04-18`, main still untouched. Operator merge-readiness gating unchanged.
+
+**Remaining items after Phase 46:**
+
+- **WARNING #9 alias-removal cadence** — release-cadence decision, not a code task. When it lands, it's a v0.3.0 breaking release (removes `deprecated: true` aliases from OpenAPI + types).
+- **WARNING #10 v2 WorksEscrowHub** — new contract deploy + migration, not upgradable. Design pass still pending.
+- **INFO #11-15** — SDK v0.3.0 deprecation deferred, Privacy Policy micro-updates, indexer SLO doc, DMARC/SPF/DKIM + DPO contact.
+- **recovery→main merge checklist** — operator-facing artifact (Phase 46 scope item from the business comm) — Codex declared this is still outstanding. Expected next slice: `docs/project_phase_4/18_recovery_merge_readiness.md` with full test matrix, known caveats, operator actions, rollback plan.
+- **Public SDK repo openapi re-sync + patch release cut** — not blocking; rides post-merge.
+
+**SDK-side impact: none new.** Phase 46 is server-read-side cleanup + `.env.prod.example` ergonomics + type `@deprecated` markers. The OpenAPI contract shape is unchanged from Phase 45 (still `payout_*` primary, `stripe_*` deprecated: true).
 
 ### Still pending (work in progress)
 
