@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–44 shipped. **Phase 44 separates scheduler liveness from reconciliation freshness and widens the Web3 env alias surface.** `--healthcheck-scheduler` now checks **DB liveness only**; daily dual-rail reconciliation freshness moves to preflight / admin-health (the two layers no longer contaminate each other, so healthcheck doesn't false-fail on migration-in-progress or not-yet-elapsed intervals). Web3 env parser now accepts short aliases — `AGENT_SNS_WEB3_TURNKEY_ORG_ID`, `AGENT_SNS_WEB3_0X_API_KEY`, `AGENT_SNS_WEB3_CONTRACT_MANIFEST_PATH` — and `.env.example` / `.env.prod.example` document them. WARNING #9 payout rename keeps progressing: fixtures / tests lean on `payout_*` as primary, `stripe_*` retained as a backend alias. Phase 42 / 43 closed / advanced the three mainnet-prerequisite warnings (#5 resident daemon, #6 dual-rail reconciliation, #7 preflight resilience). `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites** and main is still untouched. What's left: WARNING #9 rename body (ongoing), WARNING #10 v2 WorksEscrowHub with 90-day dispute timeout, INFO #11-15. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
+**Status:** Phases 1–45 shipped. **Phase 45 moves `payout_*` to primary on the OpenAPI contract and normalizes `.env.prod.example` for operator populate.** `openapi/developer-surface.yaml` — the authoritative developer-surface shape — now lists `payout_connected` / `payout_account_id` / `payout_ready` (+ the full `payout_*` field family) as the primary names; the full `stripe_*` family is retained as `deprecated: true` aliases for one release window. `.env.prod.example` is now operator-ready: required / optional flagged, source of each value called out (Safe console / Turnkey / Pimlico dashboard / 0x / manifest / preflight thresholds / reconciliation cadence), all in ASCII — prior mojibake on Web3 comments cleared. Phase 44 / 43 / 42 priors hold: scheduler healthcheck is DB-liveness-only, Web3 env parser accepts short aliases (`TURNKEY_ORG_ID` / `0X_API_KEY` / `CONTRACT_MANIFEST_PATH`), three mainnet-prerequisite warnings (#5 / #6 / #7) closed at code level. `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites** with the OpenAPI contract now also `payout_*`-primary; main still untouched. What's left: WARNING #9 rename tail (further trimming `stripe_*` read-side references), WARNING #10 v2 WorksEscrowHub, INFO #11-15, and an eventual public-SDK-repo openapi sync + SDK patch/minor cut to ship the contract change to SDK consumers. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -1103,6 +1103,59 @@ The settings parser now accepts short-form aliases for the three keys operators 
 **Branch state:** `recovery-2026-04-18`, main still untouched. Operator merge-readiness gating items unchanged (Safe creation, `.env.prod` populate, preflight pass).
 
 **SDK-side impact: none.** Server settings parser + two env example templates + fixture bias. No AppManifest / ToolManual contract change.
+
+### Phase 45 — `payout_*` becomes OpenAPI-primary + production env template normalized (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+First phase where **the SDK contract actually advances** (not just server / fixture).
+
+**OpenAPI — `payout_*` is now primary:**
+
+- `packages/contracts/sdk/openapi/developer-surface.yaml` — the authoritative developer-surface schema now lists the full `payout_*` family as primary:
+  - `payout_connected` (bool)
+  - `payout_account_id` (string, nullable)
+  - `payout_account_country` (string, nullable)
+  - `payout_ready` (bool)
+  - `payout_charges_enabled` / `payout_payouts_enabled` / `payout_details_submitted` (bool)
+  - `payout_disabled_reason` (string, nullable)
+  - `payout_requirements_currently_due` / `payout_requirements_pending_verification` (array)
+- The entire `stripe_*` family is retained as `deprecated: true` aliases: `stripe_connected`, `stripe_account_id`, `stripe_account_country`, `stripe_ready`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_disabled_reason`, `stripe_requirements_currently_due`, `stripe_requirements_pending_verification`.
+- Contract intent: SDK / portal consumers should migrate to reading `payout_*`. `stripe_*` will continue returning the same values for at least one SDK release window. The alias-removal schedule is deliberately not yet fixed — that is a future SDK-release-cadence decision.
+
+**`.env.prod.example` — operator populate shape:**
+
+- Each key is now marked **required / optional** and tagged with its **source** (Safe console / Turnkey console / Pimlico dashboard / 0x / contract manifest / preflight threshold env / reconciliation cron).
+- Coverage includes: operator Safe address, Polygon mainnet RPC, native USDC / JPYC token addresses, Pimlico mainnet bundler + paymaster URL + API key (siglume-prod separate from siglume-dev), Turnkey org / sign-with / live-sign flag, broker live-submit flag, wallet provider, paymaster balance threshold, chain-head freshness window, dual-rail cron cadence, 0x API key.
+- ASCII-only. Earlier mojibake on Web3 comments is cleared.
+- Intent: operator can open `.env.prod.example`, copy to `.env.prod`, fill placeholders without having to cross-reference code to guess what each key is for.
+
+**WARNING #9 — rename continues:**
+
+- Fixture / unit-test surface further biased toward `payout_*` primary.
+- `apps/web/src/lib/types.ts` reshaped to read `payout_*` primary on the frontend type layer.
+- `stripe_*` retained as alias at backend + frontend type levels for the same public-API compatibility reason as Phase 44.
+
+**Tests:**
+
+- `pytest apps/api/tests/unit/test_web3_payment_foundation.py -q -k "developer_portal_summary_skips_stripe_connect_lookup_in_web3_mode or preflight"` → **5 passed**
+- `npm run build` in `apps/web` → pass
+
+**Files changed (6):**
+
+- `.env.example`
+- `.env.prod.example`
+- `apps/api/tests/unit/test_web3_payment_foundation.py`
+- `apps/web/src/lib/types.ts`
+- `packages/contracts/sdk/openapi/developer-surface.yaml`
+- `packages/shared-python/agent_sns/settings.py`
+
+**Branch state:** `recovery-2026-04-18`, main still untouched. Operator merge-readiness gating unchanged.
+
+**Release / SDK-sync note:**
+
+- The `openapi/developer-surface.yaml` change on `recovery-2026-04-18` lives in `packages/contracts/sdk/openapi/` (the main-repo mirror). When recovery is merged to main, the public `siglume-api-sdk` repo's `openapi/developer-surface.yaml` will be re-synced from the mirror to make the `payout_*` primary contract visible to SDK consumers.
+- Whether that re-sync rides a patch release (v0.2.1, additive fields) or waits for a minor (v0.3.0, which could remove the `deprecated: true` aliases) is a later release-cadence decision. Current stance: **additive-only**, so a v0.2.1 patch is the lower-risk path if a cut is wanted before the deprecation window closes.
+
+**SDK-side impact: first non-trivial contract advance since Phase 33 (SettlementMode enum).** Additive only — no removed fields, no required-field flips — so existing v0.2.0 consumers keep working. Awaiting recovery→main merge + a public-SDK-repo re-sync before it's visible to SDK installs.
 
 ### Still pending (work in progress)
 
