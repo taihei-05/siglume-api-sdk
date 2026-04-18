@@ -242,7 +242,7 @@ The significance: Phase 7 is the **first phase that actually starts dismantling 
 - **Broker health + `submission_outline`** gain four new fields: `live_submission_enabled`, `prebuilt_user_operation_present`, `live_submission_attempted`, `used_placeholder_tx_hash` — observability for operators to know exactly what path a given execute took.
 - **Tests**: `test_web3_wallet_broker_api.py` → 4 passed (was 3), `test_web3_payment_foundation.py` → 14 passed, `apps/web` build → pass, Python compile → pass.
 
-**Significance: the broker can now submit real transactions to a live bundler.** What's still missing is the **generator** of `prebuilt_user_operation` — that requires Turnkey/Safe to actually sign, which is Phase 19. Once both sides are live, `LIVE_SUBMIT_ENABLED=true` + real signer = real Polygon transactions. The placeholder tx_hash pattern means no schema migration is needed for the cutover; the DB shape absorbed the asynchronous resolve model cleanly.
+**Significance: the broker can now submit real transactions to a live bundler.** What's still missing is the **generator** of `prebuilt_user_operation` — that requires Turnkey/Safe to actually sign, which is Phase 19. Once both sides are live, `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED=true` + real signer = real Polygon transactions. The placeholder tx_hash pattern means no schema migration is needed for the cutover; the DB shape absorbed the asynchronous resolve model cleanly.
 
 **SDK-side impact: none.** `metadata_jsonb.prebuilt_user_operation` is a server-side execution-metadata field, not part of the SDK's AppManifest / ToolManual contract. `tx_hash_is_placeholder` is on `chain_receipt`, also internal.
 
@@ -312,7 +312,7 @@ The external-signer path (Phase 19) remains available for cases where the key is
 - **`/transactions/execute` can auto-sign** when given an unsigned draft + live signing is on. Lets the existing single-call execute path keep working end-to-end without forcing callers to orchestrate the 3-call `prepare-signing` → `sign-prepared` → `execute-prepared` sequence (which remains available).
 - **Tests**: `test_web3_wallet_broker_api.py` → 7 passed (was 4, +3 new tests exercising the Turnkey wiring), `test_web3_payment_foundation.py` → 14 passed, Python compile → pass.
 
-**Caveat, called out explicitly by Codex:** *this phase shipped the wiring, not the successful end-to-end run.* The broker has the code path to call Turnkey for real, but the full Turnkey + Pimlico + Amoy chain has not been proven together yet. Phase 24 is exactly that — run through Amoy and verify on-chain success.
+**Caveat, called out explicitly by Codex:** *this phase shipped the wiring, not the successful end-to-end run.* The broker has the code path to call Turnkey for real, but the full Turnkey + Pimlico + Amoy chain has not been proven together yet. The Amoy verification run (which actually landed at Phase 31 on 2026-04-18) is the follow-up milestone this phase is a prerequisite for.
 
 **SDK-side impact: none.** Turnkey configuration lives in platform env; `turnkey_http` is a provider name in broker responses. No AppManifest / ToolManual contract change.
 
@@ -338,7 +338,7 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **Significance: the live-submit landing loop is now closed and GUI-drivable.** Before Phase 25, the resolve side (Phase 17) upgraded a placeholder tx_hash into a real one, but the projector still depended on the admin-side indexer sweep (`POST /v1/admin/market/web3/sync`) to catch up. Phase 25 gives each receipt its own "sync the block around me into the projector" button, so a single real-submit can be driven all the way through in the GUI without admin access. Combined with Phase 24's signer probe, the ops story for a real Amoy run is: *validate signer → execute → refresh → finalize → done, all from Owner Wallet.*
 
-**Caveat, still called out explicitly by Codex:** *the real Turnkey + Pimlico + Amoy chain has still not been run end-to-end against real infrastructure.* `amoy.json` remains a placeholder; Phase 26 is the Amoy end-to-end run itself — turn on `LIVE_SIGN_ENABLED` + `LIVE_SUBMIT_ENABLED` against a real deploy, broadcast a real userOp, then walk Refresh → Finalize in the GUI and confirm the receipt lands projected.
+**Caveat, still called out explicitly by Codex:** *the real Turnkey + Pimlico + Amoy chain has still not been run end-to-end against real infrastructure.* `amoy.json` remains a placeholder; the Amoy end-to-end run (eventually landed at Phase 31 on 2026-04-18) is the next planned checkpoint — turn on `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED` + `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED` against a real deploy, broadcast a real userOp, then walk Refresh → Finalize in the GUI and confirm the receipt lands projected.
 
 **SDK-side impact: none.** `finalize` is a platform operational surface on `chain_receipt`; it does not cross into the SDK's AppManifest / ToolManual developer contract.
 
@@ -351,7 +351,7 @@ The external-signer path (Phase 19) remains available for cases where the key is
 
 **Significance: the ops story for a real Amoy run shrinks to three GUI clicks.** Validate signer → Execute → Await finality. Phases 17 and 25 added the individual stages as separate buttons (Refresh, Finalize sync); Phase 26 keeps those available but fuses them for the common case where an operator just wants to land a userOp with minimum friction. The separation still matters for debugging — if finality stalls partway, the individual buttons let you inspect each stage — but the happy path is now a single click.
 
-**Caveat, still called out explicitly by Codex:** *the real Turnkey + Pimlico + Amoy chain has still not been run end-to-end against real infrastructure.* `amoy.json` remains a placeholder; Phase 27 is the Amoy run itself — real deploy manifest, `LIVE_SIGN_ENABLED=true` + `LIVE_SUBMIT_ENABLED=true`, and walking Validate signer → Execute → Await finality from Owner Wallet against a live bundler.
+**Caveat, still called out explicitly by Codex:** *the real Turnkey + Pimlico + Amoy chain has still not been run end-to-end against real infrastructure.* `amoy.json` remains a placeholder; the Amoy run itself (which actually landed at Phase 31 on 2026-04-18) requires — real deploy manifest, `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED=true` + `AGENT_SNS_WEB3_BROKER_LIVE_SUBMIT_ENABLED=true`, and walking Validate signer → Execute → Await finality from Owner Wallet against a live bundler.
 
 **SDK-side impact: none.** `await-finality` is a platform operational surface on `chain_receipt`; it does not cross into the SDK's AppManifest / ToolManual developer contract.
 
