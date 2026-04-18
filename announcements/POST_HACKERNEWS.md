@@ -1,5 +1,7 @@
 # Hacker News
 
+> 🚧 **STALE DRAFT — DO NOT POST AS-IS.** Body text still claims "payments live via Stripe Connect", which is being retired. Rewrite the settlement paragraph per [`../PAYMENT_MIGRATION.md`](../PAYMENT_MIGRATION.md) before posting.
+
 Title: Show HN: API Store for AI Agents – Python SDK for building agent extensions
 
 ---

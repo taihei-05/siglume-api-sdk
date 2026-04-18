@@ -125,7 +125,7 @@
     },
     "settlement_mode": {
       "type": "string",
-      "enum": ["stripe_checkout", "stripe_payment_intent"],
+      "enum": ["stripe_checkout", "stripe_payment_intent", "polygon_mandate", "embedded_wallet_charge"],
       "description": "Required for payment. How the payment is settled."
     },
     "refund_or_cancellation_note": {

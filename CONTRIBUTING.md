@@ -39,8 +39,8 @@ pip install -e .
 ## Dev Container (optional)
 
 This repository includes a `.devcontainer/` configuration.
-Opening this project in Vs Code or Github Codespaces
-automatically detects the configuration and sets up
+Opening this project in VS Code or GitHub Codespaces
+automatically detects the configuration and sets up a
 ready-to-use development environment.
 
 The container uses Python 3.11 and installs the SDK

@@ -388,7 +388,7 @@ Setting `AUTO` on an `ACTION` or `PAYMENT` API will fail manifest validation.
 
 ### Connected accounts
 
-If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, Stripe keys), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
+If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, a third-party provider API key), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
 
 ---
 
@@ -413,7 +413,7 @@ Declare the account type in `required_connected_accounts`. The agent owner conne
 Use `price_model="free"` for free APIs. For subscription APIs, use `price_model="subscription"` with `price_value_minor` set to your monthly price in cents (e.g., 999 for $9.99/month). Minimum subscription price is $5.00/month (500 cents). The following pricing models are available:
 
 - **Free** (`price_model="free"`): Anyone can install. You can convert to subscription pricing at any time.
-- **Subscription** (`price_model="subscription"`): Monthly billing. Fully operational. Developer receives 93.4% each month via Stripe Connect.
+- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement runs on Polygon on-chain embedded-wallet auto-debit (proven end-to-end on Amoy 2026-04-18 — see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md)). Register with a Polygon payout address at `/owner/publish`; buyers purchase via Web3 mandate, access grants are automatic.
 
 The SDK enum `PriceModel` also defines `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and `PER_ACTION`. These are **reserved values for future phases** — they are not accepted by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
 
@@ -649,72 +649,41 @@ json={"source_code": code, "i18n": {...}, "price_model": "subscription", "price_
 
 - **Platform fee: 6.6%**
 - **Developer receives: 93.4%**
-- Currency: USD only
-- Payments are processed by Stripe. Siglume never holds your funds.
+- Pricing: USD-denominated (actual settlement currency post-cutover will be announced with the on-chain cutover; see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md))
+- Siglume never holds your funds.
 
-Example for a $9.99/month subscription:
+Example for a $9.99/month-equivalent subscription:
 
-```
-Buyer pays:           $9.99
-Stripe fee:          -$0.59
-Siglume fee (6.6%):  -$0.66
-You receive:          $8.74/month → direct to your bank account
+```text
+Buyer pays:             $9.99
+Siglume fee (6.6%):    -$0.66
+You receive:            ~$9.33/month, settled directly to your wallet
+                        (gas fees covered by the platform)
 ```
 
 ### Setting up payouts (subscription APIs only)
 
-If you choose `price_model="subscription"`, you must register a Stripe Connect account before your API can be published.
+> ✅ **Payouts now run on Polygon.** Paid subscription publish is **open** — proven end-to-end on Polygon Amoy (2026-04-18). Register at `/owner/publish` with a Polygon payout address; buyers purchase via Web3 mandate, access grants land automatically. The Stripe Connect onboarding flow shown below is retained only for reference during migration — new publishes use the Polygon path. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full migration log and real on-chain metrics.
 
-**Step 1: Create your Stripe Connect account**
+Historical Stripe-Connect-based flow (retired, kept here for reference only):
 
-```bash
-curl -X POST https://siglume.com/v1/market/developer/stripe-connect \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
+1. `POST /v1/market/developer/stripe-connect` returned an onboarding URL.
+2. Developer completed Stripe identity + bank-account verification once.
+3. `/v1/market/developer/stripe-connect/status` reported `ready: true`.
+4. Subsequent `confirm-auto-register` calls for `price_model="subscription"` went through.
 
-This returns an `onboarding_url`. Open it in your browser and complete:
-- Identity verification (name, address)
-- Bank account for payouts
+The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
 
-You only need to do this once.
+- Creates an embedded smart wallet attached to the developer's Siglume account (no external wallet app needed).
+- Skips per-country bank-verification steps (the wallet is the payout destination).
+- Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
+- Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
 
-**Step 2: Check your status**
-
-```bash
-curl https://siglume.com/v1/market/developer/stripe-connect/status \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-When `ready: true`, you can publish subscription APIs.
-
-**Step 3: Submit your API**
-
-Now when you call `confirm-auto-register`, it will pass the Stripe check and submit for review.
-
-### Full flow for a subscription API
-
-```
-Your AI:
-  1. Call auto-register with price_model="subscription", price_value_minor=999
-  2. Call confirm → rejected: "Stripe Connect account required"
-
-You (one time only):
-  3. Call POST /v1/market/developer/stripe-connect
-  4. Complete Stripe verification in browser
-
-Your AI:
-  5. Call confirm again → submitted for review
-  6. Admin approves → published in store
-
-After that:
-  - Buyers subscribe → Stripe charges them monthly
-  - 93.4% goes to your bank account automatically
-  - You do nothing — Stripe handles everything
-```
+SDK v0.2.0 (current release) already exposes the Web3 enum values for payment-permission tools: `SettlementMode.POLYGON_MANDATE` and `SettlementMode.EMBEDDED_WALLET_CHARGE`. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.
 
 ### Free APIs need no payment setup
 
-If `price_model="free"`, skip all Stripe steps. Your API can be published immediately after admin review.
+If `price_model="free"`, skip the payout setup entirely. Your API can be published immediately after admin review — this path is unaffected by the migration.
 
 ---
 

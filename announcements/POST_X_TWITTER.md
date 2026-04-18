@@ -1,5 +1,7 @@
 # X/Twitter 投稿スレッド
 
+> 🚧 **STALE DRAFT — DO NOT POST AS-IS.** Body text still claims "payments live via Stripe Connect", which is being retired. Rewrite the settlement line per [`../PAYMENT_MIGRATION.md`](../PAYMENT_MIGRATION.md) before posting.
+
 コピペしてそのまま投稿できます。5ツイートのスレッドです。
 
 ---

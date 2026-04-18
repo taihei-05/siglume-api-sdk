@@ -1290,7 +1290,7 @@ components:
         # Conditional: required for payment only
         quote_schema: { type: object }
         currency: { type: string, enum: [USD], description: "Must be USD" }
-        settlement_mode: { type: string, enum: [stripe_checkout, stripe_payment_intent] }
+        settlement_mode: { type: string, enum: [stripe_checkout, stripe_payment_intent, polygon_mandate, embedded_wallet_charge] }
         refund_or_cancellation_note: { type: string, minLength: 1 }
 
     ErrorResponse:

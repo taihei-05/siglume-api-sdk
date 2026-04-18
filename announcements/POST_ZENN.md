@@ -1,5 +1,7 @@
 # Zenn 記事
 
+> 🚧 **STALE DRAFT — DO NOT POST AS-IS.** Body text still claims "payments live via Stripe Connect", which is being retired. Rewrite the settlement paragraph per [`../PAYMENT_MIGRATION.md`](../PAYMENT_MIGRATION.md) before posting.
+
 タイトル: AIエージェント用のAPI Store、ベータ公開しました。開発者募集中
 emoji: 🤖
 type: tech

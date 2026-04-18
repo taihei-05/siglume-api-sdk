@@ -144,7 +144,14 @@ class AppManifest:
                 f"AppManifest.jurisdiction must be ISO 3166-1 alpha-2 "
                 f"(optionally -subregion), got: {self.jurisdiction!r}"
             )
-        if self.data_residency is not None and not _JURISDICTION_PATTERN.match(self.data_residency):
+        if self.data_residency is None:
+            # Default: data lives in the same jurisdiction that governs the
+            # offering. Matches the documented contract on the field. Without
+            # this assignment, consumers that serialise the manifest see
+            # `data_residency=None` and have to compute the default themselves,
+            # which caused a subtle drift between the docstring and the object.
+            self.data_residency = self.jurisdiction
+        elif not _JURISDICTION_PATTERN.match(self.data_residency):
             raise ValueError(
                 f"AppManifest.data_residency must be ISO 3166-1 alpha-2 "
                 f"(optionally -subregion), got: {self.data_residency!r}"
@@ -354,6 +361,8 @@ class ToolManualPermissionClass(str, Enum):
 class SettlementMode(str, Enum):
     STRIPE_CHECKOUT = "stripe_checkout"
     STRIPE_PAYMENT_INTENT = "stripe_payment_intent"
+    POLYGON_MANDATE = "polygon_mandate"
+    EMBEDDED_WALLET_CHARGE = "embedded_wallet_charge"
 
 
 @dataclass
@@ -484,6 +493,52 @@ _PLATFORM_INJECTED_FIELDS = frozenset({
 
 _COMPOSITION_KEYWORDS = frozenset({"oneOf", "anyOf", "allOf"})
 
+# Forbidden keys that must not appear at any nesting depth in input_schema.
+# Mirrors server `_check_forbidden_key` sweep; patternProperties is the
+# headline case because loose property globs defeat schema validation.
+_INPUT_SCHEMA_FORBIDDEN_KEYS = frozenset({"patternProperties"})
+
+
+def _check_schema_forbidden_recursive(
+    schema: Any,
+    root_field: str,
+    err_fn,
+    *,
+    path: str = "",
+) -> None:
+    """Recurse into a JSON Schema rejecting composition keywords and
+    forbidden keys (patternProperties) at any nesting level.
+
+    Server parity: matches `_check_composition_keywords` and
+    `_check_forbidden_key` in
+    `agent_sns.application.capability_runtime.tool_manual_validator`.
+    """
+    if not isinstance(schema, dict):
+        return
+
+    for kw in _COMPOSITION_KEYWORDS:
+        if kw in schema:
+            loc = f"{root_field}.{path}.{kw}" if path else f"{root_field}.{kw}"
+            err_fn("INPUT_SCHEMA",
+                   f"Composition keyword '{kw}' is not allowed in beta{' at ' + path if path else ''}",
+                   loc)
+
+    for forbidden in _INPUT_SCHEMA_FORBIDDEN_KEYS:
+        if forbidden in schema:
+            loc = f"{root_field}.{path}.{forbidden}" if path else f"{root_field}.{forbidden}"
+            err_fn("INPUT_SCHEMA",
+                   f"'{forbidden}' is not allowed{' at ' + path if path else ''}",
+                   loc)
+
+    for key, val in schema.items():
+        if key == "properties" and isinstance(val, dict):
+            for pname, pdef in val.items():
+                sub_path = f"{path}.{pname}" if path else pname
+                _check_schema_forbidden_recursive(pdef, root_field, err_fn, path=sub_path)
+        elif key == "items" and isinstance(val, dict):
+            sub_path = f"{path}.items" if path else "items"
+            _check_schema_forbidden_recursive(val, root_field, err_fn, path=sub_path)
+
 
 def validate_tool_manual(
     manual: dict[str, Any] | ToolManual,
@@ -586,27 +641,70 @@ def validate_tool_manual(
                  "permission_class")
 
     # ── action/payment extra fields ──
+    # Mirror the server validator in agent_sns.application.capability_runtime
+    # .tool_manual_validator: schema fields accept {} as "present", string
+    # fields are validated as non-empty strings, and bools are validated
+    # separately. Using truthiness across all of them over-rejects valid
+    # manuals (e.g. preview_schema = {}) and diverges from publish-time
+    # gating — see Codex review finding.
+    def _require_str(fld: str, ctx: str) -> None:
+        val = manual.get(fld)
+        if val is None:
+            _err("MISSING_FIELD", f"'{fld}' is required for permission_class='{ctx}'", fld)
+        elif not isinstance(val, str):
+            _err("INVALID_TYPE", f"'{fld}' must be a string", fld)
+        elif len(val) == 0:
+            # Server-side `_validate_str` uses raw length (not `.strip()`),
+            # so a single whitespace passes publish-time validation.
+            # Mirror that behavior: reject only truly empty strings here,
+            # not whitespace-only. Otherwise we block manuals the server
+            # would have accepted.
+            _err("TOO_SHORT", f"'{fld}' must be at least 1 char", fld)
+
+    def _require_schema(fld: str, ctx: str) -> None:
+        val = manual.get(fld)
+        if val is None:
+            _err("MISSING_FIELD", f"'{fld}' is required for permission_class='{ctx}'", fld)
+        elif not isinstance(val, dict):
+            _err("INVALID_TYPE", f"'{fld}' must be a JSON Schema object", fld)
+
     if pc in ("action", "payment"):
-        for fld in ["approval_summary_template", "preview_schema",
-                     "idempotency_support", "side_effect_summary"]:
-            if not manual.get(fld):
-                _err("MISSING_FIELD",
-                     f"'{fld}' is required for permission_class='{pc}'", fld)
-        if manual.get("idempotency_support") is not True:
+        _require_str("approval_summary_template", pc)
+        _require_schema("preview_schema", pc)
+        _require_str("side_effect_summary", pc)
+        # `jurisdiction` became a required field for action/payment in the
+        # schema (schemas/tool-manual.schema.json) but the raw-dict validator
+        # did not enforce it, so manuals missing jurisdiction passed locally
+        # and failed at registration. Mirror the schema here.
+        _require_str("jurisdiction", pc)
+        jur = manual.get("jurisdiction")
+        if isinstance(jur, str) and len(jur) > 0 and not _JURISDICTION_PATTERN.match(jur):
+            _err("INVALID_JURISDICTION",
+                 f"jurisdiction must be ISO 3166-1 alpha-2 (optionally -subregion), got: {jur!r}",
+                 "jurisdiction")
+        if "idempotency_support" not in manual:
+            _err("MISSING_FIELD",
+                 f"'idempotency_support' is required for permission_class='{pc}'",
+                 "idempotency_support")
+        elif manual.get("idempotency_support") is not True:
             _err("IDEMPOTENCY_REQUIRED",
                  "idempotency_support must be true for action/payment",
                  "idempotency_support")
 
     if pc == "payment":
-        for fld in ["quote_schema", "currency", "settlement_mode",
-                     "refund_or_cancellation_note"]:
-            if not manual.get(fld):
-                _err("MISSING_FIELD",
-                     f"'{fld}' is required for permission_class='payment'", fld)
-        if manual.get("currency") and manual["currency"] != "USD":
+        _require_schema("quote_schema", "payment")
+        _require_str("currency", "payment")
+        _require_str("settlement_mode", "payment")
+        _require_str("refund_or_cancellation_note", "payment")
+        if isinstance(manual.get("currency"), str) and manual["currency"] != "USD":
             _err("INVALID_CURRENCY", "currency must be 'USD'", "currency")
         sm = manual.get("settlement_mode")
-        valid_sm = {"stripe_checkout", "stripe_payment_intent"}
+        valid_sm = {
+            "stripe_checkout",
+            "stripe_payment_intent",
+            "polygon_mandate",
+            "embedded_wallet_charge",
+        }
         if isinstance(sm, str) and sm not in valid_sm:
             _err("INVALID_SETTLEMENT_MODE",
                  f"settlement_mode must be one of {sorted(valid_sm)}",
@@ -620,13 +718,12 @@ def validate_tool_manual(
         if inp.get("additionalProperties") is not False:
             _err("INPUT_SCHEMA",
                  "additionalProperties must be false", "input_schema")
-        # composition keywords forbidden
-        for kw in _COMPOSITION_KEYWORDS:
-            if kw in inp:
-                _err("INPUT_SCHEMA",
-                     f"Composition keyword '{kw}' is not allowed in beta",
-                     f"input_schema.{kw}")
-        # platform-injected fields
+        # Composition keywords and patternProperties are forbidden at ANY nesting
+        # level, matching the server's _check_composition_keywords /
+        # _check_forbidden_key recursive sweep. A top-level-only check was
+        # letting nested violations through, producing false confidence.
+        _check_schema_forbidden_recursive(inp, "input_schema", _err)
+        # platform-injected fields (top-level properties only; matches server)
         props = inp.get("properties", {})
         if isinstance(props, dict):
             for pf in _PLATFORM_INJECTED_FIELDS & set(props):
@@ -648,7 +745,11 @@ def validate_tool_manual(
             _err("OUTPUT_SCHEMA",
                  "output_schema must include a 'summary' property",
                  "output_schema.properties")
-        # payment-specific output checks
+        # payment-specific output checks — match server validate_output_schema
+        # which requires BOTH amount_usd AND currency in properties (not just
+        # amount_usd). Previous SDK check only enforced amount_usd in properties
+        # while the server rejected missing currency, leading to a pass-local
+        # / fail-server divergence.
         if pc == "payment":
             if isinstance(out_req, list):
                 if "amount_usd" not in out_req:
@@ -663,6 +764,10 @@ def validate_tool_manual(
                 if "amount_usd" not in oprops:
                     _err("OUTPUT_SCHEMA",
                          "Payment output_schema must include 'amount_usd' in properties",
+                         "output_schema.properties")
+                if "currency" not in oprops:
+                    _err("OUTPUT_SCHEMA",
+                         "Payment output_schema must include 'currency' in properties",
                          "output_schema.properties")
 
     ok = not any(i.severity == "error" for i in issues)

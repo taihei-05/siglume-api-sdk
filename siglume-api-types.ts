@@ -178,7 +178,11 @@ export interface CapabilityBinding {
  */
 export type ToolManualPermissionClass = "read_only" | "action" | "payment";
 
-export type SettlementMode = "stripe_checkout" | "stripe_payment_intent";
+export type SettlementMode =
+  | "stripe_checkout"
+  | "stripe_payment_intent"
+  | "polygon_mandate"
+  | "embedded_wallet_charge";
 
 export interface ToolManual {
   // Required (all permission classes)

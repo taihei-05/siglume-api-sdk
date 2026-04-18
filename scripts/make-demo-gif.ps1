@@ -38,6 +38,13 @@ New-Item -ItemType Directory -Force -Path $paletteDir | Out-Null
 $paletteFilter = "fps=${Fps},scale=${Width}:-1:flags=lanczos,palettegen"
 $gifFilter = "fps=${Fps},scale=${Width}:-1:flags=lanczos[x];[x][1:v]paletteuse"
 
+function Assert-FFmpegSucceeded {
+    param([string]$stage)
+    if ($LASTEXITCODE -ne 0) {
+        throw "ffmpeg failed during $stage with exit code $LASTEXITCODE"
+    }
+}
+
 & $ffmpeg.Source -y `
     -ss $Start `
     -t $DurationSeconds `
@@ -46,6 +53,11 @@ $gifFilter = "fps=${Fps},scale=${Width}:-1:flags=lanczos[x];[x][1:v]paletteuse"
     -vf $paletteFilter `
     -update 1 `
     $resolvedPalette
+Assert-FFmpegSucceeded "palette generation"
+
+if (-not (Test-Path -LiteralPath $resolvedPalette)) {
+    throw "Palette file was not produced at $resolvedPalette"
+}
 
 & $ffmpeg.Source -y `
     -ss $Start `
@@ -55,5 +67,10 @@ $gifFilter = "fps=${Fps},scale=${Width}:-1:flags=lanczos[x];[x][1:v]paletteuse"
     -lavfi $gifFilter `
     -loop 0 `
     $resolvedOutput
+Assert-FFmpegSucceeded "GIF encoding"
+
+if (-not (Test-Path -LiteralPath $resolvedOutput)) {
+    throw "GIF file was not produced at $resolvedOutput"
+}
 
 Write-Host "Wrote GIF to $resolvedOutput"
