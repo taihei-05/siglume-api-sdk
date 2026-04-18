@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–39 shipped. Phase 39 closes the CRITICAL review loop: all 4 defects that were blocking `recovery-2026-04-18` merge to main (decimal scale, `RowMapping` attribute access, null-safety on seller lookup, persisted `stripe_connect` default on new Works orders) are fixed and re-verified by a reviewer second pass. The preflight gained two new checks — `amount_scaling` and `works_web3_only_orders` — as defense-in-depth against the same class of bugs re-emerging. **Merge status**: `recovery-2026-04-18` is unblocked from a CRITICAL standpoint. One follow-up WARNING surfaced during re-review (0x swap `approve` calldata is the sole remaining tx-builder that doesn't route through `token_minor_to_native_amount` — fail-closed with `ERC20InsufficientAllowance` revert, not silent loss, but should be fixed for decimal-scale uniformity). Codex has also opened a broader 15-item cleanup workstream covering residual Stripe paths (Works refund fallback, API Store webhook disable, Connect reference removal, wallet-broker mock-mode prod disable) plus operational hardening (indexer daemon containerization, dual-rail reconciliation batch, Stripe cancel-at-period-end admin API, CSS/var rename, WorksEscrowHub owner renounce).
+**Status:** Phases 1–40 shipped. Phase 40 is Codex cranking through the 15-item cleanup workstream at speed. Shipped today: API Store Stripe webhook returns `410 Gone` for new receivers (residual Stripe path #2 neutralized); Works Web3 order refund path hard-requires on-chain escrow — never falls through to Stripe refund (residual path #1); developer portal summary skips Stripe Connect lookup under Web3 mode (residual path #3); wallet broker **FATAL-exits at startup** if production mode is asked to mock-sign, and preflight reports live signer probe failure as a blocker (residual path #4). Stripe cancel-at-period-end admin API is live with dry-run + bulk-execute (WARNING #8). Indexer daemon health endpoint + GUI lag/stale/severity view (WARNING #5 first pass). WorksEscrowHub deploy script now requires `AGENT_SNS_WEB3_OPERATOR_SAFE_ADDRESS` and refuses EOA fallback; preflight operator_safe is fail-severity now (WARNING #10 first pass). CSS/var rename strategy confirmed: backend returns `stripe_*` + `payout_*` aliases, frontend migrates to `payout_*`, stripe_* aliases removed one release later (WARNING #9). WARNING #6 dual-rail reconciliation job + WARNING #7 preflight resilience are next.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -870,6 +870,45 @@ Codex plans Critical → Warning → Info in three separate PRs. Rename strategy
 - But operator's decision on whether to merge *before* or *after* items 1-10 of the 15-item workstream is an open call. Merging first means main briefly carries the residual Stripe paths that items 1-4 target; merging after means main stays on Phase 29 behavior for longer. No one-size-fits-all answer.
 
 **SDK-side impact: none.** All fixes are server + frontend internal. No AppManifest / ToolManual contract change.
+
+### Phase 40 — 15-item cleanup cranking through at speed (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+Codex is driving through the 15-item workstream opened at Phase 39. All still on `recovery-2026-04-18`; main untouched.
+
+**Residual-Stripe-path items complete (list items 1-4):**
+
+- **Item 2 (API Store Stripe webhook)** — `POST /v1/webhooks/stripe/api-store` now returns **410 Gone** for new receivers. Existing in-flight subscriptions' webhooks during their term are unaffected; only new registration is refused. (`capability_marketplace_api.py`)
+- **Item 1 (Works Stripe refund fallback)** — `works_service.py` + `agent_brain.py`: Web3-backed Works orders hard-require on-chain escrow refund. Seller-side withdraw no longer reaches the Stripe refund path. Regression test added.
+- **Item 3 (API Store Stripe Connect reference)** — Under Web3 mode, `developer_portal_summary` no longer queries Stripe Connect status. (`marketplace_capabilities.py`)
+- **Item 4 (wallet broker mock in prod)** — `web3_wallet_broker_api.py` + `settings.py`: production mode + mock-signer request now exits the process with **FATAL** at startup. Preflight upgraded: live signer probe is a *blocker* (not just warning) when in production mode. (`web3_payments.py`)
+
+**Warning items landed or advanced:**
+
+- **Warning #5 (indexer daemon health)** — `GET /v1/admin/market/web3/indexer/health` returns `lag / stale / severity`; Admin Settlement Ops GUI now renders it. (`web3_indexer_daemon.py`, `marketplace_api.py`, `schemas.py`, `AdminSettlementOpsPage.tsx`). **Still pending**: wiring the daemon as a resident process in prod (Docker compose / systemd).
+- **Warning #8 (Stripe cancel-at-period-end)** — `POST /v1/me/plan/stripe-cancel-at-period-end` (user-initiated) and `POST /v1/admin/plans/stripe-cancel-at-period-end` (bulk, with dry-run) now live. `User.plan_cancel_scheduled_at` column added (migration `0045_plan_cancel_scheduled_at.py`). PlanSection UI shows "Stripe cancellation scheduled" state. Admin Settlement Ops gets a dry-run + bulk-execute panel. Integration test: `test_plan_billing_cutover.py`.
+- **Warning #9 (stripe_* → payout_* rename)** — strategy confirmed as **alias-phase-out** rather than hard swap: backend temporarily emits **both** `stripe_*` and `payout_*` field names; frontend migrates to `payout_*`; one release later, `stripe_*` aliases removed. Developer portal monetization is the first surface; `payout_*` canonical names added, `stripe_*` kept as alias. Safer than a one-shot rename against a dual-rail contract.
+- **Warning #10 (WorksEscrowHub owner renounce + dispute timeout)** — deploy script now **requires** `AGENT_SNS_WEB3_OPERATOR_SAFE_ADDRESS`; EOA owner fallback is explicitly rejected so the contract cannot be deployed with an operator-owned key. Preflight `operator_safe` check is fail-severity (not warning). Still pending: v2 `WorksEscrowHub` with 90-day dispute-timeout refund.
+
+**Tests stacked during the phase (focused):**
+
+- `test_api_store_cutover_routes.py` — Stripe API Store webhook 410 behavior
+- `test_web3_wallet_broker_api.py` — production-mode FATAL + live-signer preflight blocker
+- `test_web3_payment_foundation.py` — Works Web3-only refund, withdraw rejection, developer summary Stripe-skip
+- `test_plan_billing_cutover.py` — Stripe cancel_at_period_end (user + admin + dry-run + bulk)
+- Focused runs: 10 + 7 + 13 passed in the three batch runs Codex reported; `apps/web` build pass; `py_compile` pass throughout.
+
+**What's left on the 15-item list:**
+
+- Warning #5 resident-daemon wiring (Docker compose / supervisor config)
+- Warning #6 dual-rail reconciliation batch job (schema for `settlement_rail` label, nightly Stripe ↔ on-chain ↔ ledger diff, Slack alert)
+- Warning #7 preflight resilience additions (known-revoked Turnkey keys, Pimlico paymaster balance threshold, Polygon RPC chain-head freshness, 0x live quote)
+- Warning #9 rename migration body (backend keeps shipping both names, frontend field-by-field move — ongoing)
+- Warning #10 v2 WorksEscrowHub with dispute timeout (new deploy + migration, not upgradable contract)
+- INFO #11-15 (SDK v0.3.0 deprecation notes, `.env.prod.example` additions, Privacy Policy micro-updates, indexer SLO doc, DMARC/SPF/DKIM + DPO contact)
+
+**Branch state**: `recovery-2026-04-18` continues to accumulate. Main is still at iter 48 (doc mirror only). **Merge decision remains operator call** — the CRITICAL is 0 since Phase 39 but WARNING items #5, #6, #7 still have live work, and item #4 mock-signer protection is what prevents Pimlico-over-nothing decay if a config hiccup slips past.
+
+**SDK-side impact: none.** Server + frontend internal. No AppManifest / ToolManual contract change.
 
 ### Still pending (work in progress)
 
