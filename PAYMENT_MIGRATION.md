@@ -431,7 +431,7 @@ Codex moved on their own priority #2 (standing indexer daemon = 24h ops foundati
 
 **Env injection status on the SDK-side operator's local:** the SDK-side operator (not Codex) has populated their own `.env` with:
 
-- Turnkey: `ORGANIZATION_ID=cdf1add6-1cb6-4186-ac44-293fbfebbb98`, full API key pair, `SIGN_WITH=0xd24CC09c30cA7859E9aC28C22518d2AC38abF7a3`, `LIVE_SIGN_ENABLED=true`
+- Turnkey: `AGENT_SNS_WEB3_TURNKEY_ORGANIZATION_ID`, full API key pair, `AGENT_SNS_WEB3_TURNKEY_SIGN_WITH`, and `AGENT_SNS_WEB3_TURNKEY_LIVE_SIGN_ENABLED=true` (values redacted — actual identifiers live in the operator's private runbook, not this public doc)
 - Pimlico: bundler + paymaster RPC URLs for `polygon-amoy`
 - Polygon: Amoy + mainnet RPCs (Infura)
 - `WALLET_PROVIDER=turnkey_http`, `BROKER_LIVE_SUBMIT_ENABLED=true`
