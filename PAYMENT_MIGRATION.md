@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–40 shipped. Phase 40 is Codex cranking through the 15-item cleanup workstream at speed. Shipped today: API Store Stripe webhook returns `410 Gone` for new receivers (residual Stripe path #2 neutralized); Works Web3 order refund path hard-requires on-chain escrow — never falls through to Stripe refund (residual path #1); developer portal summary skips Stripe Connect lookup under Web3 mode (residual path #3); wallet broker **FATAL-exits at startup** if production mode is asked to mock-sign, and preflight reports live signer probe failure as a blocker (residual path #4). Stripe cancel-at-period-end admin API is live with dry-run + bulk-execute (WARNING #8). Indexer daemon health endpoint + GUI lag/stale/severity view (WARNING #5 first pass). WorksEscrowHub deploy script now requires `AGENT_SNS_WEB3_OPERATOR_SAFE_ADDRESS` and refuses EOA fallback; preflight operator_safe is fail-severity now (WARNING #10 first pass). CSS/var rename strategy confirmed: backend returns `stripe_*` + `payout_*` aliases, frontend migrates to `payout_*`, stripe_* aliases removed one release later (WARNING #9). WARNING #6 dual-rail reconciliation job + WARNING #7 preflight resilience are next.
+**Status:** Phases 1–41 shipped. Phase 41 pushes two of the three mainnet-prerequisite warnings forward. **WARNING #7 preflight paymaster balance gate** lands: Pimlico sponsorship policy can be active *and* `deposit < threshold` still returns fail from `/v1/admin/market/web3/preflight` — closing the "sponsorship OK but no actual money" silent-stall pattern. Threshold is env-configured. **WARNING #6 dual-rail reconciliation** gets its first surface: admin API + client for manual-trigger reconciliation (auto-schedule next). Progress remains on `recovery-2026-04-18`; main still untouched. Next: WARNING #9 payout rename body (frontend-by-frontend migration) + WARNING #10 WorksEscrowHub v2 with dispute-timeout design.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -909,6 +909,40 @@ Codex is driving through the 15-item workstream opened at Phase 39. All still on
 **Branch state**: `recovery-2026-04-18` continues to accumulate. Main is still at iter 48 (doc mirror only). **Merge decision remains operator call** — the CRITICAL is 0 since Phase 39 but WARNING items #5, #6, #7 still have live work, and item #4 mock-signer protection is what prevents Pimlico-over-nothing decay if a config hiccup slips past.
 
 **SDK-side impact: none.** Server + frontend internal. No AppManifest / ToolManual contract change.
+
+### Phase 41 — preflight paymaster balance gate + dual-rail reconciliation manual trigger (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+Two of the three remaining mainnet-prerequisite warnings advance.
+
+**WARNING #7 — preflight paymaster balance gate (one piece of the resilience additions):**
+
+- `web3_wallet_broker_api.py` / `web3_payments.py` / `settings.py` / `.env.prod.example` — preflight now queries the actual Pimlico paymaster deposit balance and compares against an env-configured threshold. If **Pimlico sponsorship policy is active but deposit < threshold**, the preflight check returns `fail`. This closes the "sponsorship looks green but there's actually no money" silent-stall pattern that the original preflight couldn't detect.
+- Threshold is an env var so operator can tune per-environment (e.g. $5 for dev, $20 for prod).
+
+**WARNING #6 — dual-rail reconciliation (manual trigger, first surface):**
+
+- `marketplace_api.py` / `schemas.py` / `api.ts` — admin API + client to trigger a dual-rail reconciliation pass on demand. Manual-only for now; the nightly batch auto-schedule is the follow-up.
+- Admin Settlement Ops gets a "Run reconciliation now" action; result shows Stripe ↔ on-chain ↔ ledger diff.
+
+**Tests** (focused):
+
+- `test_web3_payment_foundation.py -k "preflight or dual_rail_reconciliation"` → **6 passed**
+- `test_web3_wallet_broker_api.py` → **9 passed** (+1 for paymaster balance probe)
+- `apps/web` build → pass, `py_compile` → pass
+
+**What's still left on the 15-item list after Phase 41:**
+
+- WARNING #5 resident-daemon wiring (Docker compose / supervisor — the health endpoint is live, but the daemon needs to be brought up as a resident process)
+- WARNING #6 nightly batch + Slack alert (manual trigger exists, auto-schedule and alerting are next)
+- WARNING #7 remaining resilience checks (known-revoked Turnkey keys, Polygon RPC chain-head freshness, 0x live quote — the balance gate is one piece)
+- WARNING #9 rename migration body (alias strategy confirmed in Phase 40, frontend-by-frontend migration ongoing)
+- WARNING #10 v2 WorksEscrowHub + dispute timeout (deploy script hardening shipped in Phase 40; v2 contract design is next)
+- Phase 39 reviewer's `erc20_approve` scale regression (1-line fix; becomes critical only before live 0x swap use, which is not a launch-day surface)
+- INFO #11-15
+
+**Branch state:** `recovery-2026-04-18` still accumulating; main untouched. Merge decision remains operator call. Mainnet-launch-critical residual gap is WARNING #5 daemon residency + WARNING #6 nightly batch + WARNING #7 remaining checks.
+
+**SDK-side impact: none.** Server + frontend + config. No AppManifest / ToolManual contract change.
 
 ### Still pending (work in progress)
 
