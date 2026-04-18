@@ -665,21 +665,21 @@ You receive:            ~$9.33/month, settled directly to your wallet
 
 > ✅ **Payouts now run on Polygon.** Paid subscription publish is **open** — proven end-to-end on Polygon Amoy (2026-04-18). Register at `/owner/publish` with a Polygon payout address; buyers purchase via Web3 mandate, access grants land automatically. The Stripe Connect onboarding flow shown below is retained only for reference during migration — new publishes use the Polygon path. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full migration log and real on-chain metrics.
 
-Historical Stripe-Connect-based flow (being retired):
+Historical Stripe-Connect-based flow (retired, kept here for reference only):
 
 1. `POST /v1/market/developer/stripe-connect` returned an onboarding URL.
 2. Developer completed Stripe identity + bank-account verification once.
 3. `/v1/market/developer/stripe-connect/status` reported `ready: true`.
 4. Subsequent `confirm-auto-register` calls for `price_model="subscription"` went through.
 
-The replacement on-chain flow will:
+The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
 
-- Create an embedded smart wallet attached to the developer's Siglume account (no external wallet app needed).
-- Skip per-country bank-verification steps (the wallet is the payout destination).
-- Have the platform cover gas fees end-to-end, so developers never hold the gas token.
-- Use session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
+- Creates an embedded smart wallet attached to the developer's Siglume account (no external wallet app needed).
+- Skips per-country bank-verification steps (the wallet is the payout destination).
+- Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
+- Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
 
-The new onboarding endpoint, request/response shapes, and SDK enum updates (`SettlementMode` values) will land in a coordinated SDK release; watch the repo's Releases page.
+SDK v0.2.0 (current release) already exposes the Web3 enum values for payment-permission tools: `SettlementMode.POLYGON_MANDATE` and `SettlementMode.EMBEDDED_WALLET_CHARGE`. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.
 
 ### Free APIs need no payment setup
 

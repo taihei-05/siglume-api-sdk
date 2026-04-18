@@ -73,7 +73,9 @@ py -3.11 -m twine upload dist/*
 py -3.11 -m twine upload dist\*
 ```
 
-No token prompts, no env var dance. Rotate the token when you change machines or suspect compromise.
+No token prompts, no env var dance on subsequent releases.
+
+**Security tradeoff — read before choosing Option A:** [SECURITY.md](./SECURITY.md#release-token-hygiene) rule 3 recommends rotating the token after every release. Persistent `.pypirc` trades that per-release rotation for convenience; the token stays valid on disk between releases. Choose Option A only if you accept the longer-lived token and keep the file on a trusted disk (no shared machine, no cloud sync of your user profile). For strict compliance with the rotate-every-release policy, use **Option B** below. In either case, rotate immediately if you suspect compromise, change machines, or see unexpected releases.
 
 ### Option B: Per-release env vars
 
