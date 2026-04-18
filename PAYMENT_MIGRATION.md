@@ -1,6 +1,6 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–43 shipped. **Phase 43 advances WARNING #9 payout rename and shapes scheduler healthcheck for production operation.** Backend unit tests now validate `payout_connected` / `payout_account_id` as the canonical names; frontend `DeveloperPortalMonetization` treats `stripe_ready` as an alias rather than a required field; e2e fixture rebuilt around `payout_ready`. Scheduler healthcheck (`py -3.11 -m apps.worker.app.main --healthcheck-scheduler`) now exits with a single-line error instead of a traceback so compose / systemd can surface it cleanly. Phase 42 (prior) closed all three mainnet-prerequisite warnings at the code level: WARNING #5 resident-daemon wiring, WARNING #6 dual-rail reconciliation, WARNING #7 preflight resilience (paymaster balance + chain-head freshness + 0x live route + blocker reasons). `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites** and main is still untouched. What's left: WARNING #9 rename body (frontend-by-frontend migration, in progress), WARNING #10 v2 WorksEscrowHub with 90-day dispute timeout, INFO #11-15, and a `.env.prod.example` production template. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
+**Status:** Phases 1–44 shipped. **Phase 44 separates scheduler liveness from reconciliation freshness and widens the Web3 env alias surface.** `--healthcheck-scheduler` now checks **DB liveness only**; daily dual-rail reconciliation freshness moves to preflight / admin-health (the two layers no longer contaminate each other, so healthcheck doesn't false-fail on migration-in-progress or not-yet-elapsed intervals). Web3 env parser now accepts short aliases — `AGENT_SNS_WEB3_TURNKEY_ORG_ID`, `AGENT_SNS_WEB3_0X_API_KEY`, `AGENT_SNS_WEB3_CONTRACT_MANIFEST_PATH` — and `.env.example` / `.env.prod.example` document them. WARNING #9 payout rename keeps progressing: fixtures / tests lean on `payout_*` as primary, `stripe_*` retained as a backend alias. Phase 42 / 43 closed / advanced the three mainnet-prerequisite warnings (#5 resident daemon, #6 dual-rail reconciliation, #7 preflight resilience). `recovery-2026-04-18` remains **code-complete for mainnet launch prerequisites** and main is still untouched. What's left: WARNING #9 rename body (ongoing), WARNING #10 v2 WorksEscrowHub with 90-day dispute timeout, INFO #11-15. **Remaining operator actions for merge readiness**: create 2-of-3 operator Safe on Polygon mainnet (3 hardware wallet signers, Codex deliberately excluded), populate `.env.prod`, run preflight.
 **Last updated:** 2026-04-18
 
 The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
@@ -1053,6 +1053,56 @@ Two pieces of Phase 42's "remaining after code-complete" list progressed.
 2. `.env.prod.example` production template for the operator populate step.
 
 **SDK-side impact: none.** Server + frontend + test + CLI-ergonomics. No AppManifest / ToolManual contract change.
+
+### Phase 44 — scheduler liveness / reconciliation freshness split + Web3 env alias widening (shipped 2026-04-18, on `recovery-2026-04-18`)
+
+Operational-surface polish on the back of Phase 42 / 43. Two pieces moved.
+
+**Scheduler healthcheck — liveness and freshness separated:**
+
+- `py -3.11 -m apps.worker.app.main --healthcheck-scheduler` now checks **DB liveness only**. It no longer entangles itself with "has the nightly reconciliation run recently enough?" questions.
+- Daily dual-rail reconciliation **freshness** moves to where it belongs: `/v1/admin/market/web3/preflight` and the admin health endpoint. Those layers already have the richer context.
+- Net effect: the compose / systemd healthcheck stops false-failing on not-yet-migrated-DB states or intervals that legitimately haven't elapsed yet. Two different failure modes, two different surfaces.
+
+**Web3 env alias widening:**
+
+The settings parser now accepts short-form aliases for the three keys operators consistently mistype:
+
+- `AGENT_SNS_WEB3_TURNKEY_ORG_ID` — alias of the full `AGENT_SNS_WEB3_TURNKEY_ORGANIZATION_ID`
+- `AGENT_SNS_WEB3_0X_API_KEY` — alias for the 0x API key (documented short name)
+- `AGENT_SNS_WEB3_CONTRACT_MANIFEST_PATH` — can now directly point at a contract-manifest JSON (no more implicit path resolution only)
+
+`.env.example` and `.env.prod.example` updated to list the alias names so operator populating production doesn't hit "oh, I typed the short name and nothing happened" footguns.
+
+**WARNING #9 — payout rename, continued slice:**
+
+- Fixtures / tests are biased further toward `payout_*` as the primary signal.
+- `stripe_*` is kept as a **backend-side alias** — public-API input contract preserved, so external callers are unaffected.
+- Read-side references keep migrating in the direction of "payout_* primary, stripe_* alias-only".
+
+**Tests:**
+
+- `py -3.11 -m apps.worker.app.main --healthcheck-scheduler` → pass
+- `pytest apps/api/tests/unit/test_web3_payment_foundation.py -q -k "preflight or developer_portal_summary_skips_stripe_connect_lookup_in_web3_mode"` → **5 passed**
+- `npm run build` in `apps/web` → pass
+- `py_compile` on modified Python files → pass
+
+**Files changed (4):**
+
+- `.env.example`
+- `.env.prod.example`
+- `packages/shared-python/agent_sns/application/web3_contracts.py`
+- `packages/shared-python/agent_sns/settings.py`
+
+**Codex's landing read:**
+
+- WARNING #5 / #6 / #7 are "かなり固まった" — substantially locked in.
+- WARNING #9 is still in staged migration, but the operational wrinkles (healthcheck flaking, env-key confusion) are reduced.
+- Next slice: keep growing the set of call sites that read `payout_*`, push `stripe_*` one more step toward alias-only.
+
+**Branch state:** `recovery-2026-04-18`, main still untouched. Operator merge-readiness gating items unchanged (Safe creation, `.env.prod` populate, preflight pass).
+
+**SDK-side impact: none.** Server settings parser + two env example templates + fixture bias. No AppManifest / ToolManual contract change.
 
 ### Still pending (work in progress)
 
