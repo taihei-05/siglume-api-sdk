@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, CommanderError } from "commander";
 
 import { SiglumeProjectError } from "../errors";
 import { renderJson } from "../utils";
@@ -165,9 +165,14 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
       emit(stderr, error.message);
       return 1;
     }
-    if (error instanceof Error && "code" in error) {
-      return Number((error as { exitCode?: number }).exitCode ?? 0);
+    if (error instanceof CommanderError) {
+      // Help / version displays carry exitCode 0; parse errors carry a non-zero code.
+      // Commander exits are the only class whose exitCode we trust; everything else falls through.
+      return typeof error.exitCode === "number" ? error.exitCode : 1;
     }
-    throw error;
+    // Node system errors (ENOENT, EACCES, ...) and any other uncaught throw
+    // are real failures — never report success just because the object has a `code` field.
+    emit(stderr, error instanceof Error ? error.message : String(error));
+    return 1;
   }
 }
