@@ -55,7 +55,7 @@ _legacy = _load_legacy_module()
 for _name in _LEGACY_PUBLIC_EXPORTS:
     globals()[_name] = getattr(_legacy, _name)
 
-from .client import (  # noqa: E402
+from .client import (  # noqa: E402, F401
     AccessGrantRecord,
     AppListingRecord,
     AutoRegistrationReceipt,

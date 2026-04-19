@@ -196,4 +196,17 @@ describe("siglume CLI advanced branches", () => {
     expect(helpExit).toBe(0);
     expect(badExit).toBe(1);
   });
+
+  it("returns non-zero exit code on filesystem errors (Node system errors)", async () => {
+    const stderr: string[] = [];
+    const nonexistent = join(tmpdir(), `siglume-nonexistent-${Date.now()}-${Math.random()}`);
+    const exitCode = await runCli(["validate", nonexistent], {
+      stderr: (line) => stderr.push(line),
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      client_factory: () => createMockClient(true),
+    });
+
+    expect(exitCode).not.toBe(0);
+    expect(stderr.length).toBeGreaterThan(0);
+  });
 });

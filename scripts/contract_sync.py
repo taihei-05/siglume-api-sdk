@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from siglume_api_sdk import validate_tool_manual
+from siglume_api_sdk import validate_tool_manual  # noqa: E402
 
 
 DOC_FILES = (

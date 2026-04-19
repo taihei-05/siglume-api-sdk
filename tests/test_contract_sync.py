@@ -9,7 +9,7 @@ SCRIPTS_DIR = ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import contract_sync
+import contract_sync  # noqa: E402
 
 
 def test_docs_and_contracts_are_in_sync() -> None:
