@@ -10,6 +10,15 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, Mapping, Typ
 
 import httpx
 
+from .webhooks import (
+    QueuedWebhookEvent,
+    WebhookDeliveryRecord,
+    WebhookSubscriptionRecord,
+    parse_queued_webhook_event,
+    parse_webhook_delivery,
+    parse_webhook_subscription,
+)
+
 if TYPE_CHECKING:
     from siglume_api_sdk import AppManifest, ToolManual
 
@@ -263,6 +272,14 @@ def _string_or_none(value: Any) -> str | None:
 
 def _to_dict(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _clone_json_like(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _clone_json_like(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_clone_json_like(item) for item in value]
+    return value
 
 
 def _enum_value(value: Any) -> Any:
@@ -999,6 +1016,113 @@ class SiglumeClient:
             ) if next_cursor else None,
         )
 
+    def create_webhook_subscription(
+        self,
+        callback_url: str,
+        *,
+        description: str | None = None,
+        event_types: list[str],
+        metadata: Mapping[str, Any] | None = None,
+    ) -> WebhookSubscriptionRecord:
+        normalized_event_types = [str(item).strip() for item in event_types if str(item).strip()]
+        if not normalized_event_types:
+            raise SiglumeClientError("event_types must contain at least one webhook event type.")
+        payload: dict[str, Any] = {"callback_url": callback_url}
+        if description:
+            payload["description"] = description
+        payload["event_types"] = normalized_event_types
+        if metadata:
+            payload["metadata"] = _to_dict(metadata)
+        data, _meta = self._request("POST", "/market/webhooks/subscriptions", json_body=payload)
+        return parse_webhook_subscription(data)
+
+    def list_webhook_subscriptions(self) -> list[WebhookSubscriptionRecord]:
+        data, _meta = self._request("GET", "/market/webhooks/subscriptions")
+        if not isinstance(data, list):
+            raise SiglumeClientError("Expected webhook subscriptions to be returned as an array.")
+        return [
+            parse_webhook_subscription(item)
+            for item in data
+            if isinstance(item, Mapping)
+        ]
+
+    def get_webhook_subscription(self, subscription_id: str) -> WebhookSubscriptionRecord:
+        data, _meta = self._request("GET", f"/market/webhooks/subscriptions/{subscription_id}")
+        return parse_webhook_subscription(data)
+
+    def rotate_webhook_subscription_secret(self, subscription_id: str) -> WebhookSubscriptionRecord:
+        data, _meta = self._request(
+            "POST",
+            f"/market/webhooks/subscriptions/{subscription_id}/rotate-secret",
+        )
+        return parse_webhook_subscription(data)
+
+    def pause_webhook_subscription(self, subscription_id: str) -> WebhookSubscriptionRecord:
+        data, _meta = self._request(
+            "POST",
+            f"/market/webhooks/subscriptions/{subscription_id}/pause",
+        )
+        return parse_webhook_subscription(data)
+
+    def resume_webhook_subscription(self, subscription_id: str) -> WebhookSubscriptionRecord:
+        data, _meta = self._request(
+            "POST",
+            f"/market/webhooks/subscriptions/{subscription_id}/resume",
+        )
+        return parse_webhook_subscription(data)
+
+    def list_webhook_deliveries(
+        self,
+        *,
+        subscription_id: str | None = None,
+        event_type: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> list[WebhookDeliveryRecord]:
+        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
+        if subscription_id:
+            params["subscription_id"] = subscription_id
+        if event_type:
+            params["event_type"] = event_type
+        if status:
+            params["status"] = status
+        data, _meta = self._request("GET", "/market/webhooks/deliveries", params=params)
+        if not isinstance(data, list):
+            raise SiglumeClientError("Expected webhook deliveries to be returned as an array.")
+        return [
+            parse_webhook_delivery(item)
+            for item in data
+            if isinstance(item, Mapping)
+        ]
+
+    def redeliver_webhook_delivery(self, delivery_id: str) -> WebhookDeliveryRecord:
+        data, _meta = self._request(
+            "POST",
+            f"/market/webhooks/deliveries/{delivery_id}/redeliver",
+        )
+        return parse_webhook_delivery(data)
+
+    def send_test_webhook_delivery(
+        self,
+        event_type: str,
+        *,
+        subscription_ids: list[str] | None = None,
+        data: Mapping[str, Any] | None = None,
+    ) -> QueuedWebhookEvent:
+        payload: dict[str, Any] = {"event_type": event_type}
+        if subscription_ids is not None:
+            payload["subscription_ids"] = [
+                str(item).strip() for item in subscription_ids if str(item).strip()
+            ]
+        if data:
+            payload["data"] = _to_dict(data)
+        response_data, _meta = self._request(
+            "POST",
+            "/market/webhooks/test-deliveries",
+            json_body=payload,
+        )
+        return parse_queued_webhook_event(response_data)
+
     def _request(
         self,
         method: str,
@@ -1006,7 +1130,7 @@ class SiglumeClient:
         *,
         json_body: Any | None = None,
         params: Mapping[str, Any] | None = None,
-    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+    ) -> tuple[Any, EnvelopeMeta]:
         for attempt in range(self.max_retries):
             response = self._client.request(method, path, json=json_body, params=params)
             if response.status_code in RETRYABLE_STATUS_CODES and attempt + 1 < self.max_retries:
@@ -1018,7 +1142,7 @@ class SiglumeClient:
             return self._handle_response(response)
         raise SiglumeClientError("Retry loop exhausted unexpectedly.")
 
-    def _handle_response(self, response: httpx.Response) -> tuple[dict[str, Any], EnvelopeMeta]:
+    def _handle_response(self, response: httpx.Response) -> tuple[Any, EnvelopeMeta]:
         try:
             payload = response.json()
         except ValueError:
@@ -1052,6 +1176,8 @@ class SiglumeClient:
             )
 
         data = payload.get("data") if isinstance(payload, Mapping) and "data" in payload else payload
-        if not isinstance(data, Mapping):
-            raise SiglumeClientError("Expected the Siglume API response body to be an object.")
-        return dict(data), meta
+        if isinstance(data, Mapping):
+            return dict(data), meta
+        if isinstance(data, list):
+            return [_clone_json_like(item) for item in data], meta
+        raise SiglumeClientError("Expected the Siglume API response body to be an object or array.")

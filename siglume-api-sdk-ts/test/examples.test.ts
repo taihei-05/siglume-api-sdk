@@ -14,6 +14,7 @@ import {
   runWalletBalanceExample,
   WalletBalanceApp,
 } from "../../examples-ts/wallet_balance";
+import { runMockWebhookExpressExample } from "../../examples-ts/webhook_handler_express";
 
 const EXAMPLES = [
   {
@@ -88,5 +89,13 @@ describe("TypeScript example suite", () => {
     expect(lines[0]).toBe("tool_manual_valid: true 0");
     expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
     expect(lines[3]).toBe("dry_run: true");
+  });
+
+  it("returns stable summary lines for webhook_handler_express", async () => {
+    const lines = await runMockWebhookExpressExample();
+
+    expect(lines[0]).toBe("status: 200");
+    expect(lines[1]).toBe("handled_type: payment.succeeded");
+    expect(lines[4]).toBe("duplicate_on_replay: true");
   });
 });

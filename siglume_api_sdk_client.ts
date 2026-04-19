@@ -177,6 +177,46 @@ export interface SupportCaseRecord {
   raw: Record<string, unknown>;
 }
 
+export interface WebhookSubscriptionRecord {
+  subscription_id: string;
+  owner_user_id: string;
+  callback_url: string;
+  status: string;
+  event_types: string[];
+  description?: string | null;
+  signing_secret_hint?: string | null;
+  signing_secret?: string | null;
+  metadata: Record<string, unknown>;
+  last_delivery_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface WebhookDeliveryRecord {
+  delivery_id: string;
+  subscription_id: string;
+  event_id: string;
+  event_type: string;
+  idempotency_key: string;
+  callback_url: string;
+  delivery_status: string;
+  request_headers: Record<string, unknown>;
+  request_body: Record<string, unknown>;
+  response_status?: number | null;
+  response_headers: Record<string, unknown>;
+  response_body?: unknown;
+  duration_ms?: number | null;
+  attempt_count: number;
+  last_attempt_at?: string | null;
+  delivered_at?: string | null;
+  error_message?: string | null;
+  trace_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface SiglumeClientShape {
   auto_register(...args: unknown[]): Promise<AutoRegistrationReceipt> | AutoRegistrationReceipt;
   confirm_registration(...args: unknown[]): Promise<RegistrationConfirmation> | RegistrationConfirmation;
@@ -193,4 +233,18 @@ export interface SiglumeClientShape {
   list_connected_accounts(...args: unknown[]): Promise<CursorPage<ConnectedAccountRecord>> | CursorPage<ConnectedAccountRecord>;
   create_support_case(...args: unknown[]): Promise<SupportCaseRecord> | SupportCaseRecord;
   list_support_cases(...args: unknown[]): Promise<CursorPage<SupportCaseRecord>> | CursorPage<SupportCaseRecord>;
+  create_webhook_subscription(options: {
+    callback_url: string;
+    description?: string;
+    event_types: string[];
+    metadata?: Record<string, unknown>;
+  }): Promise<WebhookSubscriptionRecord> | WebhookSubscriptionRecord;
+  list_webhook_subscriptions(...args: unknown[]): Promise<WebhookSubscriptionRecord[]> | WebhookSubscriptionRecord[];
+  get_webhook_subscription(...args: unknown[]): Promise<WebhookSubscriptionRecord> | WebhookSubscriptionRecord;
+  rotate_webhook_subscription_secret(...args: unknown[]): Promise<WebhookSubscriptionRecord> | WebhookSubscriptionRecord;
+  pause_webhook_subscription(...args: unknown[]): Promise<WebhookSubscriptionRecord> | WebhookSubscriptionRecord;
+  resume_webhook_subscription(...args: unknown[]): Promise<WebhookSubscriptionRecord> | WebhookSubscriptionRecord;
+  list_webhook_deliveries(...args: unknown[]): Promise<WebhookDeliveryRecord[]> | WebhookDeliveryRecord[];
+  redeliver_webhook_delivery(...args: unknown[]): Promise<WebhookDeliveryRecord> | WebhookDeliveryRecord;
+  send_test_webhook_delivery(...args: unknown[]): Promise<Record<string, unknown>> | Record<string, unknown>;
 }

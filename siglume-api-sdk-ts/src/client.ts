@@ -20,6 +20,14 @@ import type {
 } from "./types";
 import { SiglumeAPIError, SiglumeClientError, SiglumeNotFoundError } from "./errors";
 import {
+  type QueuedWebhookEvent,
+  type WebhookDeliveryRecord,
+  type WebhookSubscriptionRecord,
+  parse_queued_webhook_event,
+  parse_webhook_delivery,
+  parse_webhook_subscription,
+} from "./webhooks";
+import {
   buildDefaultI18n,
   buildRegistrationStubSource,
   coerceMapping,
@@ -55,6 +63,7 @@ type PendingConfirmation = {
 };
 
 type RequestMetaTuple = [Record<string, unknown>, EnvelopeMeta];
+type RequestAnyTuple = [unknown, EnvelopeMeta];
 
 export interface SiglumeClientShape {
   auto_register(
@@ -121,6 +130,29 @@ export interface SiglumeClientShape {
     limit?: number;
     cursor?: string;
   }): Promise<CursorPage<SupportCaseRecord>>;
+  create_webhook_subscription(options: {
+    callback_url: string;
+    description?: string;
+    event_types?: string[];
+    metadata?: Record<string, unknown>;
+  }): Promise<WebhookSubscriptionRecord>;
+  list_webhook_subscriptions(): Promise<WebhookSubscriptionRecord[]>;
+  get_webhook_subscription(subscription_id: string): Promise<WebhookSubscriptionRecord>;
+  rotate_webhook_subscription_secret(subscription_id: string): Promise<WebhookSubscriptionRecord>;
+  pause_webhook_subscription(subscription_id: string): Promise<WebhookSubscriptionRecord>;
+  resume_webhook_subscription(subscription_id: string): Promise<WebhookSubscriptionRecord>;
+  list_webhook_deliveries(options?: {
+    subscription_id?: string;
+    event_type?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<WebhookDeliveryRecord[]>;
+  redeliver_webhook_delivery(delivery_id: string): Promise<WebhookDeliveryRecord>;
+  send_test_webhook_delivery(options: {
+    event_type: string;
+    subscription_ids?: string[];
+    data?: Record<string, unknown>;
+  }): Promise<QueuedWebhookEvent>;
 }
 
 class CursorPageResult<T> implements CursorPage<T> {
@@ -744,7 +776,107 @@ export class SiglumeClient implements SiglumeClientShape {
     });
   }
 
+  async create_webhook_subscription(options: {
+    callback_url: string;
+    description?: string;
+    event_types: string[];
+    metadata?: Record<string, unknown>;
+  }): Promise<WebhookSubscriptionRecord> {
+    const normalizedEventTypes = options.event_types
+      .map((item) => String(item).trim())
+      .filter((item) => item.length > 0);
+    if (normalizedEventTypes.length === 0) {
+      throw new SiglumeClientError("event_types must contain at least one webhook event type.");
+    }
+    const payload: Record<string, unknown> = { callback_url: options.callback_url };
+    if (options.description) {
+      payload.description = options.description;
+    }
+    payload.event_types = normalizedEventTypes;
+    if (options.metadata) {
+      payload.metadata = options.metadata;
+    }
+    const [data] = await this.request("POST", "/market/webhooks/subscriptions", { json_body: payload });
+    return parse_webhook_subscription(data);
+  }
+
+  async list_webhook_subscriptions(): Promise<WebhookSubscriptionRecord[]> {
+    const [data] = await this.requestAny("GET", "/market/webhooks/subscriptions");
+    if (!Array.isArray(data)) {
+      throw new SiglumeClientError("Expected webhook subscriptions to be returned as an array.");
+    }
+    return data.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_webhook_subscription);
+  }
+
+  async get_webhook_subscription(subscription_id: string): Promise<WebhookSubscriptionRecord> {
+    const [data] = await this.request("GET", `/market/webhooks/subscriptions/${subscription_id}`);
+    return parse_webhook_subscription(data);
+  }
+
+  async rotate_webhook_subscription_secret(subscription_id: string): Promise<WebhookSubscriptionRecord> {
+    const [data] = await this.request("POST", `/market/webhooks/subscriptions/${subscription_id}/rotate-secret`);
+    return parse_webhook_subscription(data);
+  }
+
+  async pause_webhook_subscription(subscription_id: string): Promise<WebhookSubscriptionRecord> {
+    const [data] = await this.request("POST", `/market/webhooks/subscriptions/${subscription_id}/pause`);
+    return parse_webhook_subscription(data);
+  }
+
+  async resume_webhook_subscription(subscription_id: string): Promise<WebhookSubscriptionRecord> {
+    const [data] = await this.request("POST", `/market/webhooks/subscriptions/${subscription_id}/resume`);
+    return parse_webhook_subscription(data);
+  }
+
+  async list_webhook_deliveries(options: {
+    subscription_id?: string;
+    event_type?: string;
+    status?: string;
+    limit?: number;
+  } = {}): Promise<WebhookDeliveryRecord[]> {
+    const params = {
+      subscription_id: options.subscription_id,
+      event_type: options.event_type,
+      status: options.status,
+      limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 20), 100)),
+    };
+    const [data] = await this.requestAny("GET", "/market/webhooks/deliveries", { params });
+    if (!Array.isArray(data)) {
+      throw new SiglumeClientError("Expected webhook deliveries to be returned as an array.");
+    }
+    return data.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_webhook_delivery);
+  }
+
+  async redeliver_webhook_delivery(delivery_id: string): Promise<WebhookDeliveryRecord> {
+    const [data] = await this.request("POST", `/market/webhooks/deliveries/${delivery_id}/redeliver`);
+    return parse_webhook_delivery(data);
+  }
+
+  async send_test_webhook_delivery(options: {
+    event_type: string;
+    subscription_ids?: string[];
+    data?: Record<string, unknown>;
+  }): Promise<QueuedWebhookEvent> {
+    const payload: Record<string, unknown> = { event_type: options.event_type };
+    if (options.subscription_ids) {
+      payload.subscription_ids = options.subscription_ids.filter((item) => String(item).trim().length > 0);
+    }
+    if (options.data) {
+      payload.data = options.data;
+    }
+    const [data] = await this.request("POST", "/market/webhooks/test-deliveries", { json_body: payload });
+    return parse_queued_webhook_event(data);
+  }
+
   private async request(method: string, path: string, options: RequestOptions = {}): Promise<RequestMetaTuple> {
+    const [data, meta] = await this.requestAny(method, path, options);
+    if (!isRecord(data)) {
+      throw new SiglumeClientError("Expected the Siglume API response body to be an object.");
+    }
+    return [data, meta];
+  }
+
+  private async requestAny(method: string, path: string, options: RequestOptions = {}): Promise<RequestAnyTuple> {
     const url = buildUrl(this.base_url, path, options.params);
     const headers = new Headers({
       Authorization: `Bearer ${this.api_key}`,
@@ -771,7 +903,15 @@ export class SiglumeClient implements SiglumeClientShape {
         const text = response.status === 204 ? "" : await response.text();
         const parsed = text ? this.safeParseJson(text) : {};
         const envelope = isRecord(parsed) ? parsed : {};
-        const data = isRecord(envelope.data) ? envelope.data : isRecord(parsed) ? parsed : {};
+        const data = Array.isArray(envelope.data)
+          ? envelope.data.map((item) => cloneJsonLike(item))
+          : isRecord(envelope.data)
+            ? envelope.data
+            : isRecord(parsed)
+              ? parsed
+              : Array.isArray(parsed)
+                ? parsed.map((item) => cloneJsonLike(item))
+                : {};
         const meta: EnvelopeMeta = isRecord(envelope.meta)
           ? {
               request_id: stringOrNull(envelope.meta.request_id),
@@ -835,4 +975,14 @@ export class SiglumeClient implements SiglumeClientShape {
       return {};
     }
   }
+}
+
+function cloneJsonLike(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneJsonLike(item));
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneJsonLike(item)]));
+  }
+  return value;
 }

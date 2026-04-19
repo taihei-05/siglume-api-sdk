@@ -104,6 +104,16 @@ def test_buyer_langchain_example_runs_with_mock_client(capsys) -> None:
     assert output[-1].startswith("result_currency: JPY")
 
 
+def test_webhook_handler_flask_example_runs_with_mock_payload() -> None:
+    module = _load_module("webhook_handler_flask.py")
+
+    output = module.run_mock_webhook_example()
+
+    assert output[0] == "verified: evt_subscription_created_demo duplicate=False"
+    assert output[1] == "handled_type: subscription.created"
+    assert output[-1] == "duplicate_on_replay: True"
+
+
 def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:
     # Codex bot P2 on PR #107: the tool manual defaults token_symbol to
     # "native" but the adapter uppercased "NATIVE" and fell through to

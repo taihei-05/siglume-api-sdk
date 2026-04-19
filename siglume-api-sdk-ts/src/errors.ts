@@ -15,6 +15,14 @@ export class SiglumeAssistError extends SiglumeClientError {}
 
 export class SiglumeNotFoundError extends SiglumeClientError {}
 
+export class SiglumeWebhookError extends SiglumeError {}
+
+export class SiglumeWebhookSignatureError extends SiglumeWebhookError {}
+
+export class SiglumeWebhookPayloadError extends SiglumeWebhookError {}
+
+export class SiglumeWebhookReplayError extends SiglumeWebhookError {}
+
 export class SiglumeAPIError extends SiglumeClientError {
   status_code: number;
   error_code?: string;

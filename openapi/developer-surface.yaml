@@ -254,6 +254,235 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
+  /market/webhooks/subscriptions:
+    get:
+      operationId: listWebhookSubscriptions
+      summary: List webhook subscriptions
+      description: List the current developer's webhook subscriptions for marketplace lifecycle events.
+      tags: [Webhooks]
+      responses:
+        '200':
+          description: Webhook subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: createWebhookSubscription
+      summary: Create webhook subscription
+      description: Register a signed callback URL for subscription, payment, capability, and execution events.
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookSubscriptionRequest'
+      responses:
+        '201':
+          description: Webhook subscription created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/subscriptions/{subscription_id}:
+    get:
+      operationId: getWebhookSubscription
+      summary: Get webhook subscription
+      tags: [Webhooks]
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Webhook subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/subscriptions/{subscription_id}/rotate-secret:
+    post:
+      operationId: rotateWebhookSubscriptionSecret
+      summary: Rotate webhook signing secret
+      tags: [Webhooks]
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Webhook subscription with a newly issued signing secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/subscriptions/{subscription_id}/pause:
+    post:
+      operationId: pauseWebhookSubscription
+      summary: Pause webhook subscription
+      tags: [Webhooks]
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paused webhook subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/subscriptions/{subscription_id}/resume:
+    post:
+      operationId: resumeWebhookSubscription
+      summary: Resume webhook subscription
+      tags: [Webhooks]
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Resumed webhook subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/deliveries:
+    get:
+      operationId: listWebhookDeliveries
+      summary: List webhook deliveries
+      description: Inspect recent webhook deliveries, filter by subscription, event type, or delivery status.
+      tags: [Webhooks]
+      parameters:
+        - name: subscription_id
+          in: query
+          schema: { type: string }
+        - name: event_type
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Webhook delivery records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/deliveries/{delivery_id}/redeliver:
+    post:
+      operationId: redeliverWebhookDelivery
+      summary: Redeliver webhook event
+      tags: [Webhooks]
+      parameters:
+        - name: delivery_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Delivery record after requeue / redelivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/webhooks/test-deliveries:
+    post:
+      operationId: sendWebhookTestDelivery
+      summary: Queue a test webhook delivery
+      description: Queue one of the supported webhook event types to validate your endpoint wiring before going live.
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTestWebhookDeliveryRequest'
+      responses:
+        '202':
+          description: Test delivery queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueuedWebhookEventEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /market/capabilities/{listingId}:
     get:
       operationId: getAppListing
@@ -1440,6 +1669,207 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/ToolManualPreviewQualityResult'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    CreateWebhookSubscriptionRequest:
+      type: object
+      required: [callback_url, event_types]
+      properties:
+        callback_url: { type: string, format: uri }
+        description: { type: string, nullable: true }
+        event_types:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/WebhookEventType'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    SendTestWebhookDeliveryRequest:
+      type: object
+      required: [event_type]
+      properties:
+        event_type:
+          $ref: '#/components/schemas/WebhookEventType'
+        data:
+          type: object
+          additionalProperties: true
+        subscription_ids:
+          type: array
+          items: { type: string }
+
+    WebhookEventType:
+      type: string
+      enum:
+        - subscription.created
+        - subscription.renewed
+        - subscription.cancelled
+        - subscription.paused
+        - subscription.reinstated
+        - payment.succeeded
+        - payment.failed
+        - payment.disputed
+        - capability.published
+        - capability.delisted
+        - execution.completed
+        - execution.failed
+
+    WebhookEvent:
+      type: object
+      required: [id, type, api_version, occurred_at, idempotency_key, data]
+      properties:
+        id: { type: string }
+        type:
+          $ref: '#/components/schemas/WebhookEventType'
+        api_version: { type: string }
+        occurred_at: { type: string }
+        idempotency_key: { type: string }
+        trace_id: { type: string, nullable: true }
+        data:
+          type: object
+          additionalProperties: true
+
+    WebhookSubscription:
+      type: object
+      required: [id, owner_user_id, callback_url, status, event_types]
+      properties:
+        id: { type: string }
+        owner_user_id: { type: string }
+        callback_url: { type: string, format: uri }
+        status: { type: string, enum: [active, paused] }
+        event_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEventType'
+        description: { type: string, nullable: true }
+        signing_secret_hint: { type: string, nullable: true }
+        signing_secret: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+        last_delivery_at: { type: string, nullable: true }
+        created_at: { type: string, nullable: true }
+        updated_at: { type: string, nullable: true }
+
+    WebhookDelivery:
+      type: object
+      required:
+        - id
+        - subscription_id
+        - event_id
+        - event_type
+        - idempotency_key
+        - callback_url
+        - delivery_status
+        - request_headers
+        - request_body
+        - response_headers
+        - attempt_count
+      properties:
+        id: { type: string }
+        subscription_id: { type: string }
+        event_id: { type: string }
+        event_type:
+          $ref: '#/components/schemas/WebhookEventType'
+        idempotency_key: { type: string }
+        callback_url: { type: string, format: uri }
+        delivery_status: { type: string, enum: [queued, delivering, delivered, failed] }
+        request_headers:
+          type: object
+          additionalProperties: true
+        request_body:
+          type: object
+          additionalProperties: true
+        response_status: { type: integer, nullable: true }
+        response_headers:
+          type: object
+          additionalProperties: true
+        response_body: {}
+        duration_ms: { type: integer, nullable: true }
+        attempt_count: { type: integer }
+        last_attempt_at: { type: string, nullable: true }
+        delivered_at: { type: string, nullable: true }
+        error_message: { type: string, nullable: true }
+        trace_id: { type: string, nullable: true }
+        created_at: { type: string, nullable: true }
+        updated_at: { type: string, nullable: true }
+
+    QueuedWebhookEvent:
+      type: object
+      required: [queued, event]
+      properties:
+        queued: { type: boolean }
+        event:
+          $ref: '#/components/schemas/WebhookEvent'
+
+    WebhookSubscriptionEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/WebhookSubscription'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    WebhookSubscriptionListEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookSubscription'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    WebhookDeliveryEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/WebhookDelivery'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    WebhookDeliveryListEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookDelivery'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    QueuedWebhookEventEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/QueuedWebhookEvent'
         meta:
           $ref: '#/components/schemas/EnvelopeMeta'
         error:
