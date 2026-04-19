@@ -1,0 +1,109 @@
+{
+  "listings": [
+    {
+      "id": "lst_currency",
+      "capability_key": "currency-converter-v2",
+      "name": "Currency Converter",
+      "description": "Convert USD amounts to JPY with live exchange rates and return a concise summary.",
+      "job_to_be_done": "Convert currency amounts between USD and JPY.",
+      "category": "finance",
+      "permission_class": "read-only",
+      "approval_mode": "auto",
+      "dry_run_supported": true,
+      "price_model": "free",
+      "price_value_minor": 0,
+      "currency": "USD",
+      "short_description": "Convert currency with live rates.",
+      "status": "published",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {
+            "type": "number",
+            "description": "USD amount to convert."
+          },
+          "to": {
+            "type": "string",
+            "description": "Target currency code."
+          }
+        },
+        "required": [
+          "amount_usd",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line conversion summary."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Converted amount."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Target currency."
+          }
+        },
+        "required": [
+          "summary",
+          "amount",
+          "currency"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "lst_price",
+      "capability_key": "price-compare-helper",
+      "name": "Price Compare Helper",
+      "description": "Compare retailer offers for electronics and household goods.",
+      "job_to_be_done": "Compare product prices across stores.",
+      "category": "commerce",
+      "permission_class": "read-only",
+      "approval_mode": "auto",
+      "dry_run_supported": true,
+      "price_model": "free",
+      "price_value_minor": 0,
+      "currency": "USD",
+      "short_description": "Find the best price for a requested product.",
+      "status": "published"
+    },
+    {
+      "id": "lst_invoice",
+      "capability_key": "invoice-emailer",
+      "name": "Invoice Emailer",
+      "description": "Send invoice emails after owner approval and report delivery status.",
+      "job_to_be_done": "Send invoices by email.",
+      "category": "communication",
+      "permission_class": "action",
+      "approval_mode": "always-ask",
+      "dry_run_supported": true,
+      "price_model": "subscription",
+      "price_value_minor": 1200,
+      "currency": "USD",
+      "short_description": "Preview and send invoice email messages.",
+      "status": "published"
+    },
+    {
+      "id": "lst_translate",
+      "capability_key": "translation-hub",
+      "name": "Translation Hub",
+      "description": "Translate text across languages without side effects.",
+      "job_to_be_done": "Translate text.",
+      "category": "communication",
+      "permission_class": "read-only",
+      "approval_mode": "auto",
+      "dry_run_supported": true,
+      "price_model": "free",
+      "price_value_minor": 0,
+      "currency": "USD",
+      "short_description": "Translate text between common business languages.",
+      "status": "published"
+    }
+  ]
+}

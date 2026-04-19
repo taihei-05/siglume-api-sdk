@@ -20,3 +20,22 @@ const result = await draft_tool_manual({
 
 console.log(result.quality_report.grade);
 ```
+
+Buyer-side runtime helpers are also included:
+
+```ts
+import { SiglumeBuyerClient, to_anthropic_tool } from "@siglume/api-sdk";
+
+const buyer = new SiglumeBuyerClient({
+  api_key: process.env.SIGLUME_API_KEY ?? "sig_mock_key",
+  default_agent_id: process.env.SIGLUME_AGENT_ID,
+  allow_internal_execute: true,
+});
+
+const listing = await buyer.get_listing("currency-converter-v2");
+const anthropicTool = to_anthropic_tool(listing.tool_manual).schema;
+```
+
+See [`../docs/buyer-sdk.md`](../docs/buyer-sdk.md) and
+[`../examples/buyer_claude_agent_sdk.ts`](../examples/buyer_claude_agent_sdk.ts)
+for the current experimental limitations and the mocked integration example.

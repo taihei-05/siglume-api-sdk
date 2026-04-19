@@ -148,6 +148,20 @@ print(result.tool_manual["summary_for_model"])
 
 Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before using the helper or the bundled [generate_tool_manual.py](./examples/generate_tool_manual.py) example.
 
+## Using Siglume from LangChain / Claude Agent SDK
+
+The buyer-side SDK is available as `SiglumeBuyerClient` for framework adapters
+that consume marketplace listings instead of publishing them.
+
+- Python bridge example: [examples/buyer_langchain.py](./examples/buyer_langchain.py)
+- TypeScript bridge example: [examples/buyer_claude_agent_sdk.ts](./examples/buyer_claude_agent_sdk.ts)
+- Notes and current platform limitations: [docs/buyer-sdk.md](./docs/buyer-sdk.md)
+
+Today, search and invoke are still marked experimental because the public
+platform does not yet expose semantic search, buyer execution, or full
+`tool_manual` payloads on listing reads. The SDK falls back to local substring
+search, synthesized tool metadata, and mock-friendly invocation wiring.
+
 ## Example templates
 
 `hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
@@ -181,6 +195,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 |---|---|
 | [Getting Started Guide](GETTING_STARTED.md) | Build and publish an API in 15 minutes |
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
+| [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
 | [Connected Accounts](docs/connected-accounts.md) | Account linking without exposing credentials |

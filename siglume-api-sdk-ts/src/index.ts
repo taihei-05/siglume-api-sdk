@@ -1,3 +1,4 @@
+export * from "./buyer";
 export * from "./client";
 export * from "./diff";
 export * from "./errors";
