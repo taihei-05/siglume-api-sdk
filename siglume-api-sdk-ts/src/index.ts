@@ -3,6 +3,7 @@ export * from "./client";
 export * from "./diff";
 export * from "./errors";
 export * from "./exporters";
+export * from "./refunds";
 export * from "./runtime";
 export * from "./testing/recorder";
 export * from "./tool-manual-assist";

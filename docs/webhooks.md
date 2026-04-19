@@ -9,6 +9,7 @@ Siglume marketplace webhooks let sellers receive signed lifecycle events for sub
 - `subscription.cancelled`
 - `subscription.paused`
 - `subscription.reinstated`
+- `refund.issued`
 - `payment.succeeded`
 - `payment.failed`
 - `payment.disputed`
@@ -96,5 +97,5 @@ handler.on("*", async (event: SiglumeWebhookEvent) => {
 
 ## Examples
 
-- Python: [examples/webhook_handler_flask.py](/c:/tmp/siglume-app-sdk-webhooks-v05/examples/webhook_handler_flask.py:1)
-- TypeScript: [examples-ts/webhook_handler_express.ts](/c:/tmp/siglume-app-sdk-webhooks-v05/examples-ts/webhook_handler_express.ts:1)
+- Python: [examples/webhook_handler_flask.py](../examples/webhook_handler_flask.py)
+- TypeScript: [examples-ts/webhook_handler_express.ts](../examples-ts/webhook_handler_express.ts)
