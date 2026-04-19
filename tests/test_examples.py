@@ -13,13 +13,22 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from siglume_api_sdk import AppAdapter, AppTestHarness, PermissionClass, validate_tool_manual  # noqa: E402
+from siglume_api_sdk import (  # noqa: E402
+    AppAdapter,
+    AppTestHarness,
+    PermissionClass,
+    score_tool_manual_offline,
+    validate_tool_manual,
+)
 
 
 EXAMPLE_SPECS = [
     ("calendar_sync.py", PermissionClass.ACTION),
+    ("crm_sync.py", PermissionClass.ACTION),
     ("email_sender.py", PermissionClass.ACTION),
+    ("news_digest.py", PermissionClass.READ_ONLY),
     ("translation_hub.py", PermissionClass.READ_ONLY),
+    ("wallet_balance.py", PermissionClass.READ_ONLY),
     ("payment_quote.py", PermissionClass.PAYMENT),
 ]
 
@@ -34,8 +43,7 @@ def _load_module(example_name: str):
     return module
 
 
-async def _exercise_example(app: AppAdapter, permission_class: PermissionClass) -> None:
-    harness = AppTestHarness(app)
+async def _exercise_example(harness: AppTestHarness, app: AppAdapter, permission_class: PermissionClass) -> None:
     assert not harness.validate_manifest()
 
     dry_run = await harness.dry_run(task_type=app.supported_task_types()[0])
@@ -44,12 +52,14 @@ async def _exercise_example(app: AppAdapter, permission_class: PermissionClass) 
     if permission_class in (PermissionClass.ACTION, PermissionClass.PAYMENT):
         action = await harness.execute_action(task_type=app.supported_task_types()[0])
         assert action.success
+        assert not harness.validate_receipt(action)
 
     if permission_class == PermissionClass.PAYMENT:
         quote = await harness.execute_quote(task_type=app.supported_task_types()[0], input_params={"amount_usd": 9.5})
         payment = await harness.execute_payment(task_type=app.supported_task_types()[-1], input_params={"amount_usd": 9.5})
         assert quote.success
         assert payment.success
+        assert not harness.validate_receipt(payment)
 
 
 @pytest.mark.parametrize(("example_name", "permission_class"), EXAMPLE_SPECS)
@@ -62,12 +72,16 @@ def test_examples_validate_and_run(example_name: str, permission_class: Permissi
     ]
     assert len(subclasses) == 1
     app = subclasses[0]()
+    stubs = module.build_stubs() if hasattr(module, "build_stubs") else {}
+    harness = AppTestHarness(app, stubs=stubs)
 
     manual = module.build_tool_manual()
     ok, issues = validate_tool_manual(manual)
     assert ok, f"{example_name} tool manual invalid: {issues}"
+    report = score_tool_manual_offline(manual)
+    assert report.grade in {"A", "B"}, f"{example_name} tool manual fell below publish bar: {report.grade}"
 
-    asyncio.run(_exercise_example(app, permission_class))
+    asyncio.run(_exercise_example(harness, app, permission_class))
 
 
 def test_generate_tool_manual_example_requires_explicit_llm_api_key(monkeypatch) -> None:

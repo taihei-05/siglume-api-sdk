@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-19
+
+First full multi-runtime SDK release. v0.4.0 adds offline ToolManual scoring,
+the shipping TypeScript runtime, LLM-assisted ToolManual drafting, manifest/tool
+manual diffing, provider schema exporters, deterministic recording harnesses,
+experimental buyer-side helpers, and the final example set needed for a
+workflow-complete public SDK.
+
+### Added
+
+- `score_tool_manual_offline()` parity scorer plus `siglume score --offline`.
+- Full TypeScript runtime package `@siglume/api-sdk` with AppAdapter,
+  AppTestHarness, client, buyer, diff, exporter, recorder, and CLI coverage.
+- LLM-assisted ToolManual helpers:
+  `draft_tool_manual()`, `fill_tool_manual_gaps()`,
+  `AnthropicProvider`, and `OpenAIProvider`.
+- Pure diff utilities:
+  `diff_manifest()` / `diff_tool_manual()` and `siglume diff`.
+- Tool schema exporters for Anthropic, OpenAI Chat Completions, OpenAI
+  Responses, and MCP descriptors.
+- Shared JSON cassette recorder for Python and TypeScript tests.
+- Experimental buyer-side SDK:
+  `SiglumeBuyerClient`, LangChain bridge example, and Claude-style example.
+- Remaining publish-ready examples:
+  `crm_sync.py`, `news_digest.py`, `wallet_balance.py`,
+  plus matching TypeScript examples under `examples-ts/`.
+
+### Fixed
+
+- Preview-quality endpoint malformed-JSON handling now returns a 4xx
+  `INVALID_PAYLOAD` envelope instead of surfacing a 500.
+- TypeScript `SiglumeClientShape` now includes
+  `preview_quality_score(tool_manual)`.
+- Offline grader now flags non-string items in usage/result/error hint lists
+  instead of silently letting malformed manuals keep publishable grades.
+
+### Compatibility
+
+- Public v0.3.x APIs remain available; v0.4.0 is additive for existing Python
+  users.
+- TypeScript package version moves from the prerelease line to the first stable
+  `0.4.0` cut.
+- No change to the USD-only rule, required `jurisdiction`, or the manifest vs.
+  tool-manual permission-class naming split.
+
 ## [0.3.1] - 2026-04-19
 
 Patch release for two Codex auto-review P2 fixes across the v0.3 surface.
