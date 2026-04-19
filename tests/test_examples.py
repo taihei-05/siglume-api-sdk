@@ -78,3 +78,13 @@ def test_generate_tool_manual_example_requires_explicit_llm_api_key(monkeypatch)
 
     with pytest.raises(SystemExit, match="Set ANTHROPIC_API_KEY or OPENAI_API_KEY"):
         module.main()
+
+
+def test_buyer_langchain_example_runs_with_mock_client(capsys) -> None:
+    module = _load_module("buyer_langchain.py")
+
+    module.main()
+
+    output = capsys.readouterr().out.strip().splitlines()
+    assert output[0].startswith("tool_name: currency_converter_v2")
+    assert output[-1].startswith("result_currency: JPY")

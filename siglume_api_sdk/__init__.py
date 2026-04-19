@@ -76,6 +76,13 @@ from .client import (  # noqa: E402, F401
     SupportCaseRecord,
     UsageEventRecord,
 )
+from .buyer import (  # noqa: E402, F401
+    CapabilityListing,
+    SiglumeBuyerClient,
+    SiglumeExperimentalError,
+    SiglumeExperimentalWarning,
+    Subscription,
+)
 from .diff import (  # noqa: E402, F401
     BreakingChange,
     Change,
@@ -113,6 +120,7 @@ __all__ = sorted(
             "AppListingRecord",
             "AutoRegistrationReceipt",
             "CapabilityBindingRecord",
+            "CapabilityListing",
             "Change",
             "ChangeLevel",
             "ConnectedAccountRecord",
@@ -127,9 +135,13 @@ __all__ = sorted(
             "SandboxSession",
             "SiglumeAPIError",
             "SiglumeAssistError",
+            "SiglumeBuyerClient",
             "SiglumeClient",
             "SiglumeClientError",
+            "SiglumeExperimentalError",
+            "SiglumeExperimentalWarning",
             "SiglumeNotFoundError",
+            "Subscription",
             "SupportCaseRecord",
             "ToolSchemaExport",
             "UsageEventRecord",
