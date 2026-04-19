@@ -72,8 +72,14 @@ def _redact_header_value(key: str, value: str) -> str:
         stripped = value.strip()
         if not stripped:
             return "<REDACTED>"
-        head, _, _ = stripped.partition(" ")
-        return f"{head} <REDACTED>" if head else "<REDACTED>"
+        head, sep, _ = stripped.partition(" ")
+        # If the value has no whitespace separator, there is no scheme to
+        # preserve — the entire value IS the credential (e.g. a bare
+        # GitHub PAT `ghp_...` or a hex-encoded API key). Returning
+        # `{head} <REDACTED>` in that case would echo the secret back.
+        if not sep:
+            return "<REDACTED>"
+        return f"{head} <REDACTED>"
     if key in {"cookie", "set-cookie"} or _SECRET_KEY_RE.search(key):
         redacted = _redact_string(value)
         return redacted if redacted != value else "<REDACTED>"
@@ -282,17 +288,19 @@ class Recorder:
         )
 
     def _patch_httpx(self) -> None:
-        # Only patch Client.request. httpx.request (module-level) internally
-        # constructs a transient Client and calls Client.request on it, so
-        # the Client.request patch catches both paths. Patching both used
-        # to double-record module-level calls (the module wrapper delegated
-        # to the original httpx.request, whose internal Client hit the
-        # already-patched Client.request), producing cassettes ordered
-        # A,A,B,B and breaking replay.
+        # Patch both sync Client.request AND AsyncClient.request. httpx.request
+        # (module-level) internally constructs a transient sync Client and
+        # calls Client.request, so the sync patch catches both paths there.
+        # AsyncClient takes an entirely separate code path — without patching
+        # it, async callers (a common pattern in app adapters) hit the real
+        # network in REPLAY mode, making cassette-based tests non-deterministic
+        # and leaking external calls.
         self._original_client_request = httpx.Client.request
+        self._original_async_client_request = httpx.AsyncClient.request
         self._original_module_request = None
         recorder = self
         original_client_request = self._original_client_request
+        original_async_client_request = self._original_async_client_request
 
         def client_request_wrapper(client_self: httpx.Client, method: str, url: Any, *args: Any, **kwargs: Any) -> httpx.Response:
             request = client_self.build_request(
@@ -314,11 +322,34 @@ class Recorder:
             recorder._record_interaction(request, response, duration_ms)
             return response
 
+        async def async_client_request_wrapper(client_self: httpx.AsyncClient, method: str, url: Any, *args: Any, **kwargs: Any) -> httpx.Response:
+            request = client_self.build_request(
+                method,
+                url,
+                content=kwargs.get("content"),
+                data=kwargs.get("data"),
+                files=kwargs.get("files"),
+                json=kwargs.get("json"),
+                params=kwargs.get("params"),
+                headers=kwargs.get("headers"),
+                cookies=kwargs.get("cookies"),
+            )
+            if recorder._effective_mode == RecordMode.REPLAY:
+                return recorder._replay_request(request)
+            started = time.perf_counter()
+            response = await original_async_client_request(client_self, method, url, *args, **kwargs)
+            duration_ms = int(round((time.perf_counter() - started) * 1000))
+            recorder._record_interaction(request, response, duration_ms)
+            return response
+
         httpx.Client.request = client_request_wrapper
+        httpx.AsyncClient.request = async_client_request_wrapper
 
     def _restore_httpx(self) -> None:
         if self._original_client_request is not None:
             httpx.Client.request = self._original_client_request
+        if getattr(self, "_original_async_client_request", None) is not None:
+            httpx.AsyncClient.request = self._original_async_client_request
 
     def _record_interaction(self, request: httpx.Request, response: httpx.Response, duration_ms: int) -> None:
         self._interactions.append(

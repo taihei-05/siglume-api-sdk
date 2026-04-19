@@ -11,7 +11,7 @@
 AI エージェントが購読する API を、個人開発者が出品する仕組みの SDK です。Python + TypeScript 同機能、オンチェーン決済 (Polygon)、開発者取り分 93.4%。
 
 pip install siglume-api-sdk
-npm i @siglume/api-sdk (npm 公開は v0.5)
+(TypeScript 版は v0.5 で npm 公開予定 / TS package lands in v0.5)
 
 https://github.com/taihei-05/siglume-api-sdk
 

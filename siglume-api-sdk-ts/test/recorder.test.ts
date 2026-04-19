@@ -592,4 +592,51 @@ describe("AppTestHarness recorder helpers", () => {
     expect(headers[1]).toBe("Digest <REDACTED>");
     expect(headers[2]).toBe("Sig-Token <REDACTED>");
   });
+
+  it("fully redacts scheme-less Authorization headers (Codex P1 on PR #109)", async () => {
+    // A bare-token Authorization (no whitespace, no scheme prefix — e.g.
+    // a raw GitHub PAT or hex API key) was previously written back as
+    // "${secret} <REDACTED>" because the first split token was treated as
+    // the "scheme" and preserved. The whole value IS the credential in
+    // that case and must be fully redacted.
+    const dir = await mkdtemp(join(tmpdir(), "siglume-auth-bare-"));
+    tempDirs.push(dir);
+    const cassettePath = join(dir, "bare_token.json");
+
+    const originalFetch = globalThis.fetch;
+    Reflect.set(globalThis as object, "fetch", async (input: RequestInfo | URL) => {
+      void input;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const recorder = new Recorder(cassettePath, { mode: RecordMode.RECORD });
+    await recorder.start();
+    try {
+      await recorder.withGlobalFetch(async () => {
+        await fetch("https://api.example.test/a", {
+          headers: { Authorization: "ghp_abcdef0123456789abcdef0123456789abcdef" },
+        });
+        await fetch("https://api.example.test/b", {
+          headers: { Authorization: "0xdeadbeefcafe1234567890abcdef0123456789ab" },
+        });
+      });
+    } finally {
+      await recorder.close();
+      Reflect.set(globalThis as object, "fetch", originalFetch);
+    }
+
+    const raw = await readFile(cassettePath, "utf8");
+    const data = JSON.parse(raw) as {
+      interactions: Array<{ request: { headers: Record<string, string> } }>;
+    };
+    const headers = data.interactions.map((i) => i.request.headers.authorization);
+    // Must be the fully-masked form — not `ghp_... <REDACTED>` which would leak.
+    expect(headers[0]).toBe("<REDACTED>");
+    expect(headers[1]).toBe("<REDACTED>");
+    expect(raw).not.toContain("ghp_abcdef");
+    expect(raw).not.toContain("0xdeadbeefcafe");
+  });
 });

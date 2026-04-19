@@ -77,6 +77,13 @@ function redactHeaderValue(key: string, value: string): string {
     if (!stripped) {
       return "<REDACTED>";
     }
+    // If the value has no whitespace separator, there is no scheme to
+    // preserve — the entire value IS the credential (e.g. a bare
+    // GitHub PAT `ghp_...` or a hex-encoded API key). Returning
+    // `${head} <REDACTED>` in that case would echo the secret back.
+    if (!/\s/.test(stripped)) {
+      return "<REDACTED>";
+    }
     const head = stripped.split(/\s+/)[0] ?? "";
     return head ? `${head} <REDACTED>` : "<REDACTED>";
   }
