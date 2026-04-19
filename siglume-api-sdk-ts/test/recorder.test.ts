@@ -546,4 +546,50 @@ describe("AppTestHarness recorder helpers", () => {
       Reflect.set(globalThis as object, "fetch", originalFetch);
     }
   });
+
+  it("redacts non-Bearer Authorization schemes (Codex P1 on PR #105)", async () => {
+    // Any Authorization value must be redacted, not only the Bearer form.
+    // Basic / Digest / custom-token schemes previously leaked through
+    // because they did not match the narrow secret regexes in redactString.
+    const dir = await mkdtemp(join(tmpdir(), "siglume-auth-scheme-"));
+    tempDirs.push(dir);
+    const cassettePath = join(dir, "auth_schemes.json");
+
+    const originalFetch = globalThis.fetch;
+    Reflect.set(globalThis as object, "fetch", async (input: RequestInfo | URL) => {
+      void input;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const recorder = new Recorder(cassettePath, { mode: RecordMode.RECORD });
+    await recorder.start();
+    try {
+      await recorder.withGlobalFetch(async () => {
+        await fetch("https://api.example.test/a", {
+          headers: { Authorization: "Basic dXNlcjpwYXNzd29yZA==" },
+        });
+        await fetch("https://api.example.test/b", {
+          headers: { Authorization: "Digest username=\"alice\", nonce=\"abc\"" },
+        });
+        await fetch("https://api.example.test/c", {
+          headers: { Authorization: "Sig-Token abcdef123456" },
+        });
+      });
+    } finally {
+      await recorder.close();
+      Reflect.set(globalThis as object, "fetch", originalFetch);
+    }
+
+    const raw = await readFile(cassettePath, "utf8");
+    const data = JSON.parse(raw) as {
+      interactions: Array<{ request: { headers: Record<string, string> } }>;
+    };
+    const headers = data.interactions.map((i) => i.request.headers.authorization);
+    expect(headers[0]).toBe("Basic <REDACTED>");
+    expect(headers[1]).toBe("Digest <REDACTED>");
+    expect(headers[2]).toBe("Sig-Token <REDACTED>");
+  });
 });

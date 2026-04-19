@@ -67,8 +67,18 @@ function redactHeaderValue(key: string, value: string): string {
   if (key === "content-type" && value.toLowerCase().includes("multipart/form-data")) {
     return normalizeMultipartContentType(value);
   }
-  if (key === "authorization" && value.toLowerCase().startsWith("bearer ")) {
-    return "Bearer <REDACTED>";
+  if (key === "authorization") {
+    // Preserve the scheme token so cassettes stay readable, but redact
+    // every credential regardless of scheme (Bearer / Basic / Digest /
+    // custom tokens). Falling through to redactString only catches values
+    // that match our narrow secret regexes, which would leave plenty of
+    // credentials in the clear.
+    const stripped = value.trim();
+    if (!stripped) {
+      return "<REDACTED>";
+    }
+    const head = stripped.split(/\s+/)[0] ?? "";
+    return head ? `${head} <REDACTED>` : "<REDACTED>";
   }
   if (key === "cookie" || key === "set-cookie" || SECRET_KEY_RE.test(key)) {
     const redacted = redactString(value);

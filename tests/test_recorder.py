@@ -382,3 +382,58 @@ def test_python_recorder_replays_multipart_uploads(tmp_path: Path) -> None:
                     data={"note": "hello"},
                     files={"file": ("hello.bin", b"\x00\x01different", "application/octet-stream")},
                 )
+
+
+def test_recorder_redacts_non_bearer_auth_schemes(tmp_path: Path) -> None:
+    # Codex bot P1 on PR #105: any Authorization value must be redacted,
+    # not only the "Bearer " form. Basic / Digest / custom-token schemes
+    # previously leaked through because they did not match the narrow
+    # secret regexes in _redact_string.
+    cassette_path = tmp_path / "auth_schemes.json"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"ok": True})
+
+    with Recorder(cassette_path, mode=RecordMode.RECORD):
+        transport = httpx.MockTransport(handler)
+        with httpx.Client(base_url="https://api.example.test", transport=transport) as client:
+            client.get("/x", headers={"Authorization": "Basic dXNlcjpwYXNzd29yZA=="})
+            client.get("/y", headers={"Authorization": "Digest username=\"alice\", nonce=\"abc\""})
+            client.get("/z", headers={"Authorization": "Sig-Token abcdef123456"})
+
+    data = json.loads(cassette_path.read_text(encoding="utf-8"))
+    headers = [i["request"]["headers"] for i in data["interactions"]]
+    assert headers[0]["authorization"] == "Basic <REDACTED>"
+    assert headers[1]["authorization"] == "Digest <REDACTED>"
+    assert headers[2]["authorization"] == "Sig-Token <REDACTED>"
+
+
+def test_recorder_does_not_double_capture_module_level_httpx_request(tmp_path: Path) -> None:
+    # Codex bot P1 on PR #105: module-level httpx.request was patched in
+    # addition to Client.request, so module-level calls were recorded
+    # twice (once by the module wrapper, once by the internal Client path
+    # delegating to the still-patched Client.request), producing
+    # cassettes ordered A,A,B,B. Now we only patch Client.request, which
+    # catches both paths exactly once.
+    cassette_path = tmp_path / "module_level.json"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"path": str(request.url.path)})
+
+    original_request = httpx.request
+    try:
+        httpx.request = lambda method, url, **kwargs: httpx.Client(  # type: ignore[assignment]
+            transport=httpx.MockTransport(handler)
+        ).request(method, url, **kwargs)
+
+        with Recorder(cassette_path, mode=RecordMode.RECORD):
+            httpx.request("GET", "https://api.example.test/a")
+            httpx.request("GET", "https://api.example.test/b")
+    finally:
+        httpx.request = original_request
+
+    data = json.loads(cassette_path.read_text(encoding="utf-8"))
+    assert len(data["interactions"]) == 2
+    paths = [i["request"]["url"] for i in data["interactions"]]
+    assert paths[0].endswith("/a")
+    assert paths[1].endswith("/b")

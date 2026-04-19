@@ -63,8 +63,17 @@ def _redact_string(value: str) -> str:
 def _redact_header_value(key: str, value: str) -> str:
     if key == "content-type" and "multipart/form-data" in value.lower():
         return _normalize_multipart_content_type(value)
-    if key == "authorization" and value.lower().startswith("bearer "):
-        return "Bearer <REDACTED>"
+    if key == "authorization":
+        # Preserve the scheme token so cassettes stay readable, but redact
+        # every credential regardless of scheme (Bearer / Basic / Digest /
+        # custom tokens). Falling through to _redact_string only catches
+        # values that match our narrow secret regexes, which would leave
+        # plenty of credentials in the clear.
+        stripped = value.strip()
+        if not stripped:
+            return "<REDACTED>"
+        head, _, _ = stripped.partition(" ")
+        return f"{head} <REDACTED>" if head else "<REDACTED>"
     if key in {"cookie", "set-cookie"} or _SECRET_KEY_RE.search(key):
         redacted = _redact_string(value)
         return redacted if redacted != value else "<REDACTED>"
@@ -273,11 +282,17 @@ class Recorder:
         )
 
     def _patch_httpx(self) -> None:
+        # Only patch Client.request. httpx.request (module-level) internally
+        # constructs a transient Client and calls Client.request on it, so
+        # the Client.request patch catches both paths. Patching both used
+        # to double-record module-level calls (the module wrapper delegated
+        # to the original httpx.request, whose internal Client hit the
+        # already-patched Client.request), producing cassettes ordered
+        # A,A,B,B and breaking replay.
         self._original_client_request = httpx.Client.request
-        self._original_module_request = httpx.request
+        self._original_module_request = None
         recorder = self
         original_client_request = self._original_client_request
-        original_module_request = self._original_module_request
 
         def client_request_wrapper(client_self: httpx.Client, method: str, url: Any, *args: Any, **kwargs: Any) -> httpx.Response:
             request = client_self.build_request(
@@ -299,35 +314,11 @@ class Recorder:
             recorder._record_interaction(request, response, duration_ms)
             return response
 
-        def module_request_wrapper(method: str, url: Any, *args: Any, **kwargs: Any) -> httpx.Response:
-            with httpx.Client() as temp_client:
-                request = temp_client.build_request(
-                    method,
-                    url,
-                    content=kwargs.get("content"),
-                    data=kwargs.get("data"),
-                    files=kwargs.get("files"),
-                    json=kwargs.get("json"),
-                    params=kwargs.get("params"),
-                    headers=kwargs.get("headers"),
-                    cookies=kwargs.get("cookies"),
-                )
-            if recorder._effective_mode == RecordMode.REPLAY:
-                return recorder._replay_request(request)
-            started = time.perf_counter()
-            response = original_module_request(method, url, *args, **kwargs)
-            duration_ms = int(round((time.perf_counter() - started) * 1000))
-            recorder._record_interaction(request, response, duration_ms)
-            return response
-
         httpx.Client.request = client_request_wrapper
-        httpx.request = module_request_wrapper
 
     def _restore_httpx(self) -> None:
         if self._original_client_request is not None:
             httpx.Client.request = self._original_client_request
-        if self._original_module_request is not None:
-            httpx.request = self._original_module_request
 
     def _record_interaction(self, request: httpx.Request, response: httpx.Response, duration_ms: int) -> None:
         self._interactions.append(
