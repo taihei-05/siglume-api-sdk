@@ -27,6 +27,7 @@ EXAMPLE_SPECS = [
     ("crm_sync.py", PermissionClass.ACTION),
     ("email_sender.py", PermissionClass.ACTION),
     ("news_digest.py", PermissionClass.READ_ONLY),
+    ("polygon_mandate_adapter.py", PermissionClass.PAYMENT),
     ("translation_hub.py", PermissionClass.READ_ONLY),
     ("wallet_balance.py", PermissionClass.READ_ONLY),
     ("payment_quote.py", PermissionClass.PAYMENT),
@@ -135,6 +136,21 @@ def test_metering_record_example_runs_with_mock_client() -> None:
     assert output[2] == "batch_items: 2 last_period=202604"
     assert output[3] == "preview_subtotal_minor: 7615"
     assert output[4] == "usage_dimensions: tokens_in,tokens_out,calls"
+
+
+def test_polygon_mandate_adapter_example_runs_with_simulated_web3_receipts() -> None:
+    module = _load_module("polygon_mandate_adapter.py")
+
+    output = module.run_polygon_mandate_example()
+
+    assert output[0] == "tool_manual_valid: True 0"
+    assert output[1].startswith("quality_grade: ")
+    assert output[2] == "mandate_status: active cancel_scheduled=False"
+    assert output[3] == f"charge_tx: {'0x' + 'a' * 64} user_operation={'0x' + 'b' * 64}"
+    assert output[4] == "dry_run: True"
+    assert output[5] == "quote: True"
+    assert output[6] == "payment: True"
+    assert output[7] == "receipt_issues: 0"
 
 
 def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:

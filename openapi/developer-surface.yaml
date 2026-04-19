@@ -767,6 +767,99 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
+  /market/web3/swap/quote:
+    post:
+      operationId: getWeb3SwapQuote
+      summary: Get a cross-currency swap quote
+      description: Returns a live 0x quote when the platform is configured, with a deterministic mock fallback in local environments.
+      tags: [Web3]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Web3SwapQuoteRequest'
+      responses:
+        '200':
+          description: Swap quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Web3SwapQuoteEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/web3/mandates:
+    get:
+      operationId: listPolygonMandates
+      summary: List Polygon payment mandates
+      tags: [Web3]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: purpose
+          in: query
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Payment mandates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMandatePageEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/web3/receipts:
+    get:
+      operationId: listSettlementReceipts
+      summary: List Web3 settlement receipts
+      tags: [Web3]
+      parameters:
+        - name: receipt_kind
+          in: query
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Settlement receipts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChainReceiptPageEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /market/capability-approvals/challenge:
     post:
       operationId: requestExecutionApproval
@@ -1662,6 +1755,212 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Dispute'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    Web3TransactionRequest:
+      type: object
+      required: [request_id, network, chain_id, from_address, to, contract_key, contract_name, function_name, function_signature, selector, data]
+      properties:
+        request_id: { type: string }
+        network: { type: string, default: polygon }
+        chain_id: { type: integer, default: 137 }
+        from_address: { type: string }
+        to: { type: string }
+        value_hex: { type: string, default: '0x0' }
+        contract_key: { type: string }
+        contract_name: { type: string }
+        function_name: { type: string }
+        function_signature: { type: string }
+        selector: { type: string }
+        data: { type: string }
+        expected_event_name: { type: string, nullable: true }
+        expected_topic0: { type: string, nullable: true }
+        metadata_jsonb:
+          type: object
+          additionalProperties: true
+        user_operation_draft:
+          type: object
+          additionalProperties: true
+          nullable: true
+        prepared_at: { type: string, format: date-time, nullable: true }
+
+    Web3SwapQuoteRequest:
+      type: object
+      required: [sell_token, buy_token, amount_minor]
+      properties:
+        sell_token: { type: string, enum: [USDC, JPYC] }
+        buy_token: { type: string, enum: [USDC, JPYC] }
+        amount_minor: { type: integer, minimum: 1, maximum: 2147483647 }
+        slippage_bps: { type: integer, minimum: 0, maximum: 5000, default: 100 }
+
+    Web3SwapQuote:
+      type: object
+      required: [network, provider, sell_token, buy_token, amount_minor, estimated_buy_minor, minimum_buy_minor, rate, slippage_bps, fee_minor, price_impact_bps, allowance_needed, quote_payload_jsonb]
+      properties:
+        network: { type: string, default: polygon }
+        provider: { type: string }
+        sell_token: { type: string }
+        buy_token: { type: string }
+        amount_minor: { type: integer }
+        estimated_buy_minor: { type: integer }
+        minimum_buy_minor: { type: integer }
+        rate: { type: number }
+        slippage_bps: { type: integer }
+        fee_minor: { type: integer }
+        fee_token: { type: string, nullable: true }
+        price_impact_bps: { type: integer }
+        quote_expires_at: { type: string, format: date-time, nullable: true }
+        allowance_needed: { type: boolean }
+        allowance_spender: { type: string, nullable: true }
+        actual_allowance_minor: { type: integer, nullable: true }
+        approve_transaction_request:
+          anyOf:
+            - $ref: '#/components/schemas/Web3TransactionRequest'
+            - type: 'null'
+        swap_transaction_request:
+          anyOf:
+            - $ref: '#/components/schemas/Web3TransactionRequest'
+            - type: 'null'
+        quote_payload_jsonb:
+          type: object
+          additionalProperties: true
+
+    Web3SwapQuoteEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/Web3SwapQuote'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ChainReceipt:
+      type: object
+      required: [receipt_id, network, chain_id, tx_hash, receipt_kind, tx_status, confirmations, finality_confirmations, payload_jsonb, submission_kind, tx_hash_is_placeholder]
+      properties:
+        receipt_id: { type: string }
+        chain_receipt_id: { type: string, nullable: true }
+        principal_user_id: { type: string, nullable: true }
+        user_wallet_id: { type: string, nullable: true }
+        network: { type: string, default: polygon }
+        chain_id: { type: integer, default: 137 }
+        tx_hash: { type: string }
+        receipt_kind: { type: string }
+        reference_type: { type: string, nullable: true }
+        reference_id: { type: string, nullable: true }
+        tx_status: { type: string, default: finalized }
+        block_number: { type: integer, nullable: true }
+        confirmations: { type: integer, default: 0 }
+        finality_confirmations: { type: integer, default: 0 }
+        payload_jsonb:
+          type: object
+          additionalProperties: true
+        submission_kind: { type: string, default: tx_hash }
+        submitted_hash: { type: string, nullable: true }
+        user_operation_hash: { type: string, nullable: true }
+        tx_hash_is_placeholder: { type: boolean, default: false }
+        actual_gas_used: { type: integer, nullable: true }
+        actual_gas_cost_wei: { type: integer, nullable: true }
+        actual_gas_cost_pol: { type: string, nullable: true }
+        last_status_checked_at: { type: string, nullable: true }
+        execute_to_confirmed_ms: { type: integer, nullable: true }
+        await_finality_elapsed_ms: { type: integer, nullable: true }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        confirmed_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+
+    ChainReceiptPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChainReceipt'
+        next_cursor: { type: string, nullable: true }
+
+    ChainReceiptPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ChainReceiptPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    PaymentMandate:
+      type: object
+      required: [mandate_id, network, payee_type, payee_ref, purpose, cadence, token_symbol, display_currency, max_amount_minor, status, retry_count, metadata_jsonb]
+      properties:
+        mandate_id: { type: string }
+        payment_mandate_id: { type: string, nullable: true }
+        principal_user_id: { type: string, nullable: true }
+        user_wallet_id: { type: string, nullable: true }
+        network: { type: string, default: polygon }
+        payee_type: { type: string }
+        payee_ref: { type: string }
+        fee_recipient_ref: { type: string, nullable: true }
+        purpose: { type: string }
+        cadence: { type: string }
+        token_symbol: { type: string }
+        display_currency: { type: string }
+        max_amount_minor: { type: integer }
+        status: { type: string, default: active }
+        retry_count: { type: integer, default: 0 }
+        idempotency_key: { type: string, nullable: true }
+        last_attempt_at: { type: string, format: date-time, nullable: true }
+        next_attempt_at: { type: string, format: date-time, nullable: true }
+        canceled_at: { type: string, format: date-time, nullable: true }
+        metadata_jsonb:
+          type: object
+          additionalProperties: true
+        transaction_request:
+          anyOf:
+            - $ref: '#/components/schemas/Web3TransactionRequest'
+            - type: 'null'
+        approve_transaction_request:
+          anyOf:
+            - $ref: '#/components/schemas/Web3TransactionRequest'
+            - type: 'null'
+        cancel_transaction_request:
+          anyOf:
+            - $ref: '#/components/schemas/Web3TransactionRequest'
+            - type: 'null'
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+        chain_receipt:
+          anyOf:
+            - $ref: '#/components/schemas/ChainReceipt'
+            - type: 'null'
+
+    PaymentMandatePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMandate'
+        next_cursor: { type: string, nullable: true }
+
+    PaymentMandatePageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/PaymentMandatePage'
         meta:
           $ref: '#/components/schemas/EnvelopeMeta'
         error:

@@ -180,6 +180,100 @@ export interface SupportCaseRecord {
   raw: Record<string, unknown>;
 }
 
+export interface SettlementReceipt {
+  receipt_id: string;
+  chain_receipt_id?: string | null;
+  tx_hash: string;
+  user_operation_hash?: string | null;
+  receipt_kind?: string | null;
+  reference_type?: string | null;
+  reference_id?: string | null;
+  tx_status?: string | null;
+  network: string;
+  chain_id: number;
+  block_number?: number | null;
+  confirmations: number;
+  finality_confirmations: number;
+  submitted_hash?: string | null;
+  tx_hash_is_placeholder: boolean;
+  actual_gas_used?: number | null;
+  actual_gas_cost_wei?: number | null;
+  actual_gas_cost_pol?: string | null;
+  last_status_checked_at?: string | null;
+  submitted_at_iso?: string | null;
+  confirmed_at_iso?: string | null;
+  created_at_iso?: string | null;
+  updated_at_iso?: string | null;
+  payload: Record<string, unknown>;
+  raw: Record<string, unknown>;
+}
+
+export interface PolygonMandate {
+  mandate_id: string;
+  payer_wallet?: string | null;
+  payee_wallet?: string | null;
+  monthly_cap_minor: number;
+  currency: string;
+  network: string;
+  cadence: string;
+  purpose: string;
+  status: string;
+  retry_count: number;
+  next_attempt_at_iso?: string | null;
+  last_attempt_at_iso?: string | null;
+  canceled_at_iso?: string | null;
+  cancel_scheduled: boolean;
+  cancel_scheduled_at_iso?: string | null;
+  onchain_mandate_id?: number | null;
+  idempotency_key?: string | null;
+  display_currency?: string | null;
+  chain_receipt?: SettlementReceipt | null;
+  metadata: Record<string, unknown>;
+  raw: Record<string, unknown>;
+}
+
+export interface EmbeddedWalletCharge {
+  tx_hash: string;
+  user_operation_hash?: string | null;
+  block_number?: number | null;
+  gas_sponsored_by?: string | null;
+  settlement_amount_minor?: number | null;
+  platform_fee_minor?: number | null;
+  developer_net_minor?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  receipt_id?: string | null;
+  charge_ref?: string | null;
+  period_key?: string | null;
+  submitted_at_iso?: string | null;
+  confirmed_at_iso?: string | null;
+  receipt?: SettlementReceipt | null;
+  approval?: Record<string, unknown> | null;
+  finalization?: Record<string, unknown> | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CrossCurrencyQuote {
+  from_currency: string;
+  to_currency: string;
+  rate: number;
+  expires_at_iso?: string | null;
+  venue?: string | null;
+  source_amount_minor: number;
+  quoted_amount_minor: number;
+  minimum_received_minor?: number | null;
+  slippage_bps: number;
+  fee_minor: number;
+  fee_currency?: string | null;
+  price_impact_bps: number;
+  allowance_needed: boolean;
+  allowance_spender?: string | null;
+  actual_allowance_minor?: number | null;
+  approve_transaction_request?: Record<string, unknown> | null;
+  swap_transaction_request?: Record<string, unknown> | null;
+  raw: Record<string, unknown>;
+}
+
 export interface WebhookSubscriptionRecord {
   subscription_id: string;
   owner_user_id: string;
@@ -328,4 +422,18 @@ export interface SiglumeClientShape {
   list_webhook_deliveries(...args: unknown[]): Promise<WebhookDeliveryRecord[]> | WebhookDeliveryRecord[];
   redeliver_webhook_delivery(...args: unknown[]): Promise<WebhookDeliveryRecord> | WebhookDeliveryRecord;
   send_test_webhook_delivery(...args: unknown[]): Promise<Record<string, unknown>> | Record<string, unknown>;
+  list_polygon_mandates(...args: unknown[]): Promise<PolygonMandate[]> | PolygonMandate[];
+  get_polygon_mandate(...args: unknown[]): Promise<PolygonMandate> | PolygonMandate;
+  list_settlement_receipts(...args: unknown[]): Promise<SettlementReceipt[]> | SettlementReceipt[];
+  get_settlement_receipt(...args: unknown[]): Promise<SettlementReceipt> | SettlementReceipt;
+  get_embedded_wallet_charge(options: {
+    tx_hash: string;
+    limit?: number;
+  }): Promise<EmbeddedWalletCharge> | EmbeddedWalletCharge;
+  get_cross_currency_quote(options: {
+    from_currency: string;
+    to_currency: string;
+    source_amount_minor: number;
+    slippage_bps?: number;
+  }): Promise<CrossCurrencyQuote> | CrossCurrencyQuote;
 }

@@ -1133,6 +1133,56 @@ class AppTestHarness:
             "invoice_line_preview": invoice_line_preview,
         }
 
+    def simulate_polygon_mandate(
+        self,
+        *,
+        mandate_id: str,
+        payer_wallet: str,
+        payee_wallet: str,
+        monthly_cap_minor: int,
+        currency: str,
+        status: str = "active",
+        next_attempt_at_iso: str | None = "2026-05-01T00:00:00Z",
+        cancel_scheduled: bool = False,
+    ):
+        from siglume_api_sdk.web3 import simulate_polygon_mandate as _simulate_polygon_mandate
+
+        return _simulate_polygon_mandate(
+            mandate_id=mandate_id,
+            payer_wallet=payer_wallet,
+            payee_wallet=payee_wallet,
+            monthly_cap_minor=monthly_cap_minor,
+            currency=currency,
+            status=status,
+            next_attempt_at_iso=next_attempt_at_iso,
+            cancel_scheduled=cancel_scheduled,
+        )
+
+    def simulate_embedded_wallet_charge(
+        self,
+        *,
+        mandate: Any,
+        amount_minor: int,
+        tx_hash: str,
+        user_operation_hash: str | None = None,
+        block_number: int = 123456,
+        gas_sponsored_by: str = "platform",
+        platform_fee_minor: int = 0,
+        developer_net_minor: int | None = None,
+    ):
+        from siglume_api_sdk.web3 import simulate_embedded_wallet_charge as _simulate_embedded_wallet_charge
+
+        return _simulate_embedded_wallet_charge(
+            mandate=mandate,
+            amount_minor=amount_minor,
+            tx_hash=tx_hash,
+            user_operation_hash=user_operation_hash,
+            block_number=block_number,
+            gas_sponsored_by=gas_sponsored_by,
+            platform_fee_minor=platform_fee_minor,
+            developer_net_minor=developer_net_minor,
+        )
+
     def record(
         self,
         cassette_path: str,

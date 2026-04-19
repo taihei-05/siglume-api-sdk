@@ -13,6 +13,8 @@ import { ApprovalMode, Environment, PermissionClass, PriceModel } from "./types"
 import type { MeteringSimulationResult, UsageRecord } from "./metering";
 import { Recorder, RecordMode } from "./testing/recorder";
 import { validate_tool_manual } from "./tool-manual-validator";
+import type { EmbeddedWalletCharge, PolygonMandate } from "./web3";
+import { simulate_embedded_wallet_charge, simulate_polygon_mandate } from "./web3";
 
 const CAPABILITY_KEY_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -262,6 +264,32 @@ export class AppTestHarness {
       usage_record,
       invoice_line_preview,
     };
+  }
+
+  simulate_polygon_mandate(options: {
+    mandate_id: string;
+    payer_wallet: string;
+    payee_wallet: string;
+    monthly_cap_minor: number;
+    currency: string;
+    status?: string;
+    next_attempt_at_iso?: string | null;
+    cancel_scheduled?: boolean;
+  }): PolygonMandate {
+    return simulate_polygon_mandate(options);
+  }
+
+  simulate_embedded_wallet_charge(options: {
+    mandate: PolygonMandate;
+    amount_minor: number;
+    tx_hash: string;
+    user_operation_hash?: string | null;
+    block_number?: number;
+    gas_sponsored_by?: string;
+    platform_fee_minor?: number;
+    developer_net_minor?: number | null;
+  }): EmbeddedWalletCharge {
+    return simulate_embedded_wallet_charge(options);
   }
 
   async record<T>(

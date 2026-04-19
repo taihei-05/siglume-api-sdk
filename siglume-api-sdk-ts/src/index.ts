@@ -11,5 +11,6 @@ export * from "./tool-manual-assist";
 export * from "./tool-manual-grader";
 export * from "./tool-manual-validator";
 export * from "./types";
+export * from "./web3";
 export * from "./webhooks";
 export { renderJson as render_json } from "./utils";

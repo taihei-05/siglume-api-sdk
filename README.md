@@ -213,9 +213,19 @@ The public platform still accepts only `free` and `subscription` listings at
 registration time. `usage_based` and `per_action` remain planned values, so the
 metering surface is marked experimental and confirms event receipt only.
 
+## Web3 settlement helpers
+
+Use the web3 helper surface when you need typed read models for Polygon
+mandates, settlement receipts, embedded-wallet charges, or 0x cross-currency
+quotes.
+
+- Python example: [examples/polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py)
+- TypeScript example: [examples-ts/embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts)
+- API notes: [docs/web3-settlement.md](./docs/web3-settlement.md)
+
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, and `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -228,6 +238,8 @@ metering surface is marked experimental and confirms event receipt only.
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [refund_partial.py](./examples/refund_partial.py) | client | ✅ | Issue a partial refund and respond to a dispute for a prior receipt |
 | [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
+| [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
+| [embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts) | `PAYMENT` | ✅ | TypeScript mirror of the embedded-wallet settlement flow |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
 | [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
 | [register_via_client.py](./examples/register_via_client.py) | client | ✅ | Register and confirm a listing through `SiglumeClient` |
@@ -251,6 +263,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
 | [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |
+| [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
 | [Connected Accounts](docs/connected-accounts.md) | Account linking without exposing credentials |
