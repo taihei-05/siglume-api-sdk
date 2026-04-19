@@ -22,6 +22,7 @@ from siglume_api_sdk import (  # noqa: E402
     ToolManual,
     ToolManualPermissionClass,
 )
+from siglume_api_sdk.testing import Recorder, RecordMode  # noqa: E402
 
 
 def envelope(data, *, trace_id: str = "trc_test", request_id: str = "req_test") -> dict[str, object]:
@@ -96,10 +97,11 @@ def build_client(handler) -> SiglumeClient:
     )
 
 
-def test_auto_register_and_confirm_registration_return_typed_objects() -> None:
+def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: Path) -> None:
     manifest = build_manifest()
     tool_manual = build_tool_manual()
     requests: list[tuple[str, str, dict[str, object]]] = []
+    cassette_path = tmp_path / "auto_register_recorded.json"
 
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content.decode("utf-8")) if request.content else {}
@@ -145,9 +147,18 @@ def test_auto_register_and_confirm_registration_return_typed_objects() -> None:
 
         raise AssertionError(f"Unexpected request: {request.method} {request.url}")
 
-    with build_client(handler) as client:
-        receipt = client.auto_register(manifest, tool_manual)
-        confirmation = client.confirm_registration(receipt.listing_id)
+    with Recorder(cassette_path, mode=RecordMode.RECORD) as recorder:
+        with recorder.wrap(build_client(handler)) as client:
+            receipt = client.auto_register(manifest, tool_manual)
+            confirmation = client.confirm_registration(receipt.listing_id)
+
+    def unexpected_handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Replay should not hit transport: {request.method} {request.url}")
+
+    with Recorder(cassette_path, mode=RecordMode.REPLAY) as recorder:
+        with recorder.wrap(build_client(unexpected_handler)) as client:
+            replay_receipt = client.auto_register(manifest, tool_manual)
+            replay_confirmation = client.confirm_registration(replay_receipt.listing_id)
 
     assert receipt.listing_id == "lst_123"
     assert receipt.trace_id == "trc_test"
@@ -158,6 +169,8 @@ def test_auto_register_and_confirm_registration_return_typed_objects() -> None:
     assert confirmation.trace_id == "trc_confirm"
     assert requests[0][1] == "/v1/market/capabilities/auto-register"
     assert requests[1][1] == "/v1/market/capabilities/lst_123/confirm-auto-register"
+    assert replay_receipt.listing_id == receipt.listing_id
+    assert replay_confirmation.quality.grade == confirmation.quality.grade
 
 
 def test_cursor_pages_follow_next_cursor_for_listings_and_usage() -> None:

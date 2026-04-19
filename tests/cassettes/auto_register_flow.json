@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.test/v1/market/capabilities/auto-register",
+        "headers": {
+          "accept": "application/json",
+          "authorization": "Bearer <REDACTED>",
+          "content-length": "448",
+          "content-type": "application/json",
+          "user-agent": "siglume-api-sdk/fixture"
+        },
+        "body": {
+          "capability_key": "price-compare-helper",
+          "i18n": {
+            "job_to_be_done_en": "Compare retailer prices for a product and return the best current offer.",
+            "job_to_be_done_ja": "Compare retailer prices for a product and return the best current offer.",
+            "short_description_en": "Search multiple retailers and summarize the best current price.",
+            "short_description_ja": "Search multiple retailers and summarize the best current price."
+          },
+          "name": "Price Compare Helper",
+          "price_model": "free",
+          "price_value_minor": 0,
+          "source_code": "# shared registration stub"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "data": {
+            "auto_manifest": {
+              "capability_key": "price-compare-helper"
+            },
+            "confidence": {
+              "overall": 0.94
+            },
+            "listing_id": "lst_123",
+            "review_url": "/owner/publish?listing=lst_123",
+            "status": "draft"
+          },
+          "error": null,
+          "meta": {
+            "request_id": "req_test",
+            "trace_id": "trc_test"
+          }
+        },
+        "duration_ms": 7
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.test/v1/market/capabilities/lst_123/confirm-auto-register",
+        "headers": {
+          "accept": "application/json",
+          "authorization": "Bearer <REDACTED>",
+          "content-length": "1166",
+          "content-type": "application/json",
+          "user-agent": "siglume-api-sdk/fixture"
+        },
+        "body": {
+          "approved": true,
+          "overrides": {
+            "job_to_be_done": "Compare retailer prices for a product and return the best current offer.",
+            "name": "Price Compare Helper",
+            "tool_manual": {
+              "do_not_use_when": [
+                "the request is to complete checkout or place an order instead of comparing offers"
+              ],
+              "dry_run_supported": true,
+              "error_hints": [
+                "If no offers are found, ask for a clearer product name or model number."
+              ],
+              "input_schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "query": {
+                    "description": "Product name, model number, or search phrase.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              },
+              "job_to_be_done": "Search multiple retailers for a product and return a ranked price comparison the agent can cite.",
+              "output_schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "offers": {
+                    "description": "Ranked retailer offers.",
+                    "items": {
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "summary": {
+                    "description": "One-line overview of the best available deal.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "summary",
+                  "offers"
+                ],
+                "type": "object"
+              },
+              "permission_class": "read_only",
+              "requires_connected_accounts": [],
+              "result_hints": [
+                "Lead with the best offer and then summarize notable trade-offs."
+              ],
+              "summary_for_model": "Looks up current retailer offers and returns a structured comparison with the best deal first.",
+              "tool_name": "price_compare_helper",
+              "trigger_conditions": [
+                "owner asks to compare prices for a product before deciding where to buy",
+                "agent needs retailer offer data to support a shopping recommendation",
+                "request is to find the cheapest or best-value option for a product query"
+              ],
+              "usage_hints": [
+                "Use this tool after the owner has named a product and wants evidence-backed price comparison."
+              ]
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "data": {
+            "listing_id": "lst_123",
+            "quality": {
+              "grade": "B",
+              "improvement_suggestions": [
+                "Add one more retailer-specific trigger example."
+              ],
+              "issues": [],
+              "overall_score": 84
+            },
+            "release": {
+              "release_id": "rel_123",
+              "release_status": "pending_review"
+            },
+            "status": "pending_review"
+          },
+          "error": null,
+          "meta": {
+            "request_id": "req_confirm",
+            "trace_id": "trc_confirm"
+          }
+        },
+        "duration_ms": 9
+      }
+    }
+  ]
+}

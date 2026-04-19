@@ -1000,3 +1000,50 @@ class AppTestHarness:
             connected_accounts={},  # intentionally empty
             **kwargs,
         )
+
+    def record(
+        self,
+        cassette_path: str,
+        *,
+        ignore_body_fields: list[str] | None = None,
+    ) -> "_HarnessRecorderScope":
+        from siglume_api_sdk.testing import Recorder, RecordMode
+
+        return _HarnessRecorderScope(
+            self,
+            Recorder(
+                cassette_path,
+                mode=RecordMode.RECORD,
+                ignore_body_fields=ignore_body_fields,
+            ),
+        )
+
+    def replay(
+        self,
+        cassette_path: str,
+        *,
+        ignore_body_fields: list[str] | None = None,
+    ) -> "_HarnessRecorderScope":
+        from siglume_api_sdk.testing import Recorder, RecordMode
+
+        return _HarnessRecorderScope(
+            self,
+            Recorder(
+                cassette_path,
+                mode=RecordMode.REPLAY,
+                ignore_body_fields=ignore_body_fields,
+            ),
+        )
+
+
+class _HarnessRecorderScope:
+    def __init__(self, harness: AppTestHarness, recorder: Any) -> None:
+        self.harness = harness
+        self.recorder = recorder
+
+    def __enter__(self) -> AppTestHarness:
+        self.recorder.__enter__()
+        return self.harness
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.recorder.__exit__(exc_type, exc, tb)

@@ -3,6 +3,7 @@ export * from "./diff";
 export * from "./errors";
 export * from "./exporters";
 export * from "./runtime";
+export * from "./testing/recorder";
 export * from "./tool-manual-assist";
 export * from "./tool-manual-grader";
 export * from "./tool-manual-validator";

@@ -10,6 +10,7 @@ import type {
   ToolManualIssue,
 } from "./types";
 import { ApprovalMode, Environment, PermissionClass } from "./types";
+import { Recorder, RecordMode } from "./testing/recorder";
 import { validate_tool_manual } from "./tool-manual-validator";
 
 const CAPABILITY_KEY_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
@@ -222,5 +223,37 @@ export class AppTestHarness {
       ...options,
       connected_accounts: {},
     });
+  }
+
+  async record<T>(
+    cassettePath: string,
+    fn: (harness: AppTestHarness) => Promise<T> | T,
+    options: { ignore_body_fields?: string[] } = {},
+  ): Promise<T> {
+    const recorder = await Recorder.open(cassettePath, {
+      mode: RecordMode.RECORD,
+      ignore_body_fields: options.ignore_body_fields,
+    });
+    try {
+      return await recorder.withGlobalFetch(() => fn(this));
+    } finally {
+      await recorder.close();
+    }
+  }
+
+  async replay<T>(
+    cassettePath: string,
+    fn: (harness: AppTestHarness) => Promise<T> | T,
+    options: { ignore_body_fields?: string[] } = {},
+  ): Promise<T> {
+    const recorder = await Recorder.open(cassettePath, {
+      mode: RecordMode.REPLAY,
+      ignore_body_fields: options.ignore_body_fields,
+    });
+    try {
+      return await recorder.withGlobalFetch(() => fn(this));
+    } finally {
+      await recorder.close();
+    }
   }
 }

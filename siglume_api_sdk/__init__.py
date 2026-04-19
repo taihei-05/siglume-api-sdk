@@ -90,6 +90,7 @@ from .exporters import (  # noqa: E402, F401
     to_openai_function,
     to_openai_responses_tool,
 )
+from .testing import Recorder, RecordMode  # noqa: E402, F401
 from .tool_manual_assist import (  # noqa: E402, F401
     AnthropicProvider,
     LLMProvider,
@@ -135,6 +136,8 @@ __all__ = sorted(
             "AnthropicProvider",
             "LLMProvider",
             "OpenAIProvider",
+            "RecordMode",
+            "Recorder",
             "diff_manifest",
             "diff_tool_manual",
             "to_anthropic_tool",
