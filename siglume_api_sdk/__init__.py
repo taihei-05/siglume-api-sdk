@@ -76,6 +76,13 @@ from .client import (  # noqa: E402, F401
     SupportCaseRecord,
     UsageEventRecord,
 )
+from .diff import (  # noqa: E402, F401
+    BreakingChange,
+    Change,
+    ChangeLevel,
+    diff_manifest,
+    diff_tool_manual,
+)
 from .tool_manual_assist import (  # noqa: E402, F401
     AnthropicProvider,
     LLMProvider,
@@ -98,12 +105,15 @@ __all__ = sorted(
             "AppListingRecord",
             "AutoRegistrationReceipt",
             "CapabilityBindingRecord",
+            "Change",
+            "ChangeLevel",
             "ConnectedAccountRecord",
             "CursorPage",
             "DEFAULT_SIGLUME_API_BASE",
             "DeveloperPortalSummary",
             "EnvelopeMeta",
             "GrantBindingResult",
+            "BreakingChange",
             "RegistrationConfirmation",
             "RegistrationQuality",
             "SandboxSession",
@@ -117,6 +127,8 @@ __all__ = sorted(
             "AnthropicProvider",
             "LLMProvider",
             "OpenAIProvider",
+            "diff_manifest",
+            "diff_tool_manual",
             "ToolManualAssistAttempt",
             "ToolManualAssistMetadata",
             "ToolManualAssistResult",

@@ -33,6 +33,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "pack:check": "npm pack --json",

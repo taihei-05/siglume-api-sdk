@@ -1,0 +1,664 @@
+[
+  {
+    "name": "manifest_breaking_escalation_and_price_model",
+    "kind": "manifest",
+    "old": {
+      "capability_key": "echo-helper",
+      "version": "1.0.0",
+      "name": "Echo Helper",
+      "job_to_be_done": "Echo the provided text back to the owner.",
+      "permission_class": "read-only",
+      "approval_mode": "auto",
+      "dry_run_supported": true,
+      "required_connected_accounts": [],
+      "price_model": "free",
+      "currency": "USD",
+      "jurisdiction": "US",
+      "short_description": "Echo text back to the owner."
+    },
+    "new": {
+      "capability_key": "echo-helper",
+      "version": "1.0.0",
+      "name": "Echo Helper",
+      "job_to_be_done": "Echo the provided text back to the owner.",
+      "permission_class": "action",
+      "approval_mode": "auto",
+      "dry_run_supported": true,
+      "required_connected_accounts": [],
+      "price_model": "subscription",
+      "currency": "USD",
+      "jurisdiction": "US",
+      "short_description": "Echo text back to the owner."
+    },
+    "expected": [
+      {"level": "breaking", "path": "permission_class"},
+      {"level": "breaking", "path": "price_model"}
+    ],
+    "exit_code": 1
+  },
+  {
+    "name": "manifest_info_version_name_short_description_and_downgrade",
+    "kind": "manifest",
+    "old": {
+      "capability_key": "wallet-pay",
+      "version": "1.0.0",
+      "name": "Wallet Pay",
+      "job_to_be_done": "Pay invoices with a connected wallet.",
+      "permission_class": "payment",
+      "approval_mode": "always-ask",
+      "dry_run_supported": true,
+      "required_connected_accounts": ["wallet"],
+      "price_model": "subscription",
+      "currency": "USD",
+      "jurisdiction": "US",
+      "short_description": "Pay invoices with a wallet."
+    },
+    "new": {
+      "capability_key": "wallet-pay",
+      "version": "1.1.0",
+      "name": "Wallet Pay v2",
+      "job_to_be_done": "Pay invoices with a connected wallet.",
+      "permission_class": "action",
+      "approval_mode": "always-ask",
+      "dry_run_supported": true,
+      "required_connected_accounts": ["wallet"],
+      "price_model": "subscription",
+      "currency": "USD",
+      "jurisdiction": "US",
+      "short_description": "Pay and track invoices with a wallet."
+    },
+    "expected": [
+      {"level": "info", "path": "name"},
+      {"level": "info", "path": "permission_class"},
+      {"level": "info", "path": "short_description"},
+      {"level": "info", "path": "version"}
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "tool_manual_breaking_input_required_addition",
+    "kind": "tool_manual",
+    "old": {
+      "tool_name": "echo_helper",
+      "job_to_be_done": "Echo the provided query in a structured response.",
+      "summary_for_model": "Returns the provided query inside a stable echo result.",
+      "trigger_conditions": [
+        "owner asks the agent to echo a request payload",
+        "agent needs a trivial read-only smoke-test helper",
+        "request is to mirror a provided string in a structured result"
+      ],
+      "do_not_use_when": [
+        "the request needs fresh external data rather than a local echo response"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use for simple echo smoke tests."],
+      "result_hints": ["Return the echoed string clearly."],
+      "error_hints": ["If query is missing, ask for the text to echo."]
+    },
+    "new": {
+      "tool_name": "echo_helper",
+      "job_to_be_done": "Echo the provided query in a structured response.",
+      "summary_for_model": "Returns the provided query inside a stable echo result.",
+      "trigger_conditions": [
+        "owner asks the agent to echo a request payload",
+        "agent needs a trivial read-only smoke-test helper",
+        "request is to mirror a provided string in a structured result"
+      ],
+      "do_not_use_when": [
+        "the request needs fresh external data rather than a local echo response"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"},
+          "locale": {"type": "string"}
+        },
+        "required": ["query", "locale"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use for simple echo smoke tests."],
+      "result_hints": ["Return the echoed string clearly."],
+      "error_hints": ["If query is missing, ask for the text to echo."]
+    },
+    "expected": [
+      {"level": "breaking", "path": "input_schema.required"}
+    ],
+    "exit_code": 1
+  },
+  {
+    "name": "tool_manual_warning_output_template_and_list_drift",
+    "kind": "tool_manual",
+    "old": {
+      "tool_name": "publish_post",
+      "job_to_be_done": "Publish a post after the owner approves the action.",
+      "summary_for_model": "Creates a post in the connected publishing system after approval.",
+      "trigger_conditions": [
+        "owner asks the agent to publish a drafted post",
+        "agent has final post content ready for submission",
+        "request is to send prepared copy to an external publishing tool"
+      ],
+      "do_not_use_when": [
+        "the owner has not approved the outbound post"
+      ],
+      "permission_class": "action",
+      "dry_run_supported": true,
+      "requires_connected_accounts": ["publisher"],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "body": {"type": "string"}
+        },
+        "required": ["body"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use only after the final post body is ready."],
+      "result_hints": ["Confirm where the post was published."],
+      "error_hints": ["If the provider rejects the post, explain the provider response."],
+      "approval_summary_template": "Publish the prepared post.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Creates a new post in the connected provider.",
+      "jurisdiction": "US"
+    },
+    "new": {
+      "tool_name": "publish_post",
+      "job_to_be_done": "Publish a post after the owner approves the action.",
+      "summary_for_model": "Creates a post in the connected publishing system after approval.",
+      "trigger_conditions": [
+        "owner asks to broadcast a release announcement",
+        "agent needs to fan out prepared messaging to an external channel",
+        "request is to push already-approved content to a live audience"
+      ],
+      "do_not_use_when": [
+        "the content still needs editing or legal review",
+        "the owner has not approved the outbound post"
+      ],
+      "permission_class": "action",
+      "dry_run_supported": true,
+      "requires_connected_accounts": ["publisher"],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "body": {"type": "string"}
+        },
+        "required": ["body"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"},
+          "provider_status": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use only after the final post body is ready."],
+      "result_hints": ["Confirm where the post was published."],
+      "error_hints": ["If the provider rejects the post, explain the provider response."],
+      "approval_summary_template": "Publish the approved post to the selected channel.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Creates a new post in the connected provider.",
+      "jurisdiction": "US"
+    },
+    "expected": [
+      {"level": "warning", "path": "approval_summary_template"},
+      {"level": "warning", "path": "do_not_use_when"},
+      {"level": "warning", "path": "output_schema.properties"},
+      {"level": "warning", "path": "trigger_conditions"}
+    ],
+    "exit_code": 2
+  },
+  {
+    "name": "tool_manual_breaking_side_effect_and_jurisdiction",
+    "kind": "tool_manual",
+    "old": {
+      "tool_name": "invoice_lookup",
+      "job_to_be_done": "Look up invoice metadata by identifier.",
+      "summary_for_model": "Returns invoice details without changing external state.",
+      "trigger_conditions": [
+        "owner asks for invoice metadata by identifier",
+        "agent needs invoice status before taking another step",
+        "request is to inspect an invoice rather than mutate it"
+      ],
+      "do_not_use_when": [
+        "the request is to modify or pay the invoice"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {"type": "string"}
+        },
+        "required": ["invoice_id"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use when the owner needs invoice status."],
+      "result_hints": ["Lead with invoice status and amount."],
+      "error_hints": ["If the invoice is missing, ask the owner to verify the identifier."],
+      "side_effect_summary": "",
+      "jurisdiction": "US"
+    },
+    "new": {
+      "tool_name": "invoice_lookup",
+      "job_to_be_done": "Look up invoice metadata by identifier.",
+      "summary_for_model": "Returns invoice details without changing external state.",
+      "trigger_conditions": [
+        "owner asks for invoice metadata by identifier",
+        "agent needs invoice status before taking another step",
+        "request is to inspect an invoice rather than mutate it"
+      ],
+      "do_not_use_when": [
+        "the request is to modify or pay the invoice"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {"type": "string"}
+        },
+        "required": ["invoice_id"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use when the owner needs invoice status."],
+      "result_hints": ["Lead with invoice status and amount."],
+      "error_hints": ["If the invoice is missing, ask the owner to verify the identifier."],
+      "side_effect_summary": "Creates an outbound audit record in the billing provider.",
+      "jurisdiction": "JP"
+    },
+    "expected": [
+      {"level": "breaking", "path": "jurisdiction"},
+      {"level": "breaking", "path": "side_effect_summary"}
+    ],
+    "exit_code": 1
+  },
+  {
+    "name": "tool_manual_info_downgrade_and_name_change",
+    "kind": "tool_manual",
+    "old": {
+      "tool_name": "wallet_charge",
+      "job_to_be_done": "Charge a stored wallet after owner approval.",
+      "summary_for_model": "Executes a stored-value wallet charge after approval.",
+      "trigger_conditions": [
+        "owner asks to charge a stored wallet",
+        "agent has a finalized amount and approval context",
+        "request is to complete a wallet payment"
+      ],
+      "do_not_use_when": [
+        "the owner has not approved the charge"
+      ],
+      "permission_class": "payment",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {"type": "number"}
+        },
+        "required": ["amount_usd"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"},
+          "amount_usd": {"type": "number"},
+          "currency": {"type": "string"}
+        },
+        "required": ["summary", "amount_usd", "currency"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use only for approved wallet charges."],
+      "result_hints": ["Confirm the settled amount and status."],
+      "error_hints": ["If the payment fails, include the provider failure reason."],
+      "approval_summary_template": "Charge the stored wallet.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Captures a wallet payment.",
+      "quote_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {"type": "number"},
+          "currency": {"type": "string"}
+        },
+        "required": ["amount_usd", "currency"],
+        "additionalProperties": false
+      },
+      "currency": "USD",
+      "settlement_mode": "embedded_wallet_charge",
+      "refund_or_cancellation_note": "Refunds follow the merchant policy.",
+      "jurisdiction": "US"
+    },
+    "new": {
+      "tool_name": "wallet_quote",
+      "job_to_be_done": "Charge a stored wallet after owner approval.",
+      "summary_for_model": "Executes a stored-value wallet charge after approval.",
+      "trigger_conditions": [
+        "owner asks to charge a stored wallet",
+        "agent has a finalized amount and approval context",
+        "request is to complete a wallet payment"
+      ],
+      "do_not_use_when": [
+        "the owner has not approved the charge"
+      ],
+      "permission_class": "action",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {"type": "number"}
+        },
+        "required": ["amount_usd"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"},
+          "amount_usd": {"type": "number"},
+          "currency": {"type": "string"}
+        },
+        "required": ["summary", "amount_usd", "currency"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use only for approved wallet charges."],
+      "result_hints": ["Confirm the settled amount and status."],
+      "error_hints": ["If the payment fails, include the provider failure reason."],
+      "approval_summary_template": "Charge the stored wallet.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Captures a wallet payment.",
+      "quote_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {"type": "number"},
+          "currency": {"type": "string"}
+        },
+        "required": ["amount_usd", "currency"],
+        "additionalProperties": false
+      },
+      "currency": "USD",
+      "settlement_mode": "embedded_wallet_charge",
+      "refund_or_cancellation_note": "Refunds follow the merchant policy.",
+      "jurisdiction": "US"
+    },
+    "expected": [
+      {"level": "info", "path": "permission_class"},
+      {"level": "info", "path": "tool_name"}
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "tool_manual_breaking_output_removal_and_side_effect_rewrite",
+    "kind": "tool_manual",
+    "old": {
+      "tool_name": "invoice_sync",
+      "job_to_be_done": "Sync invoice status into the CRM.",
+      "summary_for_model": "Pushes invoice metadata into a connected CRM record.",
+      "trigger_conditions": [
+        "owner asks to sync invoice metadata into CRM",
+        "agent already has the invoice details ready for export",
+        "request is to update an external CRM record with invoice status"
+      ],
+      "do_not_use_when": [
+        "the invoice details are incomplete",
+        "the CRM connection is missing"
+      ],
+      "permission_class": "action",
+      "dry_run_supported": true,
+      "requires_connected_accounts": ["crm"],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {"type": "string"}
+        },
+        "required": ["invoice_id"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"},
+          "crm_record_id": {"type": "string"}
+        },
+        "required": ["summary", "crm_record_id"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use after validating the invoice is final."],
+      "result_hints": ["Show the CRM record identifier that was updated."],
+      "error_hints": ["Explain whether the sync failed because of invoice data or CRM auth."],
+      "approval_summary_template": "Sync invoice status into CRM.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Updates an existing CRM invoice record.",
+      "jurisdiction": "US"
+    },
+    "new": {
+      "tool_name": "invoice_sync",
+      "job_to_be_done": "Sync invoice status into the CRM.",
+      "summary_for_model": "Pushes invoice metadata into a connected CRM record.",
+      "trigger_conditions": [
+        "owner asks to sync invoice metadata into CRM",
+        "agent already has the invoice details ready for export",
+        "request is to update an external CRM record with invoice status"
+      ],
+      "do_not_use_when": [
+        "the invoice details are incomplete",
+        "the CRM connection is missing"
+      ],
+      "permission_class": "action",
+      "dry_run_supported": true,
+      "requires_connected_accounts": ["crm"],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {"type": "string"}
+        },
+        "required": ["invoice_id"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use after validating the invoice is final."],
+      "result_hints": ["Show the CRM record identifier that was updated."],
+      "error_hints": ["Explain whether the sync failed because of invoice data or CRM auth."],
+      "approval_summary_template": "Sync invoice status into CRM.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Creates a CRM task and updates the invoice record.",
+      "jurisdiction": "US"
+    },
+    "expected": [
+      {"level": "breaking", "path": "output_schema.properties"},
+      {"level": "breaking", "path": "side_effect_summary"}
+    ],
+    "exit_code": 1
+  },
+  {
+    "name": "tool_manual_info_required_removal",
+    "kind": "tool_manual",
+    "old": {
+      "tool_name": "contact_lookup",
+      "job_to_be_done": "Look up a CRM contact.",
+      "summary_for_model": "Returns CRM contact details for the provided identifier.",
+      "trigger_conditions": [
+        "owner asks for contact details from CRM",
+        "agent needs CRM metadata for a known contact",
+        "request is to inspect a CRM contact rather than mutate it"
+      ],
+      "do_not_use_when": [
+        "the request is to update the contact"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": ["crm"],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {"type": "string"},
+          "include_notes": {"type": "boolean"}
+        },
+        "required": ["contact_id", "include_notes"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use when the contact identifier is already known."],
+      "result_hints": ["Lead with contact status and owner."],
+      "error_hints": ["If the contact is missing, ask the owner to verify the identifier."]
+    },
+    "new": {
+      "tool_name": "contact_lookup",
+      "job_to_be_done": "Look up a CRM contact.",
+      "summary_for_model": "Returns CRM contact details for the provided identifier.",
+      "trigger_conditions": [
+        "owner asks for contact details from CRM",
+        "agent needs CRM metadata for a known contact",
+        "request is to inspect a CRM contact rather than mutate it"
+      ],
+      "do_not_use_when": [
+        "the request is to update the contact"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": ["crm"],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {"type": "string"},
+          "include_notes": {"type": "boolean"}
+        },
+        "required": ["contact_id"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "usage_hints": ["Use when the contact identifier is already known."],
+      "result_hints": ["Lead with contact status and owner."],
+      "error_hints": ["If the contact is missing, ask the owner to verify the identifier."]
+    },
+    "expected": [
+      {"level": "info", "path": "input_schema.required"}
+    ],
+    "exit_code": 0
+  }
+]

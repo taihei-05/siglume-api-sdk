@@ -8,7 +8,10 @@ import { createJiti } from "jiti";
 import {
   AppAdapter,
   AppTestHarness,
+  ChangeLevel,
   PermissionClass,
+  diff_manifest,
+  diff_tool_manual,
   score_tool_manual_offline,
   SettlementMode,
   SiglumeClient,
@@ -23,12 +26,39 @@ import type {
   ToolManualIssue,
 } from "../index";
 import { SiglumeProjectError } from "../errors";
-import { renderJson, toJsonable } from "../utils";
+import { isRecord, renderJson, toJsonable } from "../utils";
 
 const TEMPLATE_NAMES = ["echo", "price-compare", "publisher", "payment"] as const;
 type TemplateName = (typeof TEMPLATE_NAMES)[number];
 
 const SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
+const CAPABILITY_KEY_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const MANIFEST_REQUIRED_KEYS = new Set([
+  "capability_key",
+  "name",
+  "job_to_be_done",
+  "permission_class",
+  "approval_mode",
+  "dry_run_supported",
+  "required_connected_accounts",
+  "price_model",
+  "jurisdiction",
+]);
+const TOOL_MANUAL_REQUIRED_KEYS = new Set([
+  "tool_name",
+  "job_to_be_done",
+  "summary_for_model",
+  "trigger_conditions",
+  "do_not_use_when",
+  "permission_class",
+  "dry_run_supported",
+  "requires_connected_accounts",
+  "input_schema",
+  "output_schema",
+  "usage_hints",
+  "result_hints",
+  "error_hints",
+]);
 
 export interface LoadedProject {
   root_dir: string;
@@ -298,6 +328,32 @@ export async function getUsageReport(
   };
 }
 
+export async function diffJsonFiles(
+  oldPath: string,
+  newPath: string,
+): Promise<Record<string, unknown>> {
+  const oldPayload = await loadJsonDocument(oldPath);
+  const newPayload = await loadJsonDocument(newPath);
+  const kind = detectDocumentKind(oldPayload, newPayload);
+  const changes =
+    kind === "manifest"
+      ? diff_manifest({ old: oldPayload, new: newPayload })
+      : diff_tool_manual({ old: oldPayload, new: newPayload });
+  const counts = {
+    breaking: changes.filter((change) => change.level === ChangeLevel.BREAKING).length,
+    warning: changes.filter((change) => change.level === ChangeLevel.WARNING).length,
+    info: changes.filter((change) => change.level === ChangeLevel.INFO).length,
+  };
+  return {
+    kind,
+    old_path: oldPath,
+    new_path: newPath,
+    exit_code: counts.breaking > 0 ? 1 : counts.warning > 0 ? 2 : 0,
+    counts,
+    changes: changes.map((change) => toJsonable(change)),
+  };
+}
+
 export async function runHarness(path = "."): Promise<Record<string, unknown>> {
   const project = await loadProject(path);
   return runHarnessForProject(project);
@@ -398,6 +454,119 @@ function toolManualPermissionClass(permission_class: AppManifest["permission_cla
     default:
       return ToolManualPermissionClass.READ_ONLY;
   }
+}
+
+async function loadJsonDocument(path: string): Promise<Record<string, unknown>> {
+  const payload = JSON.parse(await readFile(path, "utf8")) as unknown;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new SiglumeProjectError(`${path} must contain a top-level JSON object.`);
+  }
+  return payload as Record<string, unknown>;
+}
+
+function detectDocumentKind(
+  oldPayload: Record<string, unknown>,
+  newPayload: Record<string, unknown>,
+): "manifest" | "tool_manual" {
+  const oldKind = payloadKind(oldPayload);
+  const newKind = payloadKind(newPayload);
+  if (oldKind !== newKind) {
+    throw new SiglumeProjectError("Both files must be the same document type (manifest or tool_manual).");
+  }
+  if (!oldKind) {
+    throw new SiglumeProjectError("Could not detect document type. Expected AppManifest or ToolManual JSON.");
+  }
+  return oldKind;
+}
+
+function payloadKind(payload: Record<string, unknown>): "manifest" | "tool_manual" | null {
+  if (isManifestPayload(payload)) {
+    return "manifest";
+  }
+  if (isToolManualPayload(payload)) {
+    return "tool_manual";
+  }
+  return null;
+}
+
+function isManifestPayload(payload: Record<string, unknown>): boolean {
+  if (![...MANIFEST_REQUIRED_KEYS].every((key) => key in payload)) {
+    return false;
+  }
+  if (typeof payload.capability_key !== "string" || !CAPABILITY_KEY_RE.test(payload.capability_key)) {
+    return false;
+  }
+  if (typeof payload.name !== "string" || payload.name.trim().length === 0) {
+    return false;
+  }
+  if (typeof payload.job_to_be_done !== "string" || payload.job_to_be_done.trim().length === 0) {
+    return false;
+  }
+  if (typeof payload.permission_class !== "string") {
+    return false;
+  }
+  if (typeof payload.approval_mode !== "string") {
+    return false;
+  }
+  if (typeof payload.dry_run_supported !== "boolean") {
+    return false;
+  }
+  if (!Array.isArray(payload.required_connected_accounts)) {
+    return false;
+  }
+  if (typeof payload.price_model !== "string") {
+    return false;
+  }
+  if (typeof payload.jurisdiction !== "string" || payload.jurisdiction.trim().length === 0) {
+    return false;
+  }
+  return true;
+}
+
+function isToolManualPayload(payload: Record<string, unknown>): boolean {
+  if (![...TOOL_MANUAL_REQUIRED_KEYS].every((key) => key in payload)) {
+    return false;
+  }
+  if (typeof payload.tool_name !== "string" || payload.tool_name.trim().length === 0) {
+    return false;
+  }
+  if (typeof payload.job_to_be_done !== "string" || payload.job_to_be_done.trim().length === 0) {
+    return false;
+  }
+  if (typeof payload.summary_for_model !== "string" || payload.summary_for_model.trim().length === 0) {
+    return false;
+  }
+  if (typeof payload.permission_class !== "string") {
+    return false;
+  }
+  if (typeof payload.dry_run_supported !== "boolean") {
+    return false;
+  }
+  if (!Array.isArray(payload.trigger_conditions)) {
+    return false;
+  }
+  if (!Array.isArray(payload.do_not_use_when)) {
+    return false;
+  }
+  if (!Array.isArray(payload.requires_connected_accounts)) {
+    return false;
+  }
+  if (!Array.isArray(payload.usage_hints)) {
+    return false;
+  }
+  if (!Array.isArray(payload.result_hints)) {
+    return false;
+  }
+  if (!Array.isArray(payload.error_hints)) {
+    return false;
+  }
+  if (!isRecord(payload.input_schema)) {
+    return false;
+  }
+  if (!isRecord(payload.output_schema)) {
+    return false;
+  }
+  return true;
 }
 
 async function findAdapterPath(target: string): Promise<string> {
