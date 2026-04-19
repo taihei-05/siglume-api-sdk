@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import click
 
+from siglume_api_sdk.cli.commands.diff_cmd import diff_command
 from siglume_api_sdk.cli.commands.init_cmd import init_command
 from siglume_api_sdk.cli.commands.register_cmd import register_command
 from siglume_api_sdk.cli.commands.score_cmd import score_command
@@ -17,6 +18,7 @@ def main() -> None:
 
 
 main.add_command(init_command)
+main.add_command(diff_command)
 main.add_command(validate_command)
 main.add_command(test_command)
 main.add_command(score_command)

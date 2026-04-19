@@ -4,6 +4,7 @@ import { SiglumeProjectError } from "../errors";
 import { renderJson } from "../utils";
 import {
   createSupportCaseReport,
+  diffJsonFiles,
   getUsageReport,
   runHarness,
   runRegistration,
@@ -25,6 +26,7 @@ function emit(output: ((line: string) => void) | undefined, line: string): void 
 export async function runCli(argv: string[], deps: CliRunDependencies = {}): Promise<number> {
   const stdout = deps.stdout;
   const stderr = deps.stderr ?? console.error;
+  let completionExitCode = 0;
   const program = new Command()
     .name("siglume")
     .description("Siglume developer CLI")
@@ -46,6 +48,34 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
       }
       emit(stdout, `Initialized Siglume starter template '${template}'.`);
       files.forEach((filePath) => emit(stdout, `- ${filePath}`));
+    });
+
+  program
+    .command("diff")
+    .option("--json", "emit machine-readable JSON", false)
+    .argument("<old_json>", "previous manifest/tool manual JSON")
+    .argument("<new_json>", "next manifest/tool manual JSON")
+    .action(async (oldPath: string, newPath: string, options: { json?: boolean }) => {
+      const report = await diffJsonFiles(oldPath, newPath);
+      if (options.json) {
+        emit(stdout, renderJson(report));
+      } else {
+        const changes = (report.changes as Array<Record<string, unknown>>) ?? [];
+        if (changes.length === 0) {
+          emit(stdout, "No differences detected.");
+        } else {
+          for (const level of ["breaking", "warning", "info"]) {
+            const items = changes.filter((item) => item.level === level);
+            if (items.length === 0) {
+              continue;
+            }
+            emit(stdout, level.toUpperCase());
+            items.forEach((item) => emit(stdout, `- ${String(item.path)}: ${String(item.message)}`));
+            emit(stdout, "");
+          }
+        }
+      }
+      completionExitCode = Number(report.exit_code ?? 0);
     });
 
   program
@@ -159,7 +189,7 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
 
   try {
     await program.parseAsync(argv, { from: "user" });
-    return 0;
+    return completionExitCode;
   } catch (error) {
     if (error instanceof SiglumeProjectError) {
       emit(stderr, error.message);
