@@ -733,6 +733,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/UsageEventPageEnvelope'
 
+  /market/usage-events:
+    post:
+      operationId: recordUsageEvents
+      summary: Record usage events
+      description: Experimental analytics / pre-billing ingest for future usage-based flows. The public platform still accepts only free and subscription price models for registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageEventBatchIngestRequest'
+      responses:
+        '202':
+          description: Usage events accepted for ingestion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageEventBatchIngestEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /market/capability-approvals/challenge:
     post:
       operationId: requestExecutionApproval
@@ -1308,6 +1339,7 @@ components:
         capability_listing_id: { type: string }
         capability_key: { type: string }
         agent_id: { type: string }
+        dimension: { type: string }
         owner_user_id: { type: string }
         environment: { type: string, enum: [sandbox, live] }
         task_type: { type: string }
@@ -1320,11 +1352,69 @@ components:
         latency_ms: { type: integer }
         request_hash: { type: string, nullable: true }
         idempotency_key: { type: string, nullable: true }
+        external_id: { type: string, nullable: true }
         trace_id: { type: string, nullable: true }
         period_key: { type: string }
+        occurred_at_iso: { type: string, format: date-time, nullable: true }
         receipt: { type: object }
         metadata: { type: object }
         created_at: { type: string, format: date-time }
+
+    UsageEventIngestItem:
+      type: object
+      required: [capability_key, dimension, units, external_id, occurred_at_iso]
+      properties:
+        capability_key: { type: string }
+        dimension: { type: string, description: Usage metric name such as tokens_in, tokens_out, calls, or bytes. }
+        units: { type: integer, minimum: 0 }
+        external_id: { type: string, description: Seller-side idempotency key for this usage event. }
+        occurred_at_iso: { type: string, format: date-time }
+        agent_id: { type: string, nullable: true }
+
+    UsageEventBatchIngestRequest:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/UsageEventIngestItem'
+
+    UsageEventBatchIngestResult:
+      type: object
+      required: [accepted, external_id, replayed]
+      properties:
+        accepted: { type: boolean }
+        external_id: { type: string }
+        server_id: { type: string, nullable: true }
+        replayed: { type: boolean }
+        capability_key: { type: string, nullable: true }
+        agent_id: { type: string, nullable: true }
+        period_key: { type: string, nullable: true }
+
+    UsageEventBatchIngestResponse:
+      type: object
+      required: [items, count]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageEventBatchIngestResult'
+        count: { type: integer }
+
+    UsageEventBatchIngestEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/UsageEventBatchIngestResponse'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
 
     UsageEventPage:
       type: object

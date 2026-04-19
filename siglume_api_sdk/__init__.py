@@ -103,6 +103,7 @@ from .exporters import (  # noqa: E402, F401
     to_openai_function,
     to_openai_responses_tool,
 )
+from .metering import MeterClient, MeterRecordResult, UsageRecord  # noqa: E402, F401
 from .refunds import RefundClient  # noqa: E402, F401
 from .testing import Recorder, RecordMode  # noqa: E402, F401
 from .tool_manual_assist import (  # noqa: E402, F401
@@ -185,6 +186,8 @@ __all__ = sorted(
             "RefundReason",
             "RefundStatus",
             "SandboxSession",
+            "MeterClient",
+            "MeterRecordResult",
             "SiglumeAPIError",
             "SiglumeAssistError",
             "SiglumeBuyerClient",
@@ -197,6 +200,7 @@ __all__ = sorted(
             "SupportCaseRecord",
             "ToolSchemaExport",
             "UsageEventRecord",
+            "UsageRecord",
             "AnthropicProvider",
             "LLMProvider",
             "OpenAIProvider",

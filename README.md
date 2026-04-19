@@ -2,8 +2,10 @@
 
 [![PyPI](https://img.shields.io/pypi/v/siglume-api-sdk.svg)](https://pypi.org/project/siglume-api-sdk/)
 [![CI](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
 [![GitHub Discussions](https://img.shields.io/github/discussions/taihei-05/siglume-api-sdk)](https://github.com/taihei-05/siglume-api-sdk/discussions)
 
 **Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
@@ -24,11 +26,38 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → payout setup) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> 🚀 **v0.3.0 is out** — the SDK now ships the official `SiglumeClient`,
-> `siglume` CLI, remote ToolManual preview scoring, and four starter examples.
-> See [RELEASE_NOTES_v0.3.0.md](./RELEASE_NOTES_v0.3.0.md) for the full release.
+> 🚀 **v0.4.0 is out** — first full multi-runtime release. Python + TypeScript
+> parity across `AppAdapter` / `AppTestHarness` / `SiglumeClient` / the
+> `siglume` CLI, offline ToolManual grader (server parity ±5), LLM-assisted
+> tool-manual drafting, tool schema exporter (Anthropic / OpenAI Chat +
+> Responses / MCP), recording harness, manifest diff, buyer-side SDK
+> (experimental), webhook handlers, and seller-side refund / dispute client.
+> See [RELEASE_NOTES_v0.4.0.md](./RELEASE_NOTES_v0.4.0.md) for the full release.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
+
+### 3-minute first success
+
+```bash
+pip install siglume-api-sdk
+python -c "
+from siglume_api_sdk import AppManifest, AppCategory, PermissionClass, ApprovalMode, PriceModel
+m = AppManifest(
+    capability_key='hello-echo',
+    name='Hello Echo',
+    job_to_be_done='Echo a message back so agents can smoke-test the store.',
+    category=AppCategory.OTHER,
+    permission_class=PermissionClass.READ_ONLY,
+    approval_mode=ApprovalMode.AUTO,
+    price_model=PriceModel.FREE,
+    jurisdiction='US',
+)
+print(m)
+"
+# Next: see examples/hello_echo.py for a runnable AppAdapter, then
+# examples/hello_price_compare.py for a real scraping adapter, then
+# examples/x_publisher.py for an ACTION-tier adapter with owner approval.
+```
 
 ---
 
@@ -171,9 +200,22 @@ respond to a buyer dispute from seller support tooling.
 - TypeScript example: [examples-ts/refund_partial.ts](./examples-ts/refund_partial.ts)
 - API notes: [docs/refunds-disputes.md](./docs/refunds-disputes.md)
 
+## Experimental metering
+
+Use `MeterClient` when you want to record usage events for analytics or future
+usage-based / per-action billing previews.
+
+- Python example: [examples/metering_record.py](./examples/metering_record.py)
+- TypeScript example: [examples-ts/metering_record.ts](./examples-ts/metering_record.ts)
+- API notes: [docs/metering.md](./docs/metering.md)
+
+The public platform still accepts only `free` and `subscription` listings at
+registration time. `usage_based` and `per_action` remain planned values, so the
+metering surface is marked experimental and confirms event receipt only.
+
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, and `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -185,6 +227,7 @@ respond to a buyer dispute from seller support tooling.
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [refund_partial.py](./examples/refund_partial.py) | client | ✅ | Issue a partial refund and respond to a dispute for a prior receipt |
+| [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
 | [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
 | [register_via_client.py](./examples/register_via_client.py) | client | ✅ | Register and confirm a listing through `SiglumeClient` |
@@ -206,6 +249,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Getting Started Guide](GETTING_STARTED.md) | Build and publish an API in 15 minutes |
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
+| [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
 | [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
@@ -268,7 +312,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is an early-stage project (v0.3.0, alpha) with a growing but still
+This is an early-stage project (v0.4.0, alpha) with a growing but still
 small user base. The SDK and platform are actively evolving. Start with
 a small read-only API to learn the flow.
 
