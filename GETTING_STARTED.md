@@ -44,6 +44,11 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 ```bash
 # Install from PyPI
 pip install siglume-api-sdk
+
+# Generate a starter and validate it
+siglume init --template price-compare
+siglume validate .
+siglume test .
 ```
 
 Or clone the repo to browse the examples:
@@ -546,6 +551,7 @@ response = requests.post(
     }
 )
 draft = response.json()["data"]
+listing_id = draft["listing_id"]
 print(f"Listing created: {draft['listing_id']}")
 print(f"Name: {draft['auto_manifest']['name']}")
 print(f"Status: {draft['status']}")
@@ -556,43 +562,75 @@ print(f"Status: {draft['status']}")
 # are auto-detected from source code; you only need to override
 # what the auto-detection cannot infer (e.g., trigger_conditions).
 requests.post(
-    f"https://siglume.com/v1/market/capabilities/{draft['listing_id']}/confirm-auto-register",
+    f"https://siglume.com/v1/market/capabilities/{listing_id}/confirm-auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
     json={
         "approved": True,
         "overrides": {
             "tool_manual": {
+                "tool_name": "slack_digest_publisher",
+                "job_to_be_done": "Summarize recent discussion points and post the digest to a Slack channel the owner controls.",
+                "summary_for_model": "Builds a concise discussion digest and posts it to a specified Slack channel after preview and owner approval.",
                 "trigger_conditions": [
-                    "owner asks to summarize daily discussions",
-                    "agent needs a discussion report for a Slack channel",
-                    "owner wants automated daily summaries"
+                    "owner asks to summarize daily discussions and post the result to Slack",
+                    "agent needs to deliver a channel digest to a Slack workspace after reviewing recent messages",
+                    "request is to publish a recurring daily or weekly summary into Slack"
                 ],
                 "do_not_use_when": [
-                    "the owner wants a one-off summary, not a recurring report",
-                    "the request is about channels the agent cannot access"
+                    "the owner wants a local summary only and does not want any external post",
+                    "the request targets a Slack workspace or channel the agent cannot access",
+                    "the request is to send email or update a non-Slack destination"
                 ],
+                "permission_class": "action",
+                "dry_run_supported": True,
+                "requires_connected_accounts": ["slack"],
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "channel": {"type": "string", "description": "Slack channel name"},
-                        "period": {"type": "string", "description": "Time period to summarize", "default": "today"}
+                        "channel": {"type": "string", "description": "Slack channel name or ID where the digest should be posted."},
+                        "period": {"type": "string", "description": "Time window to summarize, such as today, yesterday, or this week.", "default": "today"},
+                        "tone": {"type": "string", "description": "Writing tone for the digest, such as concise, neutral, or executive.", "default": "concise"}
                     },
-                    "required": ["channel"],
+                    "required": ["channel", "period"],
                     "additionalProperties": False
                 },
                 "output_schema": {
                     "type": "object",
                     "properties": {
-                        "summary": {"type": "string"},
+                        "summary": {"type": "string", "description": "One-line recap of what was posted to Slack."},
                         "highlights": {"type": "array", "items": {"type": "string"}},
-                        "posted": {"type": "boolean"}
+                        "posted": {"type": "boolean", "description": "Whether the digest was posted successfully."},
+                        "channel": {"type": "string", "description": "Slack channel that received the digest."}
                     },
-                    "required": ["summary"],
+                    "required": ["summary", "posted", "channel"],
                     "additionalProperties": False
                 },
-                "usage_hints": ["Present the summary with key discussion highlights"],
-                "result_hints": ["Show whether the report was posted successfully"],
-                "error_hints": ["If channel not found, ask the owner to verify the channel name"]
+                "usage_hints": [
+                    "Use this tool only after you already know which Slack channel should receive the digest.",
+                    "Prefer a dry run first so the owner can review the summary before it is posted."
+                ],
+                "result_hints": [
+                    "Show the posted channel and the one-line summary so the owner can confirm the destination and content.",
+                    "If highlights are returned, surface them before offering the next follow-up action."
+                ],
+                "error_hints": [
+                    "If the Slack channel is missing or inaccessible, ask the owner to reconnect Slack or provide a valid channel.",
+                    "If posting fails after preview, suggest retrying with the same idempotency key."
+                ],
+                "approval_summary_template": "Post a Slack digest to {channel} for {period}.",
+                "preview_schema": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {"type": "string", "description": "Preview text that will be posted to Slack."},
+                        "channel": {"type": "string", "description": "Slack channel that will receive the digest."},
+                        "estimated_message_count": {"type": "integer", "description": "Approximate number of source messages included in the digest."}
+                    },
+                    "required": ["summary", "channel"],
+                    "additionalProperties": False
+                },
+                "idempotency_support": True,
+                "side_effect_summary": "Posts a discussion digest message into the specified Slack channel.",
+                "jurisdiction": "US"
             }
         }
     }
@@ -667,9 +705,9 @@ You receive:            ~$9.33/month, settled directly to your wallet
 
 Historical Stripe-Connect-based flow (retired, kept here for reference only):
 
-1. `POST /v1/market/developer/stripe-connect` returned an onboarding URL.
+1. The developer portal returned a hosted onboarding URL.
 2. Developer completed Stripe identity + bank-account verification once.
-3. `/v1/market/developer/stripe-connect/status` reported `ready: true`.
+3. The developer portal later showed the payout setup as ready.
 4. Subsequent `confirm-auto-register` calls for `price_model="subscription"` went through.
 
 The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
@@ -679,7 +717,10 @@ The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
 - Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
 - Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
 
-SDK v0.2.0 (current release) already exposes the Web3 enum values for payment-permission tools: `SettlementMode.POLYGON_MANDATE` and `SettlementMode.EMBEDDED_WALLET_CHARGE`. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.
+SDK v0.3.0 (current release) retains the Web3 enum values for
+payment-permission tools: `SettlementMode.POLYGON_MANDATE` and
+`SettlementMode.EMBEDDED_WALLET_CHARGE`. See
+[PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.
 
 ### Free APIs need no payment setup
 
@@ -716,10 +757,7 @@ agents will NEVER select it — even if the API works perfectly.**
 | `result_hints` | How to interpret results | `"Highlight best offer"` |
 | `error_hints` | How to handle errors | `"Ask for clearer query"` |
 
-> **Note:** When using `confirm-auto-register`, fields like `tool_name`, `permission_class`,
-> and `summary_for_model` are auto-detected from source code. You only need to provide
-> overrides for what the auto-detection cannot infer (typically `trigger_conditions`,
-> `do_not_use_when`, and schema details).
+> **Note:** `confirm-auto-register` can merge your overrides with auto-detected fields, but the safest direct-API path is to send a complete `tool_manual` object that already passes `validate_tool_manual()`.
 
 ### Quality scoring
 
@@ -744,26 +782,132 @@ Your tool manual is automatically scored 0-100 with a letter grade:
 - Too few trigger conditions (fewer than 3)
 - Trigger conditions written as imperatives instead of situations
 
-### How to check your score before publishing
+### How quality scoring is returned today
+
+The public OpenAPI now exposes a dedicated preview endpoint for ToolManual
+quality scoring:
 
 ```bash
-curl -X POST https://siglume.com/v1/capability-listings/{id}/releases/validate \
+curl -X POST https://siglume.com/v1/market/tool-manuals/preview-quality \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"tool_manual": {...your manual...}}'
+  -d @tool-manual-preview.json
 ```
 
-The response includes the quality score, grade, and specific issues to fix:
+The same flow is available through the SDK:
+
+```bash
+siglume score . --remote
+```
+
+```python
+from siglume_api_sdk import SiglumeClient
+
+with SiglumeClient(api_key="YOUR_TOKEN") as client:
+    report = client.preview_quality_score(tool_manual)
+    print(report.grade, report.overall_score)
+```
+
+For end-to-end draft registration, the server still returns the quality score as
+part of `confirm-auto-register`:
+
+```bash
+curl -X POST https://siglume.com/v1/market/capabilities/LISTING_ID/confirm-auto-register \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @confirm-request.json
+```
+
+Example request payload:
 
 ```json
 {
-  "ok": true,
+  "approved": true,
+  "overrides": {
+    "tool_manual": {
+      "tool_name": "price_compare_helper",
+      "job_to_be_done": "Search multiple retailers for a product and return a ranked price comparison the agent can cite.",
+      "summary_for_model": "Looks up product offers across retailers and returns a structured comparison with the best current deal.",
+      "trigger_conditions": [
+        "owner asks to compare prices for a specific product before deciding where to buy",
+        "agent needs current retailer offers to support a shopping recommendation",
+        "request is to find the cheapest or best-value option for a product query"
+      ],
+      "do_not_use_when": [
+        "the owner already chose a seller and wants to place an order immediately",
+        "the request is to complete checkout or move money instead of comparing offers"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Product name, model number, or search phrase to compare."
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Maximum number of offers to return in the comparison.",
+            "default": 5
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line overview of the best available deal."
+          },
+          "offers": {
+            "type": "array",
+            "description": "Ranked offers returned by the comparison engine.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "best_offer": {
+            "type": "object",
+            "description": "Top-ranked offer chosen from the returned offers."
+          }
+        },
+        "required": ["summary", "offers", "best_offer"],
+        "additionalProperties": false
+      },
+      "usage_hints": [
+        "Use this tool when the user has named a product and needs evidence-backed price comparison.",
+        "Present the offers in ascending price order and call out important retailer differences."
+      ],
+      "result_hints": [
+        "Highlight the best_offer first, then summarize notable trade-offs such as shipping or stock.",
+        "If multiple offers are close, explain why one is better value instead of only naming the cheapest."
+      ],
+      "error_hints": [
+        "If no offers are found, ask the owner for a clearer product name or model number.",
+        "If retailer coverage is limited, say which sources were searched before suggesting a retry."
+      ]
+    }
+  }
+}
+```
+
+Example response:
+
+```json
+{
+  "listing_id": "listing_123",
+  "status": "pending_review",
   "quality": {
-    "score": 82,
+    "overall_score": 82,
     "grade": "B",
-    "publishable": true,
-    "issues": [...],
-    "improvement_suggestions": [...]
+    "issues": [],
+    "improvement_suggestions": [
+      "Add one more trigger condition if you want tool selection to be narrower."
+    ]
   }
 }
 ```
@@ -777,17 +921,66 @@ using the `validate_tool_manual()` function in the SDK:
 from siglume_api_sdk import validate_tool_manual
 
 my_manual = {
-    "api_name": "structural-calc",
-    "version": "1.0.0",
+    "tool_name": "structural_calc",
+    "job_to_be_done": "Run structural load and seismic checks for building plans under Japanese compliance assumptions.",
+    "summary_for_model": "Evaluates structural inputs and returns a concise engineering summary with key load and compliance outputs.",
+    "trigger_conditions": [
+        "owner asks for structural load calculations for a proposed building design",
+        "agent needs seismic or code-related engineering estimates before a design review",
+        "request is to assess structural feasibility using provided building parameters"
+    ],
+    "do_not_use_when": [
+        "the request needs a licensed engineer's formal stamp or legally binding approval",
+        "required building parameters are missing or unverifiable"
+    ],
     "permission_class": "action",
-    "short_description": "Structural engineering calculations per Japanese Building Standards Act",
-    "when_to_use": "When a job requires structural load analysis or seismic resistance checks",
-    "capabilities": [{ "name": "calculate_load", "description": "...", "input_schema": {}, "output_schema": {} }],
-    "limitations": ["Only supports Japanese building codes"],
-    "approval_summary_template": "Structural calc: {building_type}, {floors} floors",
-    "preview_schema": {},
+    "dry_run_supported": True,
+    "requires_connected_accounts": [],
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "building_type": {"type": "string", "description": "Primary structural system, such as steel or reinforced concrete."},
+            "floors": {"type": "integer", "description": "Number of floors included in the calculation."},
+            "site_region": {"type": "string", "description": "Jurisdiction or seismic region used for the compliance assumptions."}
+        },
+        "required": ["building_type", "floors", "site_region"],
+        "additionalProperties": False
+    },
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string", "description": "One-line engineering summary of the calculation outcome."},
+            "max_load_kN": {"type": "number", "description": "Calculated maximum load in kilonewtons."},
+            "risk_flags": {"type": "array", "items": {"type": "string"}, "description": "Structural concerns that require owner review."}
+        },
+        "required": ["summary", "max_load_kN"],
+        "additionalProperties": False
+    },
+    "usage_hints": [
+        "Use dry run first when the owner wants to inspect assumptions before any external submission.",
+        "State clearly which building inputs were used in the calculation."
+    ],
+    "result_hints": [
+        "Summarize the calculation outcome in plain language before listing numeric details.",
+        "Call out risk_flags explicitly if the output includes structural concerns."
+    ],
+    "error_hints": [
+        "If required building parameters are missing, ask for those exact fields before retrying.",
+        "If the calculation falls outside supported building codes, tell the owner which jurisdiction is unsupported."
+    ],
+    "approval_summary_template": "Run structural calculation for a {building_type} building with {floors} floors in {site_region}.",
+    "preview_schema": {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string", "description": "Preview of the structural calculation request."},
+            "assumptions": {"type": "array", "items": {"type": "string"}, "description": "Assumptions that will be used during the calculation."}
+        },
+        "required": ["summary", "assumptions"],
+        "additionalProperties": False
+    },
     "idempotency_support": True,
-    "side_effect_summary": "No external side effects"
+    "side_effect_summary": "Submits a structural calculation job to the engineering rules engine and records the request for audit review.",
+    "jurisdiction": "JP"
 }
 
 ok, issues = validate_tool_manual(my_manual)
@@ -800,85 +993,37 @@ else:
 
 This catches structural errors instantly without a network round-trip.
 
-### Sandbox testing
+### Sandbox testing with public endpoints
 
-Test whether your API would be selected for specific requests:
+After confirmation, create a sandbox session for your capability key:
 
 ```bash
-curl -X POST https://siglume.com/v1/capability-listings/{id}/releases/{releaseId}/sandbox-test \
+curl -X POST https://siglume.com/v1/market/sandbox/sessions \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "test_cases": [
-      {"request_text": "compare prices for headphones", "expected_selected": true},
-      {"request_text": "send an email", "expected_selected": false}
-    ]
+    "agent_id": "YOUR_AGENT_ID",
+    "capability_key": "price-compare-helper"
   }'
 ```
 
-Each test shows whether your API was selected, its rank, and why.
-
-### Providing your tool manual
-
-Include the tool manual when confirming your auto-registration:
-
-```python
-requests.post(
-    f"https://siglume.com/v1/market/capabilities/{listing_id}/confirm-auto-register",
-    headers={"Authorization": f"Bearer {token}"},
-    json={
-        "approved": True,
-        "overrides": {
-            "tool_manual": {
-                "trigger_conditions": [
-                    "owner asks to compare product prices",
-                    "agent needs price data before recommending a purchase",
-                    "owner wants to find the cheapest option"
-                ],
-                "do_not_use_when": [
-                    "the owner already chose a seller",
-                    "the request is about placing an order, not comparing"
-                ],
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Product name to search for"},
-                        "max_results": {"type": "integer", "description": "Maximum offers to return", "default": 5}
-                    },
-                    "required": ["query"],
-                    "additionalProperties": false
-                },
-                "output_schema": {
-                    "type": "object",
-                    "properties": {
-                        "summary": {"type": "string"},
-                        "offers": {"type": "array", "items": {"type": "object"}},
-                        "best_offer": {"type": "object"}
-                    },
-                    "required": ["summary", "offers"],
-                    "additionalProperties": false
-                },
-                "usage_hints": ["Present offers in a comparison format"],
-                "result_hints": ["Highlight the best value option"],
-                "error_hints": ["If no results, suggest a different search term"]
-            }
-        }
-    }
-)
-```
-
-### Updating your tool manual later
-
-After your API is approved and live, publish updated tool manuals:
+Then verify the sandbox run through usage data:
 
 ```bash
-curl -X POST https://siglume.com/v1/capability-listings/{id}/releases \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"release_semver": "1.1.0", "tool_manual": {...}, "permission_class": "read_only", "dry_run_supported": true}'
+curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=price-compare-helper" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-This only works for APIs that have already been approved by admin.
+This is the currently documented public path for end-to-end validation. The older release-level `sandbox-test` and release-publish endpoints are not part of the public developer OpenAPI.
+
+### Revising your tool manual after feedback
+
+If your score is below grade B or admin review requests changes, update the
+draft in `/owner/publish`, rerun `siglume score . --remote` (or
+`client.preview_quality_score(...)`), and then repeat the
+`auto-register` → `confirm-auto-register` flow with a corrected full tool
+manual. Public release-publish endpoints are not yet exposed in
+`openapi/developer-surface.yaml`.
 
 ---
 

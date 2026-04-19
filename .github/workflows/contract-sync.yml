@@ -1,0 +1,32 @@
+name: Contract Sync
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 18 * * *"
+
+jobs:
+  contract-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest
+
+      - name: Run contract sync check
+        run: python scripts/contract_sync.py
+
+      - name: Run contract sync tests
+        run: pytest tests/test_contract_sync.py

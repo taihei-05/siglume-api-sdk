@@ -24,7 +24,9 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → payout setup) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> 🚀 **v0.2.0 is out** — `SettlementMode` now accepts `polygon_mandate` and `embedded_wallet_charge` alongside the Stripe values. See [RELEASE_NOTES_v0.2.0.md](./RELEASE_NOTES_v0.2.0.md) for what landed, why, and the migration guide.
+> 🚀 **v0.3.0 is out** — the SDK now ships the official `SiglumeClient`,
+> `siglume` CLI, remote ToolManual preview scoring, and four starter examples.
+> See [RELEASE_NOTES_v0.3.0.md](./RELEASE_NOTES_v0.3.0.md) for the full release.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 
@@ -75,12 +77,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 |---|---|
 | **Developer share** | 93.4% of subscription revenue |
 | **Platform fee** | 6.6% |
-| **Settlement** | On-chain to an embedded wallet (migrating from Stripe Connect — see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
+| **Settlement** | On-chain to a Polygon embedded wallet (see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
 | **Gas fees** | Covered by the platform — developers and buyers never touch gas tokens |
 | **Minimum price** | $5.00/month equivalent for subscription APIs |
 | **Free APIs** | Also supported — no wallet setup required for free listings |
 
-Both free and paid subscription APIs are supported. Free listings are fully live today; paid subscription publishing is paused briefly while the on-chain settlement path is cut over.
+Both free and paid subscription APIs are supported. Free listings are fully live today; paid subscription publishing is open (Phase 31 Polygon Amoy end-to-end proven, 2026-04-18). Register with a Polygon payout address at `/owner/publish`.
 
 > **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
 > and `PER_ACTION`. These are **reserved for future phases** and are not accepted
@@ -111,6 +113,14 @@ Install from PyPI:
 pip install siglume-api-sdk
 ```
 
+Generate a starter project and validate it:
+
+```bash
+siglume init --template price-compare
+siglume validate .
+siglume test .
+```
+
 Or clone the repo to browse the examples:
 
 ```bash
@@ -122,15 +132,20 @@ python examples/hello_price_compare.py
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, and `x_publisher.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run → action lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; use them as a shape to copy from.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
 | [hello_echo.py](./examples/hello_echo.py) | `READ_ONLY` | ✅ | Minimal echo example that returns input parameters |
 | [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | ✅ | Compare product prices across retailers |
 | [x_publisher.py](./examples/x_publisher.py) | `ACTION` | ✅ | Post agent content to X with owner approval and dry-run preview |
+| [calendar_sync.py](./examples/calendar_sync.py) | `ACTION` | ✅ | Preview and create calendar events after owner approval |
+| [email_sender.py](./examples/email_sender.py) | `ACTION` | ✅ | Preview and send email with explicit approval and idempotency hints |
+| [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
+| [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
 | [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
+| [register_via_client.py](./examples/register_via_client.py) | client | ✅ | Register and confirm a listing through `SiglumeClient` |
 
 ## API ideas
 
@@ -208,7 +223,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is an early-stage project (v0.2.0, alpha) with a growing but still
+This is an early-stage project (v0.3.0, alpha) with a growing but still
 small user base. The SDK and platform are actively evolving. Start with
 a small read-only API to learn the flow.
 

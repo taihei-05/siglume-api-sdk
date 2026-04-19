@@ -225,6 +225,35 @@ paths:
                   quality:
                     type: object
 
+  /market/tool-manuals/preview-quality:
+    post:
+      operationId: previewToolManualQuality
+      summary: Preview tool-manual validation and quality score
+      description: |
+        Validate a ToolManual and return the same structural issues and quality
+        scoring that the platform uses during confirm-auto-register, without
+        creating or mutating a listing.
+      tags: [Capabilities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolManualPreviewQualityRequest'
+      responses:
+        '200':
+          description: ToolManual preview result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolManualPreviewQualityEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /market/capabilities/{listingId}:
     get:
       operationId: getAppListing
@@ -283,7 +312,7 @@ paths:
 
         Both free and subscription listings are supported.
         Use `price_model=free` for free APIs, or `price_model=subscription`
-        for paid APIs with Stripe Connect payouts (93.4% developer share).
+        for paid APIs with Polygon payout wallets (93.4% developer share).
       parameters:
         - name: listingId
           in: path
@@ -567,7 +596,7 @@ components:
 
         Listing request for the Siglume developer surface.
         Both free and subscription models are live. Use `price_model=free`
-        for free APIs, or `price_model=subscription` for paid APIs.
+        for free APIs, or `price_model=subscription` for paid APIs with a Polygon payout wallet.
       properties:
         capability_key: { type: string, minLength: 1, maxLength: 128 }
         name: { type: string, minLength: 1, maxLength: 255 }
@@ -1061,7 +1090,61 @@ components:
         payouts_live_enabled: { type: boolean }
         stripe_secret_configured: { type: boolean }
         stripe_publishable_configured: { type: boolean }
-        stripe_ready: { type: boolean }
+        payout_connected: { type: boolean }
+        payout_account_id:
+          type: string
+          nullable: true
+        payout_account_country:
+          type: string
+          nullable: true
+        payout_ready: { type: boolean }
+        payout_charges_enabled: { type: boolean }
+        payout_payouts_enabled: { type: boolean }
+        payout_details_submitted: { type: boolean }
+        payout_disabled_reason:
+          type: string
+          nullable: true
+        payout_requirements_currently_due:
+          type: array
+          items: { type: string }
+        payout_requirements_pending_verification:
+          type: array
+          items: { type: string }
+        stripe_connected:
+          type: boolean
+          deprecated: true
+        stripe_account_id:
+          type: string
+          nullable: true
+          deprecated: true
+        stripe_account_country:
+          type: string
+          nullable: true
+          deprecated: true
+        stripe_ready:
+          type: boolean
+          deprecated: true
+        stripe_charges_enabled:
+          type: boolean
+          deprecated: true
+        stripe_payouts_enabled:
+          type: boolean
+          deprecated: true
+        stripe_details_submitted:
+          type: boolean
+          deprecated: true
+        stripe_disabled_reason:
+          type: string
+          nullable: true
+          deprecated: true
+        stripe_requirements_currently_due:
+          type: array
+          deprecated: true
+          items: { type: string }
+        stripe_requirements_pending_verification:
+          type: array
+          deprecated: true
+          items: { type: string }
 
     DeveloperPortalPayoutReadiness:
       type: object
@@ -1292,6 +1375,77 @@ components:
         currency: { type: string, enum: [USD], description: "Must be USD" }
         settlement_mode: { type: string, enum: [stripe_checkout, stripe_payment_intent, polygon_mandate, embedded_wallet_charge] }
         refund_or_cancellation_note: { type: string, minLength: 1 }
+
+    ToolManualValidationMessage:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        field: { type: string, nullable: true }
+
+    ToolManualQualityIssue:
+      type: object
+      required: [category, severity, message]
+      properties:
+        category: { type: string }
+        severity: { type: string }
+        message: { type: string }
+        field: { type: string, nullable: true }
+        suggestion: { type: string, nullable: true }
+
+    ToolManualQualityPreview:
+      type: object
+      required: [overall_score, score, grade, publishable, issues, improvement_suggestions]
+      properties:
+        overall_score: { type: integer, minimum: 0, maximum: 100 }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        grade: { type: string, enum: [A, B, C, D, F] }
+        publishable: { type: boolean }
+        keyword_coverage_estimate: { type: integer, minimum: 0 }
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolManualQualityIssue'
+        improvement_suggestions:
+          type: array
+          items: { type: string }
+
+    ToolManualPreviewQualityRequest:
+      type: object
+      required: [tool_manual]
+      properties:
+        tool_manual:
+          $ref: '#/components/schemas/ToolManual'
+
+    ToolManualPreviewQualityResult:
+      type: object
+      required: [ok, errors, warnings, quality]
+      properties:
+        ok: { type: boolean }
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolManualValidationMessage'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolManualValidationMessage'
+        quality:
+          $ref: '#/components/schemas/ToolManualQualityPreview'
+
+    ToolManualPreviewQualityEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ToolManualPreviewQualityResult'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
 
     ErrorResponse:
       type: object

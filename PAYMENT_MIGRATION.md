@@ -1316,7 +1316,9 @@ The migration has two distinct axes. Phase 9 completes **one of them** (subscrip
 - **Paid subscription publish** (`price_model="subscription"`) — publish is **open**. Phase 9 unpaused it under the mock provider; Phase 31 proved it end-to-end on real Polygon Amoy (userOpHash `0xaa55cbae...`, tx_hash `0xa04699ff...`). Register with a Polygon payout address at `/owner/publish`; buyers purchase via Web3 mandate, access grants land automatically.
 - **`PAYMENT` permission class tools** — authorable with any of the four `SettlementMode` values. `stripe_*` continues to work unchanged. `embedded_wallet_charge` is fully runtime-backed on Polygon (Phase 34). `polygon_mandate` authorizes on-chain at tool-auth time; recurring-charge dispatch is a follow-up phase.
 - SDK types, validators, and examples for non-payment flows — stable.
-- **SDK v0.2.0** — current release, adds `polygon_mandate` + `embedded_wallet_charge` to `SettlementMode`.
+- **SDK v0.3.0** — current release. The four `SettlementMode` values from
+  v0.2.0 remain intact, and the SDK now also ships the official client, CLI,
+  and ToolManual preview-quality flow.
 
 ## What is changing
 
@@ -1337,7 +1339,13 @@ Embedded wallets + gas sponsorship mean this is **not** a "bring your own MetaMa
 
 1. **If your API is READ_ONLY / ACTION / free:** nothing to do. Keep building. The SDK's public API, validators, and examples are unchanged for your flow.
 2. **If you want to publish a paid subscription API:** go ahead. Paid-subscription publish is **no longer paused** as of Phase 9 (mock-backed) and proven on-chain as of Phase 31 (real Polygon Amoy completion, userOpHash `0xaa55cbae...`). Register via `/owner/publish`, providing a Polygon payout address instead of a bank account. Buyers purchase via Web3 mandate; access grants land automatically. The registration flow no longer depends on Stripe Connect.
-3. **If you want a payment-permission tool that charges on Polygon:** upgrade to SDK v0.2.0 (`pip install 'siglume-api-sdk>=0.2.0'` — quote the specifier so POSIX shells don't treat `>=` as a redirect) and declare `settlement_mode="polygon_mandate"` (subscription-style auto-debit) or `"embedded_wallet_charge"` (one-shot charge). `embedded_wallet_charge` is fully runtime-backed as of Phase 34; `polygon_mandate` authorizes on-chain at tool-auth time with recurring-charge dispatch in a follow-up phase.
+3. **If you want a payment-permission tool that charges on Polygon:** upgrade to
+   SDK v0.3.0 or newer (`pip install 'siglume-api-sdk>=0.3.0'` — quote the
+   specifier so POSIX shells don't treat `>=` as a redirect) and declare
+   `settlement_mode="polygon_mandate"` (subscription-style auto-debit) or
+   `"embedded_wallet_charge"` (one-shot charge). `embedded_wallet_charge` is
+   fully runtime-backed as of Phase 34; `polygon_mandate` authorizes on-chain
+   at tool-auth time with recurring-charge dispatch in a follow-up phase.
 4. **If you already published a paid subscription API on a previous SDK version:** platform-side migration tooling is in place. No action required — existing `stripe_*` tool manuals continue to validate and run unchanged.
 
 ## Tracking

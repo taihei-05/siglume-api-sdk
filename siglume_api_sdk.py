@@ -476,6 +476,10 @@ class ToolManualQualityReport:
     issues: list[ToolManualIssue] = field(default_factory=list)
     keyword_coverage_estimate: int = 0
     improvement_suggestions: list[str] = field(default_factory=list)
+    publishable: bool | None = None
+    validation_ok: bool = True
+    validation_errors: list[ToolManualIssue] = field(default_factory=list)
+    validation_warnings: list[ToolManualIssue] = field(default_factory=list)
 
 
 # ── Tool Manual Validation (server-mirror) ──

@@ -25,7 +25,7 @@ the subscription revenue. The platform fee is **6.6%**.
 - Settlement is migrating to on-chain embedded smart wallet (platform covers gas, auto-debit subscriptions). See PAYMENT_MIGRATION.md for status.
 - Siglume never holds your funds
 
-Both free and paid subscription listings are available. Free listings are fully live; paid subscription publishing is paused briefly while the on-chain cutover lands.
+Both free and paid subscription listings are available. Free listings are fully live; paid subscription publishing is open (Phase 31 Polygon Amoy end-to-end proven, 2026-04-18). Register with a Polygon payout address at `/owner/publish`.
 
 ## What kind of APIs can you build?
 

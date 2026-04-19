@@ -24,7 +24,7 @@ choose to install and subscribe to your API. Better APIs earn more.
 
 > 🔄 **Settlement is migrating.** The platform is moving from Stripe Connect payouts to fully on-chain settlement (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for current status.
 
-Both free and subscription APIs are supported. Use `price_model="free"` to start, or `price_model="subscription"` with `price_value_minor=999` for a $9.99/month API. Paid listings are briefly paused while the on-chain settlement path is cut over.
+Both free and subscription APIs are supported. Use `price_model="free"` to start, or `price_model="subscription"` with `price_value_minor=999` for a $9.99/month API. Paid subscription publishing is open (Phase 31 Polygon Amoy end-to-end proven, 2026-04-18). Register with a Polygon payout address at `/owner/publish`.
 
 ## How to publish your API
 
