@@ -18,6 +18,16 @@ from .webhooks import (
     parse_webhook_delivery,
     parse_webhook_subscription,
 )
+from .web3 import (
+    CrossCurrencyQuote,
+    EmbeddedWalletCharge,
+    PolygonMandate,
+    SettlementReceipt,
+    parse_cross_currency_quote,
+    parse_embedded_wallet_charge,
+    parse_polygon_mandate,
+    parse_settlement_receipt,
+)
 
 if TYPE_CHECKING:
     from siglume_api_sdk import AppManifest, ToolManual
@@ -1373,6 +1383,230 @@ class SiglumeClient:
             json_body=payload,
         )
         return parse_queued_webhook_event(response_data)
+
+    def list_polygon_mandates(
+        self,
+        *,
+        status: str | None = None,
+        purpose: str | None = None,
+        limit: int = 50,
+    ) -> list[PolygonMandate]:
+        target_limit = max(1, int(limit))
+        params_base: dict[str, Any] = {}
+        if status:
+            params_base["status"] = status
+        if purpose:
+            params_base["purpose"] = purpose
+        mandates: list[PolygonMandate] = []
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        while len(mandates) < target_limit:
+            page_limit = max(1, min(target_limit - len(mandates), 100))
+            params: dict[str, Any] = {**params_base, "limit": page_limit}
+            if cursor:
+                params["cursor"] = cursor
+            data, _meta = self._request("GET", "/market/web3/mandates", params=params)
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            mandates.extend(
+                parse_polygon_mandate(item)
+                for item in items
+                if isinstance(item, Mapping)
+            )
+            cursor = _string_or_none(data.get("next_cursor"))
+            if not cursor or cursor in seen_cursors:
+                break
+            seen_cursors.add(cursor)
+        return mandates[:target_limit]
+
+    def get_polygon_mandate(
+        self,
+        mandate_id: str,
+        *,
+        status: str | None = None,
+        purpose: str | None = None,
+        limit: int | None = None,
+    ) -> PolygonMandate:
+        normalized_mandate_id = str(mandate_id or "").strip()
+        if not normalized_mandate_id:
+            raise SiglumeClientError("mandate_id is required.")
+        params_base: dict[str, Any] = {}
+        if status:
+            params_base["status"] = status
+        if purpose:
+            params_base["purpose"] = purpose
+        remaining = None if limit is None else max(1, int(limit))
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        while True:
+            page_limit = 100 if remaining is None else max(1, min(remaining, 100))
+            params: dict[str, Any] = {**params_base, "limit": page_limit}
+            if cursor:
+                params["cursor"] = cursor
+            data, _meta = self._request("GET", "/market/web3/mandates", params=params)
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            parsed_items = [
+                parse_polygon_mandate(item)
+                for item in items
+                if isinstance(item, Mapping)
+            ]
+            for mandate in parsed_items:
+                if mandate.mandate_id == normalized_mandate_id:
+                    return mandate
+            if remaining is not None:
+                remaining -= page_limit
+                if remaining <= 0:
+                    break
+            cursor = _string_or_none(data.get("next_cursor"))
+            if not cursor or cursor in seen_cursors:
+                break
+            seen_cursors.add(cursor)
+        raise SiglumeNotFoundError(f"Polygon mandate not found: {normalized_mandate_id}")
+
+    def list_settlement_receipts(
+        self,
+        *,
+        receipt_kind: str | None = None,
+        limit: int = 50,
+    ) -> list[SettlementReceipt]:
+        target_limit = max(1, int(limit))
+        params_base: dict[str, Any] = {}
+        if receipt_kind:
+            params_base["receipt_kind"] = receipt_kind
+        receipts: list[SettlementReceipt] = []
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        while len(receipts) < target_limit:
+            page_limit = max(1, min(target_limit - len(receipts), 100))
+            params: dict[str, Any] = {**params_base, "limit": page_limit}
+            if cursor:
+                params["cursor"] = cursor
+            data, _meta = self._request("GET", "/market/web3/receipts", params=params)
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            receipts.extend(
+                parse_settlement_receipt(item)
+                for item in items
+                if isinstance(item, Mapping)
+            )
+            cursor = _string_or_none(data.get("next_cursor"))
+            if not cursor or cursor in seen_cursors:
+                break
+            seen_cursors.add(cursor)
+        return receipts[:target_limit]
+
+    def get_settlement_receipt(
+        self,
+        receipt_id: str,
+        *,
+        receipt_kind: str | None = None,
+        limit: int | None = None,
+    ) -> SettlementReceipt:
+        normalized_receipt_id = str(receipt_id or "").strip()
+        if not normalized_receipt_id:
+            raise SiglumeClientError("receipt_id is required.")
+        params_base: dict[str, Any] = {}
+        if receipt_kind:
+            params_base["receipt_kind"] = receipt_kind
+        remaining = None if limit is None else max(1, int(limit))
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        while True:
+            page_limit = 100 if remaining is None else max(1, min(remaining, 100))
+            params: dict[str, Any] = {**params_base, "limit": page_limit}
+            if cursor:
+                params["cursor"] = cursor
+            data, _meta = self._request("GET", "/market/web3/receipts", params=params)
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            parsed_items = [
+                parse_settlement_receipt(item)
+                for item in items
+                if isinstance(item, Mapping)
+            ]
+            for receipt in parsed_items:
+                if receipt.receipt_id == normalized_receipt_id or receipt.chain_receipt_id == normalized_receipt_id:
+                    return receipt
+            if remaining is not None:
+                remaining -= page_limit
+                if remaining <= 0:
+                    break
+            cursor = _string_or_none(data.get("next_cursor"))
+            if not cursor or cursor in seen_cursors:
+                break
+            seen_cursors.add(cursor)
+        raise SiglumeNotFoundError(f"Settlement receipt not found: {normalized_receipt_id}")
+
+    def get_embedded_wallet_charge(
+        self,
+        *,
+        tx_hash: str,
+        limit: int | None = None,
+    ) -> EmbeddedWalletCharge:
+        normalized_tx_hash = str(tx_hash or "").strip()
+        if not normalized_tx_hash:
+            raise SiglumeClientError("tx_hash is required.")
+        remaining = None if limit is None else max(1, int(limit))
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        while True:
+            page_limit = 100 if remaining is None else max(1, min(remaining, 100))
+            params: dict[str, Any] = {"limit": page_limit}
+            if cursor:
+                params["cursor"] = cursor
+            data, _meta = self._request("GET", "/market/web3/receipts", params=params)
+            items = data.get("items") if isinstance(data.get("items"), list) else []
+            parsed_items = [
+                parse_settlement_receipt(item)
+                for item in items
+                if isinstance(item, Mapping)
+            ]
+            for receipt in parsed_items:
+                if normalized_tx_hash in {
+                    receipt.tx_hash,
+                    receipt.user_operation_hash,
+                    receipt.submitted_hash,
+                }:
+                    return parse_embedded_wallet_charge(receipt=receipt)
+            if remaining is not None:
+                remaining -= page_limit
+                if remaining <= 0:
+                    break
+            cursor = _string_or_none(data.get("next_cursor"))
+            if not cursor or cursor in seen_cursors:
+                break
+            seen_cursors.add(cursor)
+        raise SiglumeNotFoundError(f"Embedded wallet charge not found: {normalized_tx_hash}")
+
+    def get_cross_currency_quote(
+        self,
+        *,
+        from_currency: str,
+        to_currency: str,
+        source_amount_minor: int,
+        slippage_bps: int = 100,
+    ) -> CrossCurrencyQuote:
+        normalized_from_currency = str(from_currency or "").strip().upper()
+        normalized_to_currency = str(to_currency or "").strip().upper()
+        if not normalized_from_currency:
+            raise SiglumeClientError("from_currency is required.")
+        if not normalized_to_currency:
+            raise SiglumeClientError("to_currency is required.")
+        try:
+            normalized_amount_minor = int(source_amount_minor)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise SiglumeClientError("source_amount_minor must be a finite integer.") from exc
+        if normalized_amount_minor <= 0:
+            raise SiglumeClientError("source_amount_minor must be positive.")
+        normalized_slippage_bps = max(0, min(int(slippage_bps), 5_000))
+        data, _meta = self._request(
+            "POST",
+            "/market/web3/swap/quote",
+            json_body={
+                "sell_token": normalized_from_currency,
+                "buy_token": normalized_to_currency,
+                "amount_minor": normalized_amount_minor,
+                "slippage_bps": normalized_slippage_bps,
+            },
+        )
+        return parse_cross_currency_quote(data)
 
     def _request(
         self,

@@ -32,6 +32,16 @@ import {
   parse_webhook_subscription,
 } from "./webhooks";
 import {
+  type CrossCurrencyQuote,
+  type EmbeddedWalletCharge,
+  type PolygonMandate,
+  type SettlementReceipt,
+  parse_cross_currency_quote,
+  parse_embedded_wallet_charge,
+  parse_polygon_mandate,
+  parse_settlement_receipt,
+} from "./web3";
+import {
   buildDefaultI18n,
   buildRegistrationStubSource,
   coerceMapping,
@@ -193,6 +203,34 @@ export interface SiglumeClientShape {
     subscription_ids?: string[];
     data?: Record<string, unknown>;
   }): Promise<QueuedWebhookEvent>;
+  list_polygon_mandates(options?: {
+    status?: string;
+    purpose?: string;
+    limit?: number;
+  }): Promise<PolygonMandate[]>;
+  get_polygon_mandate(mandate_id: string, options?: {
+    status?: string;
+    purpose?: string;
+    limit?: number;
+  }): Promise<PolygonMandate>;
+  list_settlement_receipts(options?: {
+    receipt_kind?: string;
+    limit?: number;
+  }): Promise<SettlementReceipt[]>;
+  get_settlement_receipt(receipt_id: string, options?: {
+    receipt_kind?: string;
+    limit?: number;
+  }): Promise<SettlementReceipt>;
+  get_embedded_wallet_charge(options: {
+    tx_hash: string;
+    limit?: number;
+  }): Promise<EmbeddedWalletCharge>;
+  get_cross_currency_quote(options: {
+    from_currency: string;
+    to_currency: string;
+    source_amount_minor: number;
+    slippage_bps?: number;
+  }): Promise<CrossCurrencyQuote>;
 }
 
 class CursorPageResult<T> implements CursorPage<T> {
@@ -1082,6 +1120,218 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     const [data] = await this.request("POST", "/market/webhooks/test-deliveries", { json_body: payload });
     return parse_queued_webhook_event(data);
+  }
+
+  async list_polygon_mandates(options: {
+    status?: string;
+    purpose?: string;
+    limit?: number;
+  } = {}): Promise<PolygonMandate[]> {
+    const targetLimit = Math.max(1, Math.trunc(options.limit ?? 50));
+    const mandates: PolygonMandate[] = [];
+    let cursor: string | null = null;
+    const seenCursors = new Set<string>();
+    while (mandates.length < targetLimit) {
+      const [data] = await this.request("GET", "/market/web3/mandates", {
+        params: {
+          status: options.status,
+          purpose: options.purpose,
+          cursor,
+          limit: Math.max(1, Math.min(targetLimit - mandates.length, 100)),
+        },
+      });
+      const items = Array.isArray(data.items)
+        ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_polygon_mandate)
+        : [];
+      mandates.push(...items);
+      cursor = stringOrNull(data.next_cursor);
+      if (!cursor || seenCursors.has(cursor)) {
+        break;
+      }
+      seenCursors.add(cursor);
+    }
+    return mandates.slice(0, targetLimit);
+  }
+
+  async get_polygon_mandate(
+    mandate_id: string,
+    options: { status?: string; purpose?: string; limit?: number | null } = {},
+  ): Promise<PolygonMandate> {
+    const normalizedMandateId = String(mandate_id ?? "").trim();
+    if (!normalizedMandateId) {
+      throw new SiglumeClientError("mandate_id is required.");
+    }
+    let remaining = options.limit == null ? null : Math.max(1, Math.trunc(options.limit));
+    let cursor: string | null = null;
+    const seenCursors = new Set<string>();
+    while (true) {
+      const [data] = await this.request("GET", "/market/web3/mandates", {
+        params: {
+          status: options.status,
+          purpose: options.purpose,
+          cursor,
+          limit: remaining == null ? 100 : Math.max(1, Math.min(remaining, 100)),
+        },
+      });
+      const items = Array.isArray(data.items)
+        ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_polygon_mandate)
+        : [];
+      const found = items.find((item) => item.mandate_id === normalizedMandateId);
+      if (found) {
+        return found;
+      }
+      if (remaining != null) {
+        remaining -= remaining == null ? 0 : Math.max(1, Math.min(remaining, 100));
+        if (remaining <= 0) {
+          break;
+        }
+      }
+      cursor = stringOrNull(data.next_cursor);
+      if (!cursor || seenCursors.has(cursor)) {
+        break;
+      }
+      seenCursors.add(cursor);
+    }
+    throw new SiglumeNotFoundError(`Polygon mandate not found: ${normalizedMandateId}`);
+  }
+
+  async list_settlement_receipts(options: { receipt_kind?: string; limit?: number } = {}): Promise<SettlementReceipt[]> {
+    const targetLimit = Math.max(1, Math.trunc(options.limit ?? 50));
+    const receipts: SettlementReceipt[] = [];
+    let cursor: string | null = null;
+    const seenCursors = new Set<string>();
+    while (receipts.length < targetLimit) {
+      const [data] = await this.request("GET", "/market/web3/receipts", {
+        params: {
+          receipt_kind: options.receipt_kind,
+          cursor,
+          limit: Math.max(1, Math.min(targetLimit - receipts.length, 100)),
+        },
+      });
+      const items = Array.isArray(data.items)
+        ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_settlement_receipt)
+        : [];
+      receipts.push(...items);
+      cursor = stringOrNull(data.next_cursor);
+      if (!cursor || seenCursors.has(cursor)) {
+        break;
+      }
+      seenCursors.add(cursor);
+    }
+    return receipts.slice(0, targetLimit);
+  }
+
+  async get_settlement_receipt(
+    receipt_id: string,
+    options: { receipt_kind?: string; limit?: number | null } = {},
+  ): Promise<SettlementReceipt> {
+    const normalizedReceiptId = String(receipt_id ?? "").trim();
+    if (!normalizedReceiptId) {
+      throw new SiglumeClientError("receipt_id is required.");
+    }
+    let remaining = options.limit == null ? null : Math.max(1, Math.trunc(options.limit));
+    let cursor: string | null = null;
+    const seenCursors = new Set<string>();
+    while (true) {
+      const [data] = await this.request("GET", "/market/web3/receipts", {
+        params: {
+          receipt_kind: options.receipt_kind,
+          cursor,
+          limit: remaining == null ? 100 : Math.max(1, Math.min(remaining, 100)),
+        },
+      });
+      const items = Array.isArray(data.items)
+        ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_settlement_receipt)
+        : [];
+      const found = items.find((item) => item.receipt_id === normalizedReceiptId || item.chain_receipt_id === normalizedReceiptId);
+      if (found) {
+        return found;
+      }
+      if (remaining != null) {
+        remaining -= remaining == null ? 0 : Math.max(1, Math.min(remaining, 100));
+        if (remaining <= 0) {
+          break;
+        }
+      }
+      cursor = stringOrNull(data.next_cursor);
+      if (!cursor || seenCursors.has(cursor)) {
+        break;
+      }
+      seenCursors.add(cursor);
+    }
+    throw new SiglumeNotFoundError(`Settlement receipt not found: ${normalizedReceiptId}`);
+  }
+
+  async get_embedded_wallet_charge(options: { tx_hash: string; limit?: number | null }): Promise<EmbeddedWalletCharge> {
+    const normalizedTxHash = String(options.tx_hash ?? "").trim();
+    if (!normalizedTxHash) {
+      throw new SiglumeClientError("tx_hash is required.");
+    }
+    let remaining = options.limit == null ? null : Math.max(1, Math.trunc(options.limit));
+    let cursor: string | null = null;
+    const seenCursors = new Set<string>();
+    while (true) {
+      const [data] = await this.request("GET", "/market/web3/receipts", {
+        params: {
+          cursor,
+          limit: remaining == null ? 100 : Math.max(1, Math.min(remaining, 100)),
+        },
+      });
+      const items = Array.isArray(data.items)
+        ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_settlement_receipt)
+        : [];
+      const found = items.find((item) => (
+        [item.tx_hash, item.user_operation_hash ?? null, item.submitted_hash ?? null].includes(normalizedTxHash)
+      ));
+      if (found) {
+        return parse_embedded_wallet_charge({}, { receipt: found });
+      }
+      if (remaining != null) {
+        remaining -= remaining == null ? 0 : Math.max(1, Math.min(remaining, 100));
+        if (remaining <= 0) {
+          break;
+        }
+      }
+      cursor = stringOrNull(data.next_cursor);
+      if (!cursor || seenCursors.has(cursor)) {
+        break;
+      }
+      seenCursors.add(cursor);
+    }
+    throw new SiglumeNotFoundError(`Embedded wallet charge not found: ${normalizedTxHash}`);
+  }
+
+  async get_cross_currency_quote(options: {
+    from_currency: string;
+    to_currency: string;
+    source_amount_minor: number;
+    slippage_bps?: number;
+  }): Promise<CrossCurrencyQuote> {
+    const from_currency = String(options.from_currency ?? "").trim().toUpperCase();
+    const to_currency = String(options.to_currency ?? "").trim().toUpperCase();
+    if (!from_currency) {
+      throw new SiglumeClientError("from_currency is required.");
+    }
+    if (!to_currency) {
+      throw new SiglumeClientError("to_currency is required.");
+    }
+    if (!Number.isFinite(options.source_amount_minor)) {
+      throw new SiglumeClientError("source_amount_minor must be a finite number.");
+    }
+    const source_amount_minor = Math.trunc(options.source_amount_minor);
+    if (source_amount_minor <= 0) {
+      throw new SiglumeClientError("source_amount_minor must be positive.");
+    }
+    const slippage_bps = Math.max(0, Math.min(Math.trunc(options.slippage_bps ?? 100), 5000));
+    const [data] = await this.request("POST", "/market/web3/swap/quote", {
+      json_body: {
+        sell_token: from_currency,
+        buy_token: to_currency,
+        amount_minor: source_amount_minor,
+        slippage_bps,
+      },
+    });
+    return parse_cross_currency_quote(data);
   }
 
   private async request(method: string, path: string, options: RequestOptions = {}): Promise<RequestMetaTuple> {

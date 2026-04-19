@@ -14,6 +14,11 @@ import {
   runWalletBalanceExample,
   WalletBalanceApp,
 } from "../../examples-ts/wallet_balance";
+import {
+  buildToolManual as buildEmbeddedWalletToolManual,
+  EmbeddedWalletPaymentApp,
+  runEmbeddedWalletPaymentExample,
+} from "../../examples-ts/embedded_wallet_payment";
 import { runMeteringRecordExample } from "../../examples-ts/metering_record";
 import { runRefundPartialExample } from "../../examples-ts/refund_partial";
 import { runMockWebhookExpressExample } from "../../examples-ts/webhook_handler_express";
@@ -32,6 +37,13 @@ const EXAMPLES = [
     createHarness: () => new AppTestHarness(new NewsDigestApp()),
     createManual: () => buildNewsDigestToolManual(),
     taskType: "news_digest",
+  },
+  {
+    name: "embedded_wallet_payment",
+    permissionClass: PermissionClass.PAYMENT,
+    createHarness: () => new AppTestHarness(new EmbeddedWalletPaymentApp()),
+    createManual: () => buildEmbeddedWalletToolManual(),
+    taskType: "prepare_subscription_charge",
   },
   {
     name: "wallet_balance",
@@ -65,6 +77,14 @@ describe("TypeScript example suite", () => {
       const action = await harness.execute_action(taskType);
       expect(action.success).toBe(true);
       expect(harness.validate_receipt(action)).toEqual([]);
+    }
+
+    if (permissionClass === PermissionClass.PAYMENT) {
+      const quote = await harness.execute_quote(taskType);
+      const payment = await harness.execute_payment("charge_subscription");
+      expect(quote.success).toBe(true);
+      expect(payment.success).toBe(true);
+      expect(harness.validate_receipt(payment)).toEqual([]);
     }
   });
 
@@ -118,5 +138,18 @@ describe("TypeScript example suite", () => {
     expect(lines[2]).toBe("batch_items: 2 last_period=202604");
     expect(lines[3]).toBe("preview_subtotal_minor: 7615");
     expect(lines[4]).toBe("usage_dimensions: tokens_in,tokens_out,calls");
+  });
+
+  it("returns stable summary lines for embedded_wallet_payment", async () => {
+    const lines = await runEmbeddedWalletPaymentExample();
+
+    expect(lines[0]).toBe("tool_manual_valid: true 0");
+    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
+    expect(lines[2]).toBe("mandate_status: active cancel_scheduled=false");
+    expect(lines[3]).toBe(`charge_tx: 0x${"a".repeat(64)} user_operation=0x${"b".repeat(64)}`);
+    expect(lines[4]).toBe("dry_run: true");
+    expect(lines[5]).toBe("quote: true");
+    expect(lines[6]).toBe("payment: true");
+    expect(lines[7]).toBe("receipt_issues: 0");
   });
 });
