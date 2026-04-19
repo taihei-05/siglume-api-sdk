@@ -1,105 +1,72 @@
-# X/Twitter 投稿スレッド
+# X / Twitter — v0.4.0 Thread
 
-> 🚧 **STALE DRAFT — DO NOT POST AS-IS.** Body text still claims "payments live via Stripe Connect", which is being retired. Rewrite the settlement line per [`../PAYMENT_MIGRATION.md`](../PAYMENT_MIGRATION.md) before posting.
-
-コピペしてそのまま投稿できます。5ツイートのスレッドです。
+> 5-tweet thread, JP and EN paired. Numbers preserved for manual re-ordering if needed.
 
 ---
 
-## Tweet 1 (Hook)
+## Tweet 1 (hook)
 
-🚀 AIエージェント用の「API Store」をベータ公開しました。
+🚀 `siglume-api-sdk` v0.4.0 をリリースしました。
 
-エージェントにAPIをインストールすると、X投稿・画像生成・ウォレット連携など新しい仕事ができるようになります。
+AI エージェントが購読する API を、個人開発者が出品する仕組みの SDK です。Python + TypeScript 同機能、オンチェーン決済 (Polygon)、開発者取り分 93.4%。
 
-開発者募集中です。SDK公開しています。
+pip install siglume-api-sdk
+npm i @siglume/api-sdk (npm 公開は v0.5)
 
-🚀 We just launched the Siglume Agent API Store beta.
+https://github.com/taihei-05/siglume-api-sdk
 
-Install APIs on AI agents to give them new powers — posting to X, generating images, wallet operations, and more.
+🚀 Released siglume-api-sdk v0.4.0.
 
-SDK is public. Looking for developers.
-
----
-
-## Tweet 2 (What you can build)
-
-今すぐ作れるAPI例:
-
-🐦 X Publisher — エージェントの分析をXに自動投稿
-🎨 Visual Publisher — 画像生成して投稿
-💰 MetaMask Connector — ウォレット連携
-
-いずれもスターターコード付き。
-
-APIs you can build today:
-
-🐦 X Publisher — auto-post agent content to X
-🎨 Visual Publisher — generate images and post
-💰 MetaMask Connector — wallet operations
-
-Starter code included for all three.
+Build APIs that autonomous AI agents subscribe to. Python + TypeScript parity, on-chain settlement on Polygon, developer keeps 93.4%.
 
 ---
 
-## Tweet 3 (How to start)
+## Tweet 2 (what v0.4 gives you)
 
-始め方は3ステップ:
+v0.4.0 の中身:
 
-```
-git clone https://github.com/taihei-05/siglume-api-sdk.git
-pip install -e .
-python examples/hello_price_compare.py
-```
+🧪 オフライン ToolManual 品質スコアラー (サーバー ±5 点)
+🔨 `siglume` CLI (init/validate/test/score/register/diff)
+🔁 Anthropic / OpenAI / MCP への tool schema 変換
+🧠 LLM で ToolManual を自動下書き (prompt caching 標準)
+📼 決定的テスト用の録画ハーネス
 
-Python 3.11+ で動きます。
+What v0.4.0 ships:
 
-Get started in 3 steps:
-
-```
-git clone https://github.com/taihei-05/siglume-api-sdk.git
-pip install -e .
-python examples/hello_price_compare.py
-```
-
-Works with Python 3.11+.
+🧪 Offline ToolManual grader (±5 vs server)
+🔨 `siglume` CLI for the full publish loop
+🔁 Exporter → Anthropic / OpenAI Chat+Responses / MCP
+🧠 LLM-assisted tool manual drafting
+📼 Deterministic VCR-style recording harness
 
 ---
 
-## Tweet 4 (Honest beta status)
+## Tweet 3 (example)
 
-正直に言うと、今はベータ版です:
+出品側は `AppAdapter` を 1 クラス実装するだけ。品質スコアが B 未満なら publish 不可で、manifest と tool manual は CLI でローカル採点できる。
 
-✅ APIの出品・公開・インストールは動いています
-✅ 無料・有料サブスクで出品できます
-✅ 決済・売上支払いはStripe Connectで稼働中
-✅ 手数料6.6%のみ（開発者93.4%）
+The publish side is one `AppAdapter` class. Grade B is the publish floor; both manifest and tool manual are scored locally by the CLI before network round-trips.
 
-Honest beta status:
+---
 
-✅ Listing, publishing, and installing APIs works
-✅ Free and subscription listings available
-✅ Payments and payouts are live via Stripe Connect
-✅ 6.6% platform fee, developer keeps 93.4%
+## Tweet 4 (buyer side)
+
+購入側 SDK (experimental) は LangChain / Claude Agent SDK adapter 付き。ToolManual を Anthropic / OpenAI / MCP のどれにも変換できるので、自作エージェントに Siglume の capability を即組み込める。
+
+Buyer-side SDK (experimental) ships with LangChain and Claude Agent SDK adapters. The ToolManual exporter converts to whichever tool-calling dialect your agent speaks.
 
 ---
 
 ## Tweet 5 (CTA)
 
-GitHub: https://github.com/taihei-05/siglume-api-sdk
-本番: https://siglume.com
+v0.4.0 wheel + sdist + PEP 740 attestations は PyPI に live、docs / examples / 7 本の runnable adapter は GitHub に。
 
-Issue に3つのバウンティを出しています。
-質問は Discussions で受け付けています。
+個人開発の side project なので、API 形状への率直なフィードバックが一番嬉しい。
 
-一緒にAIエージェントの未来を作りませんか？
+https://github.com/taihei-05/siglume-api-sdk
 
-GitHub: https://github.com/taihei-05/siglume-api-sdk
-Live: https://siglume.com
+v0.4.0 wheel + sdist + PEP 740 attestations on PyPI. Docs, examples, and 7 runnable adapters on GitHub.
 
-3 bounties are open in Issues.
-Questions welcome in Discussions.
+This is a single-maintainer side project — honest feedback on the API shape is the most valuable thing you can send back.
 
-Let's build the future of AI agents together.
-
-#AI #AIAgent #API #OpenSource #IndieHacker #Siglume
+#AI #AIAgent #TypeScript #Python #OpenSource #Web3 #Polygon
