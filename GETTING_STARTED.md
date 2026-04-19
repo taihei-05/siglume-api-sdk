@@ -401,7 +401,7 @@ If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter
 
 ### What languages can I write APIs in?
 
-**Python** is currently the only supported language. TypeScript and Go support are under consideration.
+**Python** and **TypeScript** are supported today. Go support is still under consideration.
 
 ### How do I update my API?
 
@@ -992,6 +992,29 @@ else:
 ```
 
 This catches structural errors instantly without a network round-trip.
+
+If you want a starting draft instead of writing the ToolManual from scratch,
+the SDK also includes LLM helpers that run local validation and offline
+scoring before they return a result:
+
+```python
+from siglume_api_sdk.assist import OpenAIProvider, draft_tool_manual, fill_tool_manual_gaps
+
+draft = draft_tool_manual(
+    capability_key="currency-converter-jp",
+    job_to_be_done="Convert USD amounts to JPY with live rates",
+    permission_class="read_only",
+    llm=OpenAIProvider(),
+)
+
+filled = fill_tool_manual_gaps(
+    partial_manual={"tool_name": "currency_converter_jp", "permission_class": "read_only"},
+    source_code_hint="def convert(amount_usd: float) -> dict[str, object]: ...",
+    llm=OpenAIProvider(),
+)
+```
+
+Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` explicitly before using these helpers.
 
 ### Sandbox testing with public endpoints
 

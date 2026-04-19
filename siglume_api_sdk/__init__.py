@@ -9,6 +9,32 @@ from types import ModuleType
 
 _LEGACY_MODULE_NAME = "_siglume_api_sdk_legacy"
 _LEGACY_MODULE_PATH = Path(__file__).resolve().parent.parent / "siglume_api_sdk.py"
+_LEGACY_PUBLIC_EXPORTS = [
+    "AppAdapter",
+    "AppCategory",
+    "AppManifest",
+    "AppTestHarness",
+    "ApprovalMode",
+    "ApprovalRequestHint",
+    "ConnectedAccountRef",
+    "Environment",
+    "ExecutionArtifact",
+    "ExecutionContext",
+    "ExecutionKind",
+    "ExecutionResult",
+    "HealthCheckResult",
+    "PermissionClass",
+    "PriceModel",
+    "ReceiptRef",
+    "SettlementMode",
+    "SideEffectRecord",
+    "StubProvider",
+    "ToolManual",
+    "ToolManualIssue",
+    "ToolManualPermissionClass",
+    "ToolManualQualityReport",
+    "validate_tool_manual",
+]
 
 
 def _load_legacy_module() -> ModuleType:
@@ -26,10 +52,8 @@ def _load_legacy_module() -> ModuleType:
 
 _legacy = _load_legacy_module()
 
-for _name, _value in vars(_legacy).items():
-    if _name.startswith("_"):
-        continue
-    globals()[_name] = _value
+for _name in _LEGACY_PUBLIC_EXPORTS:
+    globals()[_name] = getattr(_legacy, _name)
 
 from .client import (  # noqa: E402
     AccessGrantRecord,
@@ -52,6 +76,55 @@ from .client import (  # noqa: E402
     SupportCaseRecord,
     UsageEventRecord,
 )
-from .tool_manual_grader import score_tool_manual_offline, score_tool_manual_remote  # noqa: E402
+from .tool_manual_assist import (  # noqa: E402, F401
+    AnthropicProvider,
+    LLMProvider,
+    OpenAIProvider,
+    SiglumeAssistError,
+    ToolManualAssistAttempt,
+    ToolManualAssistMetadata,
+    ToolManualAssistResult,
+    draft_tool_manual,
+    fill_tool_manual_gaps,
+    load_tool_manual_draft_prompt,
+)
+from .tool_manual_grader import score_tool_manual_offline, score_tool_manual_remote  # noqa: E402, F401
 
-__all__ = [name for name in globals() if not name.startswith("_")]
+__all__ = sorted(
+    set(
+        _LEGACY_PUBLIC_EXPORTS
+        + [
+            "AccessGrantRecord",
+            "AppListingRecord",
+            "AutoRegistrationReceipt",
+            "CapabilityBindingRecord",
+            "ConnectedAccountRecord",
+            "CursorPage",
+            "DEFAULT_SIGLUME_API_BASE",
+            "DeveloperPortalSummary",
+            "EnvelopeMeta",
+            "GrantBindingResult",
+            "RegistrationConfirmation",
+            "RegistrationQuality",
+            "SandboxSession",
+            "SiglumeAPIError",
+            "SiglumeAssistError",
+            "SiglumeClient",
+            "SiglumeClientError",
+            "SiglumeNotFoundError",
+            "SupportCaseRecord",
+            "UsageEventRecord",
+            "AnthropicProvider",
+            "LLMProvider",
+            "OpenAIProvider",
+            "ToolManualAssistAttempt",
+            "ToolManualAssistMetadata",
+            "ToolManualAssistResult",
+            "draft_tool_manual",
+            "fill_tool_manual_gaps",
+            "load_tool_manual_draft_prompt",
+            "score_tool_manual_offline",
+            "score_tool_manual_remote",
+        ]
+    )
+)

@@ -33,3 +33,6 @@ py-modules = ["siglume_api_sdk", "siglume_api_sdk_aiworks"]
 
 [tool.setuptools.packages.find]
 include = ["siglume_api_sdk*"]
+
+[tool.setuptools.package-data]
+siglume_api_sdk = ["prompts/*.md"]

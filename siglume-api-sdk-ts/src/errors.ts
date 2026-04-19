@@ -11,6 +11,8 @@ export class SiglumeProjectError extends SiglumeError {}
 
 export class SiglumeValidationError extends SiglumeError {}
 
+export class SiglumeAssistError extends SiglumeClientError {}
+
 export class SiglumeNotFoundError extends SiglumeClientError {}
 
 export class SiglumeAPIError extends SiglumeClientError {
