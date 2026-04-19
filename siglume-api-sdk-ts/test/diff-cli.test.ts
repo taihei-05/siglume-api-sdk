@@ -206,4 +206,47 @@ describe("siglume diff CLI", () => {
     expect(stdout).toEqual([]);
     expect(stderr.join("\n")).toContain("Could not detect document type");
   });
+
+  it("prefers tool_manual over manifest when both identity keys are present (Codex P2 on PR #101)", async () => {
+    // A ToolManual JSON may carry capability_key metadata; the detector must
+    // prefer ToolManual (tool_name wins) so tool-manual-specific breaking
+    // changes are not silently downgraded to the manifest diff path.
+    const stdout: string[] = [];
+    const { oldPath, newPath } = await writePair(
+      {
+        capability_key: "ambiguous-capability",
+        tool_name: "ambiguous_tool",
+        input_schema: {
+          type: "object",
+          properties: { query: { type: "string" } },
+          required: ["query"],
+          additionalProperties: false,
+        },
+      },
+      {
+        capability_key: "ambiguous-capability",
+        tool_name: "ambiguous_tool",
+        input_schema: {
+          type: "object",
+          properties: { query: { type: "string" }, region: { type: "string" } },
+          required: ["query", "region"],
+          additionalProperties: false,
+        },
+      },
+    );
+
+    const exitCode = await runCli(["diff", oldPath, newPath, "--json"], {
+      stdout: (line) => stdout.push(line),
+    });
+
+    expect(exitCode).toBe(1);
+    const payload = JSON.parse(stdout.join("\n")) as {
+      kind: string;
+      changes: Array<{ level: string; path: string }>;
+    };
+    expect(payload.kind).toBe("tool_manual");
+    expect(
+      payload.changes.some((change) => change.level === "breaking" && change.path === "input_schema.required"),
+    ).toBe(true);
+  });
 });

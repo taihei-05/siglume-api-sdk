@@ -454,11 +454,17 @@ function detectDocumentKind(
 }
 
 function payloadKind(payload: Record<string, unknown>): "manifest" | "tool_manual" | null {
-  if (isManifestPayload(payload)) {
-    return "manifest";
-  }
+  // ToolManual takes precedence over AppManifest when both identity keys
+  // are present: a manifest has no `tool_name` field, so the presence of
+  // `tool_name` is a stronger signal. This avoids misclassifying a
+  // ToolManual payload (that happens to carry capability_key metadata)
+  // as a manifest, which would silently hide ToolManual-specific
+  // breaking changes (e.g. input_schema.required additions).
   if (isToolManualPayload(payload)) {
     return "tool_manual";
+  }
+  if (isManifestPayload(payload)) {
+    return "manifest";
   }
   return null;
 }

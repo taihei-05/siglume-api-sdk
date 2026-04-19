@@ -50,10 +50,16 @@ def _detect_kind(old_payload: dict[str, Any], new_payload: dict[str, Any]) -> st
 
 
 def _payload_kind(payload: dict[str, Any]) -> str | None:
-    if _is_manifest_payload(payload):
-        return "manifest"
+    # ToolManual takes precedence over AppManifest when both identity keys
+    # are present: a manifest has no `tool_name` field, so the presence of
+    # `tool_name` is a stronger signal. This avoids misclassifying a
+    # ToolManual payload (that happens to carry capability_key metadata)
+    # as a manifest, which would silently hide ToolManual-specific
+    # breaking changes (e.g. input_schema.required additions).
     if _is_tool_manual_payload(payload):
         return "tool_manual"
+    if _is_manifest_payload(payload):
+        return "manifest"
     return None
 
 

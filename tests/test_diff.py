@@ -224,3 +224,44 @@ def test_diff_cli_rejects_truly_unknown_document_kind() -> None:
 
         assert result.exit_code == 1
         assert "Could not detect document type" in result.output
+
+
+def test_diff_cli_prefers_tool_manual_when_ambiguous_keys_present() -> None:
+    # Codex bot P2 on PR #101: a ToolManual JSON may carry capability_key
+    # as metadata. The detector must prefer ToolManual (tool_name wins),
+    # otherwise ToolManual-specific breaking changes (e.g. input_schema.required
+    # additions) would be silently suppressed.
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        old_payload = {
+            "capability_key": "ambiguous-capability",
+            "tool_name": "ambiguous_tool",
+            "input_schema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        }
+        new_payload = {
+            "capability_key": "ambiguous-capability",
+            "tool_name": "ambiguous_tool",
+            "input_schema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}, "region": {"type": "string"}},
+                "required": ["query", "region"],  # breaking in tool_manual diff, noise in manifest diff
+                "additionalProperties": False,
+            },
+        }
+        Path("old.json").write_text(json.dumps(old_payload), encoding="utf-8")
+        Path("new.json").write_text(json.dumps(new_payload), encoding="utf-8")
+
+        result = runner.invoke(main, ["diff", "old.json", "new.json", "--json"])
+
+        assert result.exit_code == 1, result.output  # BREAKING detected via tool_manual path
+        payload = json.loads(result.output)
+        assert payload["kind"] == "tool_manual"
+        assert any(
+            change["level"] == "breaking" and change["path"] == "input_schema.required"
+            for change in payload["changes"]
+        )
