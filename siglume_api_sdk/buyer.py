@@ -547,9 +547,15 @@ def _build_execution_result(data: Mapping[str, Any], *, payload: Mapping[str, An
     usage_event = _to_dict(data.get("usage_event"))
     receipt = _to_dict(data.get("receipt"))
     execution_kind = _coerce_execution_kind(str(receipt.get("execution_kind") or payload.get("execution_kind") or "action"), ExecutionKind)
-    amount_minor = int(receipt.get("amount_minor") or usage_event.get("amount_minor") or 0)
+    # Use explicit None checks instead of `or` chains so a legitimate zero
+    # (free execution, denied execution, metered-but-zero-units run) does
+    # not silently collapse to the next fallback. The TS implementation
+    # uses `??` for the same reason — keep parity.
+    amount_minor_raw = receipt.get("amount_minor") if receipt.get("amount_minor") is not None else usage_event.get("amount_minor")
+    amount_minor = int(amount_minor_raw) if amount_minor_raw is not None else 0
     currency = str(receipt.get("currency") or usage_event.get("currency") or "USD")
-    units_consumed = int(usage_event.get("units_consumed") or 1)
+    units_raw = usage_event.get("units_consumed")
+    units_consumed = int(units_raw) if units_raw is not None else 1
     if accepted:
         return ExecutionResult(
             success=True,

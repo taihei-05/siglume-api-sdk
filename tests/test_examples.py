@@ -102,3 +102,38 @@ def test_buyer_langchain_example_runs_with_mock_client(capsys) -> None:
     output = capsys.readouterr().out.strip().splitlines()
     assert output[0].startswith("tool_name: currency_converter_v2")
     assert output[-1].startswith("result_currency: JPY")
+
+
+def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:
+    # Codex bot P2 on PR #107: the tool manual defaults token_symbol to
+    # "native" but the adapter uppercased "NATIVE" and fell through to
+    # the synthetic ERC-20 branch, contradicting its own schema default.
+    # Passing "native" must route to the chain's native asset (ETH on
+    # ethereum, MATIC on polygon).
+    module = _load_module("wallet_balance.py")
+    app_cls = next(
+        member
+        for _, member in inspect.getmembers(module, inspect.isclass)
+        if issubclass(member, AppAdapter) and member is not AppAdapter and member.__module__ == module.__name__
+    )
+    app = app_cls()
+
+    async def _run() -> None:
+        from siglume_api_sdk import ExecutionContext, ExecutionKind
+
+        for chain, expected_symbol, expected_balance in (("ethereum", "ETH", 1.2345), ("polygon", "MATIC", 542.1)):
+            ctx = ExecutionContext(
+                agent_id="agent_test",
+                owner_user_id="user_test",
+                task_type=app.supported_task_types()[0],
+                input_params={"chain": chain, "token_symbol": "native"},
+                execution_kind=ExecutionKind.DRY_RUN,
+            )
+            result = await app.execute(ctx)
+            assert result.success
+            assert result.output["token_symbol"] == expected_symbol, (
+                f"'native' on {chain} should resolve to {expected_symbol}, got {result.output['token_symbol']}"
+            )
+            assert result.output["balance"] == expected_balance
+
+    asyncio.run(_run())

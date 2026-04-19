@@ -270,3 +270,39 @@ def test_invoke_requires_explicit_opt_in_for_internal_execute() -> None:
 
     with pytest.raises(SiglumeExperimentalError, match="allow_internal_execute=True"):
         client.invoke(capability_key="currency-converter-v2", input={"amount_usd": 100})
+
+
+def test_invoke_preserves_legitimate_zero_amount_and_units() -> None:
+    # Codex bot P1 on PR #106: `or` chains were clobbering legitimate
+    # zeros — units_consumed=0 became 1, receipt.amount_minor=0 fell
+    # through to usage_event.amount_minor (or the default). Use explicit
+    # None checks instead so free / denied / zero-billed executions
+    # surface honest metrics.
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/v1/internal/market/capability/execute":
+            raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "accepted": True,
+                    "allowed": True,
+                    "reason": "accepted",
+                    "reason_code": None,
+                    # usage_event would previously rewrite these zeros via the `or` chain.
+                    "usage_event": {"units_consumed": 0, "amount_minor": 500, "execution_kind": "read_only"},
+                    "result": {"summary": "Free tier cached lookup."},
+                    "receipt": {"execution_kind": "read_only", "currency": "USD", "amount_minor": 0},
+                }
+            ),
+        )
+
+    client = build_client(handler, default_agent_id="agent_demo", allow_internal_execute=True)
+    result = client.invoke(capability_key="cached-lookup", input={"query": "x"})
+
+    assert result.success is True
+    # Zero from the receipt must win over usage_event's 500; the old `or`
+    # chain would have returned 500 here.
+    assert result.amount_minor == 0
+    # Zero units_consumed must be preserved; the old code replaced it with 1.
+    assert result.units_consumed == 0

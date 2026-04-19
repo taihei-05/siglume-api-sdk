@@ -61,7 +61,13 @@ class WalletBalanceApp(AppAdapter):
     async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
         chain = str(ctx.input_params.get("chain") or "ethereum").lower()
         default_symbol, default_balance, default_price = CHAIN_DEFAULTS.get(chain, CHAIN_DEFAULTS["ethereum"])
-        token_symbol = str(ctx.input_params.get("token_symbol") or default_symbol).upper()
+        raw_symbol = str(ctx.input_params.get("token_symbol") or default_symbol).upper()
+        # Tool manual defaults token_symbol to "native" to mean "chain's
+        # native asset" (ETH on Ethereum, MATIC on Polygon). Resolve NATIVE
+        # to the chain's concrete symbol before routing, otherwise the
+        # equality check below misses and we fall through to the synthetic
+        # ERC-20 branch, contradicting the manual's own contract.
+        token_symbol = default_symbol if raw_symbol == "NATIVE" else raw_symbol
         if token_symbol == default_symbol:
             balance = default_balance
             usd_price = default_price
