@@ -83,6 +83,13 @@ from .diff import (  # noqa: E402, F401
     diff_manifest,
     diff_tool_manual,
 )
+from .exporters import (  # noqa: E402, F401
+    ToolSchemaExport,
+    to_anthropic_tool,
+    to_mcp_tool,
+    to_openai_function,
+    to_openai_responses_tool,
+)
 from .tool_manual_assist import (  # noqa: E402, F401
     AnthropicProvider,
     LLMProvider,
@@ -123,12 +130,17 @@ __all__ = sorted(
             "SiglumeClientError",
             "SiglumeNotFoundError",
             "SupportCaseRecord",
+            "ToolSchemaExport",
             "UsageEventRecord",
             "AnthropicProvider",
             "LLMProvider",
             "OpenAIProvider",
             "diff_manifest",
             "diff_tool_manual",
+            "to_anthropic_tool",
+            "to_mcp_tool",
+            "to_openai_function",
+            "to_openai_responses_tool",
             "ToolManualAssistAttempt",
             "ToolManualAssistMetadata",
             "ToolManualAssistResult",

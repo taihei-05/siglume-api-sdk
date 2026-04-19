@@ -1,0 +1,543 @@
+[
+  {
+    "name": "read_only_price_lookup",
+    "tool_manual": {
+      "tool_name": "product_price_lookup",
+      "job_to_be_done": "Look up current retailer pricing for a product and return a structured comparison.",
+      "summary_for_model": "Looks up current retailer offers and returns a structured comparison with the best deal first.",
+      "trigger_conditions": [
+        "owner asks to compare prices for a product before deciding where to buy",
+        "agent needs retailer offer data to support a shopping recommendation",
+        "request is to find the cheapest or best-value option for a product query"
+      ],
+      "do_not_use_when": [
+        "the request is to complete checkout or place an order instead of comparing offers"
+      ],
+      "permission_class": "read_only",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Product name, model number, or search phrase."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "One-line overview of the best available deal."
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Ranked retailer offers."
+          }
+        },
+        "required": [
+          "summary",
+          "offers"
+        ],
+        "additionalProperties": false
+      },
+      "usage_hints": [
+        "Use this tool after the owner has named a product and wants evidence-backed price comparison."
+      ],
+      "result_hints": [
+        "Lead with the best offer and then summarize notable trade-offs."
+      ],
+      "error_hints": [
+        "If no offers are found, ask for a clearer product name or model number."
+      ]
+    },
+    "expected": {
+      "anthropic": {
+        "schema": {
+          "name": "product_price_lookup",
+          "description": "Looks up current retailer offers and returns a structured comparison with the best deal first.\n\nPermission class: read_only.\n\nWhen to use:\n- owner asks to compare prices for a product before deciding where to buy\n- agent needs retailer offer data to support a shopping recommendation\n- request is to find the cheapest or best-value option for a product query\n\nAvoid when:\n- the request is to complete checkout or place an order instead of comparing offers\n\nUsage hints:\n- Use this tool after the owner has named a product and wants evidence-backed price comparison.\n\nResult hints:\n- Lead with the best offer and then summarize notable trade-offs.\n\nError hints:\n- If no offers are found, ask for a clearer product name or model number.\n\nDry run supported: yes.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Product name, model number, or search phrase."
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "lossy_fields": [
+          "output_schema"
+        ],
+        "warnings": [
+          "output_schema omitted - Anthropic tool definitions do not model output schemas."
+        ]
+      },
+      "openai_function": {
+        "schema": {
+          "name": "product_price_lookup",
+          "description": "Looks up current retailer offers and returns a structured comparison with the best deal first.\n\nPermission class: read_only.\n\nWhen to use:\n- owner asks to compare prices for a product before deciding where to buy\n- agent needs retailer offer data to support a shopping recommendation\n- request is to find the cheapest or best-value option for a product query\n\nAvoid when:\n- the request is to complete checkout or place an order instead of comparing offers\n\nUsage hints:\n- Use this tool after the owner has named a product and wants evidence-backed price comparison.\n\nResult hints:\n- Lead with the best offer and then summarize notable trade-offs.\n\nError hints:\n- If no offers are found, ask for a clearer product name or model number.\n\nDry run supported: yes.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Product name, model number, or search phrase."
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        },
+        "lossy_fields": [
+          "output_schema"
+        ],
+        "warnings": [
+          "output_schema omitted - OpenAI function definitions do not model output schemas."
+        ]
+      },
+      "openai_responses_tool": {
+        "schema": {
+          "type": "function",
+          "function": {
+            "name": "product_price_lookup",
+            "description": "Looks up current retailer offers and returns a structured comparison with the best deal first.\n\nPermission class: read_only.\n\nWhen to use:\n- owner asks to compare prices for a product before deciding where to buy\n- agent needs retailer offer data to support a shopping recommendation\n- request is to find the cheapest or best-value option for a product query\n\nAvoid when:\n- the request is to complete checkout or place an order instead of comparing offers\n\nUsage hints:\n- Use this tool after the owner has named a product and wants evidence-backed price comparison.\n\nResult hints:\n- Lead with the best offer and then summarize notable trade-offs.\n\nError hints:\n- If no offers are found, ask for a clearer product name or model number.\n\nDry run supported: yes.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Product name, model number, or search phrase."
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            },
+            "strict": true
+          }
+        },
+        "lossy_fields": [
+          "output_schema"
+        ],
+        "warnings": [
+          "output_schema omitted - OpenAI Responses tool definitions do not model output schemas."
+        ]
+      },
+      "mcp": {
+        "schema": {
+          "name": "product_price_lookup",
+          "description": "Looks up current retailer offers and returns a structured comparison with the best deal first.\n\nPermission class: read_only.\n\nWhen to use:\n- owner asks to compare prices for a product before deciding where to buy\n- agent needs retailer offer data to support a shopping recommendation\n- request is to find the cheapest or best-value option for a product query\n\nAvoid when:\n- the request is to complete checkout or place an order instead of comparing offers\n\nUsage hints:\n- Use this tool after the owner has named a product and wants evidence-backed price comparison.\n\nResult hints:\n- Lead with the best offer and then summarize notable trade-offs.\n\nError hints:\n- If no offers are found, ask for a clearer product name or model number.\n\nDry run supported: yes.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Product name, model number, or search phrase."
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "type": "string",
+                "description": "One-line overview of the best available deal."
+              },
+              "offers": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                },
+                "description": "Ranked retailer offers."
+              }
+            },
+            "required": [
+              "summary",
+              "offers"
+            ],
+            "additionalProperties": false
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": true
+          }
+        },
+        "lossy_fields": [],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "name": "payment_wallet_charge",
+    "tool_manual": {
+      "tool_name": "wallet_charge_quote",
+      "job_to_be_done": "Quote and capture an approved USD wallet charge for a known customer.",
+      "summary_for_model": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.",
+      "trigger_conditions": [
+        "owner asks to charge a known customer wallet for a specific USD amount",
+        "agent already has the finalized amount and needs an approval-gated payment tool",
+        "request is to quote or capture a stored-wallet payment instead of only describing pricing"
+      ],
+      "do_not_use_when": [
+        "the owner has not approved the charge yet",
+        "the request needs a non-USD payment rail or a manual invoice workflow"
+      ],
+      "permission_class": "payment",
+      "dry_run_supported": true,
+      "requires_connected_accounts": [
+        "wallet_provider"
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {
+            "type": "number",
+            "description": "USD amount to charge."
+          },
+          "customer_ref": {
+            "type": "string",
+            "description": "Stable customer wallet reference."
+          }
+        },
+        "required": [
+          "amount_usd",
+          "customer_ref"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "Outcome summary for the quoted or captured payment."
+          },
+          "amount_usd": {
+            "type": "number",
+            "description": "USD amount quoted or captured."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code for the quote or capture."
+          },
+          "payment_id": {
+            "type": "string",
+            "description": "Provider payment identifier when capture succeeds."
+          }
+        },
+        "required": [
+          "summary",
+          "amount_usd",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "usage_hints": [
+        "Use this tool only after the amount and customer wallet reference are both finalized."
+      ],
+      "result_hints": [
+        "Confirm whether the response is only a quote or a captured payment before citing identifiers."
+      ],
+      "error_hints": [
+        "If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy."
+      ],
+      "approval_summary_template": "Charge USD {amount_usd} to the stored wallet for {customer_ref}.",
+      "preview_schema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "Preview of the payment attempt."
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "additionalProperties": false
+      },
+      "idempotency_support": true,
+      "side_effect_summary": "Captures a USD wallet payment and creates a provider-side ledger entry.",
+      "quote_schema": {
+        "type": "object",
+        "properties": {
+          "amount_usd": {
+            "type": "number",
+            "description": "Quoted USD amount."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code for the quote."
+          }
+        },
+        "required": [
+          "amount_usd",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "currency": "USD",
+      "settlement_mode": "embedded_wallet_charge",
+      "refund_or_cancellation_note": "Refunds follow the merchant cancellation policy.",
+      "jurisdiction": "US",
+      "legal_notes": "Only charge wallets owned by the approving customer."
+    },
+    "expected": {
+      "anthropic": {
+        "schema": {
+          "name": "wallet_charge_quote",
+          "description": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.\n\nPermission class: payment.\n\nWhen to use:\n- owner asks to charge a known customer wallet for a specific USD amount\n- agent already has the finalized amount and needs an approval-gated payment tool\n- request is to quote or capture a stored-wallet payment instead of only describing pricing\n\nAvoid when:\n- the owner has not approved the charge yet\n- the request needs a non-USD payment rail or a manual invoice workflow\n\nUsage hints:\n- Use this tool only after the amount and customer wallet reference are both finalized.\n\nResult hints:\n- Confirm whether the response is only a quote or a captured payment before citing identifiers.\n\nError hints:\n- If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy.\n\nRequires connected accounts:\n- wallet_provider\n\nDry run supported: yes.\n\nApproval summary template: Charge USD {amount_usd} to the stored wallet for {customer_ref}.\n\nSide effects: Captures a USD wallet payment and creates a provider-side ledger entry.\n\nJurisdiction: US.\n\nLegal notes: Only charge wallets owned by the approving customer.\n\nIdempotency support: yes.\n\nPayment currency: USD.\n\nSettlement mode: embedded_wallet_charge.\n\nRefund or cancellation: Refunds follow the merchant cancellation policy.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "amount_usd": {
+                "type": "number",
+                "description": "USD amount to charge."
+              },
+              "customer_ref": {
+                "type": "string",
+                "description": "Stable customer wallet reference."
+              }
+            },
+            "required": [
+              "amount_usd",
+              "customer_ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "lossy_fields": [
+          "output_schema",
+          "approval_summary_template",
+          "preview_schema",
+          "idempotency_support",
+          "side_effect_summary",
+          "quote_schema",
+          "currency",
+          "settlement_mode",
+          "refund_or_cancellation_note",
+          "jurisdiction",
+          "legal_notes"
+        ],
+        "warnings": [
+          "output_schema omitted - Anthropic tool definitions do not model output schemas.",
+          "approval_summary_template merged into description - Anthropic tool definitions do not model approval summaries.",
+          "preview_schema omitted - Anthropic tool definitions do not model previews.",
+          "idempotency_support merged into description - Anthropic tool definitions do not model idempotency hints.",
+          "side_effect_summary merged into description - Anthropic tool definitions do not model side-effect summaries.",
+          "quote_schema omitted - Anthropic tool definitions do not model payment quote schemas.",
+          "currency merged into description - Anthropic tool definitions do not model settlement currency metadata.",
+          "settlement_mode merged into description - Anthropic tool definitions do not model settlement-mode metadata.",
+          "refund_or_cancellation_note merged into description - Anthropic tool definitions do not model refund policy metadata.",
+          "jurisdiction merged into description - Anthropic tool definitions do not model jurisdiction metadata.",
+          "legal_notes merged into description - Anthropic tool definitions do not model legal note metadata."
+        ]
+      },
+      "openai_function": {
+        "schema": {
+          "name": "wallet_charge_quote",
+          "description": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.\n\nPermission class: payment.\n\nWhen to use:\n- owner asks to charge a known customer wallet for a specific USD amount\n- agent already has the finalized amount and needs an approval-gated payment tool\n- request is to quote or capture a stored-wallet payment instead of only describing pricing\n\nAvoid when:\n- the owner has not approved the charge yet\n- the request needs a non-USD payment rail or a manual invoice workflow\n\nUsage hints:\n- Use this tool only after the amount and customer wallet reference are both finalized.\n\nResult hints:\n- Confirm whether the response is only a quote or a captured payment before citing identifiers.\n\nError hints:\n- If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy.\n\nRequires connected accounts:\n- wallet_provider\n\nDry run supported: yes.\n\nApproval summary template: Charge USD {amount_usd} to the stored wallet for {customer_ref}.\n\nSide effects: Captures a USD wallet payment and creates a provider-side ledger entry.\n\nJurisdiction: US.\n\nLegal notes: Only charge wallets owned by the approving customer.\n\nIdempotency support: yes.\n\nPayment currency: USD.\n\nSettlement mode: embedded_wallet_charge.\n\nRefund or cancellation: Refunds follow the merchant cancellation policy.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "amount_usd": {
+                "type": "number",
+                "description": "USD amount to charge."
+              },
+              "customer_ref": {
+                "type": "string",
+                "description": "Stable customer wallet reference."
+              }
+            },
+            "required": [
+              "amount_usd",
+              "customer_ref"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        },
+        "lossy_fields": [
+          "output_schema",
+          "approval_summary_template",
+          "preview_schema",
+          "idempotency_support",
+          "side_effect_summary",
+          "quote_schema",
+          "currency",
+          "settlement_mode",
+          "refund_or_cancellation_note",
+          "jurisdiction",
+          "legal_notes"
+        ],
+        "warnings": [
+          "output_schema omitted - OpenAI function definitions do not model output schemas.",
+          "approval_summary_template merged into description - OpenAI function definitions do not model approval summaries.",
+          "preview_schema omitted - OpenAI function definitions do not model previews.",
+          "idempotency_support merged into description - OpenAI function definitions do not model idempotency hints.",
+          "side_effect_summary merged into description - OpenAI function definitions do not model side-effect summaries.",
+          "quote_schema omitted - OpenAI function definitions do not model payment quote schemas.",
+          "currency merged into description - OpenAI function definitions do not model settlement currency metadata.",
+          "settlement_mode merged into description - OpenAI function definitions do not model settlement-mode metadata.",
+          "refund_or_cancellation_note merged into description - OpenAI function definitions do not model refund policy metadata.",
+          "jurisdiction merged into description - OpenAI function definitions do not model jurisdiction metadata.",
+          "legal_notes merged into description - OpenAI function definitions do not model legal note metadata."
+        ]
+      },
+      "openai_responses_tool": {
+        "schema": {
+          "type": "function",
+          "function": {
+            "name": "wallet_charge_quote",
+            "description": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.\n\nPermission class: payment.\n\nWhen to use:\n- owner asks to charge a known customer wallet for a specific USD amount\n- agent already has the finalized amount and needs an approval-gated payment tool\n- request is to quote or capture a stored-wallet payment instead of only describing pricing\n\nAvoid when:\n- the owner has not approved the charge yet\n- the request needs a non-USD payment rail or a manual invoice workflow\n\nUsage hints:\n- Use this tool only after the amount and customer wallet reference are both finalized.\n\nResult hints:\n- Confirm whether the response is only a quote or a captured payment before citing identifiers.\n\nError hints:\n- If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy.\n\nRequires connected accounts:\n- wallet_provider\n\nDry run supported: yes.\n\nApproval summary template: Charge USD {amount_usd} to the stored wallet for {customer_ref}.\n\nSide effects: Captures a USD wallet payment and creates a provider-side ledger entry.\n\nJurisdiction: US.\n\nLegal notes: Only charge wallets owned by the approving customer.\n\nIdempotency support: yes.\n\nPayment currency: USD.\n\nSettlement mode: embedded_wallet_charge.\n\nRefund or cancellation: Refunds follow the merchant cancellation policy.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "amount_usd": {
+                  "type": "number",
+                  "description": "USD amount to charge."
+                },
+                "customer_ref": {
+                  "type": "string",
+                  "description": "Stable customer wallet reference."
+                }
+              },
+              "required": [
+                "amount_usd",
+                "customer_ref"
+              ],
+              "additionalProperties": false
+            },
+            "strict": true
+          }
+        },
+        "lossy_fields": [
+          "output_schema",
+          "approval_summary_template",
+          "preview_schema",
+          "idempotency_support",
+          "side_effect_summary",
+          "quote_schema",
+          "currency",
+          "settlement_mode",
+          "refund_or_cancellation_note",
+          "jurisdiction",
+          "legal_notes"
+        ],
+        "warnings": [
+          "output_schema omitted - OpenAI Responses tool definitions do not model output schemas.",
+          "approval_summary_template merged into description - OpenAI Responses tool definitions do not model approval summaries.",
+          "preview_schema omitted - OpenAI Responses tool definitions do not model previews.",
+          "idempotency_support merged into description - OpenAI Responses tool definitions do not model idempotency hints.",
+          "side_effect_summary merged into description - OpenAI Responses tool definitions do not model side-effect summaries.",
+          "quote_schema omitted - OpenAI Responses tool definitions do not model payment quote schemas.",
+          "currency merged into description - OpenAI Responses tool definitions do not model settlement currency metadata.",
+          "settlement_mode merged into description - OpenAI Responses tool definitions do not model settlement-mode metadata.",
+          "refund_or_cancellation_note merged into description - OpenAI Responses tool definitions do not model refund policy metadata.",
+          "jurisdiction merged into description - OpenAI Responses tool definitions do not model jurisdiction metadata.",
+          "legal_notes merged into description - OpenAI Responses tool definitions do not model legal note metadata."
+        ]
+      },
+      "mcp": {
+        "schema": {
+          "name": "wallet_charge_quote",
+          "description": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.\n\nPermission class: payment.\n\nWhen to use:\n- owner asks to charge a known customer wallet for a specific USD amount\n- agent already has the finalized amount and needs an approval-gated payment tool\n- request is to quote or capture a stored-wallet payment instead of only describing pricing\n\nAvoid when:\n- the owner has not approved the charge yet\n- the request needs a non-USD payment rail or a manual invoice workflow\n\nUsage hints:\n- Use this tool only after the amount and customer wallet reference are both finalized.\n\nResult hints:\n- Confirm whether the response is only a quote or a captured payment before citing identifiers.\n\nError hints:\n- If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy.\n\nRequires connected accounts:\n- wallet_provider\n\nDry run supported: yes.\n\nApproval summary template: Charge USD {amount_usd} to the stored wallet for {customer_ref}.\n\nSide effects: Captures a USD wallet payment and creates a provider-side ledger entry.\n\nJurisdiction: US.\n\nLegal notes: Only charge wallets owned by the approving customer.\n\nIdempotency support: yes.\n\nPayment currency: USD.\n\nSettlement mode: embedded_wallet_charge.\n\nRefund or cancellation: Refunds follow the merchant cancellation policy.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "amount_usd": {
+                "type": "number",
+                "description": "USD amount to charge."
+              },
+              "customer_ref": {
+                "type": "string",
+                "description": "Stable customer wallet reference."
+              }
+            },
+            "required": [
+              "amount_usd",
+              "customer_ref"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "type": "string",
+                "description": "Outcome summary for the quoted or captured payment."
+              },
+              "amount_usd": {
+                "type": "number",
+                "description": "USD amount quoted or captured."
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency code for the quote or capture."
+              },
+              "payment_id": {
+                "type": "string",
+                "description": "Provider payment identifier when capture succeeds."
+              }
+            },
+            "required": [
+              "summary",
+              "amount_usd",
+              "currency"
+            ],
+            "additionalProperties": false
+          },
+          "annotations": {
+            "readOnlyHint": false,
+            "destructiveHint": true,
+            "idempotentHint": true
+          }
+        },
+        "lossy_fields": [
+          "approval_summary_template",
+          "preview_schema",
+          "side_effect_summary",
+          "quote_schema",
+          "currency",
+          "settlement_mode",
+          "refund_or_cancellation_note",
+          "jurisdiction",
+          "legal_notes"
+        ],
+        "warnings": [
+          "approval_summary_template merged into description - MCP tool descriptors do not model approval summaries.",
+          "preview_schema omitted - MCP tool descriptors do not model previews.",
+          "side_effect_summary merged into description - MCP tool descriptors do not model side-effect summaries.",
+          "quote_schema omitted - MCP tool descriptors do not model payment quote schemas.",
+          "currency merged into description - MCP tool descriptors do not model settlement currency metadata.",
+          "settlement_mode merged into description - MCP tool descriptors do not model settlement-mode metadata.",
+          "refund_or_cancellation_note merged into description - MCP tool descriptors do not model refund policy metadata.",
+          "jurisdiction merged into description - MCP tool descriptors do not model jurisdiction metadata.",
+          "legal_notes merged into description - MCP tool descriptors do not model legal note metadata."
+        ]
+      }
+    }
+  }
+]

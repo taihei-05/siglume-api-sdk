@@ -1,6 +1,7 @@
 export * from "./client";
 export * from "./diff";
 export * from "./errors";
+export * from "./exporters";
 export * from "./runtime";
 export * from "./tool-manual-assist";
 export * from "./tool-manual-grader";
