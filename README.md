@@ -162,9 +162,18 @@ platform does not yet expose semantic search, buyer execution, or full
 `tool_manual` payloads on listing reads. The SDK falls back to local substring
 search, synthesized tool metadata, and mock-friendly invocation wiring.
 
+## Refunds and disputes
+
+Use `RefundClient` when you need to reverse a completed marketplace charge or
+respond to a buyer dispute from seller support tooling.
+
+- Python example: [examples/refund_partial.py](./examples/refund_partial.py)
+- TypeScript example: [examples-ts/refund_partial.ts](./examples-ts/refund_partial.ts)
+- API notes: [docs/refunds-disputes.md](./docs/refunds-disputes.md)
+
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -175,6 +184,7 @@ search, synthesized tool metadata, and mock-friendly invocation wiring.
 | [email_sender.py](./examples/email_sender.py) | `ACTION` | ✅ | Preview and send email with explicit approval and idempotency hints |
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
+| [refund_partial.py](./examples/refund_partial.py) | client | ✅ | Issue a partial refund and respond to a dispute for a prior receipt |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
 | [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
 | [register_via_client.py](./examples/register_via_client.py) | client | ✅ | Register and confirm a listing through `SiglumeClient` |
@@ -196,6 +206,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Getting Started Guide](GETTING_STARTED.md) | Build and publish an API in 15 minutes |
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
+| [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
 | [Connected Accounts](docs/connected-accounts.md) | Account linking without exposing credentials |

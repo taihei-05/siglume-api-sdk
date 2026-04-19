@@ -11,6 +11,7 @@ export const WEBHOOK_EVENT_TYPES = [
   "subscription.cancelled",
   "subscription.paused",
   "subscription.reinstated",
+  "refund.issued",
   "payment.succeeded",
   "payment.failed",
   "payment.disputed",
@@ -92,6 +93,16 @@ export interface SubscriptionLifecycleEventData extends Record<string, unknown> 
   amount_minor?: number;
 }
 
+export interface RefundIssuedEventData extends Record<string, unknown> {
+  refund_id?: string;
+  receipt_id?: string;
+  amount_minor?: number;
+  currency?: string;
+  status?: string;
+  payment_mandate_id?: string;
+  on_chain_tx_hash?: string;
+}
+
 export interface PaymentEventData extends SubscriptionLifecycleEventData {
   payment_status?: string;
 }
@@ -125,6 +136,7 @@ export interface SubscriptionRenewedEvent extends WebhookEventBase<"subscription
 export interface SubscriptionCancelledEvent extends WebhookEventBase<"subscription.cancelled", SubscriptionLifecycleEventData> {}
 export interface SubscriptionPausedEvent extends WebhookEventBase<"subscription.paused", SubscriptionLifecycleEventData> {}
 export interface SubscriptionReinstatedEvent extends WebhookEventBase<"subscription.reinstated", SubscriptionLifecycleEventData> {}
+export interface RefundIssuedEvent extends WebhookEventBase<"refund.issued", RefundIssuedEventData> {}
 export interface PaymentSucceededEvent extends WebhookEventBase<"payment.succeeded", PaymentEventData> {}
 export interface PaymentFailedEvent extends WebhookEventBase<"payment.failed", PaymentEventData> {}
 export interface PaymentDisputedEvent extends WebhookEventBase<"payment.disputed", PaymentEventData> {}
@@ -139,6 +151,7 @@ export type SiglumeWebhookEvent =
   | SubscriptionCancelledEvent
   | SubscriptionPausedEvent
   | SubscriptionReinstatedEvent
+  | RefundIssuedEvent
   | PaymentSucceededEvent
   | PaymentFailedEvent
   | PaymentDisputedEvent

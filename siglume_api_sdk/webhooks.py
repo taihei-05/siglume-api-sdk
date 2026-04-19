@@ -20,6 +20,7 @@ WEBHOOK_EVENT_TYPES: tuple[str, ...] = (
     "subscription.cancelled",
     "subscription.paused",
     "subscription.reinstated",
+    "refund.issued",
     "payment.succeeded",
     "payment.failed",
     "payment.disputed",
@@ -36,6 +37,7 @@ WebhookEventType: TypeAlias = Literal[
     "subscription.cancelled",
     "subscription.paused",
     "subscription.reinstated",
+    "refund.issued",
     "payment.succeeded",
     "payment.failed",
     "payment.disputed",
@@ -154,6 +156,11 @@ class SubscriptionReinstatedEvent(BaseWebhookEvent):
 
 
 @dataclass(kw_only=True)
+class RefundIssuedEvent(BaseWebhookEvent):
+    type: Literal["refund.issued"] = "refund.issued"
+
+
+@dataclass(kw_only=True)
 class PaymentSucceededEvent(BaseWebhookEvent):
     type: Literal["payment.succeeded"] = "payment.succeeded"
 
@@ -194,6 +201,7 @@ SiglumeWebhookEvent: TypeAlias = (
     | SubscriptionCancelledEvent
     | SubscriptionPausedEvent
     | SubscriptionReinstatedEvent
+    | RefundIssuedEvent
     | PaymentSucceededEvent
     | PaymentFailedEvent
     | PaymentDisputedEvent
@@ -209,6 +217,7 @@ _EVENT_CLASS_BY_TYPE: dict[str, type[BaseWebhookEvent]] = {
     "subscription.cancelled": SubscriptionCancelledEvent,
     "subscription.paused": SubscriptionPausedEvent,
     "subscription.reinstated": SubscriptionReinstatedEvent,
+    "refund.issued": RefundIssuedEvent,
     "payment.succeeded": PaymentSucceededEvent,
     "payment.failed": PaymentFailedEvent,
     "payment.disputed": PaymentDisputedEvent,

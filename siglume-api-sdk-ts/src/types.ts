@@ -409,3 +409,73 @@ export interface SupportCaseRecord {
   updated_at?: string | null;
   raw: Record<string, unknown>;
 }
+
+export const RefundReason = {
+  CUSTOMER_REQUEST: "customer-request",
+  DUPLICATE: "duplicate",
+  FRAUDULENT: "fraudulent",
+  SERVICE_FAILURE: "service-failure",
+  GOODWILL: "goodwill",
+} as const;
+export type RefundReason = (typeof RefundReason)[keyof typeof RefundReason];
+
+export const DisputeResponse = {
+  ACCEPT: "accept",
+  CONTEST: "contest",
+} as const;
+export type DisputeResponse = (typeof DisputeResponse)[keyof typeof DisputeResponse];
+
+export const RefundStatus = {
+  ISSUED: "issued",
+  FAILED: "failed",
+} as const;
+export type RefundStatus = (typeof RefundStatus)[keyof typeof RefundStatus];
+
+export const DisputeStatus = {
+  OPEN: "open",
+  ACCEPTED: "accepted",
+  CONTESTED: "contested",
+} as const;
+export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus];
+
+export interface RefundRecord {
+  refund_id: string;
+  receipt_id: string;
+  owner_user_id?: string | null;
+  payment_mandate_id?: string | null;
+  usage_event_id?: string | null;
+  chain_receipt_id?: string | null;
+  amount_minor: number;
+  currency: string;
+  status: string;
+  reason_code: string;
+  note?: string | null;
+  idempotency_key?: string | null;
+  on_chain_tx_hash?: string | null;
+  metadata: Record<string, unknown>;
+  idempotent_replay: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface DisputeRecord {
+  dispute_id: string;
+  receipt_id: string;
+  owner_user_id?: string | null;
+  payment_mandate_id?: string | null;
+  usage_event_id?: string | null;
+  external_dispute_id?: string | null;
+  status: string;
+  reason_code: string;
+  description?: string | null;
+  evidence: Record<string, unknown>;
+  response_decision?: string | null;
+  response_note?: string | null;
+  responded_at?: string | null;
+  metadata: Record<string, unknown>;
+  idempotent_replay: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}

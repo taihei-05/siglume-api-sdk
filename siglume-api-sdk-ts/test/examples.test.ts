@@ -14,6 +14,7 @@ import {
   runWalletBalanceExample,
   WalletBalanceApp,
 } from "../../examples-ts/wallet_balance";
+import { runRefundPartialExample } from "../../examples-ts/refund_partial";
 import { runMockWebhookExpressExample } from "../../examples-ts/webhook_handler_express";
 
 const EXAMPLES = [
@@ -97,5 +98,14 @@ describe("TypeScript example suite", () => {
     expect(lines[0]).toBe("status: 200");
     expect(lines[1]).toBe("handled_type: payment.succeeded");
     expect(lines[4]).toBe("duplicate_on_replay: true");
+  });
+
+  it("returns stable summary lines for refund_partial", async () => {
+    const lines = await runRefundPartialExample();
+
+    expect(lines[0]).toContain("refund_note: Refunds are issued against the original receipt.");
+    expect(lines[1]).toBe("refund_status: issued replay=false");
+    expect(lines[3]).toBe("refunds_for_receipt: 1");
+    expect(lines[4]).toBe("dispute_status: contested response=contest");
   });
 });
