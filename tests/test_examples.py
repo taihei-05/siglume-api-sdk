@@ -68,3 +68,13 @@ def test_examples_validate_and_run(example_name: str, permission_class: Permissi
     assert ok, f"{example_name} tool manual invalid: {issues}"
 
     asyncio.run(_exercise_example(app, permission_class))
+
+
+def test_generate_tool_manual_example_requires_explicit_llm_api_key(monkeypatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    module = _load_module("generate_tool_manual.py")
+
+    with pytest.raises(SystemExit, match="Set ANTHROPIC_API_KEY or OPENAI_API_KEY"):
+        module.main()

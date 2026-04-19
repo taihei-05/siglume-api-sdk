@@ -130,6 +130,24 @@ pip install -e .
 python examples/hello_price_compare.py
 ```
 
+Draft a ToolManual with the bundled LLM helpers:
+
+```python
+from siglume_api_sdk.assist import AnthropicProvider, draft_tool_manual
+
+result = draft_tool_manual(
+    capability_key="currency-converter-jp",
+    job_to_be_done="Convert USD amounts to JPY with live rates",
+    permission_class="read_only",
+    llm=AnthropicProvider(),
+)
+
+print(result.quality_report.grade)
+print(result.tool_manual["summary_for_model"])
+```
+
+Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before using the helper or the bundled [generate_tool_manual.py](./examples/generate_tool_manual.py) example.
+
 ## Example templates
 
 `hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, and `payment_quote.py` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
@@ -189,6 +207,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | `ToolManualIssue` | Single validation or quality issue |
 | `ToolManualQualityReport` | Quality score (0-100, grade A-F) |
 | `validate_tool_manual()` | Client-side validation (mirrors server rules) |
+| `draft_tool_manual()` / `fill_tool_manual_gaps()` | Generate or repair ToolManual content with offline scoring + retry |
 | `AppTestHarness` | Local sandbox test runner (incl. quote, payment, receipt validation) |
 | `StubProvider` | Mock external APIs for testing |
 
