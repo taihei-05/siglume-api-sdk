@@ -125,6 +125,18 @@ def test_refund_partial_example_runs_with_mock_client() -> None:
     assert output[4] == "dispute_status: contested response=contest"
 
 
+def test_metering_record_example_runs_with_mock_client() -> None:
+    module = _load_module("metering_record.py")
+
+    output = module.run_metering_example()
+
+    assert output[0].startswith("experimental_note: usage_based / per_action remain planned")
+    assert output[1] == "record_status: accepted=True replayed=False external_id=evt_usage_001"
+    assert output[2] == "batch_items: 2 last_period=202604"
+    assert output[3] == "preview_subtotal_minor: 7615"
+    assert output[4] == "usage_dimensions: tokens_in,tokens_out,calls"
+
+
 def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:
     # Codex bot P2 on PR #107: the tool manual defaults token_symbol to
     # "native" but the adapter uppercased "NATIVE" and fell through to

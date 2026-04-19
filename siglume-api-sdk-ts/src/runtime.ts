@@ -9,7 +9,8 @@ import type {
   ToolManual,
   ToolManualIssue,
 } from "./types";
-import { ApprovalMode, Environment, PermissionClass } from "./types";
+import { ApprovalMode, Environment, PermissionClass, PriceModel } from "./types";
+import type { MeteringSimulationResult, UsageRecord } from "./metering";
 import { Recorder, RecordMode } from "./testing/recorder";
 import { validate_tool_manual } from "./tool-manual-validator";
 
@@ -223,6 +224,44 @@ export class AppTestHarness {
       ...options,
       connected_accounts: {},
     });
+  }
+
+  async simulate_metering(
+    record: UsageRecord,
+    options: { execution_result?: ExecutionResult | null } = {},
+  ): Promise<MeteringSimulationResult> {
+    const { normalizeUsageRecord } = await import("./metering");
+    const manifest = await this.app.manifest();
+    const usage_record = normalizeUsageRecord(record);
+    let invoice_line_preview: MeteringSimulationResult["invoice_line_preview"] = null;
+
+    if (manifest.price_model === PriceModel.USAGE_BASED) {
+      invoice_line_preview = {
+        price_model: manifest.price_model,
+        billable_units: usage_record.units,
+        unit_amount_minor: Math.trunc(manifest.price_value_minor ?? 0),
+        subtotal_minor: usage_record.units * Math.trunc(manifest.price_value_minor ?? 0),
+        currency: manifest.currency ?? "USD",
+      };
+    } else if (manifest.price_model === PriceModel.PER_ACTION) {
+      const executionResult = options.execution_result ?? null;
+      const billable_units = Number(
+        Boolean(executionResult && executionResult.success && executionResult.execution_kind !== "dry_run"),
+      );
+      invoice_line_preview = {
+        price_model: manifest.price_model,
+        billable_units,
+        unit_amount_minor: Math.trunc(manifest.price_value_minor ?? 0),
+        subtotal_minor: billable_units * Math.trunc(manifest.price_value_minor ?? 0),
+        currency: manifest.currency ?? "USD",
+      };
+    }
+
+    return {
+      experimental: manifest.price_model === PriceModel.USAGE_BASED || manifest.price_model === PriceModel.PER_ACTION,
+      usage_record,
+      invoice_line_preview,
+    };
   }
 
   async record<T>(

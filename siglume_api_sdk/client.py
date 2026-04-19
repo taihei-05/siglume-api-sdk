@@ -233,6 +233,7 @@ class UsageEventRecord:
     usage_event_id: str
     capability_key: str | None = None
     agent_id: str | None = None
+    dimension: str | None = None
     environment: str | None = None
     task_type: str | None = None
     units_consumed: int = 0
@@ -243,6 +244,8 @@ class UsageEventRecord:
     latency_ms: int | None = None
     trace_id: str | None = None
     period_key: str | None = None
+    external_id: str | None = None
+    occurred_at_iso: str | None = None
     created_at: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -573,9 +576,10 @@ def _parse_usage_event(data: Mapping[str, Any]) -> UsageEventRecord:
         usage_event_id=str(data.get("usage_event_id") or data.get("id") or ""),
         capability_key=_string_or_none(data.get("capability_key")),
         agent_id=_string_or_none(data.get("agent_id")),
+        dimension=_string_or_none(data.get("dimension")),
         environment=_string_or_none(data.get("environment")),
         task_type=_string_or_none(data.get("task_type")),
-        units_consumed=int(data.get("units_consumed") or 0),
+        units_consumed=int(data.get("units_consumed") or data.get("units") or 0),
         outcome=_string_or_none(data.get("outcome")),
         execution_kind=_string_or_none(data.get("execution_kind")),
         permission_class=_string_or_none(data.get("permission_class")),
@@ -583,6 +587,8 @@ def _parse_usage_event(data: Mapping[str, Any]) -> UsageEventRecord:
         latency_ms=int(data["latency_ms"]) if data.get("latency_ms") is not None else None,
         trace_id=_string_or_none(data.get("trace_id")),
         period_key=_string_or_none(data.get("period_key")),
+        external_id=_string_or_none(data.get("external_id") or data.get("idempotency_key")),
+        occurred_at_iso=_string_or_none(data.get("occurred_at_iso") or data.get("occurred_at")),
         created_at=_string_or_none(data.get("created_at")),
         metadata=_to_dict(data.get("metadata")),
         raw=dict(data),

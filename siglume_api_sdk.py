@@ -1001,6 +1001,53 @@ class AppTestHarness:
             **kwargs,
         )
 
+    def simulate_metering(
+        self,
+        record: Any,
+        *,
+        execution_result: ExecutionResult | None = None,
+    ) -> dict[str, Any]:
+        """Preview how a usage record would map to a future invoice line.
+
+        This is an experimental analytics / pre-billing helper. It validates the
+        usage payload shape locally and returns a deterministic preview. It does
+        not create a charge.
+        """
+        from siglume_api_sdk.metering import _normalize_usage_record
+
+        manifest = self.app.manifest()
+        usage_record = _normalize_usage_record(record)
+        invoice_line_preview: dict[str, Any] | None = None
+
+        if manifest.price_model == PriceModel.USAGE_BASED:
+            billable_units = int(usage_record["units"])
+            invoice_line_preview = {
+                "price_model": manifest.price_model.value,
+                "billable_units": billable_units,
+                "unit_amount_minor": int(manifest.price_value_minor),
+                "subtotal_minor": billable_units * int(manifest.price_value_minor),
+                "currency": manifest.currency,
+            }
+        elif manifest.price_model == PriceModel.PER_ACTION:
+            billable_units = int(
+                execution_result is not None
+                and execution_result.success
+                and execution_result.execution_kind != ExecutionKind.DRY_RUN
+            )
+            invoice_line_preview = {
+                "price_model": manifest.price_model.value,
+                "billable_units": billable_units,
+                "unit_amount_minor": int(manifest.price_value_minor),
+                "subtotal_minor": billable_units * int(manifest.price_value_minor),
+                "currency": manifest.currency,
+            }
+
+        return {
+            "experimental": manifest.price_model in (PriceModel.USAGE_BASED, PriceModel.PER_ACTION),
+            "usage_record": usage_record,
+            "invoice_line_preview": invoice_line_preview,
+        }
+
     def record(
         self,
         cassette_path: str,

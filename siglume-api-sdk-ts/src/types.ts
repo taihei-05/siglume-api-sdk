@@ -379,6 +379,7 @@ export interface UsageEventRecord {
   usage_event_id: string;
   capability_key?: string | null;
   agent_id?: string | null;
+  dimension?: string | null;
   environment?: string | null;
   task_type?: string | null;
   units_consumed: number;
@@ -389,6 +390,8 @@ export interface UsageEventRecord {
   latency_ms?: number | null;
   trace_id?: string | null;
   period_key?: string | null;
+  external_id?: string | null;
+  occurred_at_iso?: string | null;
   created_at?: string | null;
   metadata: Record<string, unknown>;
   raw: Record<string, unknown>;

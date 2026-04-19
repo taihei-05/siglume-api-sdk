@@ -14,6 +14,7 @@ import {
   runWalletBalanceExample,
   WalletBalanceApp,
 } from "../../examples-ts/wallet_balance";
+import { runMeteringRecordExample } from "../../examples-ts/metering_record";
 import { runRefundPartialExample } from "../../examples-ts/refund_partial";
 import { runMockWebhookExpressExample } from "../../examples-ts/webhook_handler_express";
 
@@ -107,5 +108,15 @@ describe("TypeScript example suite", () => {
     expect(lines[1]).toBe("refund_status: issued replay=false");
     expect(lines[3]).toBe("refunds_for_receipt: 1");
     expect(lines[4]).toBe("dispute_status: contested response=contest");
+  });
+
+  it("returns stable summary lines for metering_record", async () => {
+    const lines = await runMeteringRecordExample();
+
+    expect(lines[0]).toContain("experimental_note: usage_based / per_action remain planned");
+    expect(lines[1]).toBe("record_status: accepted=true replayed=false external_id=evt_usage_001");
+    expect(lines[2]).toBe("batch_items: 2 last_period=202604");
+    expect(lines[3]).toBe("preview_subtotal_minor: 7615");
+    expect(lines[4]).toBe("usage_dimensions: tokens_in,tokens_out,calls");
   });
 });
