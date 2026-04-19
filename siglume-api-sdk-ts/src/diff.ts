@@ -399,6 +399,13 @@ function normalizeManifest(value: AppManifest | Record<string, unknown>): Record
     ...payload,
     price_model: payload.price_model ?? "free",
     currency: payload.currency ?? "USD",
+    // AppManifest defaults permission_class to "read-only" (hyphen form,
+    // PermissionClass.READ_ONLY). Without this default, a legacy / minimal
+    // manifest without permission_class compared against an upgraded one
+    // would leave oldRank undefined and appendPermissionClassChange would
+    // downgrade the permission escalation from BREAKING to INFO — letting
+    // the diff CLI exit 0 on a genuinely breaking change.
+    permission_class: payload.permission_class ?? "read-only",
   };
 }
 

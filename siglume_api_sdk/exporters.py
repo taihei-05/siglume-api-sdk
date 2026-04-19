@@ -128,15 +128,17 @@ def to_openai_responses_tool(tool_manual: Any) -> ToolSchemaExport:
     manual = _coerce_tool_manual(tool_manual)
     tool_name = _required_non_empty_string(manual, "tool_name")
     lossy_fields = _lossy_fields("openai_responses_tool", manual)
+    # OpenAI Responses API wants a flat function-tool shape (type / name /
+    # description / parameters / strict at the top level), not the nested
+    # Chat Completions envelope. Nesting `function: {...}` causes
+    # `client.responses.create(tools=[...])` to reject the payload.
     return ToolSchemaExport(
         schema={
             "type": "function",
-            "function": {
-                "name": tool_name,
-                "description": _build_description(manual),
-                "parameters": _mapping(manual.get("input_schema")),
-                "strict": True,
-            },
+            "name": tool_name,
+            "description": _build_description(manual),
+            "parameters": _mapping(manual.get("input_schema")),
+            "strict": True,
         },
         lossy_fields=lossy_fields,
         warnings=_warnings_for("openai_responses_tool", lossy_fields),

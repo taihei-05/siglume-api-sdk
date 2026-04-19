@@ -115,24 +115,22 @@
       "openai_responses_tool": {
         "schema": {
           "type": "function",
-          "function": {
-            "name": "product_price_lookup",
-            "description": "Looks up current retailer offers and returns a structured comparison with the best deal first.\n\nPermission class: read_only.\n\nWhen to use:\n- owner asks to compare prices for a product before deciding where to buy\n- agent needs retailer offer data to support a shopping recommendation\n- request is to find the cheapest or best-value option for a product query\n\nAvoid when:\n- the request is to complete checkout or place an order instead of comparing offers\n\nUsage hints:\n- Use this tool after the owner has named a product and wants evidence-backed price comparison.\n\nResult hints:\n- Lead with the best offer and then summarize notable trade-offs.\n\nError hints:\n- If no offers are found, ask for a clearer product name or model number.\n\nDry run supported: yes.",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "query": {
-                  "type": "string",
-                  "description": "Product name, model number, or search phrase."
-                }
-              },
-              "required": [
-                "query"
-              ],
-              "additionalProperties": false
+          "name": "product_price_lookup",
+          "description": "Looks up current retailer offers and returns a structured comparison with the best deal first.\n\nPermission class: read_only.\n\nWhen to use:\n- owner asks to compare prices for a product before deciding where to buy\n- agent needs retailer offer data to support a shopping recommendation\n- request is to find the cheapest or best-value option for a product query\n\nAvoid when:\n- the request is to complete checkout or place an order instead of comparing offers\n\nUsage hints:\n- Use this tool after the owner has named a product and wants evidence-backed price comparison.\n\nResult hints:\n- Lead with the best offer and then summarize notable trade-offs.\n\nError hints:\n- If no offers are found, ask for a clearer product name or model number.\n\nDry run supported: yes.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Product name, model number, or search phrase."
+              }
             },
-            "strict": true
-          }
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
         },
         "lossy_fields": [
           "output_schema"
@@ -409,29 +407,27 @@
       "openai_responses_tool": {
         "schema": {
           "type": "function",
-          "function": {
-            "name": "wallet_charge_quote",
-            "description": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.\n\nPermission class: payment.\n\nWhen to use:\n- owner asks to charge a known customer wallet for a specific USD amount\n- agent already has the finalized amount and needs an approval-gated payment tool\n- request is to quote or capture a stored-wallet payment instead of only describing pricing\n\nAvoid when:\n- the owner has not approved the charge yet\n- the request needs a non-USD payment rail or a manual invoice workflow\n\nUsage hints:\n- Use this tool only after the amount and customer wallet reference are both finalized.\n\nResult hints:\n- Confirm whether the response is only a quote or a captured payment before citing identifiers.\n\nError hints:\n- If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy.\n\nRequires connected accounts:\n- wallet_provider\n\nDry run supported: yes.\n\nApproval summary template: Charge USD {amount_usd} to the stored wallet for {customer_ref}.\n\nSide effects: Captures a USD wallet payment and creates a provider-side ledger entry.\n\nJurisdiction: US.\n\nLegal notes: Only charge wallets owned by the approving customer.\n\nIdempotency support: yes.\n\nPayment currency: USD.\n\nSettlement mode: embedded_wallet_charge.\n\nRefund or cancellation: Refunds follow the merchant cancellation policy.",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "amount_usd": {
-                  "type": "number",
-                  "description": "USD amount to charge."
-                },
-                "customer_ref": {
-                  "type": "string",
-                  "description": "Stable customer wallet reference."
-                }
+          "name": "wallet_charge_quote",
+          "description": "Quotes the USD amount and captures a stored-wallet payment after the owner approves.\n\nPermission class: payment.\n\nWhen to use:\n- owner asks to charge a known customer wallet for a specific USD amount\n- agent already has the finalized amount and needs an approval-gated payment tool\n- request is to quote or capture a stored-wallet payment instead of only describing pricing\n\nAvoid when:\n- the owner has not approved the charge yet\n- the request needs a non-USD payment rail or a manual invoice workflow\n\nUsage hints:\n- Use this tool only after the amount and customer wallet reference are both finalized.\n\nResult hints:\n- Confirm whether the response is only a quote or a captured payment before citing identifiers.\n\nError hints:\n- If the wallet provider rejects the charge, explain whether the failure came from balance, auth, or policy.\n\nRequires connected accounts:\n- wallet_provider\n\nDry run supported: yes.\n\nApproval summary template: Charge USD {amount_usd} to the stored wallet for {customer_ref}.\n\nSide effects: Captures a USD wallet payment and creates a provider-side ledger entry.\n\nJurisdiction: US.\n\nLegal notes: Only charge wallets owned by the approving customer.\n\nIdempotency support: yes.\n\nPayment currency: USD.\n\nSettlement mode: embedded_wallet_charge.\n\nRefund or cancellation: Refunds follow the merchant cancellation policy.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "amount_usd": {
+                "type": "number",
+                "description": "USD amount to charge."
               },
-              "required": [
-                "amount_usd",
-                "customer_ref"
-              ],
-              "additionalProperties": false
+              "customer_ref": {
+                "type": "string",
+                "description": "Stable customer wallet reference."
+              }
             },
-            "strict": true
-          }
+            "required": [
+              "amount_usd",
+              "customer_ref"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
         },
         "lossy_fields": [
           "output_schema",

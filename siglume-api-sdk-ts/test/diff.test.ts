@@ -196,4 +196,26 @@ describe("diff rules", () => {
       ]),
     );
   });
+
+  it("defaults manifest permission_class to read-only so upgrades from missing are BREAKING (Codex P1 on PR #60)", () => {
+    // When an old / legacy manifest omits permission_class, the new
+    // manifest escalating to action must still register as BREAKING.
+    // Pre-fix, normaliseManifest did not default permission_class, leaving
+    // oldRank undefined and downgrading the change to INFO — letting
+    // `siglume diff` exit 0 on a genuinely breaking permission escalation.
+    const changes = diff_manifest({
+      old: { capability_key: "legacy-app", jurisdiction: "US" },
+      new: {
+        capability_key: "legacy-app",
+        jurisdiction: "US",
+        permission_class: "action",
+      },
+    });
+
+    expect(
+      changes.some(
+        (change) => change.path === "permission_class" && change.level === ChangeLevel.BREAKING,
+      ),
+    ).toBe(true);
+  });
 });

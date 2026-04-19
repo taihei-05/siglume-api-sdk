@@ -20,9 +20,16 @@ export interface OpenAIFunctionDefinition {
   strict: true;
 }
 
+// OpenAI Responses API flattens the function tool shape: type / name /
+// description / parameters / strict live at the top level of the tool
+// object. The nested `function: {...}` envelope belongs to the Chat
+// Completions API only and is rejected by `responses.create(..., tools=[...])`.
 export interface OpenAIResponsesToolDefinition {
   type: "function";
-  function: OpenAIFunctionDefinition;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  strict: true;
 }
 
 export interface McpToolDescriptor {
@@ -152,12 +159,10 @@ export function to_openai_responses_tool(
   return {
     schema: {
       type: "function",
-      function: {
-        name: tool_name,
-        description: buildDescription(manual),
-        parameters: toRecord(manual.input_schema),
-        strict: true,
-      },
+      name: tool_name,
+      description: buildDescription(manual),
+      parameters: toRecord(manual.input_schema),
+      strict: true,
     },
     lossy_fields,
     warnings: warningsFor("openai_responses_tool", lossy_fields),

@@ -417,6 +417,13 @@ def _normalize_manifest(value: Any) -> dict[str, Any]:
     normalized = dict(payload)
     normalized["price_model"] = normalized.get("price_model") or "free"
     normalized["currency"] = normalized.get("currency") or "USD"
+    # AppManifest defaults permission_class to "read-only" (hyphen form,
+    # PermissionClass.READ_ONLY). Without this default, a legacy/minimal
+    # manifest without permission_class compared against an upgraded
+    # manifest would leave oldRank undefined and appendPermissionClassChange
+    # would downgrade the permission escalation from BREAKING to INFO —
+    # letting the diff CLI exit 0 on a genuinely breaking change.
+    normalized["permission_class"] = normalized.get("permission_class") or "read-only"
     return normalized
 
 

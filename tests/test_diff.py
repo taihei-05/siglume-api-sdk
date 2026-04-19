@@ -265,3 +265,30 @@ def test_diff_cli_prefers_tool_manual_when_ambiguous_keys_present() -> None:
             change["level"] == "breaking" and change["path"] == "input_schema.required"
             for change in payload["changes"]
         )
+
+
+def test_diff_manifest_defaults_permission_class_for_missing_old_value() -> None:
+    # Codex bot P1 on PR #60: when an old/legacy manifest omits
+    # permission_class and the new one escalates to action, the permission
+    # escalation must be BREAKING. Previously the normaliser did not default
+    # permission_class, so oldRank was undefined and the change was
+    # downgraded to INFO — making `siglume diff` exit 0 on a real
+    # permission escalation.
+    changes = diff_manifest(
+        old={"capability_key": "legacy-app", "jurisdiction": "US"},
+        new={
+            "capability_key": "legacy-app",
+            "jurisdiction": "US",
+            "permission_class": "action",
+        },
+    )
+
+    breaking_permission = [
+        change
+        for change in changes
+        if change.path == "permission_class" and change.level == ChangeLevel.BREAKING
+    ]
+    assert breaking_permission, [
+        {"path": change.path, "level": change.level.value, "old": change.old, "new": change.new}
+        for change in changes
+    ]

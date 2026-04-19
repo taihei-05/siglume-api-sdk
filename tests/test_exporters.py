@@ -120,11 +120,19 @@ def test_mcp_annotations_track_permission_and_idempotency() -> None:
     }
 
 
-def test_openai_responses_export_wraps_function_definition() -> None:
+def test_openai_responses_export_uses_flat_function_tool_shape() -> None:
+    # Codex bot P1 on PR #102: the OpenAI Responses API expects a flat
+    # { type, name, description, parameters, strict } tool object, not the
+    # Chat Completions { type, function: { ... } } envelope. The nested
+    # form is rejected by client.responses.create(..., tools=[...]).
     case = next(item for item in CASES if item["name"] == "read_only_price_lookup")
 
     exported = to_openai_responses_tool(case["tool_manual"])
 
     assert exported.schema["type"] == "function"
-    assert exported.schema["function"]["name"] == case["tool_manual"]["tool_name"]
-    assert exported.schema["function"]["strict"] is True
+    assert exported.schema["name"] == case["tool_manual"]["tool_name"]
+    assert exported.schema["strict"] is True
+    assert "description" in exported.schema
+    assert "parameters" in exported.schema
+    # The nested function envelope MUST be absent — that is the bug we fixed.
+    assert "function" not in exported.schema

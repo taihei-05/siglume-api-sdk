@@ -115,14 +115,22 @@ describe("tool schema exporters", () => {
     });
   });
 
-  it("wraps the OpenAI Responses export in a function tool envelope", async () => {
+  it("exports a flat function-tool shape for the OpenAI Responses API", async () => {
+    // Codex bot P1 on PR #102: the Responses API requires { type, name,
+    // description, parameters, strict } at the top level; the Chat
+    // Completions { type, function: {...} } envelope is rejected by
+    // client.responses.create(..., tools=[...]).
     const cases = await loadCases();
     const fixture = cases.find((item) => item.name === "read_only_price_lookup")!;
 
     const exported = to_openai_responses_tool(fixture.tool_manual);
 
     expect(exported.schema.type).toBe("function");
-    expect(exported.schema.function.name).toBe("product_price_lookup");
-    expect(exported.schema.function.strict).toBe(true);
+    expect(exported.schema.name).toBe("product_price_lookup");
+    expect(exported.schema.strict).toBe(true);
+    expect(exported.schema.description).toBeTypeOf("string");
+    expect(exported.schema.parameters).toBeTypeOf("object");
+    // The nested Chat-Completions envelope MUST be absent.
+    expect((exported.schema as unknown as { function?: unknown }).function).toBeUndefined();
   });
 });
