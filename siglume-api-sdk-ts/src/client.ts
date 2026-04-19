@@ -133,7 +133,12 @@ export interface SiglumeClientShape {
   create_webhook_subscription(options: {
     callback_url: string;
     description?: string;
-    event_types?: string[];
+    // Required by the concrete implementation (SiglumeClient.
+    // create_webhook_subscription immediately calls
+    // options.event_types.map(...)). Make it required at the type
+    // level so TS consumers get a compile-time error instead of a
+    // runtime TypeError before the intended validation runs.
+    event_types: string[];
     metadata?: Record<string, unknown>;
   }): Promise<WebhookSubscriptionRecord>;
   list_webhook_subscriptions(): Promise<WebhookSubscriptionRecord[]>;
