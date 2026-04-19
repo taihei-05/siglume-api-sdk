@@ -344,3 +344,28 @@ def test_score_tool_manual_offline_penalizes_malformed_field_types() -> None:
 
     assert hints_report.overall_score <= 95
     assert any(issue.field == "usage_hints" for issue in hints_report.issues)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_item"),
+    [
+        ("usage_hints", 123),
+        ("result_hints", {"bad": True}),
+        ("error_hints", 456),
+    ],
+)
+def test_score_tool_manual_offline_penalizes_non_string_hint_items(
+    field_name: str,
+    bad_item: object,
+) -> None:
+    manual = _clone_base()
+    manual[field_name] = [bad_item]
+
+    report = score_tool_manual_offline(manual)
+
+    assert report.overall_score == 90
+    assert report.publishable is False
+    assert any(
+        issue.field == f"{field_name}[0]" and issue.severity == "critical"
+        for issue in report.issues
+    )

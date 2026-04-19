@@ -268,7 +268,13 @@ def score_tool_manual_offline(tool_manual: Any) -> Any:
 
     validation_errors = [issue for issue in validation_issues if getattr(issue, "severity", "error") == "error"]
     validation_warnings = [issue for issue in validation_issues if getattr(issue, "severity", "error") != "error"]
-    publishable = bool(validation_ok) and quality["grade"] in {"A", "B"}
+    has_critical_quality_issue = any(
+        getattr(issue, "severity", "warning") == "critical"
+        for issue in quality["issues"]
+    )
+    # v0.4 hardens the local gate ahead of the current platform scorer so
+    # malformed hint payloads cannot still look publishable in offline checks.
+    publishable = bool(validation_ok) and quality["grade"] in {"A", "B"} and not has_critical_quality_issue
 
     return ToolManualQualityReport(
         overall_score=quality["overall_score"],
@@ -705,7 +711,7 @@ def _score_output_schema_completeness(manual: dict[str, Any], issues: list[Any],
 
 def _score_hints(manual: dict[str, Any], issues: list[Any], issue_cls: Any) -> int:
     score = 10
-    for field_name in ("usage_hints", "result_hints"):
+    for field_name in ("usage_hints", "result_hints", "error_hints"):
         hints = manual.get(field_name)
         if not isinstance(hints, list):
             issues.append(
@@ -732,7 +738,23 @@ def _score_hints(manual: dict[str, Any], issues: list[Any], issue_cls: Any) -> i
             score -= 3
             continue
 
-        short_count = sum(1 for item in hints if isinstance(item, str) and len(item) < 10)
+        short_count = 0
+        for index, item in enumerate(hints):
+            if not isinstance(item, str):
+                issues.append(
+                    _issue(
+                        issue_cls,
+                        "description_quality",
+                        "critical",
+                        f"{field_name} items must be strings",
+                        field=f"{field_name}[{index}]",
+                        suggestion="Replace non-string hint items with short plain-language guidance",
+                    )
+                )
+                score -= 10
+                continue
+            if len(item) < 10:
+                short_count += 1
         if short_count > 0:
             issues.append(
                 _issue(
