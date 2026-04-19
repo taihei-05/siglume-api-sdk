@@ -33,32 +33,6 @@ type TemplateName = (typeof TEMPLATE_NAMES)[number];
 
 const SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 const CAPABILITY_KEY_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
-const MANIFEST_REQUIRED_KEYS = new Set([
-  "capability_key",
-  "name",
-  "job_to_be_done",
-  "permission_class",
-  "approval_mode",
-  "dry_run_supported",
-  "required_connected_accounts",
-  "price_model",
-  "jurisdiction",
-]);
-const TOOL_MANUAL_REQUIRED_KEYS = new Set([
-  "tool_name",
-  "job_to_be_done",
-  "summary_for_model",
-  "trigger_conditions",
-  "do_not_use_when",
-  "permission_class",
-  "dry_run_supported",
-  "requires_connected_accounts",
-  "input_schema",
-  "output_schema",
-  "usage_hints",
-  "result_hints",
-  "error_hints",
-]);
 
 export interface LoadedProject {
   root_dir: string;
@@ -490,83 +464,20 @@ function payloadKind(payload: Record<string, unknown>): "manifest" | "tool_manua
 }
 
 function isManifestPayload(payload: Record<string, unknown>): boolean {
-  if (![...MANIFEST_REQUIRED_KEYS].every((key) => key in payload)) {
-    return false;
-  }
-  if (typeof payload.capability_key !== "string" || !CAPABILITY_KEY_RE.test(payload.capability_key)) {
-    return false;
-  }
-  if (typeof payload.name !== "string" || payload.name.trim().length === 0) {
-    return false;
-  }
-  if (typeof payload.job_to_be_done !== "string" || payload.job_to_be_done.trim().length === 0) {
-    return false;
-  }
-  if (typeof payload.permission_class !== "string") {
-    return false;
-  }
-  if (typeof payload.approval_mode !== "string") {
-    return false;
-  }
-  if (typeof payload.dry_run_supported !== "boolean") {
-    return false;
-  }
-  if (!Array.isArray(payload.required_connected_accounts)) {
-    return false;
-  }
-  if (typeof payload.price_model !== "string") {
-    return false;
-  }
-  if (typeof payload.jurisdiction !== "string" || payload.jurisdiction.trim().length === 0) {
-    return false;
-  }
-  return true;
+  // Identify AppManifest by its unique capability_key (format-checked).
+  // Other fields have defaults in the dataclass shape, so requiring them
+  // would reject legitimate minimal / legacy manifests; the diff engine
+  // already normalizes missing defaults.
+  const key = payload.capability_key;
+  return typeof key === "string" && CAPABILITY_KEY_RE.test(key);
 }
 
 function isToolManualPayload(payload: Record<string, unknown>): boolean {
-  if (![...TOOL_MANUAL_REQUIRED_KEYS].every((key) => key in payload)) {
-    return false;
-  }
-  if (typeof payload.tool_name !== "string" || payload.tool_name.trim().length === 0) {
-    return false;
-  }
-  if (typeof payload.job_to_be_done !== "string" || payload.job_to_be_done.trim().length === 0) {
-    return false;
-  }
-  if (typeof payload.summary_for_model !== "string" || payload.summary_for_model.trim().length === 0) {
-    return false;
-  }
-  if (typeof payload.permission_class !== "string") {
-    return false;
-  }
-  if (typeof payload.dry_run_supported !== "boolean") {
-    return false;
-  }
-  if (!Array.isArray(payload.trigger_conditions)) {
-    return false;
-  }
-  if (!Array.isArray(payload.do_not_use_when)) {
-    return false;
-  }
-  if (!Array.isArray(payload.requires_connected_accounts)) {
-    return false;
-  }
-  if (!Array.isArray(payload.usage_hints)) {
-    return false;
-  }
-  if (!Array.isArray(payload.result_hints)) {
-    return false;
-  }
-  if (!Array.isArray(payload.error_hints)) {
-    return false;
-  }
-  if (!isRecord(payload.input_schema)) {
-    return false;
-  }
-  if (!isRecord(payload.output_schema)) {
-    return false;
-  }
-  return true;
+  // Identify ToolManual by tool_name. AppManifest has no tool_name field,
+  // so this is unambiguous against manifests. Optional fields are not
+  // required for discrimination — the diff engine fills in defaults.
+  const toolName = payload.tool_name;
+  return typeof toolName === "string" && toolName.trim().length > 0;
 }
 
 async function findAdapterPath(target: string): Promise<string> {

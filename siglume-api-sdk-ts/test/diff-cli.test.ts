@@ -166,9 +166,10 @@ describe("siglume diff CLI", () => {
     expect(await readFile(oldPath, "utf8")).toContain("Echo Helper");
   });
 
-  it("rejects partial documents whose kind cannot be detected safely", async () => {
+  it("accepts minimal manifests with only identity fields (Codex P1 on PR #100)", async () => {
+    // Optional fields have defaults in the dataclass shape; the diff engine
+    // normalizes them, so detection must only require the identity key.
     const stdout: string[] = [];
-    const stderr: string[] = [];
     const { oldPath, newPath } = await writePair(
       {
         capability_key: "partial",
@@ -178,6 +179,22 @@ describe("siglume diff CLI", () => {
         capability_key: "partial",
         permission_class: "read-only",
       },
+    );
+
+    const exitCode = await runCli(["diff", oldPath, newPath], {
+      stdout: (line) => stdout.push(line),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("No differences detected.");
+  });
+
+  it("rejects truly unknown document kinds (no capability_key or tool_name)", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const { oldPath, newPath } = await writePair(
+      { unrelated: "data" },
+      { unrelated: "data" },
     );
 
     const exitCode = await runCli(["diff", oldPath, newPath], {

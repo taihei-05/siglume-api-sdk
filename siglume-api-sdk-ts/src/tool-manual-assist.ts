@@ -634,7 +634,10 @@ function normalizeToolManual(raw: Record<string, unknown>): ToolManual {
       continue;
     }
     if (fieldName === "dry_run_supported" || fieldName === "idempotency_support") {
-      normalized[fieldName] = Boolean(value);
+      // Do not coerce — Boolean("false") === true would mask a real type error
+      // and let invalid idempotency_support slip past validation for action/payment.
+      // Preserve the original so the ToolManual validator can reject it explicitly.
+      normalized[fieldName] = value;
       continue;
     }
     if (fieldName === "currency" && typeof value === "string") {

@@ -630,7 +630,10 @@ def _normalize_tool_manual_mapping(raw: Mapping[str, Any]) -> dict[str, Any]:
         elif field_name in {"input_schema", "output_schema", "preview_schema", "quote_schema"}:
             normalized[field_name] = _normalize_mapping(value)
         elif field_name in {"dry_run_supported", "idempotency_support"}:
-            normalized[field_name] = bool(value)
+            # Do not coerce — bool("false") == True would mask a real type error
+            # and let invalid idempotency_support slip past validation for action/payment.
+            # Preserve the original so the ToolManual validator can reject it explicitly.
+            normalized[field_name] = value
         elif field_name == "permission_class":
             normalized[field_name] = str(value)
         elif field_name == "currency":

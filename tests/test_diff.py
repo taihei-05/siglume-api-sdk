@@ -191,29 +191,34 @@ def test_diff_tool_manual_reports_required_add_and_remove_together() -> None:
     assert any(change.level == ChangeLevel.INFO and change.path == "input_schema.required" for change in changes)
 
 
-def test_diff_cli_rejects_partial_documents_with_unknown_kind() -> None:
+def test_diff_cli_accepts_minimal_manifest_with_only_identity_fields() -> None:
+    # Codex bot P1 on PR #100: legacy/minimal manifests with only identity
+    # fields must not be rejected. Optional fields have defaults and are
+    # handled by the diff engine's default normalization.
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("old.json").write_text(
-            json.dumps(
-                {
-                    "capability_key": "partial",
-                    "permission_class": "read-only",
-                },
-                indent=2,
-            ),
+            json.dumps({"capability_key": "partial", "permission_class": "read-only"}),
             encoding="utf-8",
         )
         Path("new.json").write_text(
-            json.dumps(
-                {
-                    "capability_key": "partial",
-                    "permission_class": "read-only",
-                },
-                indent=2,
-            ),
+            json.dumps({"capability_key": "partial", "permission_class": "read-only"}),
             encoding="utf-8",
         )
+
+        result = runner.invoke(main, ["diff", "old.json", "new.json"])
+
+        # Identical minimal manifests → no diff, exit 0.
+        assert result.exit_code == 0, result.output
+        assert "No differences detected." in result.output
+
+
+def test_diff_cli_rejects_truly_unknown_document_kind() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        # Neither capability_key nor tool_name → can't discriminate.
+        Path("old.json").write_text(json.dumps({"unrelated": "data"}), encoding="utf-8")
+        Path("new.json").write_text(json.dumps({"unrelated": "data"}), encoding="utf-8")
 
         result = runner.invoke(main, ["diff", "old.json", "new.json"])
 
