@@ -1,3 +1,5 @@
+import type { ToolManual, ToolManualQualityReport } from "./siglume-api-types";
+
 export interface EnvelopeMeta {
   request_id?: string | null;
   trace_id?: string | null;
@@ -178,6 +180,7 @@ export interface SupportCaseRecord {
 export interface SiglumeClientShape {
   auto_register(...args: unknown[]): Promise<AutoRegistrationReceipt> | AutoRegistrationReceipt;
   confirm_registration(...args: unknown[]): Promise<RegistrationConfirmation> | RegistrationConfirmation;
+  preview_quality_score(tool_manual: ToolManual): Promise<ToolManualQualityReport> | ToolManualQualityReport;
   submit_review(listingId: string): Promise<AppListingRecord> | AppListingRecord;
   list_my_listings(...args: unknown[]): Promise<CursorPage<AppListingRecord>> | CursorPage<AppListingRecord>;
   get_listing(listingId: string): Promise<AppListingRecord> | AppListingRecord;

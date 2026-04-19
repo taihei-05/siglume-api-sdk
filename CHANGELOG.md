@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-04-19
+
+Patch release for two Codex auto-review P2 fixes across the v0.3 surface.
+
+### Fixed
+
+- Added `preview_quality_score(tool_manual)` to the TypeScript `SiglumeClientShape`
+  so TS consumers can call the same preview-quality method that Python
+  `SiglumeClient` already exposes without custom interface patching.
+- Documented the paired backend hotfix where
+  `POST /v1/market/tool-manuals/preview-quality` now returns an `INVALID_PAYLOAD`
+  4xx envelope instead of a 500 when the request body contains malformed JSON.
+
 ## [0.3.0] — 2026-04-19
 
 First workflow-complete SDK release. Developers can now scaffold, validate, test,
