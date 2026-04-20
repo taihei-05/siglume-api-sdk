@@ -410,4 +410,117 @@ describe("web3 helpers", () => {
     expect(charge.gas_sponsored_by).toBe("platform");
     expect(charge.receipt?.payload.gas_sponsored_by).toBe("platform");
   });
+
+  it("matches charge tx_hash case-insensitively", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response(JSON.stringify(envelope({
+        items: [{
+          receipt_id: "chr_case_001",
+          tx_hash: `0x${"a".repeat(64)}`,
+          user_operation_hash: `0x${"b".repeat(64)}`,
+          submitted_hash: `0x${"b".repeat(64)}`,
+          receipt_kind: "mandate_charge_succeeded",
+          tx_status: "confirmed",
+          network: "polygon",
+          chain_id: 137,
+          payload_jsonb: { gross_amount_minor: 100, platform_fee_minor: 0, token_symbol: "USDC" },
+        }],
+        next_cursor: null,
+      })), { status: 200 }),
+    });
+
+    const charge = await client.get_embedded_wallet_charge({ tx_hash: `0x${"A".repeat(64)}` });
+    expect(charge.tx_hash).toBe(`0x${"a".repeat(64)}`);
+  });
+
+  it("accepts tool_execution_payment_submitted receipts as valid charges", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response(JSON.stringify(envelope({
+        items: [{
+          receipt_id: "chr_tool_001",
+          tx_hash: `0x${"d".repeat(64)}`,
+          receipt_kind: "tool_execution_payment_submitted",
+          tx_status: "confirmed",
+          network: "polygon",
+          chain_id: 137,
+          payload_jsonb: { gross_amount_minor: 50, platform_fee_minor: 0, token_symbol: "USDC" },
+        }],
+        next_cursor: null,
+      })), { status: 200 }),
+    });
+
+    const charge = await client.get_embedded_wallet_charge({ tx_hash: `0x${"d".repeat(64)}` });
+    expect(charge.tx_hash).toBe(`0x${"d".repeat(64)}`);
+  });
+
+  it("skips non-charge receipt_kind when looking up an embedded wallet charge", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response(JSON.stringify(envelope({
+        items: [{
+          receipt_id: "rcp_setup_001",
+          tx_hash: `0x${"c".repeat(64)}`,
+          receipt_kind: "mandate_create_submitted",
+          tx_status: "confirmed",
+          network: "polygon",
+          chain_id: 137,
+        }],
+        next_cursor: null,
+      })), { status: 200 }),
+    });
+
+    await expect(client.get_embedded_wallet_charge({ tx_hash: `0x${"c".repeat(64)}` }))
+      .rejects.toBeInstanceOf(SiglumeNotFoundError);
+  });
+
+  it("rejects non-finite slippage_bps before sending the swap quote request", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("fetch should not be called for invalid slippage_bps");
+      },
+    });
+
+    await expect(client.get_cross_currency_quote({
+      from_currency: "JPYC",
+      to_currency: "USDC",
+      source_amount_minor: 1000,
+      slippage_bps: Number.NaN,
+    })).rejects.toThrow("slippage_bps must be a finite number");
+  });
+
+  it("treats legacy cancel_queue_required as cancel_scheduled even when cancel_scheduled is false", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response(JSON.stringify(envelope({
+        items: [{
+          mandate_id: "pmd_legacy_cancel",
+          payment_mandate_id: "pmd_legacy_cancel",
+          network: "polygon",
+          payee_type: "platform",
+          payee_ref: `0x${"2".repeat(40)}`,
+          purpose: "subscription",
+          cadence: "monthly",
+          token_symbol: "JPYC",
+          max_amount_minor: 148000,
+          status: "active",
+          metadata_jsonb: {
+            cancel_scheduled: false,
+            cancel_queue_required: true,
+          },
+        }],
+        next_cursor: null,
+      })), { status: 200 }),
+    });
+
+    const mandate = await client.get_polygon_mandate("pmd_legacy_cancel");
+    expect(mandate.cancel_scheduled).toBe(true);
+  });
 });

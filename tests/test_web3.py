@@ -316,3 +316,104 @@ def test_web3_helpers_follow_next_cursor_pages_for_lookup_and_charge() -> None:
     assert charge.settlement_amount_minor == 148000
     assert mandate_calls["count"] == 2
     assert receipt_calls["count"] == 2
+
+
+def test_get_embedded_wallet_charge_matches_checksummed_tx_hash() -> None:
+    """EVM tx hashes are case-insensitive — caller may pass mixed case while API returns lower case."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "items": [
+                        {
+                            "receipt_id": "chr_case_001",
+                            "tx_hash": "0x" + "a" * 64,
+                            "user_operation_hash": "0x" + "b" * 64,
+                            "receipt_kind": "mandate_charge_succeeded",
+                            "tx_status": "confirmed",
+                            "network": "polygon",
+                            "chain_id": 137,
+                            "submitted_hash": "0x" + "b" * 64,
+                            "payload_jsonb": {
+                                "gross_amount_minor": 100,
+                                "platform_fee_minor": 0,
+                                "token_symbol": "USDC",
+                            },
+                        }
+                    ],
+                    "next_cursor": None,
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        charge = client.get_embedded_wallet_charge(tx_hash="0x" + "A" * 64)
+
+    assert charge.tx_hash == "0x" + "a" * 64
+
+
+def test_get_embedded_wallet_charge_accepts_tool_execution_payment_kind() -> None:
+    """Capability gateway charges land as receipt_kind=tool_execution_payment_submitted."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "items": [
+                        {
+                            "receipt_id": "chr_tool_001",
+                            "tx_hash": "0x" + "d" * 64,
+                            "receipt_kind": "tool_execution_payment_submitted",
+                            "tx_status": "confirmed",
+                            "network": "polygon",
+                            "chain_id": 137,
+                            "payload_jsonb": {
+                                "gross_amount_minor": 50,
+                                "platform_fee_minor": 0,
+                                "token_symbol": "USDC",
+                            },
+                        }
+                    ],
+                    "next_cursor": None,
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        charge = client.get_embedded_wallet_charge(tx_hash="0x" + "d" * 64)
+
+    assert charge.tx_hash == "0x" + "d" * 64
+
+
+def test_get_embedded_wallet_charge_skips_non_charge_receipt_kinds() -> None:
+    """Charge lookup must not return receipts whose kind is unrelated to charges (e.g. mandate setup)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "items": [
+                        {
+                            "receipt_id": "rcp_setup_001",
+                            "tx_hash": "0x" + "c" * 64,
+                            "receipt_kind": "mandate_create_submitted",
+                            "tx_status": "confirmed",
+                            "network": "polygon",
+                            "chain_id": 137,
+                        }
+                    ],
+                    "next_cursor": None,
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        try:
+            client.get_embedded_wallet_charge(tx_hash="0x" + "c" * 64)
+        except SiglumeNotFoundError:
+            return
+    raise AssertionError("Expected SiglumeNotFoundError for non-charge receipt_kind")

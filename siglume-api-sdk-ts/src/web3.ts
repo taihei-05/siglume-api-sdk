@@ -150,7 +150,7 @@ export function parse_polygon_mandate(data: Record<string, unknown>): PolygonMan
     next_attempt_at_iso: stringOrNull(data.next_attempt_at),
     last_attempt_at_iso: stringOrNull(data.last_attempt_at),
     canceled_at_iso: stringOrNull(data.canceled_at),
-    cancel_scheduled: Boolean(metadata.cancel_scheduled ?? metadata.cancel_queue_required ?? false),
+    cancel_scheduled: Boolean(metadata.cancel_scheduled) || Boolean(metadata.cancel_queue_required),
     cancel_scheduled_at_iso: stringOrNull(metadata.cancel_queue_requested_at),
     onchain_mandate_id: numberOrNull(metadata.onchain_mandate_id),
     idempotency_key: stringOrNull(data.idempotency_key),

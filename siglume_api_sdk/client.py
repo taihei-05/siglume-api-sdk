@@ -1547,6 +1547,7 @@ class SiglumeClient:
         normalized_tx_hash = str(tx_hash or "").strip()
         if not normalized_tx_hash:
             raise SiglumeClientError("tx_hash is required.")
+        lookup_hash = normalized_tx_hash.lower()
         remaining = None if limit is None else max(1, int(limit))
         cursor: str | None = None
         seen_cursors: set[str] = set()
@@ -1563,11 +1564,16 @@ class SiglumeClient:
                 if isinstance(item, Mapping)
             ]
             for receipt in parsed_items:
-                if normalized_tx_hash in {
-                    receipt.tx_hash,
-                    receipt.user_operation_hash,
-                    receipt.submitted_hash,
-                }:
+                kind = (receipt.receipt_kind or "").lower()
+                if "charge" not in kind and "payment" not in kind:
+                    continue
+                candidate_hashes = {
+                    (receipt.tx_hash or "").lower(),
+                    (receipt.user_operation_hash or "").lower(),
+                    (receipt.submitted_hash or "").lower(),
+                }
+                candidate_hashes.discard("")
+                if lookup_hash in candidate_hashes:
                     return parse_embedded_wallet_charge(receipt=receipt)
             if remaining is not None:
                 remaining -= page_limit

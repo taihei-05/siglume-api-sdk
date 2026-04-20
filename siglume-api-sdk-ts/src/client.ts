@@ -1267,6 +1267,7 @@ export class SiglumeClient implements SiglumeClientShape {
     if (!normalizedTxHash) {
       throw new SiglumeClientError("tx_hash is required.");
     }
+    const lookupHash = normalizedTxHash.toLowerCase();
     let remaining = options.limit == null ? null : Math.max(1, Math.trunc(options.limit));
     let cursor: string | null = null;
     const seenCursors = new Set<string>();
@@ -1280,9 +1281,16 @@ export class SiglumeClient implements SiglumeClientShape {
       const items = Array.isArray(data.items)
         ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parse_settlement_receipt)
         : [];
-      const found = items.find((item) => (
-        [item.tx_hash, item.user_operation_hash ?? null, item.submitted_hash ?? null].includes(normalizedTxHash)
-      ));
+      const found = items.find((item) => {
+        const kind = String(item.receipt_kind ?? "").toLowerCase();
+        if (!kind.includes("charge") && !kind.includes("payment")) {
+          return false;
+        }
+        const candidates = [item.tx_hash, item.user_operation_hash, item.submitted_hash]
+          .map((h) => String(h ?? "").toLowerCase())
+          .filter((h) => h.length > 0);
+        return candidates.includes(lookupHash);
+      });
       if (found) {
         return parse_embedded_wallet_charge({}, { receipt: found });
       }
@@ -1322,7 +1330,11 @@ export class SiglumeClient implements SiglumeClientShape {
     if (source_amount_minor <= 0) {
       throw new SiglumeClientError("source_amount_minor must be positive.");
     }
-    const slippage_bps = Math.max(0, Math.min(Math.trunc(options.slippage_bps ?? 100), 5000));
+    const slippage_input = options.slippage_bps ?? 100;
+    if (!Number.isFinite(slippage_input)) {
+      throw new SiglumeClientError("slippage_bps must be a finite number.");
+    }
+    const slippage_bps = Math.max(0, Math.min(Math.trunc(slippage_input), 5000));
     const [data] = await this.request("POST", "/market/web3/swap/quote", {
       json_body: {
         sell_token: from_currency,
