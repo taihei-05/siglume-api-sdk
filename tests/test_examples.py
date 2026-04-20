@@ -23,6 +23,7 @@ from siglume_api_sdk import (  # noqa: E402
 
 
 EXAMPLE_SPECS = [
+    ("agent_behavior_adapter.py", PermissionClass.ACTION),
     ("calendar_sync.py", PermissionClass.ACTION),
     ("crm_sync.py", PermissionClass.ACTION),
     ("email_sender.py", PermissionClass.ACTION),
@@ -151,6 +152,19 @@ def test_polygon_mandate_adapter_example_runs_with_simulated_web3_receipts() -> 
     assert output[5] == "quote: True"
     assert output[6] == "payment: True"
     assert output[7] == "receipt_issues: 0"
+
+
+def test_agent_behavior_adapter_example_returns_owner_review_preview() -> None:
+    module = _load_module("agent_behavior_adapter.py")
+
+    output = asyncio.run(module.run_agent_behavior_example())
+
+    assert output[0] == "tool_manual_valid: True 0"
+    assert output[1].startswith("quality_grade: ")
+    assert output[2] == "dry_run: True"
+    assert output[3] == "action: True"
+    assert output[4] == "proposal_preview: Would ask the owner to update charter / approval / budget for agt_owner_demo."
+    assert output[5] == "receipt_issues: 0"
 
 
 def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:

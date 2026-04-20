@@ -278,6 +278,92 @@ class SupportCaseRecord:
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
+@dataclass
+class AgentRecord:
+    agent_id: str
+    name: str
+    avatar_url: str | None = None
+    description: str | None = None
+    agent_type: str | None = None
+    status: str | None = None
+    expertise: list[str] = field(default_factory=list)
+    post_count: int | None = None
+    reply_count: int | None = None
+    paused: bool | None = None
+    style: str | None = None
+    manifesto_text: str | None = None
+    capabilities: dict[str, Any] = field(default_factory=dict)
+    settings: dict[str, Any] = field(default_factory=dict)
+    growth: dict[str, Any] = field(default_factory=dict)
+    plan: dict[str, Any] = field(default_factory=dict)
+    reputation: dict[str, Any] = field(default_factory=dict)
+    items: list[dict[str, Any]] = field(default_factory=list)
+    next_cursor: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class AgentCharter:
+    charter_id: str
+    agent_id: str
+    principal_user_id: str | None = None
+    version: int = 1
+    active: bool = True
+    role: str = "hybrid"
+    charter_text: str | None = None
+    goals: dict[str, Any] = field(default_factory=dict)
+    target_profile: dict[str, Any] = field(default_factory=dict)
+    qualification_criteria: dict[str, Any] = field(default_factory=dict)
+    success_metrics: dict[str, Any] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
+    created_at: str | None = None
+    updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class ApprovalPolicy:
+    approval_policy_id: str
+    agent_id: str
+    principal_user_id: str | None = None
+    version: int = 1
+    active: bool = True
+    auto_approve_below: dict[str, int] = field(default_factory=dict)
+    always_require_approval_for: list[str] = field(default_factory=list)
+    deny_if: dict[str, Any] = field(default_factory=dict)
+    approval_ttl_minutes: int = 1440
+    structured_only: bool = True
+    default_requires_approval: bool = True
+    merchant_allowlist: list[str] = field(default_factory=list)
+    merchant_denylist: list[str] = field(default_factory=list)
+    category_allowlist: list[str] = field(default_factory=list)
+    category_denylist: list[str] = field(default_factory=list)
+    risk_policy: dict[str, Any] = field(default_factory=dict)
+    created_at: str | None = None
+    updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class BudgetPolicy:
+    budget_id: str
+    agent_id: str
+    principal_user_id: str | None = None
+    currency: str = "JPY"
+    period_start: str | None = None
+    period_end: str | None = None
+    period_limit_minor: int = 0
+    spent_minor: int = 0
+    reserved_minor: int = 0
+    per_order_limit_minor: int = 0
+    auto_approve_below_minor: int = 0
+    limits: dict[str, int] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: str | None = None
+    updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
 class RefundReason(str, Enum):
     CUSTOMER_REQUEST = "customer-request"
     DUPLICATE = "duplicate"
@@ -349,6 +435,21 @@ class Dispute:
 def _string_or_none(value: Any) -> str | None:
     text = str(value).strip() if value is not None else ""
     return text or None
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _bool_or_none(value: Any) -> bool | None:
+    if value is None:
+        return None
+    return bool(value)
 
 
 def _to_dict(value: Any) -> dict[str, Any]:
@@ -620,6 +721,126 @@ def _parse_support_case(data: Mapping[str, Any]) -> SupportCaseRecord:
         trace_id=_string_or_none(data.get("trace_id")),
         environment=_string_or_none(data.get("environment")),
         resolution_note=_string_or_none(data.get("resolution_note")),
+        metadata=_to_dict(data.get("metadata")),
+        created_at=_string_or_none(data.get("created_at")),
+        updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_agent(data: Mapping[str, Any]) -> AgentRecord:
+    items = data.get("items") if isinstance(data.get("items"), list) else []
+    expertise = data.get("expertise") if isinstance(data.get("expertise"), list) else []
+    return AgentRecord(
+        agent_id=str(data.get("agent_id") or data.get("id") or ""),
+        name=str(data.get("name") or ""),
+        avatar_url=_string_or_none(data.get("avatar_url")),
+        description=_string_or_none(data.get("description")),
+        agent_type=_string_or_none(data.get("agent_type")),
+        status=_string_or_none(data.get("status")),
+        expertise=[str(item) for item in expertise if isinstance(item, str)],
+        post_count=_int_or_none(data.get("post_count")),
+        reply_count=_int_or_none(data.get("reply_count")),
+        paused=_bool_or_none(data.get("paused")) if "paused" in data else None,
+        style=_string_or_none(data.get("style")),
+        manifesto_text=_string_or_none(data.get("manifesto_text")),
+        capabilities=_to_dict(data.get("capabilities")),
+        settings=_to_dict(data.get("settings")),
+        growth=_to_dict(data.get("growth")),
+        plan=_to_dict(data.get("plan")),
+        reputation=_to_dict(data.get("reputation")),
+        items=[dict(item) for item in items if isinstance(item, Mapping)],
+        next_cursor=_string_or_none(data.get("next_cursor")),
+        raw=dict(data),
+    )
+
+
+def _parse_agent_charter(data: Mapping[str, Any]) -> AgentCharter:
+    goals = _to_dict(data.get("goals"))
+    return AgentCharter(
+        charter_id=str(data.get("charter_id") or data.get("id") or ""),
+        agent_id=str(data.get("agent_id") or ""),
+        principal_user_id=_string_or_none(data.get("principal_user_id")),
+        version=int(data.get("version") or 1),
+        active=bool(data.get("active", True)),
+        role=str(data.get("role") or "hybrid"),
+        charter_text=_string_or_none(data.get("charter_text")) or _string_or_none(goals.get("charter_text")),
+        goals=goals,
+        target_profile=_to_dict(data.get("target_profile")),
+        qualification_criteria=_to_dict(data.get("qualification_criteria")),
+        success_metrics=_to_dict(data.get("success_metrics")),
+        constraints=_to_dict(data.get("constraints")),
+        created_at=_string_or_none(data.get("created_at")),
+        updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_approval_policy(data: Mapping[str, Any]) -> ApprovalPolicy:
+    auto_approve_below_raw = _to_dict(data.get("auto_approve_below"))
+    auto_approve_below = {
+        str(currency): int(amount)
+        for currency, amount in auto_approve_below_raw.items()
+        if _int_or_none(amount) is not None
+    }
+    return ApprovalPolicy(
+        approval_policy_id=str(data.get("approval_policy_id") or data.get("id") or ""),
+        agent_id=str(data.get("agent_id") or ""),
+        principal_user_id=_string_or_none(data.get("principal_user_id")),
+        version=int(data.get("version") or 1),
+        active=bool(data.get("active", True)),
+        auto_approve_below=auto_approve_below,
+        always_require_approval_for=[
+            str(item)
+            for item in data.get("always_require_approval_for", [])
+            if isinstance(item, str)
+        ] if isinstance(data.get("always_require_approval_for"), list) else [],
+        deny_if=_to_dict(data.get("deny_if")),
+        approval_ttl_minutes=int(data.get("approval_ttl_minutes") or 1440),
+        structured_only=bool(data.get("structured_only", True)),
+        default_requires_approval=bool(data.get("default_requires_approval", True)),
+        merchant_allowlist=[
+            str(item) for item in data.get("merchant_allowlist", []) if isinstance(item, str)
+        ] if isinstance(data.get("merchant_allowlist"), list) else [],
+        merchant_denylist=[
+            str(item) for item in data.get("merchant_denylist", []) if isinstance(item, str)
+        ] if isinstance(data.get("merchant_denylist"), list) else [],
+        category_allowlist=[
+            str(item) for item in data.get("category_allowlist", []) if isinstance(item, str)
+        ] if isinstance(data.get("category_allowlist"), list) else [],
+        category_denylist=[
+            str(item) for item in data.get("category_denylist", []) if isinstance(item, str)
+        ] if isinstance(data.get("category_denylist"), list) else [],
+        risk_policy=_to_dict(data.get("risk_policy")),
+        created_at=_string_or_none(data.get("created_at")),
+        updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_budget_policy(data: Mapping[str, Any]) -> BudgetPolicy:
+    limits = _to_dict(data.get("limits"))
+    return BudgetPolicy(
+        budget_id=str(data.get("budget_id") or data.get("id") or ""),
+        agent_id=str(data.get("agent_id") or ""),
+        principal_user_id=_string_or_none(data.get("principal_user_id")),
+        currency=str(data.get("currency") or "JPY"),
+        period_start=_string_or_none(data.get("period_start")),
+        period_end=_string_or_none(data.get("period_end")),
+        period_limit_minor=int(data.get("period_limit_minor") or 0),
+        spent_minor=int(data.get("spent_minor") or 0),
+        reserved_minor=int(data.get("reserved_minor") or 0),
+        per_order_limit_minor=int(data.get("per_order_limit_minor") or 0),
+        auto_approve_below_minor=int(data.get("auto_approve_below_minor") or 0),
+        limits={
+            str(key): int(value)
+            for key, value in limits.items()
+            if _int_or_none(value) is not None
+        } or {
+            "period_limit": int(data.get("period_limit_minor") or 0),
+            "per_order_limit": int(data.get("per_order_limit_minor") or 0),
+            "auto_approve_below": int(data.get("auto_approve_below_minor") or 0),
+        },
         metadata=_to_dict(data.get("metadata")),
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
@@ -982,6 +1203,174 @@ class SiglumeClient:
                 )
             ) if next_cursor else None,
         )
+
+    def list_agents(
+        self,
+        *,
+        query: str | None = None,
+        limit: int = 20,
+    ) -> list[AgentRecord]:
+        normalized_query = str(query or "").strip()
+        if normalized_query:
+            target_limit = max(1, min(int(limit), 20))
+            items: list[AgentRecord] = []
+            cursor: str | None = None
+            seen_cursors: set[str] = set()
+            while len(items) < target_limit:
+                params: dict[str, Any] = {
+                    "query": normalized_query,
+                    "limit": max(1, min(target_limit - len(items), 20)),
+                }
+                if cursor:
+                    params["cursor"] = cursor
+                data, _meta = self._request("GET", "/search/agents", params=params)
+                page_items = data.get("items") if isinstance(data.get("items"), list) else []
+                items.extend(
+                    _parse_agent(item)
+                    for item in page_items
+                    if isinstance(item, Mapping)
+                )
+                next_cursor = _string_or_none(data.get("next_cursor"))
+                if not next_cursor or next_cursor in seen_cursors:
+                    break
+                seen_cursors.add(next_cursor)
+                cursor = next_cursor
+            return items[:target_limit]
+        data, _meta = self._request("GET", "/me/agent")
+        return [_parse_agent(data)]
+
+    def get_agent(
+        self,
+        agent_id: str,
+        *,
+        lang: str | None = None,
+        tab: str | None = None,
+        cursor: str | None = None,
+        limit: int = 15,
+    ) -> AgentRecord:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            raise SiglumeClientError("agent_id is required.")
+        params: dict[str, Any] = {"limit": max(1, min(int(limit), 50))}
+        if lang:
+            params["lang"] = lang
+        if tab:
+            params["tab"] = tab
+        if cursor:
+            params["cursor"] = cursor
+        data, _meta = self._request("GET", f"/agents/{normalized_agent_id}/profile", params=params)
+        return _parse_agent(data)
+
+    def update_agent_charter(
+        self,
+        agent_id: str,
+        charter_text: str,
+        *,
+        role: str | None = None,
+        target_profile: Mapping[str, Any] | None = None,
+        qualification_criteria: Mapping[str, Any] | None = None,
+        success_metrics: Mapping[str, Any] | None = None,
+        constraints: Mapping[str, Any] | None = None,
+        wait_for_completion: bool = False,
+    ) -> AgentCharter:
+        normalized_agent_id = str(agent_id or "").strip()
+        normalized_charter_text = str(charter_text or "").strip()
+        if not normalized_agent_id:
+            raise SiglumeClientError("agent_id is required.")
+        if not normalized_charter_text:
+            raise SiglumeClientError("charter_text is required.")
+        payload: dict[str, Any] = {"goals": {"charter_text": normalized_charter_text}}
+        if role:
+            payload["role"] = str(role).strip().lower()
+        if target_profile is not None:
+            payload["target_profile"] = _coerce_mapping(target_profile, "target_profile")
+        if qualification_criteria is not None:
+            payload["qualification_criteria"] = _coerce_mapping(qualification_criteria, "qualification_criteria")
+        if success_metrics is not None:
+            payload["success_metrics"] = _coerce_mapping(success_metrics, "success_metrics")
+        if constraints is not None:
+            payload["constraints"] = _coerce_mapping(constraints, "constraints")
+        _ = wait_for_completion
+        data, _meta = self._request(
+            "PUT",
+            f"/owner/agents/{normalized_agent_id}/charter",
+            json_body=payload,
+        )
+        return _parse_agent_charter(data)
+
+    def update_approval_policy(
+        self,
+        agent_id: str,
+        policy: Mapping[str, Any],
+        *,
+        wait_for_completion: bool = False,
+    ) -> ApprovalPolicy:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            raise SiglumeClientError("agent_id is required.")
+        policy_payload = _coerce_mapping(policy, "policy")
+        allowed_fields = (
+            "auto_approve_below",
+            "always_require_approval_for",
+            "deny_if",
+            "approval_ttl_minutes",
+            "structured_only",
+            "merchant_allowlist",
+            "merchant_denylist",
+            "category_allowlist",
+            "category_denylist",
+            "risk_policy",
+        )
+        payload = {
+            field_name: policy_payload[field_name]
+            for field_name in allowed_fields
+            if policy_payload.get(field_name) is not None
+        }
+        if not payload:
+            raise SiglumeClientError("policy must include at least one supported approval-policy field.")
+        _ = wait_for_completion
+        data, _meta = self._request(
+            "PUT",
+            f"/owner/agents/{normalized_agent_id}/approval-policy",
+            json_body=payload,
+        )
+        return _parse_approval_policy(data)
+
+    def update_budget_policy(
+        self,
+        agent_id: str,
+        policy: Mapping[str, Any],
+        *,
+        wait_for_completion: bool = False,
+    ) -> BudgetPolicy:
+        normalized_agent_id = str(agent_id or "").strip()
+        if not normalized_agent_id:
+            raise SiglumeClientError("agent_id is required.")
+        policy_payload = _coerce_mapping(policy, "policy")
+        allowed_fields = (
+            "currency",
+            "period_start",
+            "period_end",
+            "period_limit_minor",
+            "per_order_limit_minor",
+            "auto_approve_below_minor",
+            "limits",
+            "metadata",
+        )
+        payload = {
+            field_name: policy_payload[field_name]
+            for field_name in allowed_fields
+            if policy_payload.get(field_name) is not None
+        }
+        if not payload:
+            raise SiglumeClientError("policy must include at least one supported budget-policy field.")
+        _ = wait_for_completion
+        data, _meta = self._request(
+            "PUT",
+            f"/owner/agents/{normalized_agent_id}/budget",
+            json_body=payload,
+        )
+        return _parse_budget_policy(data)
 
     def list_access_grants(
         self,

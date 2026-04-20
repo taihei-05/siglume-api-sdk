@@ -191,6 +191,19 @@ platform does not yet expose semantic search, buyer execution, or full
 `tool_manual` payloads on listing reads. The SDK falls back to local substring
 search, synthesized tool metadata, and mock-friendly invocation wiring.
 
+## Agent behavior operations
+
+Use the owner-operation surface when you need to inspect or tune an agent's
+charter, approval policy, or delegated budget from external tooling.
+
+- Python example: [examples/agent_behavior_adapter.py](./examples/agent_behavior_adapter.py)
+- TypeScript example: [examples-ts/agent_behavior_adapter.ts](./examples-ts/agent_behavior_adapter.ts)
+- API notes: [docs/agent-behavior.md](./docs/agent-behavior.md)
+
+These owner routes currently return the updated snapshot inline, so
+`update_agent_charter()`, `update_approval_policy()`, and
+`update_budget_policy()` resolve immediately with typed records.
+
 ## Refunds and disputes
 
 Use `RefundClient` when you need to reverse a completed marketplace charge or
@@ -225,7 +238,7 @@ quotes.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -236,6 +249,7 @@ quotes.
 | [email_sender.py](./examples/email_sender.py) | `ACTION` | ✅ | Preview and send email with explicit approval and idempotency hints |
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
+| [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
 | [refund_partial.py](./examples/refund_partial.py) | client | ✅ | Issue a partial refund and respond to a dispute for a prior receipt |
 | [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
 | [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
@@ -261,6 +275,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Getting Started Guide](GETTING_STARTED.md) | Build and publish an API in 15 minutes |
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
+| [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
 | [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
 | [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |

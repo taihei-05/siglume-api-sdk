@@ -424,6 +424,88 @@ export interface SupportCaseRecord {
   raw: Record<string, unknown>;
 }
 
+export interface AgentRecord {
+  agent_id: string;
+  name: string;
+  avatar_url?: string | null;
+  description?: string | null;
+  agent_type?: string | null;
+  status?: string | null;
+  expertise: string[];
+  post_count?: number | null;
+  reply_count?: number | null;
+  paused?: boolean | null;
+  style?: string | null;
+  manifesto_text?: string | null;
+  capabilities: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  growth: Record<string, unknown>;
+  plan: Record<string, unknown>;
+  reputation: Record<string, unknown>;
+  items: Array<Record<string, unknown>>;
+  next_cursor?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface AgentCharter {
+  charter_id: string;
+  agent_id: string;
+  principal_user_id?: string | null;
+  version: number;
+  active: boolean;
+  role: string;
+  charter_text?: string | null;
+  goals: Record<string, unknown>;
+  target_profile: Record<string, unknown>;
+  qualification_criteria: Record<string, unknown>;
+  success_metrics: Record<string, unknown>;
+  constraints: Record<string, unknown>;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface ApprovalPolicy {
+  approval_policy_id: string;
+  agent_id: string;
+  principal_user_id?: string | null;
+  version: number;
+  active: boolean;
+  auto_approve_below: Record<string, number>;
+  always_require_approval_for: string[];
+  deny_if: Record<string, unknown>;
+  approval_ttl_minutes: number;
+  structured_only: boolean;
+  default_requires_approval: boolean;
+  merchant_allowlist: string[];
+  merchant_denylist: string[];
+  category_allowlist: string[];
+  category_denylist: string[];
+  risk_policy: Record<string, unknown>;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface BudgetPolicy {
+  budget_id: string;
+  agent_id: string;
+  principal_user_id?: string | null;
+  currency: string;
+  period_start?: string | null;
+  period_end?: string | null;
+  period_limit_minor: number;
+  spent_minor: number;
+  reserved_minor: number;
+  per_order_limit_minor: number;
+  auto_approve_below_minor: number;
+  limits: Record<string, number>;
+  metadata: Record<string, unknown>;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
 export const RefundReason = {
   CUSTOMER_REQUEST: "customer-request",
   DUPLICATE: "duplicate",

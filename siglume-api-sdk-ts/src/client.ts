@@ -1,8 +1,12 @@
 import type {
   AccessGrantRecord,
+  AgentCharter,
+  AgentRecord,
   AppListingRecord,
   AppManifest,
+  ApprovalPolicy,
   AutoRegistrationReceipt,
+  BudgetPolicy,
   CapabilityBindingRecord,
   ConnectedAccountRecord,
   CursorPage,
@@ -46,6 +50,7 @@ import {
   buildRegistrationStubSource,
   coerceMapping,
   isRecord,
+  numberOrNull,
   parseRetryAfter,
   sleep,
   stringOrNull,
@@ -110,6 +115,33 @@ export interface SiglumeClientShape {
     limit?: number;
     cursor?: string;
   }): Promise<CursorPage<UsageEventRecord>>;
+  list_agents(options?: { query?: string; limit?: number }): Promise<AgentRecord[]>;
+  get_agent(
+    agent_id: string,
+    options?: { lang?: string; tab?: string; cursor?: string; limit?: number },
+  ): Promise<AgentRecord>;
+  update_agent_charter(
+    agent_id: string,
+    charter_text: string,
+    options?: {
+      role?: string;
+      target_profile?: Record<string, unknown>;
+      qualification_criteria?: Record<string, unknown>;
+      success_metrics?: Record<string, unknown>;
+      constraints?: Record<string, unknown>;
+      wait_for_completion?: boolean;
+    },
+  ): Promise<AgentCharter>;
+  update_approval_policy(
+    agent_id: string,
+    policy: Record<string, unknown>,
+    options?: { wait_for_completion?: boolean },
+  ): Promise<ApprovalPolicy>;
+  update_budget_policy(
+    agent_id: string,
+    policy: Record<string, unknown>,
+    options?: { wait_for_completion?: boolean },
+  ): Promise<BudgetPolicy>;
   list_access_grants(options?: {
     status?: string;
     agent_id?: string;
@@ -493,6 +525,130 @@ function parseSupportCase(data: Record<string, unknown>): SupportCaseRecord {
   };
 }
 
+function parseAgent(data: Record<string, unknown>): AgentRecord {
+  return {
+    agent_id: String(data.agent_id ?? data.id ?? ""),
+    name: String(data.name ?? ""),
+    avatar_url: stringOrNull(data.avatar_url),
+    description: stringOrNull(data.description),
+    agent_type: stringOrNull(data.agent_type),
+    status: stringOrNull(data.status),
+    expertise: Array.isArray(data.expertise)
+      ? data.expertise.filter((item): item is string => typeof item === "string")
+      : [],
+    post_count: typeof data.post_count === "number" ? data.post_count : null,
+    reply_count: typeof data.reply_count === "number" ? data.reply_count : null,
+    paused: typeof data.paused === "boolean" ? data.paused : null,
+    style: stringOrNull(data.style),
+    manifesto_text: stringOrNull(data.manifesto_text),
+    capabilities: toRecord(data.capabilities),
+    settings: toRecord(data.settings),
+    growth: toRecord(data.growth),
+    plan: toRecord(data.plan),
+    reputation: toRecord(data.reputation),
+    items: Array.isArray(data.items)
+      ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => ({ ...item }))
+      : [],
+    next_cursor: stringOrNull(data.next_cursor),
+    raw: { ...data },
+  };
+}
+
+function parseAgentCharter(data: Record<string, unknown>): AgentCharter {
+  const goals = toRecord(data.goals);
+  return {
+    charter_id: String(data.charter_id ?? data.id ?? ""),
+    agent_id: String(data.agent_id ?? ""),
+    principal_user_id: stringOrNull(data.principal_user_id),
+    version: Number(data.version ?? 1),
+    active: Boolean(data.active ?? true),
+    role: String(data.role ?? "hybrid"),
+    charter_text: stringOrNull(data.charter_text ?? goals.charter_text),
+    goals,
+    target_profile: toRecord(data.target_profile),
+    qualification_criteria: toRecord(data.qualification_criteria),
+    success_metrics: toRecord(data.success_metrics),
+    constraints: toRecord(data.constraints),
+    created_at: stringOrNull(data.created_at),
+    updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
+function parseApprovalPolicy(data: Record<string, unknown>): ApprovalPolicy {
+  const auto_approve_below = Object.fromEntries(
+    Object.entries(toRecord(data.auto_approve_below)).flatMap(([currency, amount]) => {
+      const numericAmount = numberOrNull(amount);
+      return numericAmount === null ? [] : [[currency, Math.trunc(numericAmount)]];
+    }),
+  );
+  return {
+    approval_policy_id: String(data.approval_policy_id ?? data.id ?? ""),
+    agent_id: String(data.agent_id ?? ""),
+    principal_user_id: stringOrNull(data.principal_user_id),
+    version: Number(data.version ?? 1),
+    active: Boolean(data.active ?? true),
+    auto_approve_below,
+    always_require_approval_for: Array.isArray(data.always_require_approval_for)
+      ? data.always_require_approval_for.filter((item): item is string => typeof item === "string")
+      : [],
+    deny_if: toRecord(data.deny_if),
+    approval_ttl_minutes: Number(data.approval_ttl_minutes ?? 1440),
+    structured_only: Boolean(data.structured_only ?? true),
+    default_requires_approval: Boolean(data.default_requires_approval ?? true),
+    merchant_allowlist: Array.isArray(data.merchant_allowlist)
+      ? data.merchant_allowlist.filter((item): item is string => typeof item === "string")
+      : [],
+    merchant_denylist: Array.isArray(data.merchant_denylist)
+      ? data.merchant_denylist.filter((item): item is string => typeof item === "string")
+      : [],
+    category_allowlist: Array.isArray(data.category_allowlist)
+      ? data.category_allowlist.filter((item): item is string => typeof item === "string")
+      : [],
+    category_denylist: Array.isArray(data.category_denylist)
+      ? data.category_denylist.filter((item): item is string => typeof item === "string")
+      : [],
+    risk_policy: toRecord(data.risk_policy),
+    created_at: stringOrNull(data.created_at),
+    updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
+function parseBudgetPolicy(data: Record<string, unknown>): BudgetPolicy {
+  const limitsSource = toRecord(data.limits);
+  const limits = Object.keys(limitsSource).length > 0
+    ? Object.fromEntries(
+        Object.entries(limitsSource).flatMap(([key, value]) => {
+          const numericValue = numberOrNull(value);
+          return numericValue === null ? [] : [[key, Math.trunc(numericValue)]];
+        }),
+      )
+    : {
+        period_limit: Math.trunc(Number(data.period_limit_minor ?? 0)),
+        per_order_limit: Math.trunc(Number(data.per_order_limit_minor ?? 0)),
+        auto_approve_below: Math.trunc(Number(data.auto_approve_below_minor ?? 0)),
+      };
+  return {
+    budget_id: String(data.budget_id ?? data.id ?? ""),
+    agent_id: String(data.agent_id ?? ""),
+    principal_user_id: stringOrNull(data.principal_user_id),
+    currency: String(data.currency ?? "JPY"),
+    period_start: stringOrNull(data.period_start),
+    period_end: stringOrNull(data.period_end),
+    period_limit_minor: Math.trunc(Number(data.period_limit_minor ?? 0)),
+    spent_minor: Math.trunc(Number(data.spent_minor ?? 0)),
+    reserved_minor: Math.trunc(Number(data.reserved_minor ?? 0)),
+    per_order_limit_minor: Math.trunc(Number(data.per_order_limit_minor ?? 0)),
+    auto_approve_below_minor: Math.trunc(Number(data.auto_approve_below_minor ?? 0)),
+    limits,
+    metadata: toRecord(data.metadata),
+    created_at: stringOrNull(data.created_at),
+    updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
 function parseRefund(data: Record<string, unknown>): RefundRecord {
   return {
     refund_id: String(data.refund_id ?? data.id ?? ""),
@@ -760,6 +916,173 @@ export class SiglumeClient implements SiglumeClientShape {
         ? (cursor) => this.get_usage({ ...options, cursor })
         : undefined,
     });
+  }
+
+  async list_agents(options: { query?: string; limit?: number } = {}): Promise<AgentRecord[]> {
+    const normalizedQuery = String(options.query ?? "").trim();
+    if (normalizedQuery) {
+      const targetLimit = Math.max(1, Math.min(Math.trunc(options.limit ?? 20), 20));
+      const agents: AgentRecord[] = [];
+      let cursor: string | null = null;
+      const seenCursors = new Set<string>();
+      while (agents.length < targetLimit) {
+        const [data] = await this.request("GET", "/search/agents", {
+          params: {
+            query: normalizedQuery,
+            cursor,
+            limit: Math.max(1, Math.min(targetLimit - agents.length, 20)),
+          },
+        });
+        const pageItems = Array.isArray(data.items)
+          ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseAgent)
+          : [];
+        agents.push(...pageItems);
+        cursor = stringOrNull(data.next_cursor);
+        if (!cursor || seenCursors.has(cursor)) {
+          break;
+        }
+        seenCursors.add(cursor);
+      }
+      return agents.slice(0, targetLimit);
+    }
+    const [data] = await this.request("GET", "/me/agent");
+    return [parseAgent(data)];
+  }
+
+  async get_agent(
+    agent_id: string,
+    options: { lang?: string; tab?: string; cursor?: string; limit?: number } = {},
+  ): Promise<AgentRecord> {
+    const normalizedAgentId = String(agent_id ?? "").trim();
+    if (!normalizedAgentId) {
+      throw new SiglumeClientError("agent_id is required.");
+    }
+    const [data] = await this.request("GET", `/agents/${normalizedAgentId}/profile`, {
+      params: {
+        lang: options.lang,
+        tab: options.tab,
+        cursor: options.cursor,
+        limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 15), 50)),
+      },
+    });
+    return parseAgent(data);
+  }
+
+  async update_agent_charter(
+    agent_id: string,
+    charter_text: string,
+    options: {
+      role?: string;
+      target_profile?: Record<string, unknown>;
+      qualification_criteria?: Record<string, unknown>;
+      success_metrics?: Record<string, unknown>;
+      constraints?: Record<string, unknown>;
+      wait_for_completion?: boolean;
+    } = {},
+  ): Promise<AgentCharter> {
+    const normalizedAgentId = String(agent_id ?? "").trim();
+    const normalizedCharterText = String(charter_text ?? "").trim();
+    if (!normalizedAgentId) {
+      throw new SiglumeClientError("agent_id is required.");
+    }
+    if (!normalizedCharterText) {
+      throw new SiglumeClientError("charter_text is required.");
+    }
+    void options.wait_for_completion;
+    const payload: Record<string, unknown> = {
+      goals: { charter_text: normalizedCharterText },
+    };
+    if (options.role) {
+      payload.role = String(options.role).trim().toLowerCase();
+    }
+    if (options.target_profile) {
+      payload.target_profile = toRecord(options.target_profile);
+    }
+    if (options.qualification_criteria) {
+      payload.qualification_criteria = toRecord(options.qualification_criteria);
+    }
+    if (options.success_metrics) {
+      payload.success_metrics = toRecord(options.success_metrics);
+    }
+    if (options.constraints) {
+      payload.constraints = toRecord(options.constraints);
+    }
+    const [data] = await this.request("PUT", `/owner/agents/${normalizedAgentId}/charter`, {
+      json_body: payload,
+    });
+    return parseAgentCharter(data);
+  }
+
+  async update_approval_policy(
+    agent_id: string,
+    policy: Record<string, unknown>,
+    options: { wait_for_completion?: boolean } = {},
+  ): Promise<ApprovalPolicy> {
+    const normalizedAgentId = String(agent_id ?? "").trim();
+    if (!normalizedAgentId) {
+      throw new SiglumeClientError("agent_id is required.");
+    }
+    const policyPayload = toRecord(policy);
+    const allowedFields = [
+      "auto_approve_below",
+      "always_require_approval_for",
+      "deny_if",
+      "approval_ttl_minutes",
+      "structured_only",
+      "merchant_allowlist",
+      "merchant_denylist",
+      "category_allowlist",
+      "category_denylist",
+      "risk_policy",
+    ] as const;
+    const payload = Object.fromEntries(
+      allowedFields
+        .filter((field) => policyPayload[field] !== undefined && policyPayload[field] !== null)
+        .map((field) => [field, policyPayload[field]]),
+    );
+    if (Object.keys(payload).length === 0) {
+      throw new SiglumeClientError("policy must include at least one supported approval-policy field.");
+    }
+    void options.wait_for_completion;
+    const [data] = await this.request("PUT", `/owner/agents/${normalizedAgentId}/approval-policy`, {
+      json_body: payload,
+    });
+    return parseApprovalPolicy(data);
+  }
+
+  async update_budget_policy(
+    agent_id: string,
+    policy: Record<string, unknown>,
+    options: { wait_for_completion?: boolean } = {},
+  ): Promise<BudgetPolicy> {
+    const normalizedAgentId = String(agent_id ?? "").trim();
+    if (!normalizedAgentId) {
+      throw new SiglumeClientError("agent_id is required.");
+    }
+    const policyPayload = toRecord(policy);
+    const allowedFields = [
+      "currency",
+      "period_start",
+      "period_end",
+      "period_limit_minor",
+      "per_order_limit_minor",
+      "auto_approve_below_minor",
+      "limits",
+      "metadata",
+    ] as const;
+    const payload = Object.fromEntries(
+      allowedFields
+        .filter((field) => policyPayload[field] !== undefined && policyPayload[field] !== null)
+        .map((field) => [field, policyPayload[field]]),
+    );
+    if (Object.keys(payload).length === 0) {
+      throw new SiglumeClientError("policy must include at least one supported budget-policy field.");
+    }
+    void options.wait_for_completion;
+    const [data] = await this.request("PUT", `/owner/agents/${normalizedAgentId}/budget`, {
+      json_body: payload,
+    });
+    return parseBudgetPolicy(data);
   }
 
   async list_access_grants(options: {

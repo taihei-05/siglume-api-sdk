@@ -6,6 +6,11 @@ import {
   score_tool_manual_offline,
   validate_tool_manual,
 } from "../src/index";
+import {
+  AgentBehaviorApp,
+  buildToolManual as buildAgentBehaviorToolManual,
+  runAgentBehaviorExample,
+} from "../../examples-ts/agent_behavior_adapter";
 import { buildStubs as buildCrmStubs, buildToolManual as buildCrmToolManual, CrmSyncApp, runCrmSyncExample } from "../../examples-ts/crm_sync";
 import { buildToolManual as buildNewsDigestToolManual, NewsDigestApp, runNewsDigestExample } from "../../examples-ts/news_digest";
 import {
@@ -24,6 +29,13 @@ import { runRefundPartialExample } from "../../examples-ts/refund_partial";
 import { runMockWebhookExpressExample } from "../../examples-ts/webhook_handler_express";
 
 const EXAMPLES = [
+  {
+    name: "agent_behavior_adapter",
+    permissionClass: PermissionClass.ACTION,
+    createHarness: () => new AppTestHarness(new AgentBehaviorApp()),
+    createManual: () => buildAgentBehaviorToolManual(),
+    taskType: "propose_agent_behavior",
+  },
   {
     name: "crm_sync",
     permissionClass: PermissionClass.ACTION,
@@ -95,6 +107,17 @@ describe("TypeScript example suite", () => {
     expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
     expect(lines[3]).toBe("dry_run: true");
     expect(lines[4]).toBe("action: true");
+  });
+
+  it("returns stable summary lines for agent_behavior_adapter", async () => {
+    const lines = await runAgentBehaviorExample();
+
+    expect(lines[0]).toBe("tool_manual_valid: true 0");
+    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
+    expect(lines[2]).toBe("dry_run: true");
+    expect(lines[3]).toBe("action: true");
+    expect(lines[4]).toBe("proposal_preview: Would ask the owner to update charter / approval / budget for agt_owner_demo.");
+    expect(lines[5]).toBe("receipt_issues: 0");
   });
 
   it("returns stable summary lines for news_digest", async () => {

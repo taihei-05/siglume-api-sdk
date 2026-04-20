@@ -57,8 +57,12 @@ for _name in _LEGACY_PUBLIC_EXPORTS:
 
 from .client import (  # noqa: E402, F401
     AccessGrantRecord,
+    AgentCharter,
+    AgentRecord,
     AppListingRecord,
+    ApprovalPolicy,
     AutoRegistrationReceipt,
+    BudgetPolicy,
     CapabilityBindingRecord,
     ConnectedAccountRecord,
     CursorPage,
@@ -175,8 +179,12 @@ __all__ = sorted(
         _LEGACY_PUBLIC_EXPORTS
         + [
             "AccessGrantRecord",
+            "AgentCharter",
+            "AgentRecord",
             "AppListingRecord",
+            "ApprovalPolicy",
             "AutoRegistrationReceipt",
+            "BudgetPolicy",
             "CapabilityBindingRecord",
             "CapabilityListing",
             "Change",

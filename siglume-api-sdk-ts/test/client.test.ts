@@ -365,4 +365,362 @@ describe("SiglumeClient", () => {
       "Support case summary/body must fit within the 2000 character API limit.",
     );
   });
+
+  it("lists the caller's personal agent when no query is provided", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        expect(url.pathname).toBe("/v1/me/agent");
+        return new Response(JSON.stringify(envelope({
+          agent_id: "agt_owner_demo",
+          agent_type: "personal",
+          name: "Owner Demo",
+          avatar_url: "/avatars/owner-demo.png",
+          description: "Owner-managed marketplace agent.",
+          status: "active",
+          capabilities: { marketplace: true },
+          settings: { paused: false },
+        })), { status: 200 });
+      },
+    });
+
+    const agents = await client.list_agents();
+
+    expect(agents).toHaveLength(1);
+    expect(agents[0]?.agent_id).toBe("agt_owner_demo");
+    expect(agents[0]?.capabilities.marketplace).toBe(true);
+  });
+
+  it("uses search and profile routes for list_agents(query) and get_agent", async () => {
+    const searchRequests: Array<{ cursor: string | null; limit: string | null }> = [];
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/search/agents") {
+          expect(url.searchParams.get("query")).toBe("budget");
+          searchRequests.push({
+            cursor: url.searchParams.get("cursor"),
+            limit: url.searchParams.get("limit"),
+          });
+          if (url.searchParams.get("cursor") === "next_agents") {
+            return new Response(JSON.stringify(envelope({
+              items: [{
+                agent_id: "agt_budget_helper",
+                name: "Budget Helper",
+                avatar_url: "/avatars/budget-helper.png",
+                description: "Tracks cautious purchasing rules.",
+                expertise: ["budgeting"],
+                post_count: 1,
+                reply_count: 0,
+              }],
+              next_cursor: null,
+            })), { status: 200 });
+          }
+          return new Response(JSON.stringify(envelope({
+            items: [{
+              agent_id: "agt_budget_demo",
+              name: "Budget Demo",
+              avatar_url: "/avatars/budget-demo.png",
+              description: "Focuses on budget-safe travel purchases.",
+              expertise: ["travel", "budgeting"],
+              post_count: 3,
+              reply_count: 1,
+            }],
+            next_cursor: "next_agents",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/agents/agt_budget_demo/profile") {
+          return new Response(JSON.stringify(envelope({
+            agent_id: "agt_budget_demo",
+            name: "Budget Demo",
+            avatar_url: "/avatars/budget-demo.png",
+            description: "Focuses on budget-safe travel purchases.",
+            agent_type: "personal",
+            expertise: ["travel", "budgeting"],
+            style: "careful",
+            paused: false,
+            manifesto_text: "Prefer clear budgets and explicit approvals.",
+            plan: { tier: "pro" },
+            reputation: { score: 0.92 },
+            post_count: 3,
+            reply_count: 1,
+            items: [{ content_id: "cnt_demo_1", title: "Travel safety checklist" }],
+            next_cursor: null,
+          })), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const agents = await client.list_agents({ query: "budget", limit: 5 });
+    const agent = await client.get_agent("agt_budget_demo");
+
+    expect(agents.map((item) => item.agent_id)).toEqual(["agt_budget_demo", "agt_budget_helper"]);
+    expect(agents[0]?.expertise).toEqual(["travel", "budgeting"]);
+    expect(agent.manifesto_text).toBe("Prefer clear budgets and explicit approvals.");
+    expect(agent.plan.tier).toBe("pro");
+    expect(agent.items[0]?.content_id).toBe("cnt_demo_1");
+    expect(searchRequests).toEqual([
+      { cursor: null, limit: "5" },
+      { cursor: "next_agents", limit: "4" },
+    ]);
+  });
+
+  it("maps update_agent_charter into the owner charter payload", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/charter");
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        expect(body).toEqual({
+          goals: { charter_text: "Prefer capped spend and explicit approval for unusual purchases." },
+          role: "buyer",
+          success_metrics: { approval_rate_floor: 0.8 },
+        });
+        return new Response(JSON.stringify(envelope({
+          charter_id: "chr_demo_2",
+          agent_id: "agt_owner_demo",
+          principal_user_id: "usr_owner_demo",
+          version: 2,
+          active: true,
+          role: "buyer",
+          goals: { charter_text: "Prefer capped spend and explicit approval for unusual purchases." },
+          target_profile: {},
+          qualification_criteria: {},
+          success_metrics: { approval_rate_floor: 0.8 },
+          constraints: {},
+        })), { status: 200 });
+      },
+    });
+
+    const charter = await client.update_agent_charter(
+      "agt_owner_demo",
+      "Prefer capped spend and explicit approval for unusual purchases.",
+      {
+        role: "buyer",
+        success_metrics: { approval_rate_floor: 0.8 },
+        wait_for_completion: true,
+      },
+    );
+
+    expect(charter.charter_id).toBe("chr_demo_2");
+    expect(charter.charter_text).toBe("Prefer capped spend and explicit approval for unusual purchases.");
+    expect(charter.success_metrics.approval_rate_floor).toBe(0.8);
+  });
+
+  it("sanitizes approval and budget policy updates before sending them", async () => {
+    const requests: Array<{ path: string; body: Record<string, unknown> }> = [];
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        requests.push({ path: url.pathname, body });
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/approval-policy") {
+          return new Response(JSON.stringify(envelope({
+            approval_policy_id: "apl_demo_2",
+            agent_id: "agt_owner_demo",
+            principal_user_id: "usr_owner_demo",
+            version: 2,
+            active: true,
+            auto_approve_below: { JPY: 3000 },
+            always_require_approval_for: ["travel.booking"],
+            deny_if: {},
+            approval_ttl_minutes: 720,
+            structured_only: true,
+            merchant_allowlist: [],
+            merchant_denylist: [],
+            category_allowlist: [],
+            category_denylist: [],
+            risk_policy: {},
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/budget") {
+          return new Response(JSON.stringify(envelope({
+            budget_id: "bdg_demo_2",
+            agent_id: "agt_owner_demo",
+            principal_user_id: "usr_owner_demo",
+            currency: "JPY",
+            period_start: "2026-04-01T00:00:00Z",
+            period_end: "2026-05-01T00:00:00Z",
+            period_limit_minor: 50000,
+            spent_minor: 0,
+            reserved_minor: 0,
+            per_order_limit_minor: 12000,
+            auto_approve_below_minor: 3000,
+            limits: {
+              period_limit: 50000,
+              per_order_limit: 12000,
+              auto_approve_below: 3000,
+            },
+            metadata: { source: "sdk-test" },
+          })), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const policy = await client.update_approval_policy(
+      "agt_owner_demo",
+      {
+        approval_policy_id: "apl_ignore_me",
+        version: 999,
+        auto_approve_below: { JPY: 3000 },
+        always_require_approval_for: ["travel.booking"],
+        approval_ttl_minutes: 720,
+        structured_only: true,
+      },
+      { wait_for_completion: true },
+    );
+    const budget = await client.update_budget_policy(
+      "agt_owner_demo",
+      {
+        budget_id: "bdg_ignore_me",
+        currency: "JPY",
+        period_limit_minor: 50000,
+        per_order_limit_minor: 12000,
+        auto_approve_below_minor: 3000,
+        metadata: { source: "sdk-test" },
+      },
+      { wait_for_completion: true },
+    );
+
+    expect(requests[0]).toEqual({
+      path: "/v1/owner/agents/agt_owner_demo/approval-policy",
+      body: {
+        auto_approve_below: { JPY: 3000 },
+        always_require_approval_for: ["travel.booking"],
+        approval_ttl_minutes: 720,
+        structured_only: true,
+      },
+    });
+    expect(requests[1]).toEqual({
+      path: "/v1/owner/agents/agt_owner_demo/budget",
+      body: {
+        currency: "JPY",
+        period_limit_minor: 50000,
+        per_order_limit_minor: 12000,
+        auto_approve_below_minor: 3000,
+        metadata: { source: "sdk-test" },
+      },
+    });
+    expect(policy.approval_policy_id).toBe("apl_demo_2");
+    expect(policy.auto_approve_below.JPY).toBe(3000);
+    expect(budget.budget_id).toBe("bdg_demo_2");
+    expect(budget.limits.per_order_limit).toBe(12000);
+  });
+
+  it("validates local inputs for agent behavior updates", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response("{}", { status: 500 }),
+    });
+
+    await expect(client.get_agent("")).rejects.toThrow("agent_id is required.");
+    await expect(client.update_agent_charter("", "keep budgets tight")).rejects.toThrow("agent_id is required.");
+    await expect(client.update_agent_charter("agt_owner_demo", "")).rejects.toThrow("charter_text is required.");
+    await expect(client.update_approval_policy("agt_owner_demo", {})).rejects.toThrow(
+      "policy must include at least one supported approval-policy field.",
+    );
+    await expect(client.update_budget_policy("agt_owner_demo", {})).rejects.toThrow(
+      "policy must include at least one supported budget-policy field.",
+    );
+  });
+
+  it("parses sparse approval and budget responses with numeric fallbacks", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/approval-policy") {
+          return new Response(JSON.stringify(envelope({
+            id: "apl_sparse",
+            agent_id: "agt_owner_demo",
+            auto_approve_below: { JPY: 2500, USD: "skip-me" },
+            structured_only: false,
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/budget") {
+          return new Response(JSON.stringify(envelope({
+            id: "bdg_sparse",
+            agent_id: "agt_owner_demo",
+            currency: "USD",
+            period_limit_minor: 9000,
+            per_order_limit_minor: 1500,
+            auto_approve_below_minor: 500,
+            limits: null,
+          })), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const policy = await client.update_approval_policy("agt_owner_demo", {
+      auto_approve_below: { JPY: 2500 },
+    });
+    const budget = await client.update_budget_policy("agt_owner_demo", {
+      currency: "USD",
+      period_limit_minor: 9000,
+      per_order_limit_minor: 1500,
+      auto_approve_below_minor: 500,
+    });
+
+    expect(policy.approval_policy_id).toBe("apl_sparse");
+    expect(policy.auto_approve_below).toEqual({ JPY: 2500 });
+    expect(budget.budget_id).toBe("bdg_sparse");
+    expect(budget.limits).toEqual({
+      period_limit: 9000,
+      per_order_limit: 1500,
+      auto_approve_below: 500,
+    });
+  });
+
+  it("accepts raw array payloads for webhook list endpoints", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/webhooks/subscriptions") {
+          return new Response(JSON.stringify([
+            {
+              id: "whsub_123",
+              event_type: "subscription.created",
+              url: "https://example.test/webhooks/siglume",
+              status: "active",
+            },
+          ]), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const subscriptions = await client.list_webhook_subscriptions();
+
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]?.subscription_id).toBe("whsub_123");
+    expect(subscriptions[0]?.event_types).toEqual([]);
+  });
+
+  it("wraps non-Error transport failures as SiglumeClientError", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      max_retries: 1,
+      fetch: async () => {
+        throw "transport exploded";
+      },
+    });
+
+    await expect(client.list_agents()).rejects.toThrow("Siglume request failed.");
+  });
 });

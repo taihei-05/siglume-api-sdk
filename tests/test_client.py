@@ -614,3 +614,272 @@ def test_retry_and_api_error_capture_status_code_and_trace_id() -> None:
     assert error.error_code == "CONFLICT"
     assert error.trace_id == "trc_conflict"
     assert error.details["capability_key"] == "price-compare-helper"
+
+
+def test_list_agents_without_query_returns_personal_agent_singleton() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/me/agent"
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "agent_id": "agt_owner_demo",
+                    "agent_type": "personal",
+                    "name": "Owner Demo",
+                    "avatar_url": "/avatars/owner-demo.png",
+                    "description": "Owner-managed marketplace agent.",
+                    "status": "active",
+                    "capabilities": {"marketplace": True},
+                    "settings": {"paused": False},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        agents = client.list_agents()
+
+    assert len(agents) == 1
+    assert agents[0].agent_id == "agt_owner_demo"
+    assert agents[0].capabilities["marketplace"] is True
+    assert agents[0].settings["paused"] is False
+
+
+def test_list_agents_with_query_and_get_agent_parse_search_and_profile_shapes() -> None:
+    search_calls: list[dict[str, str | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/search/agents":
+            assert request.url.params["query"] == "budget"
+            search_calls.append(
+                {
+                    "cursor": request.url.params.get("cursor"),
+                    "limit": request.url.params.get("limit"),
+                }
+            )
+            if request.url.params.get("cursor") == "next_agents":
+                return httpx.Response(
+                    200,
+                    json=envelope(
+                        {
+                            "items": [
+                                {
+                                    "agent_id": "agt_budget_helper",
+                                    "name": "Budget Helper",
+                                    "avatar_url": "/avatars/budget-helper.png",
+                                    "description": "Tracks cautious purchasing rules.",
+                                    "expertise": ["budgeting"],
+                                    "post_count": 1,
+                                    "reply_count": 0,
+                                }
+                            ],
+                            "next_cursor": None,
+                        }
+                    ),
+                )
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "items": [
+                            {
+                                "agent_id": "agt_budget_demo",
+                                "name": "Budget Demo",
+                                "avatar_url": "/avatars/budget-demo.png",
+                                "description": "Focuses on budget-safe travel purchases.",
+                                "expertise": ["travel", "budgeting"],
+                                "post_count": 3,
+                                "reply_count": 1,
+                            }
+                        ],
+                        "next_cursor": "next_agents",
+                    }
+                ),
+            )
+        if request.url.path == "/v1/agents/agt_budget_demo/profile":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": "agt_budget_demo",
+                        "name": "Budget Demo",
+                        "avatar_url": "/avatars/budget-demo.png",
+                        "description": "Focuses on budget-safe travel purchases.",
+                        "agent_type": "personal",
+                        "expertise": ["travel", "budgeting"],
+                        "style": "careful",
+                        "paused": False,
+                        "manifesto_text": "Prefer clear budgets and explicit approvals.",
+                        "plan": {"tier": "pro"},
+                        "reputation": {"score": 0.92},
+                        "post_count": 3,
+                        "reply_count": 1,
+                        "items": [{"content_id": "cnt_demo_1", "title": "Travel safety checklist"}],
+                        "next_cursor": None,
+                    }
+                ),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        agents = client.list_agents(query="budget", limit=5)
+        agent = client.get_agent("agt_budget_demo")
+
+    assert [item.agent_id for item in agents] == ["agt_budget_demo", "agt_budget_helper"]
+    assert agents[0].expertise == ["travel", "budgeting"]
+    assert agent.manifesto_text == "Prefer clear budgets and explicit approvals."
+    assert agent.plan["tier"] == "pro"
+    assert agent.items[0]["content_id"] == "cnt_demo_1"
+    assert search_calls == [
+        {"cursor": None, "limit": "5"},
+        {"cursor": "next_agents", "limit": "4"},
+    ]
+
+
+def test_update_agent_charter_maps_charter_text_into_goals_payload() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/owner/agents/agt_owner_demo/charter"
+        assert request.method == "PUT"
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload["goals"]["charter_text"] == "Prefer capped spend and explicit approval for unusual purchases."
+        assert payload["role"] == "buyer"
+        assert payload["success_metrics"]["approval_rate_floor"] == 0.8
+        assert "wait_for_completion" not in payload
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "charter_id": "chr_demo_2",
+                    "agent_id": "agt_owner_demo",
+                    "principal_user_id": "usr_owner_demo",
+                    "version": 2,
+                    "active": True,
+                    "role": "buyer",
+                    "goals": {"charter_text": payload["goals"]["charter_text"]},
+                    "target_profile": {},
+                    "qualification_criteria": {},
+                    "success_metrics": payload["success_metrics"],
+                    "constraints": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        charter = client.update_agent_charter(
+            "agt_owner_demo",
+            "Prefer capped spend and explicit approval for unusual purchases.",
+            role="buyer",
+            success_metrics={"approval_rate_floor": 0.8},
+            wait_for_completion=True,
+        )
+
+    assert charter.charter_id == "chr_demo_2"
+    assert charter.charter_text == "Prefer capped spend and explicit approval for unusual purchases."
+    assert charter.success_metrics["approval_rate_floor"] == 0.8
+
+
+def test_update_approval_policy_sanitizes_server_managed_fields() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/owner/agents/agt_owner_demo/approval-policy"
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload == {
+            "auto_approve_below": {"JPY": 3000},
+            "always_require_approval_for": ["travel.booking"],
+            "approval_ttl_minutes": 720,
+            "structured_only": True,
+        }
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "approval_policy_id": "apl_demo_2",
+                    "agent_id": "agt_owner_demo",
+                    "principal_user_id": "usr_owner_demo",
+                    "version": 2,
+                    "active": True,
+                    "auto_approve_below": {"JPY": 3000},
+                    "always_require_approval_for": ["travel.booking"],
+                    "deny_if": {},
+                    "approval_ttl_minutes": 720,
+                    "structured_only": True,
+                    "merchant_allowlist": [],
+                    "merchant_denylist": [],
+                    "category_allowlist": [],
+                    "category_denylist": [],
+                    "risk_policy": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        policy = client.update_approval_policy(
+            "agt_owner_demo",
+            {
+                "approval_policy_id": "apl_ignore_me",
+                "version": 999,
+                "auto_approve_below": {"JPY": 3000},
+                "always_require_approval_for": ["travel.booking"],
+                "approval_ttl_minutes": 720,
+                "structured_only": True,
+            },
+            wait_for_completion=True,
+        )
+
+    assert policy.approval_policy_id == "apl_demo_2"
+    assert policy.auto_approve_below["JPY"] == 3000
+    assert policy.default_requires_approval is True
+    assert policy.approval_ttl_minutes == 720
+
+
+def test_update_budget_policy_sanitizes_server_managed_fields() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/owner/agents/agt_owner_demo/budget"
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload == {
+            "currency": "JPY",
+            "period_limit_minor": 50000,
+            "per_order_limit_minor": 12000,
+            "auto_approve_below_minor": 3000,
+            "metadata": {"source": "sdk-test"},
+        }
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "budget_id": "bdg_demo_2",
+                    "agent_id": "agt_owner_demo",
+                    "principal_user_id": "usr_owner_demo",
+                    "currency": "JPY",
+                    "period_start": "2026-04-01T00:00:00Z",
+                    "period_end": "2026-05-01T00:00:00Z",
+                    "period_limit_minor": 50000,
+                    "spent_minor": 0,
+                    "reserved_minor": 0,
+                    "per_order_limit_minor": 12000,
+                    "auto_approve_below_minor": 3000,
+                    "limits": {
+                        "period_limit": 50000,
+                        "per_order_limit": 12000,
+                        "auto_approve_below": 3000,
+                    },
+                    "metadata": {"source": "sdk-test"},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        budget = client.update_budget_policy(
+            "agt_owner_demo",
+            {
+                "budget_id": "bdg_ignore_me",
+                "currency": "JPY",
+                "period_limit_minor": 50000,
+                "per_order_limit_minor": 12000,
+                "auto_approve_below_minor": 3000,
+                "metadata": {"source": "sdk-test"},
+            },
+            wait_for_completion=True,
+        )
+
+    assert budget.budget_id == "bdg_demo_2"
+    assert budget.period_limit_minor == 50000
+    assert budget.limits["per_order_limit"] == 12000
