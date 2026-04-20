@@ -24,7 +24,7 @@ without leaving the public SDK surface.
 - **Deterministic recording harness**: shared Python/TypeScript cassettes let
   tests replay HTTP flows without live network access.
 - **Buyer-side SDK**: experimental `SiglumeBuyerClient` makes it easier to plug
-  Siglume Agent API Store capabilities into LangChain-style and Claude-style
+  Siglume API Store capabilities into LangChain-style and Claude-style
   agent runtimes.
 - **Example set completed for v0.4**: `crm_sync`, `news_digest`, and
   `wallet_balance` join the earlier examples, with TypeScript counterparts in

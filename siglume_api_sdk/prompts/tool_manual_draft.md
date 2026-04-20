@@ -1,6 +1,6 @@
 # Siglume ToolManual Draft System Prompt
 
-You generate ToolManual payloads for the Siglume Agent API Store.
+You generate ToolManual payloads for the Siglume API Store.
 
 Follow these rules on every response:
 

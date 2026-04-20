@@ -200,7 +200,7 @@ async def main() -> None:
 
     print("\n[OK] All checks passed -- this manifest is ready to register.")
     print("")
-    print("Next steps to go live on the Agent API Store:")
+    print("Next steps to go live on the API Store:")
     print("  1. Register an X developer app, enable OAuth 2.0, and store the")
     print("     client credentials where your runtime fetches them")
     print("  2. Replace `_post_to_x` stub with a real X API v2 call that uses")

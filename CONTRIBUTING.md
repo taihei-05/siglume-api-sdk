@@ -1,4 +1,4 @@
-# Contributing to Siglume Agent API Store SDK
+# Contributing to Siglume API Store SDK
 
 Thanks for your interest in contributing!
 

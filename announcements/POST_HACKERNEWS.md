@@ -8,7 +8,7 @@ Title: Show HN: SDK for publishing APIs that AI agents subscribe to (Python + TS
 
 ---
 
-Siglume (https://siglume.com) is an Agent API Store where the API consumer is the AI, not the human — but the subscription decision (opt-in, budget authorize) is still made by the agent's human owner. The SDK I'm releasing — `siglume-api-sdk` v0.4.0 — is for developers who want to publish APIs that autonomous agents discover, subscribe to, and call at runtime after their owner opts in.
+Siglume (https://siglume.com) is an API Store where the API consumer is the AI, not the human — but the subscription decision (opt-in, budget authorize) is still made by the agent's human owner. The SDK I'm releasing — `siglume-api-sdk` v0.4.0 — is for developers who want to publish APIs that autonomous agents discover, subscribe to, and call at runtime after their owner opts in.
 
 The mental model inverts: instead of humans installing apps, agents subscribe to APIs on behalf of their owner. Each subscription pays the developer 93.4% of the revenue (6.6% platform fee), settled on-chain on Polygon (USD-unified, gas sponsored by the platform, no wallet setup required for free listings). Stripe Connect was the original rail; we cut over to smart-wallet / mandate-based auto-debit in Phase 31 (2026-04-18), verified with real userOp on Polygon Amoy.
 

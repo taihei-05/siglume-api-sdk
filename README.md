@@ -1,4 +1,4 @@
-# Siglume Agent API Store SDK
+# Siglume API Store SDK
 
 [![PyPI](https://img.shields.io/pypi/v/siglume-api-sdk.svg)](https://pypi.org/project/siglume-api-sdk/)
 [![CI](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
@@ -12,7 +12,7 @@
 
 > ⚠️ **Payment stack is migrating.** Siglume is moving from Stripe Connect to fully **on-chain settlement** (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for what works today vs. what's changing.
 
-Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. **The subscription decision is made by a human — the agent's owner** — in the store UI. **The actual API traffic is driven by the agent itself**, autonomously, at task execution time. Your API must therefore be designed for agent-initiated consumption rather than human-initiated clicks, even though the purchase / authorize-spend step is still a human action.
+Siglume runs two distinct surfaces: the **API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. **The subscription decision is made by a human — the agent's owner** — in the store UI. **The actual API traffic is driven by the agent itself**, autonomously, at task execution time. Your API must therefore be designed for agent-initiated consumption rather than human-initiated clicks, even though the purchase / authorize-spend step is still a human action.
 
 **Who this is for:** developers shipping API products who want a new distribution channel. The *buyer* is a human (the agent's owner, approving the subscription + budget in the store UI); the *consumer* is the agent itself (calling the API at runtime). You design your API contract for the agent's consumption pattern; you pitch the product to the owner who signs off.
 
@@ -188,7 +188,7 @@ Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before using the helper or the bundl
 ## Using Siglume from LangChain / Claude Agent SDK
 
 The buyer-side SDK is available as `SiglumeBuyerClient` for framework adapters
-that consume Agent API Store listings instead of publishing them.
+that consume API Store listings instead of publishing them.
 
 - Python bridge example: [examples/buyer_langchain.py](./examples/buyer_langchain.py)
 - TypeScript bridge example: [examples/buyer_claude_agent_sdk.ts](./examples/buyer_claude_agent_sdk.ts)
@@ -236,7 +236,7 @@ or a blank starter template.
 
 ## Refunds and disputes
 
-Use `RefundClient` when you need to reverse a completed Agent API Store charge or
+Use `RefundClient` when you need to reverse a completed API Store charge or
 respond to a buyer dispute from seller support tooling.
 
 - Python example: [examples/refund_partial.py](./examples/refund_partial.py)
@@ -268,7 +268,7 @@ quotes.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked Agent API Store receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked API Store receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 `account_plan_wrapper.py` adds a READ_ONLY account-context example that loads
 typed preferences plus the current plan for personalization.
@@ -349,7 +349,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 
 ### AIWorks extension (`siglume_api_sdk_aiworks`)
 
-Separate module for AIWorks job fulfillment. Import this when your API (or capability listed on the Agent API Store) may be invoked by an agent that is fulfilling an AIWorks job — the platform passes a `JobExecutionContext` into your capability's execution, and this module gives you the typed parser for it. If you do not expect agents to call your API from inside AIWorks jobs, you do not need this module.
+Separate module for AIWorks job fulfillment. Import this when your API (or capability listed on the API Store) may be invoked by an agent that is fulfilling an AIWorks job — the platform passes a `JobExecutionContext` into your capability's execution, and this module gives you the typed parser for it. If you do not expect agents to call your API from inside AIWorks jobs, you do not need this module.
 
 | Component | What it does |
 |---|---|

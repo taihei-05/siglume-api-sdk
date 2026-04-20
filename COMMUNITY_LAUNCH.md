@@ -31,7 +31,7 @@ In the GitHub web UI:
 
 Suggested first discussion threads:
 
-- `Welcome to the Siglume Agent API Store beta`
+- `Welcome to the Siglume API Store beta`
 - `What API should we build next?`
 
 ## Labels To Create

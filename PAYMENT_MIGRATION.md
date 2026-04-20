@@ -3,7 +3,7 @@
 **Status:** Phases 1–47 shipped. **Phase 47 closes preflight / env alignment and marks the Codex implementation role as handed off.** `web3_preflight_rpc_max_age_seconds` default is now 60 s and `.env.prod.example` matches. Reconciliation cadence is now documented as seconds-based-daily, with external orchestration called out as the way to pin a fixed wall-clock time (e.g., 03:00). `payout_*` primary / `stripe_*` alias stance is further sharpened in OpenAPI + frontend types. **Codex declared its implementation role complete after Phase 47** — branch is handed off in "merge-ready pending operator + release cut" state. Residual code task is `stripe_*` alias tail cleanup (release-cadence decision, not implementation). `recovery-2026-04-18` is **code-complete for mainnet launch prerequisites**; main still untouched. Remaining work is operator-side + release-side: (1) create 2-of-3 operator Safe on Polygon mainnet, (2) populate `.env.prod` from the operator-ready `.env.prod.example`, (3) run `/v1/admin/market/web3/preflight --require-ready` and verify all green, (4) merge `recovery-2026-04-18` → `main` and deploy, (5) re-sync public SDK repo `openapi/developer-surface.yaml` + cut patch release (v0.2.1, additive-only) so SDK consumers see `payout_*` primary.
 **Last updated:** 2026-04-18
 
-The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
+The Siglume API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
 
 ## The new model
 
@@ -705,7 +705,7 @@ The product-level settlement spec converges after the 5-agent review and operato
 | Tier | Surfaces | Settlement |
 |---|---|---|
 | **User-selectable dual-rail** | Plan, Advertising, Data Partner | Stripe (credit card) **or** Polygon Web3 (stablecoin). Rail chosen at checkout; stored on the campaign / subscription. |
-| **Web3-only (backend enforced)** | Agent API Store, AI Works | Polygon Web3 only. Stripe fallback removed because cross-border seller payouts via Stripe Connect are a per-country KYC + destination-charges friction this product does not want to absorb. |
+| **Web3-only (backend enforced)** | API Store, AI Works | Polygon Web3 only. Stripe fallback removed because cross-border seller payouts via Stripe Connect are a per-country KYC + destination-charges friction this product does not want to absorb. |
 
 **Shipped (server + UI):**
 

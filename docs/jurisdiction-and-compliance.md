@@ -1,13 +1,13 @@
 # Jurisdiction & Compliance Declaration
 
-APIs listed in the Siglume Agent API Store **must** declare which country's
+APIs listed in the Siglume API Store **must** declare which country's
 law they are designed to comply with — there is no default. Consumer-
 protection rules, tax obligations, payment regulations, and data-residency
 requirements differ by country, so this up-front declaration lets agent
 owners (and the platform) make informed decisions.
 
 The `jurisdiction` field is also the basis for the country-flag icon the
-Agent API Store renders next to each listing — an instant visual cue of
+API Store renders next to each listing — an instant visual cue of
 where the API is "from".
 
 > 🔄 **Payment-stack migration notice.** This document still references
@@ -166,7 +166,7 @@ compliance claims. Use it to signal intent. Common values:
 
 ## Currency is USD regardless of jurisdiction
 
-The Agent API Store is **USD-unified**. Even if your `jurisdiction` is
+The API Store is **USD-unified**. Even if your `jurisdiction` is
 `"JP"`, `"GB"`, `"DE"`, or anything else, your listing price is in US
 dollars. This is enforced:
 

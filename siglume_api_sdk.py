@@ -1,7 +1,7 @@
 """Siglume Agent App SDK — interface definitions for external developers.
 
 This module defines the contracts that app developers implement to create
-agent apps for the Siglume Agent API Store.
+agent apps for the Siglume API Store.
 
 An "agent app" is a power-up kit that gives a Siglume AI agent new capabilities.
 For example: Amazon price comparison, travel booking, CRM sync, etc.
@@ -131,12 +131,12 @@ class AppManifest:
     example_prompts: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        # Currency: the Agent API Store is USD-unified. Non-USD submissions
+        # Currency: the API Store is USD-unified. Non-USD submissions
         # are rejected at registration. Enforce here so developers get a clear
         # error at adapter-construction time rather than a 422 at register.
         if self.currency and self.currency.upper() != "USD":
             raise ValueError(
-                f"AppManifest.currency must be 'USD' — the Agent API Store is "
+                f"AppManifest.currency must be 'USD' — the API Store is "
                 f"USD-unified regardless of jurisdiction. Got: {self.currency!r}"
             )
         self.currency = "USD"
@@ -144,7 +144,7 @@ class AppManifest:
         if not self.jurisdiction:
             raise ValueError(
                 "AppManifest.jurisdiction is REQUIRED. Every API listed on "
-                "the Agent API Store must explicitly declare its country of "
+                "the API Store must explicitly declare its country of "
                 "origin (the country whose law governs the offering) as an "
                 "ISO 3166-1 alpha-2 code, e.g. 'US', 'JP', 'GB', 'DE', 'SG'. "
                 "No default is applied — you must make an informed choice."

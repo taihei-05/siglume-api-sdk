@@ -1,6 +1,6 @@
 # Announcement Assets
 
-Launch and community-recruitment copy for the public Siglume Agent API Store SDK.
+Launch and community-recruitment copy for the public Siglume API Store SDK.
 
 ## Files
 

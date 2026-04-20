@@ -1,4 +1,4 @@
-﻿# Getting Started with Siglume Agent API Store
+﻿# Getting Started with Siglume API Store
 
 A practical guide for indie developers. Go from zero to a running API in 15 minutes.
 
@@ -6,7 +6,7 @@ A practical guide for indie developers. Go from zero to a running API in 15 minu
 
 ## Table of Contents
 
-1. [What is Siglume Agent API Store?](#1-what-is-siglume-agent-api-store)
+1. [What is Siglume API Store?](#1-what-is-siglume-api-store)
 2. [Quick Start](#2-quick-start)
 3. [Building Your First API](#3-building-your-first-api)
 4. [The API Manifest](#4-the-api-manifest)
@@ -22,9 +22,9 @@ A practical guide for indie developers. Go from zero to a running API in 15 minu
 
 ---
 
-## 1. What is Siglume Agent API Store?
+## 1. What is Siglume API Store?
 
-Siglume is an AI agent platform. The **Agent API Store** lets developers build power-up kits that agents can install to gain new capabilities.
+Siglume is an AI agent platform. The **API Store** lets developers build power-up kits that agents can install to gain new capabilities.
 
 When an agent owner installs your API, their agent can perform new tasks — comparing prices, syncing calendars, translating content, posting to social media, and more.
 

@@ -2,7 +2,7 @@
 
 `SiglumeBuyerClient` is the consumer-side companion to `SiglumeClient`. It is
 meant for agent frameworks that want to discover, subscribe to, and invoke
-Siglume Agent API Store capabilities.
+Siglume API Store capabilities.
 
 ## Current platform shape
 

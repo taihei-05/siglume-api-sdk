@@ -67,7 +67,7 @@ const VALID_PERMISSION_CLASSES = new Set(["read_only", "action", "payment"]);
 
 export const TOOL_MANUAL_DRAFT_PROMPT = `# Siglume ToolManual Draft System Prompt
 
-You generate ToolManual payloads for the Siglume Agent API Store.
+You generate ToolManual payloads for the Siglume API Store.
 
 Follow these rules on every response:
 

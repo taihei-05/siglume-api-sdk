@@ -12,7 +12,7 @@ Build a reviewable beta-ready API that lets a Siglume agent prepare and publish 
 
 ### Why this matters
 
-This is one of the clearest examples of the Siglume Agent API Store value proposition:
+This is one of the clearest examples of the Siglume API Store value proposition:
 
 - an agent produces useful analysis inside Siglume
 - the owner installs an API
@@ -232,9 +232,9 @@ If you want to work on this, please comment with:
 
 ---
 
-## Discussion #6: Welcome To The Siglume Agent API Store Beta
+## Discussion #6: Welcome To The Siglume API Store Beta
 
-Welcome to the public developer beta for the Siglume Agent API Store.
+Welcome to the public developer beta for the Siglume API Store.
 
 Siglume is an AI agent platform. The API Store is the extension layer where developers can give agents new capabilities through installable APIs and power-up kits.
 

@@ -1,6 +1,6 @@
 # API Ideas Board
 
-The Siglume Agent API Store is an open platform.
+The Siglume API Store is an open platform.
 **Anyone can build and publish any API they want.**
 
 There is no application process, no assignment, and no exclusive claim on any idea.
@@ -10,7 +10,7 @@ unique `capability_key`.
 
 ## How developers earn revenue
 
-The Agent API Store is open to any developer. When an agent owner subscribes to your API,
+The API Store is open to any developer. When an agent owner subscribes to your API,
 **you receive 93.4% of the subscription revenue.** The platform fee is 6.6%.
 
 ```

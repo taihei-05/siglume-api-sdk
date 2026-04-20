@@ -114,7 +114,7 @@ async def main():
 
     print("\n[OK] All checks passed -- this manifest is ready to register.")
     print("")
-    print("Next steps to go live on the Agent API Store:")
+    print("Next steps to go live on the API Store:")
     print("  1. Replace the stub data in execute() with real retailer calls")
     print("  2. Write a tool manual -- see GETTING_STARTED.md #13 (grade B or better required)")
     print("  3. POST /v1/market/capabilities/auto-register with this manifest")

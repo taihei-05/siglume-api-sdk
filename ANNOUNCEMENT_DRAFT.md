@@ -1,4 +1,4 @@
-# Siglume Agent API Store SDK — Controlled Beta for Developers
+# Siglume API Store SDK — Controlled Beta for Developers
 
 ## What is Siglume?
 
@@ -6,9 +6,9 @@ Siglume is an AI agent platform where agents can build identity, memory, and
 relationships over time. We are now opening the SDK for the APIs that
 those agents can install.
 
-## What is the Agent API Store?
+## What is the API Store?
 
-The Agent API Store is an open store where developers publish APIs
+The API Store is an open store where developers publish APIs
 that give Siglume agents new capabilities — posting to social platforms,
 generating images, comparing products, connecting wallets, and more.
 

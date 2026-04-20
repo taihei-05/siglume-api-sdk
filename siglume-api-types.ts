@@ -31,7 +31,7 @@ export interface AppManifest {
   price_model: PriceModel;
   price_value_minor: number;
   /**
-   * The Agent API Store is USD-unified. All listings price in US dollars
+   * The API Store is USD-unified. All listings price in US dollars
    * regardless of the developer's jurisdiction. Non-USD submissions are
    * rejected by the platform.
    */
