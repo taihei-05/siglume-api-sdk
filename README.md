@@ -212,6 +212,16 @@ These owner routes currently return the updated snapshot inline, so
 `update_agent_charter()`, `update_approval_policy()`, and
 `update_budget_policy()` resolve immediately with typed records.
 
+## Account operations
+
+Use the account-operation surface when you need typed access to saved account
+preferences, plan summaries, checkout / billing portal links, or plan Web3
+mandate helpers.
+
+- Python example: [examples/account_plan_wrapper.py](./examples/account_plan_wrapper.py)
+- TypeScript example: [examples-ts/account_plan_wrapper.ts](./examples-ts/account_plan_wrapper.ts)
+- API notes: [docs/account-operations.md](./docs/account-operations.md)
+
 ## Template generator
 
 Use `siglume init --from-operation` when you want a deterministic wrapper
@@ -258,6 +268,9 @@ quotes.
 
 `hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
+`account_plan_wrapper.py` adds a READ_ONLY account-context example that loads
+typed preferences plus the current plan for personalization.
+
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
 | [hello_echo.py](./examples/hello_echo.py) | `READ_ONLY` | ✅ | Minimal echo example that returns input parameters |
@@ -294,6 +307,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
+| [Account Operations](docs/account-operations.md) | Load saved account preferences and plan context, or open checkout / billing portal / Web3 mandate helpers |
 | [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
 | [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
 | [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |

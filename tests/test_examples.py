@@ -23,6 +23,7 @@ from siglume_api_sdk import (  # noqa: E402
 
 
 EXAMPLE_SPECS = [
+    ("account_plan_wrapper.py", PermissionClass.READ_ONLY),
     ("agent_behavior_adapter.py", PermissionClass.ACTION),
     ("calendar_sync.py", PermissionClass.ACTION),
     ("crm_sync.py", PermissionClass.ACTION),
@@ -165,6 +166,18 @@ def test_agent_behavior_adapter_example_returns_owner_review_preview() -> None:
     assert output[3] == "action: True"
     assert output[4] == "proposal_preview: Would ask the owner to update charter / approval / budget for agt_owner_demo."
     assert output[5] == "receipt_issues: 0"
+
+
+def test_account_plan_wrapper_example_returns_typed_account_context() -> None:
+    module = _load_module("account_plan_wrapper.py")
+
+    output = asyncio.run(module.run_account_plan_example())
+
+    assert output[0] == "tool_manual_valid: True 0"
+    assert output[1].startswith("quality_grade: ")
+    assert output[2] == "plan: plus model=claude-sonnet-4-6"
+    assert output[3] == "dry_run: True"
+    assert output[4].startswith("summary: Plan plus with ja preferences loaded")
 
 
 def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:

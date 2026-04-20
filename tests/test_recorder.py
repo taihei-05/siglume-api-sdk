@@ -191,6 +191,63 @@ def test_python_recorder_redacts_sensitive_values(tmp_path: Path) -> None:
             assert replayed.status_code == 200
 
 
+def test_python_recorder_redacts_checkout_and_portal_urls(tmp_path: Path) -> None:
+    cassette_path = tmp_path / "billing-links.json"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "checkout_url": "https://billing.example.test/checkout/cs_live_secret",
+                    "portal_url": "https://billing.example.test/portal/bps_live_secret",
+                    "ok": True,
+                }
+            ),
+        )
+
+    with Recorder(cassette_path, mode=RecordMode.RECORD):
+        with httpx.Client(base_url="https://api.example.test", transport=httpx.MockTransport(handler)) as client:
+            response = client.get("/billing-links")
+            assert response.status_code == 200
+
+    cassette_text = cassette_path.read_text(encoding="utf-8")
+    assert "cs_live_secret" not in cassette_text
+    assert "bps_live_secret" not in cassette_text
+    assert '"checkout_url": "<REDACTED>"' in cassette_text
+    assert '"portal_url": "<REDACTED>"' in cassette_text
+
+    def unexpected_handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Replay should not hit transport: {request.method} {request.url}")
+
+    with Recorder(cassette_path, mode=RecordMode.REPLAY):
+        with httpx.Client(base_url="https://api.example.test", transport=httpx.MockTransport(unexpected_handler)) as client:
+            replayed = client.get("/billing-links")
+            assert replayed.json()["data"]["checkout_url"] == "<REDACTED>"
+            assert replayed.json()["data"]["portal_url"] == "<REDACTED>"
+
+
+def test_python_recorder_redacts_checkout_and_portal_url_query_params(tmp_path: Path) -> None:
+    cassette_path = tmp_path / "billing-query.json"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=envelope({"ok": True}))
+
+    with Recorder(cassette_path, mode=RecordMode.RECORD):
+        with httpx.Client(base_url="https://api.example.test", transport=httpx.MockTransport(handler)) as client:
+            response = client.get(
+                "/billing-links?checkout_url=https://billing.example.test/checkout/cs_live_secret"
+                "&portal_url=https://billing.example.test/portal/bps_live_secret"
+            )
+            assert response.status_code == 200
+
+    cassette_text = cassette_path.read_text(encoding="utf-8")
+    assert "cs_live_secret" not in cassette_text
+    assert "bps_live_secret" not in cassette_text
+    assert "checkout_url=%3CREDACTED%3E" in cassette_text
+    assert "portal_url=%3CREDACTED%3E" in cassette_text
+
+
 def test_python_recorder_ignore_body_fields_allows_replay_drift(tmp_path: Path) -> None:
     cassette_path = tmp_path / "ignore-fields.json"
 

@@ -393,6 +393,239 @@ describe("SiglumeClient", () => {
     expect(agents[0]?.capabilities.marketplace).toBe(true);
   });
 
+  it("wraps account preferences and plan routes with typed payloads", async () => {
+    const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+        requests.push({ method: String(init?.method ?? "GET"), path: url.pathname, body });
+        if (url.pathname === "/v1/me/preferences" && (!init?.method || init.method === "GET")) {
+          return new Response(JSON.stringify(envelope({
+            language: "ja",
+            summary_depth: "concise",
+            notification_mode: "daily_digest",
+            autonomy_level: "review_first",
+            interest_profile: { themes: ["ai", "marketplace"] },
+            consent_policy: { share_profile: false },
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/preferences" && init?.method === "PUT") {
+          expect(body).toEqual({
+            language: "en",
+            interest_profile: { themes: ["ai", "finance"] },
+          });
+          return new Response(JSON.stringify(envelope({
+            language: "en",
+            summary_depth: "concise",
+            notification_mode: "daily_digest",
+            autonomy_level: "review_first",
+            interest_profile: { themes: ["ai", "finance"] },
+            consent_policy: { share_profile: false },
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan") {
+          return new Response(JSON.stringify(envelope({
+            plan: "plus",
+            display_name: "Plus",
+            limits: { manifesto_chars: 1000 },
+            available_models: [{ id: "claude-sonnet-4-6", provider: "anthropic" }],
+            default_model: "claude-sonnet-4-6",
+            selected_model: "claude-sonnet-4-6",
+            subscription_id: "sub_demo_plan",
+            period_end: "2026-05-20T00:00:00Z",
+            cancel_scheduled_at: null,
+            cancel_pending: false,
+            plan_change_scheduled_to: null,
+            plan_change_scheduled_at: null,
+            plan_change_scheduled_currency: null,
+            usage_today: { chat: 4 },
+            available_plans: { plus: { display_name: "Plus", price_usd: 1100 } },
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/checkout") {
+          expect(url.searchParams.get("plan")).toBe("plus");
+          expect(url.searchParams.get("currency")).toBe("usd");
+          return new Response(JSON.stringify(envelope({
+            checkout_url: "https://billing.example.test/checkout/cs_live_demo",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/billing-portal") {
+          return new Response(JSON.stringify(envelope({
+            portal_url: "https://billing.example.test/portal/bps_live_demo",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/cancel") {
+          return new Response(JSON.stringify(envelope({
+            cancelled: true,
+            effective_at: "2026-05-20T00:00:00Z",
+            cancel_scheduled_at: "2026-05-20T00:00:00Z",
+            plan: "plus",
+            subscription_id: "sub_demo_plan",
+            rail: "stripe",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/web3-mandate") {
+          expect(url.searchParams.get("plan")).toBe("pro");
+          expect(url.searchParams.get("currency")).toBe("jpy");
+          return new Response(JSON.stringify(envelope({
+            mandate_id: "mand_plan_demo",
+            payment_mandate_id: "pmd_plan_demo",
+            network: "polygon",
+            payee_type: "platform",
+            payee_ref: "platform:plan:pro",
+            purpose: "subscription",
+            cadence: "monthly",
+            token_symbol: "JPYC",
+            display_currency: "JPY",
+            max_amount_minor: 4980,
+            status: "active",
+            retry_count: 0,
+            metadata_jsonb: { plan: "pro" },
+            chain_receipt: {
+              receipt_id: "chr_plan_demo",
+              tx_hash: `0x${"c".repeat(64)}`,
+              network: "polygon",
+              chain_id: 137,
+              confirmations: 12,
+              finality_confirmations: 12,
+              payload: { amount_minor: 4980 },
+            },
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/web3-cancel") {
+          return new Response(JSON.stringify(envelope({
+            mandate_id: "mand_plan_demo",
+            payment_mandate_id: "pmd_plan_demo",
+            network: "polygon",
+            payee_type: "platform",
+            payee_ref: "platform:plan:pro",
+            purpose: "subscription",
+            cadence: "monthly",
+            token_symbol: "JPYC",
+            display_currency: "JPY",
+            max_amount_minor: 4980,
+            status: "cancelled",
+            retry_count: 1,
+            metadata_jsonb: { plan: "pro" },
+          })), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const preferences = await client.get_account_preferences();
+    const updated = await client.update_account_preferences({
+      language: "en",
+      interest_profile: { themes: ["ai", "finance"] },
+    });
+    const plan = await client.get_account_plan();
+    const checkout = await client.start_plan_checkout({ target_tier: "plus", currency: "usd" });
+    const portal = await client.open_plan_billing_portal();
+    const cancellation = await client.cancel_account_plan();
+    const mandate = await client.create_plan_web3_mandate({ target_tier: "pro", currency: "jpy" });
+    const cancelledMandate = await client.cancel_plan_web3_mandate();
+
+    expect(preferences.language).toBe("ja");
+    expect(updated.language).toBe("en");
+    expect(updated.interest_profile).toEqual({ themes: ["ai", "finance"] });
+    expect(plan.plan).toBe("plus");
+    expect((plan.available_plans.plus as Record<string, unknown>).price_usd).toBe(1100);
+    expect(checkout.checkout_url).toBe("https://billing.example.test/checkout/cs_live_demo");
+    expect(portal.portal_url).toBe("https://billing.example.test/portal/bps_live_demo");
+    expect(cancellation.cancelled).toBe(true);
+    expect(cancellation.rail).toBe("stripe");
+    expect(mandate.mandate_id).toBe("mand_plan_demo");
+    expect(mandate.chain_receipt?.tx_hash).toBe(`0x${"c".repeat(64)}`);
+    expect(cancelledMandate.status).toBe("cancelled");
+    expect(requests.map((request) => request.path)).toEqual([
+      "/v1/me/preferences",
+      "/v1/me/preferences",
+      "/v1/me/plan",
+      "/v1/me/plan/checkout",
+      "/v1/me/plan/billing-portal",
+      "/v1/me/plan/cancel",
+      "/v1/me/plan/web3-mandate",
+      "/v1/me/plan/web3-cancel",
+    ]);
+  });
+
+  it("requires at least one field for update_account_preferences", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response("{}", { status: 500 }),
+    });
+
+    await expect(client.update_account_preferences({})).rejects.toThrow(
+      "update_account_preferences requires at least one preference field.",
+    );
+  });
+
+  it("requires target_tier for start_plan_checkout", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response("{}", { status: 500 }),
+    });
+
+    await expect(client.start_plan_checkout({ target_tier: "" })).rejects.toThrow("target_tier is required.");
+  });
+
+  it("requires target_tier for create_plan_web3_mandate", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response("{}", { status: 500 }),
+    });
+
+    await expect(client.create_plan_web3_mandate({ target_tier: "" })).rejects.toThrow("target_tier is required.");
+  });
+
+  it("parses sparse account preference and plan payloads", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/me/preferences") {
+          return new Response(JSON.stringify(envelope({ language: "en" })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan") {
+          return new Response(JSON.stringify(envelope({
+            plan: "free",
+            available_models: [],
+            available_plans: {},
+            usage_today: {},
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/billing-portal") {
+          return new Response(JSON.stringify(envelope({
+            portal_url: "https://billing.example.test/portal/demo",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/me/plan/cancel") {
+          return new Response(JSON.stringify(envelope({ cancelled: false })), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const preferences = await client.get_account_preferences();
+    const plan = await client.get_account_plan();
+    const portal = await client.open_plan_billing_portal();
+    const cancellation = await client.cancel_account_plan();
+
+    expect(preferences.language).toBe("en");
+    expect(preferences.interest_profile).toEqual({});
+    expect(plan.plan).toBe("free");
+    expect(plan.available_models).toEqual([]);
+    expect(portal.portal_url).toBe("https://billing.example.test/portal/demo");
+    expect(cancellation.cancelled).toBe(false);
+  });
+
   it("uses search and profile routes for list_agents(query) and get_agent", async () => {
     const searchRequests: Array<{ cursor: string | null; limit: string | null }> = [];
     const client = new SiglumeClient({

@@ -11,6 +11,7 @@ declare const Deno:
 
 const CASSETTE_VERSION = 1;
 const SECRET_KEY_RE = /(api[_-]?key|secret|private[_-]?key|access[_-]?token|refresh[_-]?token)/i;
+const HANDLE_URL_KEY_RE = /(checkout[_-]?url|portal[_-]?url)/i;
 const PRIVKEY_RE = /0x[a-f0-9]{64}/g;
 const TOKEN_RE = /(pypi|ghp|gho|ghu|ghs)-[A-Za-z0-9]+/g;
 const BOUNDARY_RE = /boundary="?([^";]+)"?/i;
@@ -117,7 +118,7 @@ function redactUrl(urlText: string): string {
   const url = new URL(urlText);
   const nextParams = new URLSearchParams();
   for (const [key, value] of Array.from(url.searchParams.entries())) {
-    if (SECRET_KEY_RE.test(key)) {
+    if (SECRET_KEY_RE.test(key) || HANDLE_URL_KEY_RE.test(key)) {
       const redacted = redactString(value);
       nextParams.append(key, redacted !== value ? redacted : "<REDACTED>");
     } else {
@@ -129,6 +130,9 @@ function redactUrl(urlText: string): string {
 }
 
 function redactBody(value: unknown, keyName?: string): unknown {
+  if (keyName && HANDLE_URL_KEY_RE.test(keyName)) {
+    return "<REDACTED>";
+  }
   if (keyName && SECRET_KEY_RE.test(keyName)) {
     if (typeof value === "string") {
       const redacted = redactString(value);

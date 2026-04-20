@@ -14,6 +14,7 @@ import httpx
 
 CASSETTE_VERSION = 1
 _SECRET_KEY_RE = re.compile(r"(api[_-]?key|secret|private[_-]?key|access[_-]?token|refresh[_-]?token)", re.IGNORECASE)
+_HANDLE_URL_KEY_RE = re.compile(r"(checkout[_-]?url|portal[_-]?url)", re.IGNORECASE)
 _PRIVKEY_RE = re.compile(r"0x[a-f0-9]{64}")
 _TOKEN_RE = re.compile(r"(pypi|ghp|gho|ghu|ghs)-[A-Za-z0-9]+")
 _BOUNDARY_RE = re.compile(r'boundary="?([^";]+)"?', re.IGNORECASE)
@@ -103,7 +104,7 @@ def _redact_url(url: str) -> str:
         return url
     redacted_query: list[tuple[str, str]] = []
     for key, value in parse_qsl(parts.query, keep_blank_values=True):
-        if _SECRET_KEY_RE.search(key):
+        if _SECRET_KEY_RE.search(key) or _HANDLE_URL_KEY_RE.search(key):
             next_value = _redact_string(value)
             redacted_query.append((key, next_value if next_value != value else "<REDACTED>"))
         else:
@@ -112,6 +113,8 @@ def _redact_url(url: str) -> str:
 
 
 def _redact_body(value: Any, *, key_name: str | None = None) -> Any:
+    if key_name and _HANDLE_URL_KEY_RE.search(key_name):
+        return "<REDACTED>"
     if key_name and _SECRET_KEY_RE.search(key_name):
         if isinstance(value, str):
             redacted = _redact_string(value)

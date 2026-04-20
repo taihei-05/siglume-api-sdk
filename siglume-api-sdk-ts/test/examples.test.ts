@@ -11,6 +11,11 @@ import {
   buildToolManual as buildAgentBehaviorToolManual,
   runAgentBehaviorExample,
 } from "../../examples-ts/agent_behavior_adapter";
+import {
+  AccountPlanWrapperApp,
+  buildToolManual as buildAccountPlanToolManual,
+  runAccountPlanWrapperExample,
+} from "../../examples-ts/account_plan_wrapper";
 import { buildStubs as buildCrmStubs, buildToolManual as buildCrmToolManual, CrmSyncApp, runCrmSyncExample } from "../../examples-ts/crm_sync";
 import { buildToolManual as buildNewsDigestToolManual, NewsDigestApp, runNewsDigestExample } from "../../examples-ts/news_digest";
 import {
@@ -35,6 +40,13 @@ const EXAMPLES = [
     createHarness: () => new AppTestHarness(new AgentBehaviorApp()),
     createManual: () => buildAgentBehaviorToolManual(),
     taskType: "propose_agent_behavior",
+  },
+  {
+    name: "account_plan_wrapper",
+    permissionClass: PermissionClass.READ_ONLY,
+    createHarness: () => new AppTestHarness(new AccountPlanWrapperApp()),
+    createManual: () => buildAccountPlanToolManual(),
+    taskType: "load_account_plan_context",
   },
   {
     name: "crm_sync",
@@ -118,6 +130,16 @@ describe("TypeScript example suite", () => {
     expect(lines[3]).toBe("action: true");
     expect(lines[4]).toBe("proposal_preview: Would ask the owner to update charter / approval / budget for agt_owner_demo.");
     expect(lines[5]).toBe("receipt_issues: 0");
+  });
+
+  it("returns stable summary lines for account_plan_wrapper", async () => {
+    const lines = await runAccountPlanWrapperExample();
+
+    expect(lines[0]).toBe("tool_manual_valid: true 0");
+    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
+    expect(lines[2]).toBe("plan: plus model=claude-sonnet-4-6");
+    expect(lines[3]).toBe("dry_run: true");
+    expect(lines[4]).toBe("summary: Plan plus with ja preferences loaded for writing tone personalization.");
   });
 
   it("returns stable summary lines for news_digest", async () => {

@@ -273,6 +273,73 @@ describe("Recorder", () => {
     }
   });
 
+  it("redacts checkout_url and portal_url response fields", async () => {
+    const cassettePath = await makeTempCassette("billing-links.json");
+    const recorder = await Recorder.open(cassettePath, { mode: RecordMode.RECORD });
+    const originalFetch = globalThis.fetch;
+    Reflect.set(globalThis as object, "fetch", async () => new Response(JSON.stringify(envelope({
+      checkout_url: "https://billing.example.test/checkout/cs_live_secret",
+      portal_url: "https://billing.example.test/portal/bps_live_secret",
+      ok: true,
+    })), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    try {
+      await recorder.withGlobalFetch(() => fetch("https://api.example.test/billing-links"));
+    } finally {
+      Reflect.set(globalThis as object, "fetch", originalFetch);
+      await recorder.close();
+    }
+
+    const cassetteText = await readFile(cassettePath, "utf8");
+    expect(cassetteText).toContain('"checkout_url": "<REDACTED>"');
+    expect(cassetteText).toContain('"portal_url": "<REDACTED>"');
+    expect(cassetteText).not.toContain("cs_live_secret");
+    expect(cassetteText).not.toContain("bps_live_secret");
+
+    const replayRecorder = await Recorder.open(cassettePath, { mode: RecordMode.REPLAY });
+    Reflect.set(globalThis as object, "fetch", async () => {
+      throw new Error("Replay should not hit fetch");
+    });
+    try {
+      const replayed = await replayRecorder.withGlobalFetch(() => fetch("https://api.example.test/billing-links"));
+      const payload = await replayed.json() as { data: { checkout_url: string; portal_url: string } };
+      expect(payload.data.checkout_url).toBe("<REDACTED>");
+      expect(payload.data.portal_url).toBe("<REDACTED>");
+    } finally {
+      Reflect.set(globalThis as object, "fetch", originalFetch);
+      await replayRecorder.close();
+    }
+  });
+
+  it("redacts checkout_url and portal_url query params", async () => {
+    const cassettePath = await makeTempCassette("billing-query.json");
+    const recorder = await Recorder.open(cassettePath, { mode: RecordMode.RECORD });
+    const originalFetch = globalThis.fetch;
+    Reflect.set(globalThis as object, "fetch", async () => new Response(JSON.stringify(envelope({ ok: true })), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    try {
+      await recorder.withGlobalFetch(() =>
+        fetch(
+          "https://api.example.test/billing-links?checkout_url=https://billing.example.test/checkout/cs_live_secret"
+          + "&portal_url=https://billing.example.test/portal/bps_live_secret",
+        ),
+      );
+    } finally {
+      Reflect.set(globalThis as object, "fetch", originalFetch);
+      await recorder.close();
+    }
+
+    const cassetteText = await readFile(cassettePath, "utf8");
+    expect(cassetteText).toContain("checkout_url=%3CREDACTED%3E");
+    expect(cassetteText).toContain("portal_url=%3CREDACTED%3E");
+    expect(cassetteText).not.toContain("cs_live_secret");
+    expect(cassetteText).not.toContain("bps_live_secret");
+  });
+
   it("ignores configured top-level body fields during replay matching", async () => {
     const cassettePath = await makeTempCassette("ignore-fields.json");
     const recordRecorder = await Recorder.open(cassettePath, {

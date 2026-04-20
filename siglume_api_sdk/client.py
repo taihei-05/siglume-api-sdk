@@ -370,6 +370,94 @@ class BudgetPolicy:
 
 
 @dataclass
+class AccountPreferences:
+    language: str | None = None
+    summary_depth: str | None = None
+    notification_mode: str | None = None
+    autonomy_level: str | None = None
+    interest_profile: dict[str, Any] = field(default_factory=dict)
+    consent_policy: dict[str, Any] = field(default_factory=dict)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class AccountPlan:
+    plan: str
+    display_name: str | None = None
+    limits: dict[str, Any] = field(default_factory=dict)
+    available_models: list[dict[str, Any]] = field(default_factory=list)
+    default_model: str | None = None
+    selected_model: str | None = None
+    subscription_id: str | None = None
+    period_end: str | None = None
+    cancel_scheduled_at: str | None = None
+    cancel_pending: bool = False
+    plan_change_scheduled_to: str | None = None
+    plan_change_scheduled_at: str | None = None
+    plan_change_scheduled_currency: str | None = None
+    usage_today: dict[str, Any] = field(default_factory=dict)
+    available_plans: dict[str, Any] = field(default_factory=dict)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class PlanCheckoutSession:
+    checkout_url: str | None = None
+    expires_at_iso: str | None = None
+    plan: str | None = None
+    currency: str | None = None
+    customer_id: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class BillingPortalLink:
+    portal_url: str | None = None
+    expires_at_iso: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class AccountPlanCancellation:
+    cancelled: bool = False
+    effective_at: str | None = None
+    cancel_scheduled_at: str | None = None
+    plan: str | None = None
+    subscription_id: str | None = None
+    rail: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class PlanWeb3Mandate:
+    mandate_id: str
+    payment_mandate_id: str | None = None
+    principal_user_id: str | None = None
+    user_wallet_id: str | None = None
+    network: str = "polygon"
+    payee_type: str | None = None
+    payee_ref: str | None = None
+    fee_recipient_ref: str | None = None
+    purpose: str | None = None
+    cadence: str | None = None
+    token_symbol: str | None = None
+    display_currency: str | None = None
+    max_amount_minor: int = 0
+    status: str = "active"
+    retry_count: int = 0
+    idempotency_key: str | None = None
+    last_attempt_at: str | None = None
+    next_attempt_at: str | None = None
+    canceled_at: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    transaction_request: dict[str, Any] | None = None
+    approve_transaction_request: dict[str, Any] | None = None
+    cancel_transaction_request: dict[str, Any] | None = None
+    chain_receipt: SettlementReceipt | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
 class OperationExecution:
     agent_id: str
     operation_key: str
@@ -865,6 +953,104 @@ def _parse_budget_policy(data: Mapping[str, Any]) -> BudgetPolicy:
     )
 
 
+def _parse_account_preferences(data: Mapping[str, Any]) -> AccountPreferences:
+    return AccountPreferences(
+        language=_string_or_none(data.get("language")),
+        summary_depth=_string_or_none(data.get("summary_depth")),
+        notification_mode=_string_or_none(data.get("notification_mode")),
+        autonomy_level=_string_or_none(data.get("autonomy_level")),
+        interest_profile=_to_dict(data.get("interest_profile")),
+        consent_policy=_to_dict(data.get("consent_policy")),
+        raw=dict(data),
+    )
+
+
+def _parse_account_plan(data: Mapping[str, Any]) -> AccountPlan:
+    available_models = data.get("available_models") if isinstance(data.get("available_models"), list) else []
+    return AccountPlan(
+        plan=str(data.get("plan") or ""),
+        display_name=_string_or_none(data.get("display_name")),
+        limits=_to_dict(data.get("limits")),
+        available_models=[dict(item) for item in available_models if isinstance(item, Mapping)],
+        default_model=_string_or_none(data.get("default_model")),
+        selected_model=_string_or_none(data.get("selected_model")),
+        subscription_id=_string_or_none(data.get("subscription_id")),
+        period_end=_string_or_none(data.get("period_end")),
+        cancel_scheduled_at=_string_or_none(data.get("cancel_scheduled_at")),
+        cancel_pending=bool(data.get("cancel_pending")) if data.get("cancel_pending") is not None else False,
+        plan_change_scheduled_to=_string_or_none(data.get("plan_change_scheduled_to")),
+        plan_change_scheduled_at=_string_or_none(data.get("plan_change_scheduled_at")),
+        plan_change_scheduled_currency=_string_or_none(data.get("plan_change_scheduled_currency")),
+        usage_today=_to_dict(data.get("usage_today")),
+        available_plans=_to_dict(data.get("available_plans")),
+        raw=dict(data),
+    )
+
+
+def _parse_plan_checkout_session(data: Mapping[str, Any]) -> PlanCheckoutSession:
+    return PlanCheckoutSession(
+        checkout_url=_string_or_none(data.get("checkout_url")),
+        expires_at_iso=_string_or_none(data.get("expires_at_iso") or data.get("expires_at")),
+        plan=_string_or_none(data.get("plan")),
+        currency=_string_or_none(data.get("currency")),
+        customer_id=_string_or_none(data.get("customer_id")),
+        raw=dict(data),
+    )
+
+
+def _parse_billing_portal_link(data: Mapping[str, Any]) -> BillingPortalLink:
+    return BillingPortalLink(
+        portal_url=_string_or_none(data.get("portal_url")),
+        expires_at_iso=_string_or_none(data.get("expires_at_iso") or data.get("expires_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_account_plan_cancellation(data: Mapping[str, Any]) -> AccountPlanCancellation:
+    return AccountPlanCancellation(
+        cancelled=bool(data.get("cancelled")) if data.get("cancelled") is not None else False,
+        effective_at=_string_or_none(data.get("effective_at")),
+        cancel_scheduled_at=_string_or_none(data.get("cancel_scheduled_at")),
+        plan=_string_or_none(data.get("plan")),
+        subscription_id=_string_or_none(data.get("subscription_id")),
+        rail=_string_or_none(data.get("rail")),
+        raw=dict(data),
+    )
+
+
+def _parse_plan_web3_mandate(data: Mapping[str, Any]) -> PlanWeb3Mandate:
+    chain_receipt_payload = data.get("chain_receipt")
+    return PlanWeb3Mandate(
+        mandate_id=str(data.get("mandate_id") or data.get("payment_mandate_id") or ""),
+        payment_mandate_id=_string_or_none(data.get("payment_mandate_id")),
+        principal_user_id=_string_or_none(data.get("principal_user_id")),
+        user_wallet_id=_string_or_none(data.get("user_wallet_id")),
+        network=str(data.get("network") or "polygon"),
+        payee_type=_string_or_none(data.get("payee_type")),
+        payee_ref=_string_or_none(data.get("payee_ref")),
+        fee_recipient_ref=_string_or_none(data.get("fee_recipient_ref")),
+        purpose=_string_or_none(data.get("purpose")),
+        cadence=_string_or_none(data.get("cadence")),
+        token_symbol=_string_or_none(data.get("token_symbol")),
+        display_currency=_string_or_none(data.get("display_currency")),
+        max_amount_minor=int(data.get("max_amount_minor") or 0),
+        status=str(data.get("status") or "active"),
+        retry_count=int(data.get("retry_count") or 0),
+        idempotency_key=_string_or_none(data.get("idempotency_key")),
+        last_attempt_at=_string_or_none(data.get("last_attempt_at")),
+        next_attempt_at=_string_or_none(data.get("next_attempt_at")),
+        canceled_at=_string_or_none(data.get("canceled_at")),
+        metadata=_to_dict(data.get("metadata_jsonb") or data.get("metadata")),
+        transaction_request=_to_dict(data.get("transaction_request")) or None,
+        approve_transaction_request=_to_dict(data.get("approve_transaction_request")) or None,
+        cancel_transaction_request=_to_dict(data.get("cancel_transaction_request")) or None,
+        chain_receipt=parse_settlement_receipt(chain_receipt_payload)
+        if isinstance(chain_receipt_payload, Mapping)
+        else None,
+        raw=dict(data),
+    )
+
+
 def _parse_operation_execution(
     data: Mapping[str, Any],
     *,
@@ -1339,6 +1525,84 @@ class SiglumeClient:
             if item.operation_key == normalized_key:
                 return item
         raise SiglumeNotFoundError(f"Operation not found: {normalized_key}")
+
+    def get_account_preferences(self) -> AccountPreferences:
+        data, _meta = self._request("GET", "/me/preferences")
+        return _parse_account_preferences(data)
+
+    def update_account_preferences(
+        self,
+        *,
+        language: str | None = None,
+        summary_depth: str | None = None,
+        notification_mode: str | None = None,
+        autonomy_level: str | None = None,
+        interest_profile: Mapping[str, Any] | None = None,
+        consent_policy: Mapping[str, Any] | None = None,
+    ) -> AccountPreferences:
+        payload: dict[str, Any] = {}
+        if language is not None:
+            payload["language"] = str(language).strip()
+        if summary_depth is not None:
+            payload["summary_depth"] = str(summary_depth).strip()
+        if notification_mode is not None:
+            payload["notification_mode"] = str(notification_mode).strip()
+        if autonomy_level is not None:
+            payload["autonomy_level"] = str(autonomy_level).strip()
+        if interest_profile is not None:
+            payload["interest_profile"] = _coerce_mapping(interest_profile, "interest_profile")
+        if consent_policy is not None:
+            payload["consent_policy"] = _coerce_mapping(consent_policy, "consent_policy")
+        if not payload:
+            raise SiglumeClientError("update_account_preferences requires at least one preference field.")
+        data, _meta = self._request("PUT", "/me/preferences", json_body=payload)
+        return _parse_account_preferences(data)
+
+    def get_account_plan(self) -> AccountPlan:
+        data, _meta = self._request("GET", "/me/plan")
+        return _parse_account_plan(data)
+
+    def start_plan_checkout(
+        self,
+        target_tier: str,
+        *,
+        currency: str | None = None,
+    ) -> PlanCheckoutSession:
+        normalized_tier = str(target_tier or "").strip().lower()
+        if not normalized_tier:
+            raise SiglumeClientError("target_tier is required.")
+        params: dict[str, Any] = {"plan": normalized_tier}
+        if currency is not None and str(currency).strip():
+            params["currency"] = str(currency).strip().lower()
+        data, _meta = self._request("POST", "/me/plan/checkout", params=params)
+        return _parse_plan_checkout_session(data)
+
+    def open_plan_billing_portal(self) -> BillingPortalLink:
+        data, _meta = self._request("GET", "/me/plan/billing-portal")
+        return _parse_billing_portal_link(data)
+
+    def cancel_account_plan(self) -> AccountPlanCancellation:
+        data, _meta = self._request("POST", "/me/plan/cancel")
+        return _parse_account_plan_cancellation(data)
+
+    def create_plan_web3_mandate(
+        self,
+        target_tier: str,
+        *,
+        currency: str | None = None,
+    ) -> PlanWeb3Mandate:
+        normalized_tier = str(target_tier or "").strip().lower()
+        if not normalized_tier:
+            raise SiglumeClientError("target_tier is required.")
+        params: dict[str, Any] = {"plan": normalized_tier}
+        if currency is not None and str(currency).strip():
+            params["currency"] = str(currency).strip().lower()
+        data, _meta = self._request("POST", "/me/plan/web3-mandate", params=params)
+        return _parse_plan_web3_mandate(data)
+
+    def cancel_plan_web3_mandate(self) -> PlanWeb3Mandate:
+        data, _meta = self._request("POST", "/me/plan/web3-cancel")
+        return _parse_plan_web3_mandate(data)
 
     def update_agent_charter(
         self,

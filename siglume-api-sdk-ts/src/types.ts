@@ -1,3 +1,5 @@
+import type { SettlementReceipt } from "./web3";
+
 export type Awaitable<T> = T | Promise<T>;
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -503,6 +505,88 @@ export interface BudgetPolicy {
   metadata: Record<string, unknown>;
   created_at?: string | null;
   updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface AccountPreferences {
+  language?: string | null;
+  summary_depth?: string | null;
+  notification_mode?: string | null;
+  autonomy_level?: string | null;
+  interest_profile: Record<string, unknown>;
+  consent_policy: Record<string, unknown>;
+  raw: Record<string, unknown>;
+}
+
+export interface AccountPlan {
+  plan: string;
+  display_name?: string | null;
+  limits: Record<string, unknown>;
+  available_models: Array<Record<string, unknown>>;
+  default_model?: string | null;
+  selected_model?: string | null;
+  subscription_id?: string | null;
+  period_end?: string | null;
+  cancel_scheduled_at?: string | null;
+  cancel_pending: boolean;
+  plan_change_scheduled_to?: string | null;
+  plan_change_scheduled_at?: string | null;
+  plan_change_scheduled_currency?: string | null;
+  usage_today: Record<string, unknown>;
+  available_plans: Record<string, unknown>;
+  raw: Record<string, unknown>;
+}
+
+export interface PlanCheckoutSession {
+  checkout_url?: string | null;
+  expires_at_iso?: string | null;
+  plan?: string | null;
+  currency?: string | null;
+  customer_id?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface BillingPortalLink {
+  portal_url?: string | null;
+  expires_at_iso?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface AccountPlanCancellation {
+  cancelled: boolean;
+  effective_at?: string | null;
+  cancel_scheduled_at?: string | null;
+  plan?: string | null;
+  subscription_id?: string | null;
+  rail?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface PlanWeb3Mandate {
+  mandate_id: string;
+  payment_mandate_id?: string | null;
+  principal_user_id?: string | null;
+  user_wallet_id?: string | null;
+  network: string;
+  payee_type?: string | null;
+  payee_ref?: string | null;
+  fee_recipient_ref?: string | null;
+  purpose?: string | null;
+  cadence?: string | null;
+  token_symbol?: string | null;
+  display_currency?: string | null;
+  max_amount_minor: number;
+  status: string;
+  retry_count: number;
+  idempotency_key?: string | null;
+  last_attempt_at?: string | null;
+  next_attempt_at?: string | null;
+  canceled_at?: string | null;
+  metadata: Record<string, unknown>;
+  transaction_request?: Record<string, unknown> | null;
+  approve_transaction_request?: Record<string, unknown> | null;
+  cancel_transaction_request?: Record<string, unknown> | null;
+  chain_receipt?: SettlementReceipt | null;
   raw: Record<string, unknown>;
 }
 

@@ -1,11 +1,15 @@
 import type {
   AccessGrantRecord,
+  AccountPlan,
+  AccountPlanCancellation,
+  AccountPreferences,
   AgentCharter,
   AgentRecord,
   AppListingRecord,
   AppManifest,
   ApprovalPolicy,
   AutoRegistrationReceipt,
+  BillingPortalLink,
   BudgetPolicy,
   CapabilityBindingRecord,
   ConnectedAccountRecord,
@@ -20,6 +24,8 @@ import type {
   RefundReason,
   RefundRecord,
   SandboxSession,
+  PlanCheckoutSession,
+  PlanWeb3Mandate,
   SupportCaseRecord,
   ToolManual,
   ToolManualIssue,
@@ -124,6 +130,21 @@ export interface SiglumeClientShape {
   list_agents(options?: { query?: string; limit?: number }): Promise<AgentRecord[]>;
   list_operations(options?: { agent_id?: string; lang?: string }): Promise<OperationMetadata[]>;
   get_operation_metadata(operation_key: string, options?: { agent_id?: string; lang?: string }): Promise<OperationMetadata>;
+  get_account_preferences(): Promise<AccountPreferences>;
+  update_account_preferences(options: {
+    language?: string;
+    summary_depth?: string;
+    notification_mode?: string;
+    autonomy_level?: string;
+    interest_profile?: Record<string, unknown>;
+    consent_policy?: Record<string, unknown>;
+  }): Promise<AccountPreferences>;
+  get_account_plan(): Promise<AccountPlan>;
+  start_plan_checkout(options: { target_tier: string; currency?: string }): Promise<PlanCheckoutSession>;
+  open_plan_billing_portal(): Promise<BillingPortalLink>;
+  cancel_account_plan(): Promise<AccountPlanCancellation>;
+  create_plan_web3_mandate(options: { target_tier: string; currency?: string }): Promise<PlanWeb3Mandate>;
+  cancel_plan_web3_mandate(): Promise<PlanWeb3Mandate>;
   get_agent(
     agent_id: string,
     options?: { lang?: string; tab?: string; cursor?: string; limit?: number },
@@ -663,6 +684,102 @@ function parseBudgetPolicy(data: Record<string, unknown>): BudgetPolicy {
   };
 }
 
+function parseAccountPreferences(data: Record<string, unknown>): AccountPreferences {
+  return {
+    language: stringOrNull(data.language) ?? undefined,
+    summary_depth: stringOrNull(data.summary_depth) ?? undefined,
+    notification_mode: stringOrNull(data.notification_mode) ?? undefined,
+    autonomy_level: stringOrNull(data.autonomy_level) ?? undefined,
+    interest_profile: toRecord(data.interest_profile),
+    consent_policy: toRecord(data.consent_policy),
+    raw: { ...data },
+  };
+}
+
+function parseAccountPlan(data: Record<string, unknown>): AccountPlan {
+  return {
+    plan: String(data.plan ?? ""),
+    display_name: stringOrNull(data.display_name) ?? undefined,
+    limits: toRecord(data.limits),
+    available_models: Array.isArray(data.available_models)
+      ? data.available_models.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => ({ ...item }))
+      : [],
+    default_model: stringOrNull(data.default_model) ?? undefined,
+    selected_model: stringOrNull(data.selected_model) ?? undefined,
+    subscription_id: stringOrNull(data.subscription_id) ?? undefined,
+    period_end: stringOrNull(data.period_end) ?? undefined,
+    cancel_scheduled_at: stringOrNull(data.cancel_scheduled_at) ?? undefined,
+    cancel_pending: Boolean(data.cancel_pending ?? false),
+    plan_change_scheduled_to: stringOrNull(data.plan_change_scheduled_to) ?? undefined,
+    plan_change_scheduled_at: stringOrNull(data.plan_change_scheduled_at) ?? undefined,
+    plan_change_scheduled_currency: stringOrNull(data.plan_change_scheduled_currency) ?? undefined,
+    usage_today: toRecord(data.usage_today),
+    available_plans: toRecord(data.available_plans),
+    raw: { ...data },
+  };
+}
+
+function parsePlanCheckoutSession(data: Record<string, unknown>): PlanCheckoutSession {
+  return {
+    checkout_url: stringOrNull(data.checkout_url) ?? undefined,
+    expires_at_iso: stringOrNull(data.expires_at_iso ?? data.expires_at) ?? undefined,
+    plan: stringOrNull(data.plan) ?? undefined,
+    currency: stringOrNull(data.currency) ?? undefined,
+    customer_id: stringOrNull(data.customer_id) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parseBillingPortalLink(data: Record<string, unknown>): BillingPortalLink {
+  return {
+    portal_url: stringOrNull(data.portal_url) ?? undefined,
+    expires_at_iso: stringOrNull(data.expires_at_iso ?? data.expires_at) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parseAccountPlanCancellation(data: Record<string, unknown>): AccountPlanCancellation {
+  return {
+    cancelled: Boolean(data.cancelled ?? false),
+    effective_at: stringOrNull(data.effective_at) ?? undefined,
+    cancel_scheduled_at: stringOrNull(data.cancel_scheduled_at) ?? undefined,
+    plan: stringOrNull(data.plan) ?? undefined,
+    subscription_id: stringOrNull(data.subscription_id) ?? undefined,
+    rail: stringOrNull(data.rail) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parsePlanWeb3Mandate(data: Record<string, unknown>): PlanWeb3Mandate {
+  return {
+    mandate_id: String(data.mandate_id ?? data.payment_mandate_id ?? ""),
+    payment_mandate_id: stringOrNull(data.payment_mandate_id) ?? undefined,
+    principal_user_id: stringOrNull(data.principal_user_id) ?? undefined,
+    user_wallet_id: stringOrNull(data.user_wallet_id) ?? undefined,
+    network: String(data.network ?? "polygon"),
+    payee_type: stringOrNull(data.payee_type) ?? undefined,
+    payee_ref: stringOrNull(data.payee_ref) ?? undefined,
+    fee_recipient_ref: stringOrNull(data.fee_recipient_ref) ?? undefined,
+    purpose: stringOrNull(data.purpose) ?? undefined,
+    cadence: stringOrNull(data.cadence) ?? undefined,
+    token_symbol: stringOrNull(data.token_symbol) ?? undefined,
+    display_currency: stringOrNull(data.display_currency) ?? undefined,
+    max_amount_minor: Math.trunc(Number(data.max_amount_minor ?? 0)),
+    status: String(data.status ?? "active"),
+    retry_count: Math.trunc(Number(data.retry_count ?? 0)),
+    idempotency_key: stringOrNull(data.idempotency_key) ?? undefined,
+    last_attempt_at: stringOrNull(data.last_attempt_at) ?? undefined,
+    next_attempt_at: stringOrNull(data.next_attempt_at) ?? undefined,
+    canceled_at: stringOrNull(data.canceled_at) ?? undefined,
+    metadata: toRecord(data.metadata_jsonb ?? data.metadata),
+    transaction_request: isRecord(data.transaction_request) ? { ...data.transaction_request } : null,
+    approve_transaction_request: isRecord(data.approve_transaction_request) ? { ...data.approve_transaction_request } : null,
+    cancel_transaction_request: isRecord(data.cancel_transaction_request) ? { ...data.cancel_transaction_request } : null,
+    chain_receipt: isRecord(data.chain_receipt) ? parse_settlement_receipt(data.chain_receipt) : null,
+    raw: { ...data },
+  };
+}
+
 function parseOperationExecution(
   data: Record<string, unknown>,
   operation_key: string,
@@ -1021,6 +1138,96 @@ export class SiglumeClient implements SiglumeClientShape {
       throw new SiglumeNotFoundError(`Operation not found: ${normalizedKey}`);
     }
     return match;
+  }
+
+  async get_account_preferences(): Promise<AccountPreferences> {
+    const [data] = await this.request("GET", "/me/preferences");
+    return parseAccountPreferences(data);
+  }
+
+  async update_account_preferences(options: {
+    language?: string;
+    summary_depth?: string;
+    notification_mode?: string;
+    autonomy_level?: string;
+    interest_profile?: Record<string, unknown>;
+    consent_policy?: Record<string, unknown>;
+  }): Promise<AccountPreferences> {
+    const payload: Record<string, unknown> = {};
+    if (options.language !== undefined) {
+      payload.language = String(options.language).trim();
+    }
+    if (options.summary_depth !== undefined) {
+      payload.summary_depth = String(options.summary_depth).trim();
+    }
+    if (options.notification_mode !== undefined) {
+      payload.notification_mode = String(options.notification_mode).trim();
+    }
+    if (options.autonomy_level !== undefined) {
+      payload.autonomy_level = String(options.autonomy_level).trim();
+    }
+    if (options.interest_profile !== undefined) {
+      payload.interest_profile = toRecord(options.interest_profile);
+    }
+    if (options.consent_policy !== undefined) {
+      payload.consent_policy = toRecord(options.consent_policy);
+    }
+    if (Object.keys(payload).length === 0) {
+      throw new SiglumeClientError("update_account_preferences requires at least one preference field.");
+    }
+    const [data] = await this.request("PUT", "/me/preferences", { json_body: payload });
+    return parseAccountPreferences(data);
+  }
+
+  async get_account_plan(): Promise<AccountPlan> {
+    const [data] = await this.request("GET", "/me/plan");
+    return parseAccountPlan(data);
+  }
+
+  async start_plan_checkout(options: { target_tier: string; currency?: string }): Promise<PlanCheckoutSession> {
+    const target_tier = String(options.target_tier ?? "").trim().toLowerCase();
+    if (!target_tier) {
+      throw new SiglumeClientError("target_tier is required.");
+    }
+    const [data] = await this.request("POST", "/me/plan/checkout", {
+      params: {
+        plan: target_tier,
+        currency: options.currency ? String(options.currency).trim().toLowerCase() : undefined,
+      },
+    });
+    return parsePlanCheckoutSession(data);
+  }
+
+  async open_plan_billing_portal(): Promise<BillingPortalLink> {
+    const [data] = await this.request("GET", "/me/plan/billing-portal");
+    return parseBillingPortalLink(data);
+  }
+
+  async cancel_account_plan(): Promise<AccountPlanCancellation> {
+    const [data] = await this.request("POST", "/me/plan/cancel");
+    return parseAccountPlanCancellation(data);
+  }
+
+  async create_plan_web3_mandate(options: {
+    target_tier: string;
+    currency?: string;
+  }): Promise<PlanWeb3Mandate> {
+    const target_tier = String(options.target_tier ?? "").trim().toLowerCase();
+    if (!target_tier) {
+      throw new SiglumeClientError("target_tier is required.");
+    }
+    const [data] = await this.request("POST", "/me/plan/web3-mandate", {
+      params: {
+        plan: target_tier,
+        currency: options.currency ? String(options.currency).trim().toLowerCase() : undefined,
+      },
+    });
+    return parsePlanWeb3Mandate(data);
+  }
+
+  async cancel_plan_web3_mandate(): Promise<PlanWeb3Mandate> {
+    const [data] = await this.request("POST", "/me/plan/web3-cancel");
+    return parsePlanWeb3Mandate(data);
   }
 
   async get_agent(

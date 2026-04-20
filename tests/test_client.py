@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -283,6 +284,241 @@ def test_cursor_pages_follow_next_cursor_for_listings_and_usage() -> None:
     assert [item.capability_key for item in listing_items] == ["price-compare-helper", "calendar-sync"]
     assert [item.units_consumed for item in usage_items] == [1, 3]
     assert call_counter == {"listings": 2, "usage": 2}
+
+
+def test_account_preferences_and_plan_wrappers_use_direct_me_endpoints() -> None:
+    requests: list[tuple[str, str, dict[str, object]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        requests.append((request.method, request.url.path, body))
+
+        if request.url.path == "/v1/me/preferences" and request.method == "GET":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "language": "ja",
+                        "summary_depth": "concise",
+                        "notification_mode": "daily_digest",
+                        "autonomy_level": "review_first",
+                        "interest_profile": {"themes": ["ai", "marketplace"]},
+                        "consent_policy": {"share_profile": False},
+                    }
+                ),
+            )
+        if request.url.path == "/v1/me/preferences" and request.method == "PUT":
+            assert body == {
+                "language": "en",
+                "interest_profile": {"themes": ["ai", "finance"]},
+            }
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "language": "en",
+                        "summary_depth": "concise",
+                        "notification_mode": "daily_digest",
+                        "autonomy_level": "review_first",
+                        "interest_profile": {"themes": ["ai", "finance"]},
+                        "consent_policy": {"share_profile": False},
+                    }
+                ),
+            )
+        if request.url.path == "/v1/me/plan":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "plan": "plus",
+                        "display_name": "Plus",
+                        "limits": {"manifesto_chars": 1000},
+                        "available_models": [{"id": "claude-sonnet-4-6", "provider": "anthropic"}],
+                        "default_model": "claude-sonnet-4-6",
+                        "selected_model": "claude-sonnet-4-6",
+                        "subscription_id": "sub_demo_plan",
+                        "period_end": "2026-05-20T00:00:00Z",
+                        "cancel_scheduled_at": None,
+                        "cancel_pending": False,
+                        "plan_change_scheduled_to": None,
+                        "plan_change_scheduled_at": None,
+                        "plan_change_scheduled_currency": None,
+                        "usage_today": {"chat": 4},
+                        "available_plans": {"plus": {"display_name": "Plus", "price_usd": 1100}},
+                    }
+                ),
+            )
+        if request.url.path == "/v1/me/plan/checkout":
+            assert request.url.params["plan"] == "plus"
+            assert request.url.params["currency"] == "usd"
+            return httpx.Response(
+                200,
+                json=envelope({"checkout_url": "https://billing.example.test/checkout/cs_live_demo"}),
+            )
+        if request.url.path == "/v1/me/plan/billing-portal":
+            return httpx.Response(
+                200,
+                json=envelope({"portal_url": "https://billing.example.test/portal/bps_live_demo"}),
+            )
+        if request.url.path == "/v1/me/plan/cancel":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "cancelled": True,
+                        "effective_at": "2026-05-20T00:00:00Z",
+                        "cancel_scheduled_at": "2026-05-20T00:00:00Z",
+                        "plan": "plus",
+                        "subscription_id": "sub_demo_plan",
+                        "rail": "stripe",
+                    }
+                ),
+            )
+        if request.url.path == "/v1/me/plan/web3-mandate":
+            assert request.url.params["plan"] == "pro"
+            assert request.url.params["currency"] == "jpy"
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "mandate_id": "mand_plan_demo",
+                        "payment_mandate_id": "pmd_plan_demo",
+                        "network": "polygon",
+                        "payee_type": "platform",
+                        "payee_ref": "platform:plan:pro",
+                        "purpose": "subscription",
+                        "cadence": "monthly",
+                        "token_symbol": "JPYC",
+                        "display_currency": "JPY",
+                        "max_amount_minor": 4980,
+                        "status": "active",
+                        "retry_count": 0,
+                        "metadata_jsonb": {"plan": "pro"},
+                        "chain_receipt": {
+                            "receipt_id": "chr_plan_demo",
+                            "tx_hash": "0x" + ("c" * 64),
+                            "network": "polygon",
+                            "chain_id": 137,
+                            "confirmations": 12,
+                            "finality_confirmations": 12,
+                            "payload": {"amount_minor": 4980},
+                        },
+                    }
+                ),
+            )
+        if request.url.path == "/v1/me/plan/web3-cancel":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "mandate_id": "mand_plan_demo",
+                        "payment_mandate_id": "pmd_plan_demo",
+                        "network": "polygon",
+                        "payee_type": "platform",
+                        "payee_ref": "platform:plan:pro",
+                        "purpose": "subscription",
+                        "cadence": "monthly",
+                        "token_symbol": "JPYC",
+                        "display_currency": "JPY",
+                        "max_amount_minor": 4980,
+                        "status": "cancelled",
+                        "retry_count": 1,
+                        "metadata_jsonb": {"plan": "pro"},
+                    }
+                ),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        preferences = client.get_account_preferences()
+        updated_preferences = client.update_account_preferences(
+            language="en",
+            interest_profile={"themes": ["ai", "finance"]},
+        )
+        plan = client.get_account_plan()
+        checkout = client.start_plan_checkout("plus", currency="usd")
+        portal = client.open_plan_billing_portal()
+        cancellation = client.cancel_account_plan()
+        mandate = client.create_plan_web3_mandate("pro", currency="jpy")
+        cancelled_mandate = client.cancel_plan_web3_mandate()
+
+    assert preferences.language == "ja"
+    assert updated_preferences.language == "en"
+    assert updated_preferences.interest_profile == {"themes": ["ai", "finance"]}
+    assert plan.plan == "plus"
+    assert plan.available_plans["plus"]["price_usd"] == 1100
+    assert checkout.checkout_url == "https://billing.example.test/checkout/cs_live_demo"
+    assert portal.portal_url == "https://billing.example.test/portal/bps_live_demo"
+    assert cancellation.cancelled is True
+    assert cancellation.rail == "stripe"
+    assert mandate.mandate_id == "mand_plan_demo"
+    assert mandate.chain_receipt is not None
+    assert mandate.chain_receipt.tx_hash == "0x" + ("c" * 64)
+    assert cancelled_mandate.status == "cancelled"
+    assert [path for _, path, _ in requests] == [
+        "/v1/me/preferences",
+        "/v1/me/preferences",
+        "/v1/me/plan",
+        "/v1/me/plan/checkout",
+        "/v1/me/plan/billing-portal",
+        "/v1/me/plan/cancel",
+        "/v1/me/plan/web3-mandate",
+        "/v1/me/plan/web3-cancel",
+    ]
+
+
+def test_update_account_preferences_requires_at_least_one_field() -> None:
+    with build_client(lambda request: httpx.Response(500)) as client:
+        with pytest.raises(SiglumeClientError, match="requires at least one preference field"):
+            client.update_account_preferences()
+
+
+def test_start_plan_checkout_requires_target_tier() -> None:
+    with build_client(lambda request: httpx.Response(500)) as client:
+        with pytest.raises(SiglumeClientError, match="target_tier is required"):
+            client.start_plan_checkout("")
+
+
+def test_create_plan_web3_mandate_requires_target_tier() -> None:
+    with build_client(lambda request: httpx.Response(500)) as client:
+        with pytest.raises(SiglumeClientError, match="target_tier is required"):
+            client.create_plan_web3_mandate("")
+
+
+def test_account_wrappers_parse_sparse_payloads() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/me/preferences":
+            return httpx.Response(200, json=envelope({"language": "en"}))
+        if request.url.path == "/v1/me/plan":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "plan": "free",
+                        "available_models": [],
+                        "available_plans": {},
+                        "usage_today": {},
+                    }
+                ),
+            )
+        if request.url.path == "/v1/me/plan/billing-portal":
+            return httpx.Response(200, json=envelope({"portal_url": "https://billing.example.test/portal/demo"}))
+        if request.url.path == "/v1/me/plan/cancel":
+            return httpx.Response(200, json=envelope({"cancelled": False}))
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        preferences = client.get_account_preferences()
+        plan = client.get_account_plan()
+        portal = client.open_plan_billing_portal()
+        cancellation = client.cancel_account_plan()
+
+    assert preferences.language == "en"
+    assert preferences.interest_profile == {}
+    assert plan.plan == "free"
+    assert plan.available_models == []
+    assert portal.portal_url == "https://billing.example.test/portal/demo"
+    assert cancellation.cancelled is False
 
 
 def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
