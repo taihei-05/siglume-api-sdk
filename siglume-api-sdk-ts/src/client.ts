@@ -30,6 +30,7 @@ import type {
   FavoriteAgent,
   FavoriteAgentMutation,
   GrantBindingResult,
+  MarketNeedRecord,
   NetworkClaimRecord,
   NetworkContentDetail,
   NetworkContentSummary,
@@ -214,6 +215,46 @@ export interface SiglumeClientShape {
     params?: Record<string, unknown>,
     options?: { lang?: string },
   ): Promise<OperationExecution>;
+  list_market_needs(options?: {
+    agent_id?: string;
+    status?: string;
+    buyer_agent_id?: string;
+    cursor?: string;
+    limit?: number;
+    lang?: string;
+  }): Promise<CursorPage<MarketNeedRecord>>;
+  get_market_need(need_id: string, options?: {
+    agent_id?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord>;
+  create_market_need(options: {
+    agent_id?: string;
+    buyer_agent_id?: string;
+    title: string;
+    problem_statement: string;
+    category_key: string;
+    budget_min_minor: number;
+    budget_max_minor: number;
+    urgency?: number;
+    requirement_jsonb?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord>;
+  update_market_need(need_id: string, options?: {
+    agent_id?: string;
+    buyer_agent_id?: string;
+    title?: string;
+    problem_statement?: string;
+    category_key?: string;
+    budget_min_minor?: number;
+    budget_max_minor?: number;
+    urgency?: number;
+    requirement_jsonb?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord>;
   update_agent_charter(
     agent_id: string,
     charter_text: string,
@@ -739,6 +780,32 @@ function parseBudgetPolicy(data: Record<string, unknown>): BudgetPolicy {
     metadata: toRecord(data.metadata),
     created_at: stringOrNull(data.created_at),
     updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
+function parseMarketNeed(data: Record<string, unknown>): MarketNeedRecord {
+  return {
+    need_id: String(data.need_id ?? data.id ?? ""),
+    owner_user_id: stringOrNull(data.owner_user_id ?? data.principal_user_id) ?? undefined,
+    principal_user_id: stringOrNull(data.principal_user_id ?? data.owner_user_id) ?? undefined,
+    buyer_agent_id: stringOrNull(data.buyer_agent_id) ?? undefined,
+    charter_id: stringOrNull(data.charter_id) ?? undefined,
+    charter_version: Math.trunc(Number(data.charter_version ?? 1)),
+    title: stringOrNull(data.title) ?? undefined,
+    problem_statement: stringOrNull(data.problem_statement) ?? undefined,
+    category_key: stringOrNull(data.category_key) ?? undefined,
+    budget_min_minor: numberOrNull(data.budget_min_minor) ?? undefined,
+    budget_max_minor: numberOrNull(data.budget_max_minor) ?? undefined,
+    urgency: Math.trunc(Number(data.urgency ?? 1)),
+    requirement_jsonb: toRecord(data.requirement_jsonb),
+    status: String(data.status ?? "open").trim().toLowerCase(),
+    source_kind: stringOrNull(data.source_kind) ?? undefined,
+    source_ref_id: stringOrNull(data.source_ref_id) ?? undefined,
+    metadata: toRecord(data.metadata),
+    detected_at: stringOrNull(data.detected_at) ?? undefined,
+    created_at: stringOrNull(data.created_at) ?? undefined,
+    updated_at: stringOrNull(data.updated_at) ?? undefined,
     raw: { ...data },
   };
 }
@@ -1877,6 +1944,226 @@ export class SiglumeClient implements SiglumeClientShape {
     return parseOperationExecution(data, normalizedKey, meta);
   }
 
+  // `market.needs.*` currently uses the public owner-operation execute route.
+  // These wrappers add typed ergonomics without inventing an OpenAPI path that
+  // the platform has not published yet.
+  async list_market_needs(
+    options: {
+      agent_id?: string;
+      status?: string;
+      buyer_agent_id?: string;
+      cursor?: string;
+      limit?: number;
+      lang?: string;
+    } = {},
+  ): Promise<CursorPageResult<MarketNeedRecord>> {
+    const resolvedAgentId = await this.resolveOwnerOperationAgentId(options.agent_id);
+    const params: Record<string, unknown> = {
+      limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 20), 100)),
+    };
+    if (options.status !== undefined && String(options.status).trim()) {
+      params.status = String(options.status).trim().toLowerCase();
+    }
+    if (options.buyer_agent_id !== undefined && String(options.buyer_agent_id).trim()) {
+      params.buyer_agent_id = String(options.buyer_agent_id).trim();
+    }
+    if (options.cursor !== undefined && String(options.cursor).trim()) {
+      params.cursor = String(options.cursor).trim();
+    }
+    const execution = await this.execute_owner_operation(
+      resolvedAgentId,
+      "market.needs.list",
+      params,
+      { lang: options.lang },
+    );
+    const items = Array.isArray(execution.result.items)
+      ? execution.result.items.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseMarketNeed(item))
+      : [];
+    const next_cursor = stringOrNull(execution.result.next_cursor);
+    return new CursorPageResult({
+      items,
+      next_cursor,
+      limit: Math.trunc(Number(params.limit)),
+      meta: {
+        request_id: execution.request_id ?? null,
+        trace_id: execution.trace_id ?? null,
+      },
+      fetchNext: next_cursor
+        ? (cursor) => this.list_market_needs({
+          agent_id: resolvedAgentId,
+          status: options.status,
+          buyer_agent_id: options.buyer_agent_id,
+          cursor,
+          limit: options.limit,
+          lang: options.lang,
+        }) as Promise<CursorPageResult<MarketNeedRecord>>
+        : undefined,
+    });
+  }
+
+  async get_market_need(
+    need_id: string,
+    options: {
+      agent_id?: string;
+      lang?: string;
+    } = {},
+  ): Promise<MarketNeedRecord> {
+    const normalizedNeedId = String(need_id ?? "").trim();
+    if (!normalizedNeedId) {
+      throw new SiglumeClientError("need_id is required.");
+    }
+    const execution = await this.execute_owner_operation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "market.needs.get",
+      { need_id: normalizedNeedId },
+      { lang: options.lang },
+    );
+    return parseMarketNeed(execution.result);
+  }
+
+  async create_market_need(options: {
+    agent_id?: string;
+    buyer_agent_id?: string;
+    title: string;
+    problem_statement: string;
+    category_key: string;
+    budget_min_minor: number;
+    budget_max_minor: number;
+    urgency?: number;
+    requirement_jsonb?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord> {
+    const normalizedTitle = String(options.title ?? "").trim();
+    const normalizedProblemStatement = String(options.problem_statement ?? "").trim();
+    const normalizedCategoryKey = String(options.category_key ?? "").trim().toLowerCase();
+    if (!normalizedTitle) {
+      throw new SiglumeClientError("title is required.");
+    }
+    if (!normalizedProblemStatement) {
+      throw new SiglumeClientError("problem_statement is required.");
+    }
+    if (!normalizedCategoryKey) {
+      throw new SiglumeClientError("category_key is required.");
+    }
+    const minMinor = Math.trunc(Number(options.budget_min_minor));
+    const maxMinor = Math.trunc(Number(options.budget_max_minor));
+    if (minMinor > maxMinor) {
+      throw new SiglumeClientError("budget_min_minor cannot exceed budget_max_minor.");
+    }
+    const payload: Record<string, unknown> = {
+      title: normalizedTitle,
+      problem_statement: normalizedProblemStatement,
+      category_key: normalizedCategoryKey,
+      budget_min_minor: minMinor,
+      budget_max_minor: maxMinor,
+      urgency: Math.trunc(Number(options.urgency ?? 1)),
+    };
+    if (options.buyer_agent_id !== undefined && String(options.buyer_agent_id).trim()) {
+      payload.buyer_agent_id = String(options.buyer_agent_id).trim();
+    }
+    if (options.requirement_jsonb) {
+      payload.requirement_jsonb = toRecord(options.requirement_jsonb);
+    }
+    if (options.metadata) {
+      payload.metadata = toRecord(options.metadata);
+    }
+    if (options.status !== undefined && String(options.status).trim()) {
+      payload.status = String(options.status).trim().toLowerCase();
+    }
+    const execution = await this.execute_owner_operation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "market.needs.create",
+      payload,
+      { lang: options.lang },
+    );
+    return parseMarketNeed(execution.result);
+  }
+
+  async update_market_need(
+    need_id: string,
+    options: {
+      agent_id?: string;
+      buyer_agent_id?: string;
+      title?: string;
+      problem_statement?: string;
+      category_key?: string;
+      budget_min_minor?: number;
+      budget_max_minor?: number;
+      urgency?: number;
+      requirement_jsonb?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+      status?: string;
+      lang?: string;
+    } = {},
+  ): Promise<MarketNeedRecord> {
+    const normalizedNeedId = String(need_id ?? "").trim();
+    if (!normalizedNeedId) {
+      throw new SiglumeClientError("need_id is required.");
+    }
+    const payload: Record<string, unknown> = { need_id: normalizedNeedId };
+    if (options.buyer_agent_id !== undefined && String(options.buyer_agent_id).trim()) {
+      payload.buyer_agent_id = String(options.buyer_agent_id).trim();
+    }
+    if (options.title !== undefined) {
+      const normalizedTitle = String(options.title).trim();
+      if (!normalizedTitle) {
+        throw new SiglumeClientError("title cannot be empty.");
+      }
+      payload.title = normalizedTitle;
+    }
+    if (options.problem_statement !== undefined) {
+      const normalizedProblemStatement = String(options.problem_statement).trim();
+      if (!normalizedProblemStatement) {
+        throw new SiglumeClientError("problem_statement cannot be empty.");
+      }
+      payload.problem_statement = normalizedProblemStatement;
+    }
+    if (options.category_key !== undefined) {
+      const normalizedCategoryKey = String(options.category_key).trim().toLowerCase();
+      if (!normalizedCategoryKey) {
+        throw new SiglumeClientError("category_key cannot be empty.");
+      }
+      payload.category_key = normalizedCategoryKey;
+    }
+    if (options.budget_min_minor !== undefined) {
+      payload.budget_min_minor = Math.trunc(Number(options.budget_min_minor));
+    }
+    if (options.budget_max_minor !== undefined) {
+      payload.budget_max_minor = Math.trunc(Number(options.budget_max_minor));
+    }
+    if (
+      typeof payload.budget_min_minor === "number"
+      && typeof payload.budget_max_minor === "number"
+      && payload.budget_min_minor > payload.budget_max_minor
+    ) {
+      throw new SiglumeClientError("budget_min_minor cannot exceed budget_max_minor.");
+    }
+    if (options.urgency !== undefined) {
+      payload.urgency = Math.trunc(Number(options.urgency));
+    }
+    if (options.requirement_jsonb) {
+      payload.requirement_jsonb = toRecord(options.requirement_jsonb);
+    }
+    if (options.metadata) {
+      payload.metadata = toRecord(options.metadata);
+    }
+    if (options.status !== undefined && String(options.status).trim()) {
+      payload.status = String(options.status).trim().toLowerCase();
+    }
+    if (Object.keys(payload).length === 1) {
+      throw new SiglumeClientError("update_market_need requires at least one field to update.");
+    }
+    const execution = await this.execute_owner_operation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "market.needs.update",
+      payload,
+      { lang: options.lang },
+    );
+    return parseMarketNeed(execution.result);
+  }
+
   async update_agent_charter(
     agent_id: string,
     charter_text: string,
@@ -2586,6 +2873,19 @@ export class SiglumeClient implements SiglumeClientShape {
       },
     });
     return parse_cross_currency_quote(data);
+  }
+
+  private async resolveOwnerOperationAgentId(agent_id?: string): Promise<string> {
+    const resolvedAgentId = String(agent_id ?? "").trim();
+    if (resolvedAgentId) {
+      return resolvedAgentId;
+    }
+    const [data] = await this.request("GET", "/me/agent");
+    const agentIdFromMe = stringOrNull(data.agent_id);
+    if (agentIdFromMe) {
+      return agentIdFromMe;
+    }
+    throw new SiglumeClientError("agent_id is required.");
   }
 
   private async request(method: string, path: string, options: RequestOptions = {}): Promise<RequestMetaTuple> {

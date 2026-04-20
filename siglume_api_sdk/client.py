@@ -370,6 +370,31 @@ class BudgetPolicy:
 
 
 @dataclass
+class MarketNeedRecord:
+    need_id: str
+    owner_user_id: str | None = None
+    principal_user_id: str | None = None
+    buyer_agent_id: str | None = None
+    charter_id: str | None = None
+    charter_version: int = 1
+    title: str | None = None
+    problem_statement: str | None = None
+    category_key: str | None = None
+    budget_min_minor: int | None = None
+    budget_max_minor: int | None = None
+    urgency: int = 1
+    requirement_jsonb: dict[str, Any] = field(default_factory=dict)
+    status: str = "open"
+    source_kind: str | None = None
+    source_ref_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    detected_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
 class AccountPreferences:
     language: str | None = None
     summary_depth: str | None = None
@@ -1143,6 +1168,32 @@ def _parse_budget_policy(data: Mapping[str, Any]) -> BudgetPolicy:
             "auto_approve_below": int(data.get("auto_approve_below_minor") or 0),
         },
         metadata=_to_dict(data.get("metadata")),
+        created_at=_string_or_none(data.get("created_at")),
+        updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_market_need(data: Mapping[str, Any]) -> MarketNeedRecord:
+    return MarketNeedRecord(
+        need_id=str(data.get("need_id") or data.get("id") or ""),
+        owner_user_id=_string_or_none(data.get("owner_user_id") or data.get("principal_user_id")),
+        principal_user_id=_string_or_none(data.get("principal_user_id") or data.get("owner_user_id")),
+        buyer_agent_id=_string_or_none(data.get("buyer_agent_id")),
+        charter_id=_string_or_none(data.get("charter_id")),
+        charter_version=int(data.get("charter_version") or 1),
+        title=_string_or_none(data.get("title")),
+        problem_statement=_string_or_none(data.get("problem_statement")),
+        category_key=_string_or_none(data.get("category_key")),
+        budget_min_minor=_int_or_none(data.get("budget_min_minor")),
+        budget_max_minor=_int_or_none(data.get("budget_max_minor")),
+        urgency=int(data.get("urgency") or 1),
+        requirement_jsonb=_to_dict(data.get("requirement_jsonb")),
+        status=str(data.get("status") or "open").strip().lower(),
+        source_kind=_string_or_none(data.get("source_kind")),
+        source_ref_id=_string_or_none(data.get("source_ref_id")),
+        metadata=_to_dict(data.get("metadata")),
+        detected_at=_string_or_none(data.get("detected_at")),
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
         raw=dict(data),
@@ -2456,6 +2507,201 @@ class SiglumeClient:
             json_body=payload,
         )
         return _parse_operation_execution(data, operation_key=normalized_key, meta=meta)
+
+    def _resolve_owner_operation_agent_id(self, agent_id: str | None = None) -> str:
+        resolved_agent_id = str(agent_id or "").strip()
+        if resolved_agent_id:
+            return resolved_agent_id
+        data, _meta = self._request("GET", "/me/agent")
+        agent_id_from_me = _string_or_none(data.get("agent_id"))
+        if agent_id_from_me:
+            return agent_id_from_me
+        raise SiglumeClientError("agent_id is required.")
+
+    # `market.needs.*` currently rides on the public owner-operation execute
+    # route, so these helpers stay thin and typed rather than inventing a
+    # separate REST contract that does not exist in OpenAPI yet.
+    def list_market_needs(
+        self,
+        *,
+        agent_id: str | None = None,
+        status: str | None = None,
+        buyer_agent_id: str | None = None,
+        cursor: str | None = None,
+        limit: int = 20,
+        lang: str = "en",
+    ) -> CursorPage[MarketNeedRecord]:
+        resolved_agent_id = self._resolve_owner_operation_agent_id(agent_id)
+        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
+        if status is not None and str(status).strip():
+            params["status"] = str(status).strip().lower()
+        if buyer_agent_id is not None and str(buyer_agent_id).strip():
+            params["buyer_agent_id"] = str(buyer_agent_id).strip()
+        if cursor is not None and str(cursor).strip():
+            params["cursor"] = str(cursor).strip()
+        execution = self.execute_owner_operation(
+            resolved_agent_id,
+            "market.needs.list",
+            params,
+            lang=lang,
+        )
+        items = execution.result.get("items") if isinstance(execution.result.get("items"), list) else []
+        next_cursor = _string_or_none(execution.result.get("next_cursor"))
+        meta = EnvelopeMeta(request_id=execution.request_id, trace_id=execution.trace_id)
+        return CursorPage(
+            items=[_parse_market_need(item) for item in items if isinstance(item, Mapping)],
+            next_cursor=next_cursor,
+            limit=params["limit"],
+            meta=meta,
+            _fetch_next=(
+                lambda next_value: self.list_market_needs(
+                    agent_id=resolved_agent_id,
+                    status=status,
+                    buyer_agent_id=buyer_agent_id,
+                    cursor=next_value,
+                    limit=limit,
+                    lang=lang,
+                )
+            ) if next_cursor else None,
+        )
+
+    def get_market_need(
+        self,
+        need_id: str,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> MarketNeedRecord:
+        normalized_need_id = str(need_id or "").strip()
+        if not normalized_need_id:
+            raise SiglumeClientError("need_id is required.")
+        execution = self.execute_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "market.needs.get",
+            {"need_id": normalized_need_id},
+            lang=lang,
+        )
+        return _parse_market_need(execution.result)
+
+    def create_market_need(
+        self,
+        *,
+        agent_id: str | None = None,
+        buyer_agent_id: str | None = None,
+        title: str,
+        problem_statement: str,
+        category_key: str,
+        budget_min_minor: int,
+        budget_max_minor: int,
+        urgency: int = 1,
+        requirement_jsonb: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        status: str | None = None,
+        lang: str = "en",
+    ) -> MarketNeedRecord:
+        normalized_title = str(title or "").strip()
+        normalized_problem_statement = str(problem_statement or "").strip()
+        normalized_category_key = str(category_key or "").strip().lower()
+        if not normalized_title:
+            raise SiglumeClientError("title is required.")
+        if not normalized_problem_statement:
+            raise SiglumeClientError("problem_statement is required.")
+        if not normalized_category_key:
+            raise SiglumeClientError("category_key is required.")
+        min_minor = int(budget_min_minor)
+        max_minor = int(budget_max_minor)
+        if min_minor > max_minor:
+            raise SiglumeClientError("budget_min_minor cannot exceed budget_max_minor.")
+        payload: dict[str, Any] = {
+            "title": normalized_title,
+            "problem_statement": normalized_problem_statement,
+            "category_key": normalized_category_key,
+            "budget_min_minor": min_minor,
+            "budget_max_minor": max_minor,
+            "urgency": int(urgency),
+        }
+        if buyer_agent_id is not None and str(buyer_agent_id).strip():
+            payload["buyer_agent_id"] = str(buyer_agent_id).strip()
+        if requirement_jsonb is not None:
+            payload["requirement_jsonb"] = _coerce_mapping(requirement_jsonb, "requirement_jsonb")
+        if metadata is not None:
+            payload["metadata"] = _coerce_mapping(metadata, "metadata")
+        if status is not None and str(status).strip():
+            payload["status"] = str(status).strip().lower()
+        resolved_agent_id = self._resolve_owner_operation_agent_id(agent_id)
+        execution = self.execute_owner_operation(
+            resolved_agent_id,
+            "market.needs.create",
+            payload,
+            lang=lang,
+        )
+        return _parse_market_need(execution.result)
+
+    def update_market_need(
+        self,
+        need_id: str,
+        *,
+        agent_id: str | None = None,
+        buyer_agent_id: str | None = None,
+        title: str | None = None,
+        problem_statement: str | None = None,
+        category_key: str | None = None,
+        budget_min_minor: int | None = None,
+        budget_max_minor: int | None = None,
+        urgency: int | None = None,
+        requirement_jsonb: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        status: str | None = None,
+        lang: str = "en",
+    ) -> MarketNeedRecord:
+        normalized_need_id = str(need_id or "").strip()
+        if not normalized_need_id:
+            raise SiglumeClientError("need_id is required.")
+        payload: dict[str, Any] = {"need_id": normalized_need_id}
+        if buyer_agent_id is not None and str(buyer_agent_id).strip():
+            payload["buyer_agent_id"] = str(buyer_agent_id).strip()
+        if title is not None:
+            normalized_title = str(title).strip()
+            if not normalized_title:
+                raise SiglumeClientError("title cannot be empty.")
+            payload["title"] = normalized_title
+        if problem_statement is not None:
+            normalized_problem_statement = str(problem_statement).strip()
+            if not normalized_problem_statement:
+                raise SiglumeClientError("problem_statement cannot be empty.")
+            payload["problem_statement"] = normalized_problem_statement
+        if category_key is not None:
+            normalized_category_key = str(category_key).strip().lower()
+            if not normalized_category_key:
+                raise SiglumeClientError("category_key cannot be empty.")
+            payload["category_key"] = normalized_category_key
+        if budget_min_minor is not None:
+            payload["budget_min_minor"] = int(budget_min_minor)
+        if budget_max_minor is not None:
+            payload["budget_max_minor"] = int(budget_max_minor)
+        if (
+            payload.get("budget_min_minor") is not None
+            and payload.get("budget_max_minor") is not None
+            and int(payload["budget_min_minor"]) > int(payload["budget_max_minor"])
+        ):
+            raise SiglumeClientError("budget_min_minor cannot exceed budget_max_minor.")
+        if urgency is not None:
+            payload["urgency"] = int(urgency)
+        if requirement_jsonb is not None:
+            payload["requirement_jsonb"] = _coerce_mapping(requirement_jsonb, "requirement_jsonb")
+        if metadata is not None:
+            payload["metadata"] = _coerce_mapping(metadata, "metadata")
+        if status is not None and str(status).strip():
+            payload["status"] = str(status).strip().lower()
+        if len(payload) == 1:
+            raise SiglumeClientError("update_market_need requires at least one field to update.")
+        execution = self.execute_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "market.needs.update",
+            payload,
+            lang=lang,
+        )
+        return _parse_market_need(execution.result)
 
     def list_access_grants(
         self,

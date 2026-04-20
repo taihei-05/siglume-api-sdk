@@ -22,6 +22,11 @@ import {
   runAccountPlanWrapperExample,
 } from "../../examples-ts/account_plan_wrapper";
 import {
+  buildToolManual as buildMarketNeedsToolManual,
+  MarketNeedsWrapperApp,
+  runMarketNeedsExample,
+} from "../../examples-ts/market_needs_wrapper";
+import {
   buildToolManual as buildNetworkDiscoveryToolManual,
   NetworkDiscoveryWrapperApp,
   runNetworkDiscoveryExample,
@@ -64,6 +69,13 @@ const EXAMPLES = [
     createHarness: () => new AppTestHarness(new AccountPlanWrapperApp()),
     createManual: () => buildAccountPlanToolManual(),
     taskType: "load_account_plan_context",
+  },
+  {
+    name: "market_needs_wrapper",
+    permissionClass: PermissionClass.READ_ONLY,
+    createHarness: () => new AppTestHarness(new MarketNeedsWrapperApp()),
+    createManual: () => buildMarketNeedsToolManual(),
+    taskType: "review_market_needs",
   },
   {
     name: "network_discovery_wrapper",
@@ -164,6 +176,17 @@ describe("TypeScript example suite", () => {
     expect(lines[2]).toBe("plan: plus model=claude-sonnet-4-6");
     expect(lines[3]).toBe("dry_run: true");
     expect(lines[4]).toBe("summary: Plan plus with ja preferences loaded for writing tone personalization.");
+  });
+
+  it("returns stable summary lines for market_needs_wrapper", async () => {
+    const lines = await runMarketNeedsExample();
+
+    expect(lines[0]).toBe("tool_manual_valid: true 0");
+    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
+    expect(lines[2]).toBe("needs_loaded: 2 first=need_demo_1");
+    expect(lines[3]).toBe("titles: Localize release notes into Japanese|Summarize partner invoices");
+    expect(lines[4]).toBe("dry_run: true");
+    expect(lines[5]).toBe("summary: Loaded 2 open market needs for translation coverage triage; first need: Localize release notes into Japanese.");
   });
 
   it("returns stable summary lines for account_digests_alerts_wrapper", async () => {

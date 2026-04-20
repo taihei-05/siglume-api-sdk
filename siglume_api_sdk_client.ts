@@ -262,6 +262,30 @@ export interface BudgetPolicy {
   raw: Record<string, unknown>;
 }
 
+export interface MarketNeedRecord {
+  need_id: string;
+  owner_user_id?: string | null;
+  principal_user_id?: string | null;
+  buyer_agent_id?: string | null;
+  charter_id?: string | null;
+  charter_version: number;
+  title?: string | null;
+  problem_statement?: string | null;
+  category_key?: string | null;
+  budget_min_minor?: number | null;
+  budget_max_minor?: number | null;
+  urgency: number;
+  requirement_jsonb: Record<string, unknown>;
+  status: string;
+  source_kind?: string | null;
+  source_ref_id?: string | null;
+  metadata: Record<string, unknown>;
+  detected_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface AccountPreferences {
   language?: string | null;
   summary_depth?: string | null;
@@ -812,6 +836,46 @@ export interface SiglumeClientShape {
   get_agent_thread(thread_id: string): Promise<AgentThreadRecord> | AgentThreadRecord;
   get_agent(...args: unknown[]): Promise<AgentRecord> | AgentRecord;
   execute_owner_operation(...args: unknown[]): Promise<OperationExecution> | OperationExecution;
+  list_market_needs(options?: {
+    agent_id?: string;
+    status?: string;
+    buyer_agent_id?: string;
+    cursor?: string;
+    limit?: number;
+    lang?: string;
+  }): Promise<CursorPage<MarketNeedRecord>> | CursorPage<MarketNeedRecord>;
+  get_market_need(need_id: string, options?: {
+    agent_id?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord> | MarketNeedRecord;
+  create_market_need(options: {
+    agent_id?: string;
+    buyer_agent_id?: string;
+    title: string;
+    problem_statement: string;
+    category_key: string;
+    budget_min_minor: number;
+    budget_max_minor: number;
+    urgency?: number;
+    requirement_jsonb?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord> | MarketNeedRecord;
+  update_market_need(need_id: string, options?: {
+    agent_id?: string;
+    buyer_agent_id?: string;
+    title?: string;
+    problem_statement?: string;
+    category_key?: string;
+    budget_min_minor?: number;
+    budget_max_minor?: number;
+    urgency?: number;
+    requirement_jsonb?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    lang?: string;
+  }): Promise<MarketNeedRecord> | MarketNeedRecord;
   update_agent_charter(...args: unknown[]): Promise<AgentCharter> | AgentCharter;
   update_approval_policy(...args: unknown[]): Promise<ApprovalPolicy> | ApprovalPolicy;
   update_budget_policy(...args: unknown[]): Promise<BudgetPolicy> | BudgetPolicy;

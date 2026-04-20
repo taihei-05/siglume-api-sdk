@@ -2167,3 +2167,325 @@ def test_list_operations_falls_back_to_bundled_catalog_when_route_unavailable() 
         "owner.budget.update",
     }
     assert all(item.agent_id == DEFAULT_OPERATION_AGENT_ID for item in operations)
+
+
+def test_market_need_wrappers_round_trip_through_owner_operation_cassette(tmp_path: Path) -> None:
+    cassette_path = tmp_path / "market-needs-roundtrip.json"
+    requests: list[tuple[str, str, dict[str, object]]] = []
+
+    need_one = {
+        "need_id": "need_demo_1",
+        "owner_user_id": "usr_owner_demo",
+        "principal_user_id": "usr_owner_demo",
+        "buyer_agent_id": DEFAULT_OPERATION_AGENT_ID,
+        "charter_id": "chr_owner_demo",
+        "charter_version": 3,
+        "title": "Localize release notes into Japanese",
+        "problem_statement": "Need a reviewable EN->JA translation within 24 hours.",
+        "category_key": "translation",
+        "budget_min_minor": 8000,
+        "budget_max_minor": 15000,
+        "urgency": 7,
+        "requirement_jsonb": {"languages": ["en", "ja"], "sla_hours": 24},
+        "status": "open",
+        "metadata": {"source": "sdk-test"},
+        "detected_at": "2026-04-20T08:00:00Z",
+        "created_at": "2026-04-20T08:00:00Z",
+        "updated_at": "2026-04-20T08:10:00Z",
+    }
+    need_two = {
+        "need_id": "need_demo_2",
+        "owner_user_id": "usr_owner_demo",
+        "principal_user_id": "usr_owner_demo",
+        "buyer_agent_id": DEFAULT_OPERATION_AGENT_ID,
+        "charter_id": "chr_owner_demo",
+        "charter_version": 3,
+        "title": "Summarize partner invoices",
+        "problem_statement": "Need an invoice anomaly summary before finance review.",
+        "category_key": "finance",
+        "budget_min_minor": 6000,
+        "budget_max_minor": 12000,
+        "urgency": 5,
+        "requirement_jsonb": {"period": "monthly"},
+        "status": "open",
+        "metadata": {"source": "sdk-test"},
+        "detected_at": "2026-04-19T21:00:00Z",
+        "created_at": "2026-04-19T21:00:00Z",
+        "updated_at": "2026-04-20T07:00:00Z",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path != f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
+            raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        requests.append((request.method, request.url.path, body))
+        operation = body.get("operation")
+        params = body.get("params") if isinstance(body.get("params"), dict) else {}
+        if operation == "market.needs.list":
+            if params.get("cursor") == "next_need":
+                return httpx.Response(
+                    200,
+                    json=envelope(
+                        {
+                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                            "message": "Market needs loaded.",
+                            "action": "market_needs_list",
+                            "result": {"items": [need_two], "next_cursor": None},
+                        },
+                        trace_id="trc_market_needs_list_2",
+                        request_id="req_market_needs_list_2",
+                    ),
+                )
+            assert params == {"limit": 1, "status": "open"}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "message": "Market needs loaded.",
+                        "action": "market_needs_list",
+                        "result": {"items": [need_one], "next_cursor": "next_need"},
+                    },
+                        trace_id="trc_market_needs_list_1",
+                        request_id="req_market_needs_list_1",
+                ),
+            )
+        if operation == "market.needs.get":
+            assert params == {"need_id": "need_demo_1"}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "message": "Market need loaded.",
+                        "action": "market_needs_get",
+                        "result": need_one,
+                    },
+                    trace_id="trc_market_needs_get",
+                    request_id="req_market_needs_get",
+                ),
+            )
+        if operation == "market.needs.create":
+            assert params == {
+                "title": "Draft Japanese release-note translation need",
+                "problem_statement": "Need a publish-ready translation within 24 hours.",
+                "category_key": "translation",
+                "budget_min_minor": 9000,
+                "budget_max_minor": 15000,
+                "urgency": 8,
+                "requirement_jsonb": {"languages": ["en", "ja"]},
+                "metadata": {"source": "sdk-test"},
+                "status": "open",
+            }
+            created = dict(need_one)
+            created["need_id"] = "need_created_1"
+            created["title"] = str(params["title"])
+            created["problem_statement"] = str(params["problem_statement"])
+            created["budget_min_minor"] = int(params["budget_min_minor"])
+            created["budget_max_minor"] = int(params["budget_max_minor"])
+            created["urgency"] = int(params["urgency"])
+            created["requirement_jsonb"] = dict(params["requirement_jsonb"])
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "message": "Market need created.",
+                        "action": "market_needs_create",
+                        "result": created,
+                    },
+                    trace_id="trc_market_needs_create",
+                    request_id="req_market_needs_create",
+                ),
+            )
+        if operation == "market.needs.update":
+            assert params == {
+                "need_id": "need_demo_1",
+                "status": "closed",
+                "metadata": {"source": "sdk-test", "reviewed": True},
+            }
+            updated = dict(need_one)
+            updated["status"] = "closed"
+            updated["metadata"] = {"source": "sdk-test", "reviewed": True}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "message": "Market need updated.",
+                        "action": "market_needs_update",
+                        "result": updated,
+                    },
+                    trace_id="trc_market_needs_update",
+                    request_id="req_market_needs_update",
+                ),
+            )
+        raise AssertionError(f"Unexpected operation payload: {body}")
+
+    with Recorder(cassette_path, mode=RecordMode.RECORD) as recorder:
+        with recorder.wrap(build_client(handler)) as client:
+            first_page = client.list_market_needs(agent_id=DEFAULT_OPERATION_AGENT_ID, status="open", limit=1)
+            all_needs = first_page.all_items()
+            detail = client.get_market_need("need_demo_1", agent_id=DEFAULT_OPERATION_AGENT_ID)
+            created = client.create_market_need(
+                agent_id=DEFAULT_OPERATION_AGENT_ID,
+                title="Draft Japanese release-note translation need",
+                problem_statement="Need a publish-ready translation within 24 hours.",
+                category_key="translation",
+                budget_min_minor=9000,
+                budget_max_minor=15000,
+                urgency=8,
+                requirement_jsonb={"languages": ["en", "ja"]},
+                metadata={"source": "sdk-test"},
+                status="open",
+            )
+            updated = client.update_market_need(
+                "need_demo_1",
+                agent_id=DEFAULT_OPERATION_AGENT_ID,
+                status="closed",
+                metadata={"source": "sdk-test", "reviewed": True},
+            )
+
+    with Recorder(cassette_path, mode=RecordMode.REPLAY) as recorder:
+        with recorder.wrap(build_client(lambda request: (_ for _ in ()).throw(AssertionError(f"Replay should not hit transport: {request.method} {request.url}")))) as client:
+            replay_page = client.list_market_needs(agent_id=DEFAULT_OPERATION_AGENT_ID, status="open", limit=1)
+            replay_needs = replay_page.all_items()
+            replay_detail = client.get_market_need("need_demo_1", agent_id=DEFAULT_OPERATION_AGENT_ID)
+            replay_created = client.create_market_need(
+                agent_id=DEFAULT_OPERATION_AGENT_ID,
+                title="Draft Japanese release-note translation need",
+                problem_statement="Need a publish-ready translation within 24 hours.",
+                category_key="translation",
+                budget_min_minor=9000,
+                budget_max_minor=15000,
+                urgency=8,
+                requirement_jsonb={"languages": ["en", "ja"]},
+                metadata={"source": "sdk-test"},
+                status="open",
+            )
+            replay_updated = client.update_market_need(
+                "need_demo_1",
+                agent_id=DEFAULT_OPERATION_AGENT_ID,
+                status="closed",
+                metadata={"source": "sdk-test", "reviewed": True},
+            )
+
+    assert [item.need_id for item in all_needs] == ["need_demo_1", "need_demo_2"]
+    assert first_page.meta.trace_id == "trc_market_needs_list_1"
+    assert detail.title == "Localize release notes into Japanese"
+    assert detail.requirement_jsonb == {"languages": ["en", "ja"], "sla_hours": 24}
+    assert created.need_id == "need_created_1"
+    assert updated.status == "closed"
+    assert replay_needs[1].title == "Summarize partner invoices"
+    assert replay_detail.need_id == detail.need_id
+    assert replay_created.need_id == created.need_id
+    assert replay_updated.metadata["reviewed"] is True
+    assert [item[2]["operation"] for item in requests] == [
+        "market.needs.list",
+        "market.needs.list",
+        "market.needs.get",
+        "market.needs.create",
+        "market.needs.update",
+    ]
+
+
+def test_market_need_wrappers_validate_required_inputs() -> None:
+    with build_client(lambda request: (_ for _ in ()).throw(AssertionError(f"Unexpected request: {request.method} {request.url}"))) as client:
+        with pytest.raises(SiglumeClientError, match="need_id is required."):
+            client.get_market_need("")
+        with pytest.raises(SiglumeClientError, match="title is required."):
+            client.create_market_need(
+                title="",
+                problem_statement="Need a translation.",
+                category_key="translation",
+                budget_min_minor=10,
+                budget_max_minor=20,
+            )
+        with pytest.raises(SiglumeClientError, match="problem_statement is required."):
+            client.create_market_need(
+                title="Translate release notes",
+                problem_statement="",
+                category_key="translation",
+                budget_min_minor=10,
+                budget_max_minor=20,
+            )
+        with pytest.raises(SiglumeClientError, match="category_key is required."):
+            client.create_market_need(
+                title="Translate release notes",
+                problem_statement="Need a translation.",
+                category_key="",
+                budget_min_minor=10,
+                budget_max_minor=20,
+            )
+        with pytest.raises(SiglumeClientError, match="budget_min_minor cannot exceed budget_max_minor."):
+            client.create_market_need(
+                title="Translate release notes",
+                problem_statement="Need a translation.",
+                category_key="translation",
+                budget_min_minor=30,
+                budget_max_minor=20,
+            )
+        with pytest.raises(SiglumeClientError, match="update_market_need requires at least one field to update."):
+            client.update_market_need("need_demo_1")
+
+
+def test_market_need_wrappers_resolve_default_agent_and_parse_sparse_payloads() -> None:
+    requests: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/v1/me/agent":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "agent_type": "personal",
+                        "name": "Owner Demo",
+                    }
+                ),
+            )
+        if request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
+            body = json.loads(request.content.decode("utf-8")) if request.content else {}
+            operation = body.get("operation")
+            if operation == "market.needs.list":
+                return httpx.Response(
+                    200,
+                    json=envelope(
+                        {
+                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                            "message": "Market needs loaded.",
+                            "action": "market_needs_list",
+                            "result": {"items": [{"need_id": "need_sparse", "status": "open"}], "next_cursor": "cursor_sparse"},
+                        }
+                    ),
+                )
+            if operation == "market.needs.get":
+                return httpx.Response(
+                    200,
+                    json=envelope(
+                        {
+                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                            "message": "Market need loaded.",
+                            "action": "market_needs_get",
+                            "result": {"need_id": "need_sparse", "status": "open"},
+                        }
+                    ),
+                )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        page = client.list_market_needs(limit=2)
+        detail = client.get_market_need("need_sparse")
+
+    assert page.items[0].need_id == "need_sparse"
+    assert page.items[0].metadata == {}
+    assert page.next_cursor == "cursor_sparse"
+    assert detail.need_id == "need_sparse"
+    assert detail.requirement_jsonb == {}
+    assert requests == [
+        ("GET", "/v1/me/agent"),
+        ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
+        ("GET", "/v1/me/agent"),
+        ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
+    ]
