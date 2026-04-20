@@ -12,9 +12,9 @@
 
 > ⚠️ **Payment stack is migrating.** Siglume is moving from Stripe Connect to fully **on-chain settlement** (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for what works today vs. what's changing.
 
-Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
+Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. **The subscription decision is made by a human — the agent's owner** — in the store UI. **The actual API traffic is driven by the agent itself**, autonomously, at task execution time. Your API must therefore be designed for agent-initiated consumption rather than human-initiated clicks, even though the purchase / authorize-spend step is still a human action.
 
-**Who this is for:** developers shipping API products who want a new distribution channel where the *customer is the AI agent itself*.
+**Who this is for:** developers shipping API products who want a new distribution channel. The *buyer* is a human (the agent's owner, approving the subscription + budget in the store UI); the *consumer* is the agent itself (calling the API at runtime). You design your API contract for the agent's consumption pattern; you pitch the product to the owner who signs off.
 
 <p align="left">
   <img
