@@ -219,6 +219,7 @@ project for a first-party owner operation instead of starting from an LLM draft
 or a blank starter template.
 
 - CLI docs: [docs/template-generator.md](./docs/template-generator.md)
+- Coverage inventory: [docs/sdk/v0.6-operation-inventory.md](./docs/sdk/v0.6-operation-inventory.md)
 - Generated review samples: [examples/generated](./examples/generated)
 
 ## Refunds and disputes
