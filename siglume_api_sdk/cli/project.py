@@ -20,15 +20,25 @@ import click
 
 from siglume_api_sdk import (
     AppAdapter,
+    AppCategory,
     AppManifest,
     AppTestHarness,
+    ApprovalMode,
     PermissionClass,
+    PriceModel,
     SettlementMode,
     SiglumeClient,
+    SiglumeClientError,
     ToolManual,
     ToolManualPermissionClass,
-    validate_tool_manual,
     score_tool_manual_offline,
+    validate_tool_manual,
+)
+from siglume_api_sdk.operations import (
+    DEFAULT_OPERATION_AGENT_ID,
+    OperationMetadata,
+    default_capability_key_for_operation,
+    fallback_operation_catalog,
 )
 
 
@@ -41,6 +51,12 @@ TEMPLATE_EXAMPLES = {
     "publisher": "x_publisher.py",
     "payment": "metamask_connector.py",
 }
+
+FALLBACK_OPERATION_WARNING = (
+    "Using the bundled fallback owner-operation catalog because the live "
+    "catalog is unavailable. Generated templates remain experimental until the "
+    "platform operation catalog is reachable."
+)
 
 
 @dataclass
@@ -249,6 +265,599 @@ def load_project(path: str | Path = ".") -> LoadedProject:
 
 def render_json(data: Any) -> str:
     return json.dumps(to_jsonable(data), ensure_ascii=False, indent=2)
+
+
+def list_operation_catalog(
+    *,
+    agent_id: str | None = None,
+    lang: str = "en",
+) -> dict[str, Any]:
+    resolved_agent_id = str(agent_id or "").strip()
+    warning_message: str | None = None
+    try:
+        api_key = resolve_api_key()
+    except click.ClickException as exc:
+        api_key = None
+        warning_message = str(exc)
+    if api_key:
+        try:
+            with SiglumeClient(api_key=api_key) as client:
+                operations = client.list_operations(agent_id=resolved_agent_id or None, lang=lang)
+            return {
+                "agent_id": operations[0].agent_id if operations else (resolved_agent_id or None),
+                "source": "live",
+                "warning": None,
+                "operations": [to_jsonable(item) for item in operations],
+            }
+        except SiglumeClientError as exc:
+            warning_message = str(exc)
+    operations = fallback_operation_catalog(agent_id=resolved_agent_id or DEFAULT_OPERATION_AGENT_ID)
+    return {
+        "agent_id": operations[0].agent_id if operations else (resolved_agent_id or DEFAULT_OPERATION_AGENT_ID),
+        "source": "fallback",
+        "warning": warning_message or FALLBACK_OPERATION_WARNING,
+        "operations": [to_jsonable(item) for item in operations],
+    }
+
+
+def _resolve_operation_metadata(
+    operation_key: str,
+    *,
+    agent_id: str | None = None,
+    lang: str = "en",
+) -> tuple[OperationMetadata, str | None]:
+    normalized_key = str(operation_key or "").strip()
+    if not normalized_key:
+        raise click.ClickException("operation_key is required.")
+    catalog = list_operation_catalog(agent_id=agent_id, lang=lang)
+    operations = catalog["operations"] if isinstance(catalog.get("operations"), list) else []
+    for item in operations:
+        if isinstance(item, dict) and str(item.get("operation_key") or "") == normalized_key:
+            return (
+                OperationMetadata(
+                    operation_key=str(item["operation_key"]),
+                    summary=str(item["summary"]),
+                    params_summary=str(item.get("params_summary") or ""),
+                    page_href=str(item.get("page_href") or "") or None,
+                    allowed_params=[str(value) for value in item.get("allowed_params", []) if isinstance(value, str)],
+                    required_params=[str(value) for value in item.get("required_params", []) if isinstance(value, str)],
+                    requires_params=bool(item.get("requires_params")),
+                    param_types={str(key): str(value) for key, value in dict(item.get("param_types") or {}).items()},
+                    permission_class=str(item.get("permission_class") or "read-only"),
+                    approval_mode=str(item.get("approval_mode") or "auto"),
+                    input_schema=dict(item.get("input_schema") or {}),
+                    output_schema=dict(item.get("output_schema") or {}),
+                    agent_id=str(item.get("agent_id") or "") or None,
+                    source=str(item.get("source") or catalog.get("source") or "fallback"),
+                    raw=dict(item.get("raw") or {}),
+                ),
+                str(catalog.get("warning") or "") or None,
+            )
+    raise click.ClickException(f"Unknown operation key: {normalized_key}")
+
+
+def _permission_class_from_operation(operation: OperationMetadata) -> PermissionClass:
+    mapping = {
+        "action": PermissionClass.ACTION,
+        "payment": PermissionClass.PAYMENT,
+    }
+    return mapping.get(operation.permission_class, PermissionClass.READ_ONLY)
+
+
+def _approval_mode_from_operation(operation: OperationMetadata) -> ApprovalMode:
+    mapping = {
+        "always-ask": ApprovalMode.ALWAYS_ASK,
+        "budget-bounded": ApprovalMode.BUDGET_BOUNDED,
+        "deny": ApprovalMode.DENY,
+    }
+    return mapping.get(operation.approval_mode, ApprovalMode.AUTO)
+
+
+def _tool_permission_class_from_operation(operation: OperationMetadata) -> ToolManualPermissionClass:
+    permission = _permission_class_from_operation(operation)
+    return _tool_manual_permission_class(permission)
+
+
+def _operation_display_name(operation: OperationMetadata) -> str:
+    chunks = [
+        chunk.capitalize()
+        for chunk in operation.operation_key.replace(".", " ").replace("-", " ").replace("_", " ").split()
+    ]
+    return " ".join(chunks) + " Wrapper"
+
+
+def _operation_task_type(operation: OperationMetadata) -> str:
+    return f"wrap_{operation.operation_key.replace('.', '_').replace('-', '_')}"
+
+
+def _operation_class_name(operation: OperationMetadata) -> str:
+    chunks = [
+        chunk.capitalize()
+        for chunk in operation.operation_key.replace(".", " ").replace("-", " ").replace("_", " ").split()
+    ]
+    return "".join(chunks) + "WrapperApp"
+
+
+def _operation_trigger_conditions(operation: OperationMetadata) -> list[str]:
+    summary = operation.summary.rstrip(".")
+    capability = operation.operation_key.replace(".", " ")
+    if operation.permission_class in {"action", "payment"}:
+        return [
+            f"owner explicitly asks to {summary.lower()}",
+            f"agent needs to run the first-party operation {operation.operation_key} instead of calling an external API",
+            f"request matches the owner-governance workflow described as {capability}",
+        ]
+    return [
+        f"owner asks to inspect or review data covered by {operation.operation_key}",
+        f"agent needs the first-party platform context described as {summary.lower()}",
+        f"request matches the owner-operation workflow described as {capability}",
+    ]
+
+
+def _operation_do_not_use_when(operation: OperationMetadata) -> list[str]:
+    if operation.permission_class in {"action", "payment"}:
+        return [
+            "the owner has not reviewed the preview or has not approved the requested first-party platform change",
+            "the request is unrelated to the documented owner operation or targets the wrong owned agent",
+        ]
+    return [
+        "the owner wants to mutate state instead of only reading first-party platform data",
+        "the request is unrelated to the documented owner operation",
+    ]
+
+
+def _operation_usage_hints(operation: OperationMetadata) -> list[str]:
+    return [
+        f"Use dry_run first so the owner can review the {operation.operation_key} preview before any live execution.",
+    ]
+
+
+def _operation_result_hints(operation: OperationMetadata) -> list[str]:
+    return [
+        "Lead with the summary and action, then include the structured result payload for follow-up tooling.",
+    ]
+
+
+def _operation_error_hints(operation: OperationMetadata) -> list[str]:
+    return [
+        "If the operation rejects the payload, surface which input field needs correction before retrying.",
+    ]
+
+
+def _operation_preview_schema(operation: OperationMetadata) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string", "description": "Preview of the first-party operation."},
+            "operation_key": {"type": "string", "description": "Owner operation that would run."},
+            "agent_id": {"type": "string", "description": "Owned agent that would receive the operation."},
+            "params": {"type": "object", "description": "Operation params after agent_id is removed from input."},
+        },
+        "required": ["summary", "operation_key", "agent_id", "params"],
+        "additionalProperties": False,
+    }
+
+
+def build_operation_manifest(
+    operation: OperationMetadata,
+    *,
+    capability_key_override: str | None = None,
+) -> AppManifest:
+    permission = _permission_class_from_operation(operation)
+    return AppManifest(
+        capability_key=(capability_key_override or default_capability_key_for_operation(operation.operation_key)).strip(),
+        name=_operation_display_name(operation),
+        job_to_be_done=f"Wrap the Siglume first-party operation `{operation.operation_key}` for owned agents.",
+        category=AppCategory.OTHER,
+        permission_class=permission,
+        approval_mode=_approval_mode_from_operation(operation),
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        jurisdiction="US",
+        short_description=operation.summary,
+        example_prompts=[f"Run {operation.operation_key} for my owned agent."],
+    )
+
+
+def build_operation_tool_manual(
+    operation: OperationMetadata,
+    manifest: AppManifest,
+) -> dict[str, Any]:
+    manual: dict[str, Any] = {
+        "tool_name": operation.operation_key.replace(".", "_").replace("-", "_"),
+        "job_to_be_done": f"Run the Siglume first-party operation `{operation.operation_key}` for an owned agent.",
+        "summary_for_model": (
+            f"Wraps the built-in Siglume owner operation `{operation.operation_key}` "
+            f"and returns the structured platform response."
+        ),
+        "trigger_conditions": _operation_trigger_conditions(operation),
+        "do_not_use_when": _operation_do_not_use_when(operation),
+        "permission_class": _tool_permission_class_from_operation(operation).value,
+        "dry_run_supported": True,
+        "requires_connected_accounts": [],
+        "input_schema": dict(operation.input_schema),
+        "output_schema": dict(operation.output_schema),
+        "usage_hints": _operation_usage_hints(operation),
+        "result_hints": _operation_result_hints(operation),
+        "error_hints": _operation_error_hints(operation),
+    }
+    if manifest.permission_class in (PermissionClass.ACTION, PermissionClass.PAYMENT):
+        manual.update(
+            {
+                "approval_summary_template": f"Run {operation.operation_key} for {{agent_id}}.",
+                "preview_schema": _operation_preview_schema(operation),
+                "idempotency_support": True,
+                "side_effect_summary": (
+                    f"Runs the first-party owner operation `{operation.operation_key}` against the selected owned agent."
+                ),
+                "jurisdiction": manifest.jurisdiction,
+            }
+        )
+    return manual
+
+
+def _operation_adapter_source(operation: OperationMetadata, manifest: AppManifest) -> str:
+    class_name = _operation_class_name(operation)
+    permission_enum_name = {
+        PermissionClass.ACTION: "ACTION",
+        PermissionClass.PAYMENT: "PAYMENT",
+    }.get(manifest.permission_class, "READ_ONLY")
+    approval_enum_name = {
+        ApprovalMode.ALWAYS_ASK: "ALWAYS_ASK",
+        ApprovalMode.BUDGET_BOUNDED: "BUDGET_BOUNDED",
+        ApprovalMode.DENY: "DENY",
+    }.get(manifest.approval_mode, "AUTO")
+    needs_approval = "True" if manifest.permission_class in (PermissionClass.ACTION, PermissionClass.PAYMENT) else "False"
+    approval_prompt_line = (
+        'approval_prompt=f"Run {OPERATION_KEY} for {agent_id}.",' if manifest.permission_class in (PermissionClass.ACTION, PermissionClass.PAYMENT) else ""
+    )
+    return textwrap.dedent(
+        f'''\
+        """Generated Siglume wrapper for `{operation.operation_key}`."""
+        from __future__ import annotations
+
+        import asyncio
+        import os
+        import sys
+        from pathlib import Path
+
+        try:
+            from siglume_api_sdk import (
+                AppAdapter,
+                AppCategory,
+                AppManifest,
+                AppTestHarness,
+                ApprovalMode,
+                ExecutionContext,
+                ExecutionKind,
+                ExecutionResult,
+                PermissionClass,
+                PriceModel,
+                SideEffectRecord,
+                SiglumeClient,
+            )
+        except ImportError:
+            sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+            from siglume_api_sdk import (
+                AppAdapter,
+                AppCategory,
+                AppManifest,
+                AppTestHarness,
+                ApprovalMode,
+                ExecutionContext,
+                ExecutionKind,
+                ExecutionResult,
+                PermissionClass,
+                PriceModel,
+                SideEffectRecord,
+                SiglumeClient,
+            )
+
+        try:
+            from .stubs import GeneratedOperationStub, build_stubs
+        except ImportError:
+            from stubs import GeneratedOperationStub, build_stubs
+
+        OPERATION_KEY = "{operation.operation_key}"
+        DEFAULT_AGENT_ID = "{operation.agent_id or DEFAULT_OPERATION_AGENT_ID}"
+        DEFAULT_LANGUAGE = "en"
+
+
+        class {class_name}(AppAdapter):
+            def __init__(self, client: SiglumeClient | None = None, stub_provider: GeneratedOperationStub | None = None) -> None:
+                self._client = client
+                self._stub_provider = stub_provider or GeneratedOperationStub(OPERATION_KEY)
+
+            def manifest(self) -> AppManifest:
+                return AppManifest(
+                    capability_key="{manifest.capability_key}",
+                    name="{manifest.name}",
+                    job_to_be_done="{manifest.job_to_be_done}",
+                    category=AppCategory.OTHER,
+                    permission_class=PermissionClass.{permission_enum_name},
+                    approval_mode=ApprovalMode.{approval_enum_name},
+                    dry_run_supported=True,
+                    required_connected_accounts=[],
+                    price_model=PriceModel.FREE,
+                    jurisdiction="{manifest.jurisdiction}",
+                    short_description="{manifest.short_description}",
+                    example_prompts={json.dumps(list(manifest.example_prompts or []))},
+                )
+
+            async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
+                payload = dict(ctx.input_params or {{}})
+                agent_id = str(payload.pop("agent_id", DEFAULT_AGENT_ID) or DEFAULT_AGENT_ID)
+                preview = {{
+                    "summary": f"Would run {{OPERATION_KEY}} for {{agent_id}}.",
+                    "operation_key": OPERATION_KEY,
+                    "agent_id": agent_id,
+                    "params": payload,
+                }}
+                if ctx.execution_kind == ExecutionKind.DRY_RUN:
+                    return ExecutionResult(
+                        success=True,
+                        execution_kind=ctx.execution_kind,
+                        output=preview,
+                        needs_approval={needs_approval},
+                        {approval_prompt_line}
+                    )
+
+                execution = await self._invoke_operation(agent_id, payload)
+                return ExecutionResult(
+                    success=True,
+                    execution_kind=ctx.execution_kind,
+                    output={{
+                        "summary": execution["message"],
+                        "action": execution["action"],
+                        "result": execution["result"],
+                    }},
+                    receipt_summary={{
+                        "action": execution["action"],
+                        "operation_key": OPERATION_KEY,
+                        "agent_id": agent_id,
+                    }},
+                    side_effects=[
+                        SideEffectRecord(
+                            action=execution["action"],
+                            provider="siglume_owner_operation",
+                            external_id=agent_id,
+                            reversible=False,
+                            metadata={{"operation_key": OPERATION_KEY}},
+                        )
+                    ] if ctx.execution_kind != ExecutionKind.DRY_RUN else [],
+                )
+
+            async def _invoke_operation(self, agent_id: str, params: dict[str, object]) -> dict[str, object]:
+                if self._client is not None:
+                    result = self._client.execute_owner_operation(agent_id, OPERATION_KEY, params, lang=DEFAULT_LANGUAGE)
+                    return {{"message": result.message, "action": result.action, "result": result.result}}
+                api_key = str(os.environ.get("SIGLUME_API_KEY") or "").strip()
+                if api_key:
+                    with SiglumeClient(api_key=api_key) as client:
+                        result = client.execute_owner_operation(agent_id, OPERATION_KEY, params, lang=DEFAULT_LANGUAGE)
+                    return {{"message": result.message, "action": result.action, "result": result.result}}
+                return await self._stub_provider.handle("execute", {{"operation": OPERATION_KEY, "agent_id": agent_id, "params": params}})
+
+            def supported_task_types(self) -> list[str]:
+                return ["{_operation_task_type(operation)}"]
+
+
+        async def main() -> None:
+            harness = AppTestHarness({class_name}(), stubs=build_stubs())
+            print("manifest_issues:", harness.validate_manifest())
+            dry_run = await harness.dry_run(task_type="{_operation_task_type(operation)}")
+            print("dry_run:", dry_run.success)
+            if {needs_approval}:
+                action = await harness.execute_action(task_type="{_operation_task_type(operation)}")
+                print("action:", action.success)
+                print("receipt_issues:", len(harness.validate_receipt(action)))
+
+
+        if __name__ == "__main__":
+            asyncio.run(main())
+        '''
+    )
+
+
+def _operation_stubs_source(operation: OperationMetadata) -> str:
+    return textwrap.dedent(
+        f'''\
+        """Generated stubs for `{operation.operation_key}`."""
+        from __future__ import annotations
+
+        import sys
+        from pathlib import Path
+        from typing import Any
+
+        try:
+            from siglume_api_sdk import StubProvider
+        except ImportError:
+            sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+            from siglume_api_sdk import StubProvider
+
+        OPERATION_KEY = "{operation.operation_key}"
+
+
+        class GeneratedOperationStub(StubProvider):
+            def __init__(self, operation_key: str = OPERATION_KEY) -> None:
+                super().__init__("siglume_owner_operation")
+                self.operation_key = operation_key
+
+            async def handle(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+                agent_id = str(params.get("agent_id") or "{operation.agent_id or DEFAULT_OPERATION_AGENT_ID}")
+                payload = dict(params.get("params") or {{}})
+                return {{
+                    "message": f"Stubbed {{self.operation_key}} for {{agent_id}}.",
+                    "action": self.operation_key.replace(".", "_"),
+                    "result": {{
+                        "operation_key": self.operation_key,
+                        "agent_id": agent_id,
+                        "stubbed": True,
+                        "params": payload,
+                    }},
+                }}
+
+
+        def build_stubs() -> dict[str, StubProvider]:
+            return {{"siglume_owner_operation": GeneratedOperationStub()}}
+        '''
+    )
+
+
+def _operation_test_source(operation: OperationMetadata) -> str:
+    class_name = _operation_class_name(operation)
+    return textwrap.dedent(
+        f'''\
+        from __future__ import annotations
+
+        import asyncio
+        import json
+        import sys
+        from pathlib import Path
+
+        ROOT = Path(__file__).resolve().parents[1]
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+
+        from ..adapter import {class_name}  # noqa: E402
+        from ..stubs import build_stubs  # noqa: E402
+        from siglume_api_sdk import AppTestHarness, score_tool_manual_offline, validate_tool_manual  # noqa: E402
+
+
+        def test_generated_template_harness_and_quality() -> None:
+            harness = AppTestHarness({class_name}(), stubs=build_stubs())
+            manual = json.loads((ROOT / "tool_manual.json").read_text(encoding="utf-8"))
+            ok, issues = validate_tool_manual(manual)
+            report = score_tool_manual_offline(manual)
+
+            assert ok, issues
+            assert report.grade in {{"A", "B"}}
+            assert not harness.validate_manifest()
+
+            async def _run() -> None:
+                dry_run = await harness.dry_run(task_type="{_operation_task_type(operation)}")
+                assert dry_run.success
+                if "{operation.permission_class}" in {{"action", "payment"}}:
+                    action = await harness.execute_action(task_type="{_operation_task_type(operation)}")
+                    assert action.success
+                    assert not harness.validate_receipt(action)
+
+            asyncio.run(_run())
+        '''
+    )
+
+
+def _operation_readme_template(operation: OperationMetadata, manifest: AppManifest, warning: str | None) -> str:
+    lines = [
+        f"# {manifest.name}",
+        "",
+        f"This starter wraps the first-party Siglume owner operation `{operation.operation_key}`.",
+        "",
+        f"- Source catalog: `{operation.source}`",
+        f"- Default agent_id: `{operation.agent_id or DEFAULT_OPERATION_AGENT_ID}`",
+        f"- Permission class: `{operation.permission_class}`",
+        f"- Approval mode: `{operation.approval_mode}`",
+    ]
+    if warning:
+        lines.append(f"- Warning: {warning}")
+    lines.extend(
+        [
+            f"- Route page: `{operation.page_href or '/owner'}`",
+            "",
+            "## Generated files",
+            "",
+            "- `adapter.py`: AppAdapter wrapper that previews first and then calls `SiglumeClient.execute_owner_operation()`",
+            "- `stubs.py`: mock fallback used when `SIGLUME_API_KEY` is not set",
+            "- `manifest.json`: reviewable manifest snapshot",
+            "- `tool_manual.json`: machine-generated ToolManual scaffold",
+            "- `tests/test_adapter.py`: smoke test for `AppTestHarness`",
+            "",
+            "## Commands",
+            "",
+            "```bash",
+            "siglume validate .",
+            "siglume test .",
+            "pytest tests/test_adapter.py",
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_operation_template(
+    operation_key: str,
+    destination: Path,
+    *,
+    capability_key_override: str | None = None,
+    agent_id: str | None = None,
+    lang: str = "en",
+) -> tuple[list[Path], OperationMetadata, dict[str, Any]]:
+    destination.mkdir(parents=True, exist_ok=True)
+    tests_dir = destination / "tests"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    package_init_path = destination / "__init__.py"
+    tests_init_path = tests_dir / "__init__.py"
+    adapter_path = destination / "adapter.py"
+    stubs_path = destination / "stubs.py"
+    manifest_path = destination / "manifest.json"
+    tool_manual_path = destination / "tool_manual.json"
+    readme_path = destination / "README.md"
+    test_path = tests_dir / "test_adapter.py"
+
+    for path in (
+        package_init_path,
+        tests_init_path,
+        adapter_path,
+        stubs_path,
+        manifest_path,
+        tool_manual_path,
+        readme_path,
+        test_path,
+    ):
+        if path.exists():
+            raise click.ClickException(f"{path.name} already exists in {destination}")
+
+    operation, warning = _resolve_operation_metadata(operation_key, agent_id=agent_id, lang=lang)
+    manifest = build_operation_manifest(operation, capability_key_override=capability_key_override)
+    tool_manual = build_operation_tool_manual(operation, manifest)
+    valid, issues = validate_tool_manual(tool_manual)
+    quality = score_tool_manual_offline(tool_manual)
+    if not valid:
+        raise click.ClickException(f"Generated tool manual for {operation.operation_key} is invalid: {issues}")
+    if quality.grade not in {"A", "B"}:
+        raise click.ClickException(
+            f"Generated tool manual for {operation.operation_key} scored below publish bar: {quality.grade}"
+        )
+
+    package_init_path.write_text("", encoding="utf-8")
+    tests_init_path.write_text("", encoding="utf-8")
+    adapter_path.write_text(_operation_adapter_source(operation, manifest), encoding="utf-8")
+    stubs_path.write_text(_operation_stubs_source(operation), encoding="utf-8")
+    manifest_path.write_text(render_json(manifest), encoding="utf-8")
+    tool_manual_path.write_text(render_json(tool_manual), encoding="utf-8")
+    readme_path.write_text(_operation_readme_template(operation, manifest, warning), encoding="utf-8")
+    test_path.write_text(_operation_test_source(operation), encoding="utf-8")
+    return (
+        [
+            package_init_path,
+            tests_init_path,
+            adapter_path,
+            stubs_path,
+            manifest_path,
+            tool_manual_path,
+            readme_path,
+            test_path,
+        ],
+        operation,
+        {
+            "tool_manual_valid": valid,
+            "tool_manual_issues": [to_jsonable(issue) for issue in issues],
+            "quality": to_jsonable(quality),
+            "warning": warning,
+        },
+    )
 
 
 def write_init_template(template: str, destination: Path) -> list[Path]:

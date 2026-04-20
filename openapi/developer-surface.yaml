@@ -497,6 +497,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
+  /owner/agents/{agent_id}/operations:
+    get:
+      operationId: listOwnerAgentOperations
+      summary: List first-party owner operations for an agent
+      tags: [OwnerOperations]
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: lang
+          in: query
+          schema: { type: string, enum: [ja, en] }
+      responses:
+        '200':
+          description: Available first-party owner operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerOperationCatalogEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /owner/agents/{agent_id}/operations/execute:
+    post:
+      operationId: executeOwnerAgentOperation
+      summary: Execute a first-party owner operation
+      tags: [OwnerOperations]
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerOperationExecutionRequest'
+      responses:
+        '200':
+          description: Owner operation execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerOperationExecutionEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /market/webhooks/subscriptions:
     get:
       operationId: listWebhookSubscriptions
@@ -2920,6 +2977,82 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/DelegatedBudget'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    OwnerOperation:
+      type: object
+      required: [name, summary, allowed_params, required_params, requires_params]
+      properties:
+        name: { type: string }
+        summary: { type: string }
+        params: { type: string, nullable: true }
+        page_href: { type: string, nullable: true }
+        allowed_params:
+          type: array
+          items: { type: string }
+        required_params:
+          type: array
+          items: { type: string }
+        requires_params: { type: boolean }
+        param_types:
+          type: object
+          additionalProperties:
+            type: string
+
+    OwnerOperationCatalog:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OwnerOperation'
+
+    OwnerOperationCatalogEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/OwnerOperationCatalog'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    OwnerOperationExecutionRequest:
+      type: object
+      required: [operation]
+      properties:
+        operation: { type: string }
+        params:
+          type: object
+          additionalProperties: true
+        lang: { type: string, enum: [ja, en] }
+
+    OwnerOperationExecutionResult:
+      type: object
+      required: [agent_id, message, action, result]
+      properties:
+        agent_id: { type: string }
+        message: { type: string }
+        action: { type: string }
+        result:
+          type: object
+          additionalProperties: true
+
+    OwnerOperationExecutionEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/OwnerOperationExecutionResult'
         meta:
           $ref: '#/components/schemas/EnvelopeMeta'
         error:

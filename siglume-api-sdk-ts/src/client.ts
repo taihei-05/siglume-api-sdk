@@ -46,6 +46,12 @@ import {
   parse_settlement_receipt,
 } from "./web3";
 import {
+  type OperationExecution,
+  type OperationMetadata,
+  buildOperationMetadata,
+  fallbackOperationCatalog,
+} from "./operations";
+import {
   buildDefaultI18n,
   buildRegistrationStubSource,
   coerceMapping,
@@ -116,10 +122,18 @@ export interface SiglumeClientShape {
     cursor?: string;
   }): Promise<CursorPage<UsageEventRecord>>;
   list_agents(options?: { query?: string; limit?: number }): Promise<AgentRecord[]>;
+  list_operations(options?: { agent_id?: string; lang?: string }): Promise<OperationMetadata[]>;
+  get_operation_metadata(operation_key: string, options?: { agent_id?: string; lang?: string }): Promise<OperationMetadata>;
   get_agent(
     agent_id: string,
     options?: { lang?: string; tab?: string; cursor?: string; limit?: number },
   ): Promise<AgentRecord>;
+  execute_owner_operation(
+    agent_id: string,
+    operation_key: string,
+    params?: Record<string, unknown>,
+    options?: { lang?: string },
+  ): Promise<OperationExecution>;
   update_agent_charter(
     agent_id: string,
     charter_text: string,
@@ -649,6 +663,23 @@ function parseBudgetPolicy(data: Record<string, unknown>): BudgetPolicy {
   };
 }
 
+function parseOperationExecution(
+  data: Record<string, unknown>,
+  operation_key: string,
+  meta: EnvelopeMeta,
+): OperationExecution {
+  return {
+    agent_id: String(data.agent_id ?? ""),
+    operation_key,
+    message: String(data.message ?? ""),
+    action: String(data.action ?? operation_key.replaceAll(".", "_")),
+    result: toRecord(data.result),
+    trace_id: meta.trace_id ?? null,
+    request_id: meta.request_id ?? null,
+    raw: { ...data },
+  };
+}
+
 function parseRefund(data: Record<string, unknown>): RefundRecord {
   return {
     refund_id: String(data.refund_id ?? data.id ?? ""),
@@ -949,6 +980,49 @@ export class SiglumeClient implements SiglumeClientShape {
     return [parseAgent(data)];
   }
 
+  async list_operations(options: { agent_id?: string; lang?: string } = {}): Promise<OperationMetadata[]> {
+    let resolvedAgentId = String(options.agent_id ?? "").trim();
+    if (!resolvedAgentId) {
+      const agents = await this.list_agents();
+      if (agents.length === 0) {
+        return fallbackOperationCatalog();
+      }
+      resolvedAgentId = agents[0]!.agent_id;
+    }
+    try {
+      const [data] = await this.request("GET", `/owner/agents/${resolvedAgentId}/operations`, {
+        params: {
+          lang: String(options.lang ?? "en").trim().toLowerCase() === "ja" ? "ja" : "en",
+        },
+      });
+      const items = Array.isArray(data.items)
+        ? data.items.filter((item): item is Record<string, unknown> => isRecord(item))
+        : [];
+      if (items.length === 0) {
+        return fallbackOperationCatalog(resolvedAgentId);
+      }
+      return items.map((item) => buildOperationMetadata(item, { agent_id: resolvedAgentId, source: "live" }));
+    } catch {
+      return fallbackOperationCatalog(resolvedAgentId);
+    }
+  }
+
+  async get_operation_metadata(
+    operation_key: string,
+    options: { agent_id?: string; lang?: string } = {},
+  ): Promise<OperationMetadata> {
+    const normalizedKey = String(operation_key ?? "").trim();
+    if (!normalizedKey) {
+      throw new SiglumeClientError("operation_key is required.");
+    }
+    const operations = await this.list_operations(options);
+    const match = operations.find((item) => item.operation_key === normalizedKey);
+    if (!match) {
+      throw new SiglumeNotFoundError(`Operation not found: ${normalizedKey}`);
+    }
+    return match;
+  }
+
   async get_agent(
     agent_id: string,
     options: { lang?: string; tab?: string; cursor?: string; limit?: number } = {},
@@ -966,6 +1040,30 @@ export class SiglumeClient implements SiglumeClientShape {
       },
     });
     return parseAgent(data);
+  }
+
+  async execute_owner_operation(
+    agent_id: string,
+    operation_key: string,
+    params: Record<string, unknown> = {},
+    options: { lang?: string } = {},
+  ): Promise<OperationExecution> {
+    const normalizedAgentId = String(agent_id ?? "").trim();
+    const normalizedKey = String(operation_key ?? "").trim();
+    if (!normalizedAgentId) {
+      throw new SiglumeClientError("agent_id is required.");
+    }
+    if (!normalizedKey) {
+      throw new SiglumeClientError("operation_key is required.");
+    }
+    const [data, meta] = await this.request("POST", `/owner/agents/${normalizedAgentId}/operations/execute`, {
+      json_body: {
+        operation: normalizedKey,
+        params: toRecord(params),
+        lang: String(options.lang ?? "en").trim().toLowerCase() === "ja" ? "ja" : "en",
+      },
+    });
+    return parseOperationExecution(data, normalizedKey, meta);
   }
 
   async update_agent_charter(
@@ -1073,10 +1171,16 @@ export class SiglumeClient implements SiglumeClientShape {
     const nullableFields = new Set<string>(["period_start", "period_end"]);
     const payload: Record<string, unknown> = {};
     for (const field of allowedFields) {
-      if (!Object.prototype.hasOwnProperty.call(policyPayload, field)) continue;
+      if (!Object.prototype.hasOwnProperty.call(policyPayload, field)) {
+        continue;
+      }
       const value = policyPayload[field];
-      if (value === undefined) continue;
-      if (value === null && !nullableFields.has(field)) continue;
+      if (value === undefined) {
+        continue;
+      }
+      if (value === null && !nullableFields.has(field)) {
+        continue;
+      }
       payload[field] = value;
     }
     if (Object.keys(payload).length === 0) {

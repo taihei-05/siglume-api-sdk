@@ -10,6 +10,11 @@ from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, Mapping, Typ
 
 import httpx
 
+from .operations import (
+    OperationMetadata,
+    build_operation_metadata,
+    fallback_operation_catalog,
+)
 from .webhooks import (
     QueuedWebhookEvent,
     WebhookDeliveryRecord,
@@ -361,6 +366,18 @@ class BudgetPolicy:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class OperationExecution:
+    agent_id: str
+    operation_key: str
+    message: str
+    action: str
+    result: dict[str, Any] = field(default_factory=dict)
+    trace_id: str | None = None
+    request_id: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -848,6 +865,24 @@ def _parse_budget_policy(data: Mapping[str, Any]) -> BudgetPolicy:
     )
 
 
+def _parse_operation_execution(
+    data: Mapping[str, Any],
+    *,
+    operation_key: str,
+    meta: EnvelopeMeta,
+) -> OperationExecution:
+    return OperationExecution(
+        agent_id=str(data.get("agent_id") or ""),
+        operation_key=operation_key,
+        message=str(data.get("message") or ""),
+        action=str(data.get("action") or operation_key.replace(".", "_")),
+        result=_to_dict(data.get("result")),
+        trace_id=meta.trace_id,
+        request_id=meta.request_id,
+        raw=dict(data),
+    )
+
+
 def _parse_refund(data: Mapping[str, Any]) -> Refund:
     return Refund(
         refund_id=str(data.get("refund_id") or data.get("id") or ""),
@@ -1261,6 +1296,50 @@ class SiglumeClient:
         data, _meta = self._request("GET", f"/agents/{normalized_agent_id}/profile", params=params)
         return _parse_agent(data)
 
+    def list_operations(
+        self,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> list[OperationMetadata]:
+        resolved_agent_id = str(agent_id or "").strip()
+        if not resolved_agent_id:
+            agents = self.list_agents()
+            if not agents:
+                return fallback_operation_catalog()
+            resolved_agent_id = agents[0].agent_id
+        try:
+            data, _meta = self._request(
+                "GET",
+                f"/owner/agents/{resolved_agent_id}/operations",
+                params={"lang": "ja" if str(lang or "").strip().lower() == "ja" else "en"},
+            )
+        except SiglumeClientError:
+            return fallback_operation_catalog(agent_id=resolved_agent_id)
+        items = data.get("items") if isinstance(data.get("items"), list) else []
+        if not items:
+            return fallback_operation_catalog(agent_id=resolved_agent_id)
+        return [
+            build_operation_metadata(item, agent_id=resolved_agent_id, source="live")
+            for item in items
+            if isinstance(item, Mapping)
+        ]
+
+    def get_operation_metadata(
+        self,
+        operation_key: str,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> OperationMetadata:
+        normalized_key = str(operation_key or "").strip()
+        if not normalized_key:
+            raise SiglumeClientError("operation_key is required.")
+        for item in self.list_operations(agent_id=agent_id, lang=lang):
+            if item.operation_key == normalized_key:
+                return item
+        raise SiglumeNotFoundError(f"Operation not found: {normalized_key}")
+
     def update_agent_charter(
         self,
         agent_id: str,
@@ -1375,6 +1454,32 @@ class SiglumeClient:
             json_body=payload,
         )
         return _parse_budget_policy(data)
+
+    def execute_owner_operation(
+        self,
+        agent_id: str,
+        operation_key: str,
+        params: Mapping[str, Any] | None = None,
+        *,
+        lang: str = "en",
+    ) -> OperationExecution:
+        normalized_agent_id = str(agent_id or "").strip()
+        normalized_key = str(operation_key or "").strip()
+        if not normalized_agent_id:
+            raise SiglumeClientError("agent_id is required.")
+        if not normalized_key:
+            raise SiglumeClientError("operation_key is required.")
+        payload = {
+            "operation": normalized_key,
+            "params": _coerce_mapping(params or {}, "params"),
+            "lang": "ja" if str(lang or "").strip().lower() == "ja" else "en",
+        }
+        data, meta = self._request(
+            "POST",
+            f"/owner/agents/{normalized_agent_id}/operations/execute",
+            json_body=payload,
+        )
+        return _parse_operation_execution(data, operation_key=normalized_key, meta=meta)
 
     def list_access_grants(
         self,

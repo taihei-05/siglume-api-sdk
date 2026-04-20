@@ -78,6 +78,62 @@ function createMockClient() {
         raw: {},
       };
     },
+    async list_operations() {
+      return [
+        {
+          operation_key: "owner.charter.update",
+          summary: "Update the owner charter.",
+          params_summary: "Supports goals and constraints.",
+          page_href: "/owner/charters",
+          allowed_params: ["goals", "constraints"],
+          required_params: ["goals"],
+          requires_params: true,
+          param_types: { goals: "dict", constraints: "dict" },
+          permission_class: "action",
+          approval_mode: "always-ask",
+          input_schema: {
+            type: "object",
+            properties: {
+              agent_id: { type: "string", default: "agt_owner_demo" },
+              goals: {
+                type: "object",
+                properties: {
+                  charter_text: { type: "string", default: "Prefer explicit approvals." },
+                },
+                required: ["charter_text"],
+                additionalProperties: true,
+              },
+              constraints: { type: "object", default: {} },
+            },
+            required: ["goals"],
+            additionalProperties: false,
+          },
+          output_schema: {
+            type: "object",
+            properties: {
+              summary: { type: "string" },
+              action: { type: "string" },
+              result: { type: "object" },
+            },
+            required: ["summary", "action", "result"],
+            additionalProperties: false,
+          },
+          agent_id: "agt_owner_demo",
+          source: "live",
+          raw: {},
+        },
+      ];
+    },
+    async execute_owner_operation(agent_id: string, operation_key: string, params: Record<string, unknown>) {
+      return {
+        agent_id,
+        operation_key,
+        message: `Executed ${operation_key}.`,
+        action: operation_key.replaceAll(".", "_"),
+        result: { ok: true, params },
+        raw: {},
+      };
+    },
   };
 }
 
@@ -191,6 +247,29 @@ async function createTestProject(): Promise<string> {
   return dir;
 }
 
+async function linkSourcePackage(projectDir: string): Promise<void> {
+  const scopedDir = join(projectDir, "node_modules", "@siglume");
+  const packageDir = join(scopedDir, "api-sdk");
+  await mkdir(scopedDir, { recursive: true });
+  await mkdir(packageDir, { recursive: true });
+  await writeFile(
+    join(packageDir, "package.json"),
+    JSON.stringify(
+      {
+        name: "@siglume/api-sdk",
+        type: "module",
+        exports: {
+          ".": "./src/index.ts",
+        },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  await symlink(join(process.cwd(), "src"), join(packageDir, "src"), "junction");
+}
+
 describe("siglume CLI", () => {
   it("runs offline score and harness flows", async () => {
     const projectDir = await createTestProject();
@@ -222,9 +301,7 @@ describe("siglume CLI", () => {
     const initExit = await runCli(["init", projectDir, "--template", "echo", "--json"], {
       stdout: (line) => stdout.push(line),
     });
-    const packageLinkDir = join(projectDir, "node_modules", "@siglume");
-    await mkdir(packageLinkDir, { recursive: true });
-    await symlink(process.cwd(), join(packageLinkDir, "api-sdk"), "junction");
+    await linkSourcePackage(projectDir);
     const validateExit = await runCli(["validate", projectDir, "--json"], {
       stdout: (line) => stdout.push(line),
       client_factory: clientFactory as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
@@ -237,6 +314,44 @@ describe("siglume CLI", () => {
     const validatePayload = JSON.parse(stdout.at(-1) as string) as Record<string, unknown>;
     expect(manifest.capability_key).toBe("echo-starter");
     expect(validatePayload.ok).toBe(true);
+  });
+
+  it("lists owner operations and generates an operation wrapper", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "siglume-ts-op-init-"));
+    const stdout: string[] = [];
+    const clientFactory = () => createMockClient();
+
+    const listExit = await runCli(["init", "--list-operations", "--json"], {
+      stdout: (line) => stdout.push(line),
+      client_factory: clientFactory as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+    const initExit = await runCli(
+      ["init", "--from-operation", "owner.charter.update", "--capability-key", "my-charter-wrapper", projectDir, "--json"],
+      {
+        stdout: (line) => stdout.push(line),
+        client_factory: clientFactory as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+        env: { SIGLUME_API_KEY: "sig_test_key" },
+      },
+    );
+    await linkSourcePackage(projectDir);
+    const harnessExit = await runCli(["test", projectDir, "--json"], {
+      stdout: (line) => stdout.push(line),
+      client_factory: clientFactory as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+
+    expect(listExit).toBe(0);
+    expect(initExit).toBe(0);
+    expect(harnessExit).toBe(0);
+    const listPayload = JSON.parse(stdout[0] as string) as Record<string, unknown>;
+    const initPayload = JSON.parse(stdout[1] as string) as Record<string, unknown>;
+    expect(listPayload.source).toBe("live");
+    expect((listPayload.operations as Array<Record<string, unknown>>)[0]?.operation_key).toBe("owner.charter.update");
+    expect(initPayload.mode).toBe("from-operation");
+    expect((initPayload.operation as Record<string, unknown>).operation_key).toBe("owner.charter.update");
+    expect(await readFile(join(projectDir, "adapter.ts"), "utf8")).toContain("execute_owner_operation");
+    expect(await readFile(join(projectDir, "tool_manual.json"), "utf8")).toContain("\"owner_charter_update\"");
   });
 
   it("covers register, support, and usage commands with mocked client methods", async () => {

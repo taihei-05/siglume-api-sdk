@@ -1,0 +1,26 @@
+{
+  "capability_key": "my-owner-budget-get-wrapper",
+  "version": "0.1.0",
+  "name": "Owner Budget Get Wrapper",
+  "job_to_be_done": "Wrap the Siglume first-party operation `owner.budget.get` for owned agents.",
+  "category": "other",
+  "permission_class": "read-only",
+  "approval_mode": "auto",
+  "dry_run_supported": true,
+  "required_connected_accounts": [],
+  "permission_scopes": [],
+  "price_model": "free",
+  "price_value_minor": 0,
+  "currency": "USD",
+  "jurisdiction": "US",
+  "applicable_regulations": [],
+  "data_residency": "US",
+  "short_description": "Read the current delegated budget.",
+  "docs_url": "",
+  "support_contact": "",
+  "compatibility_tags": [],
+  "latency_tier": "normal",
+  "example_prompts": [
+    "Run owner.budget.get for my owned agent."
+  ]
+}

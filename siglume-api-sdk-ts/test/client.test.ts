@@ -617,6 +617,49 @@ describe("SiglumeClient", () => {
     expect(budget.limits.per_order_limit).toBe(12000);
   });
 
+  it("preserves nullable budget boundaries when clearing period_start and period_end", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/budget");
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        expect(body).toEqual({
+          currency: "JPY",
+          period_start: null,
+          period_end: null,
+          period_limit_minor: 9000,
+        });
+        return new Response(JSON.stringify(envelope({
+          budget_id: "bdg_nullable",
+          agent_id: "agt_owner_demo",
+          currency: "JPY",
+          period_start: null,
+          period_end: null,
+          period_limit_minor: 9000,
+          spent_minor: 0,
+          reserved_minor: 0,
+          per_order_limit_minor: 0,
+          auto_approve_below_minor: 0,
+          limits: {},
+          metadata: {},
+        })), { status: 200 });
+      },
+    });
+
+    const budget = await client.update_budget_policy("agt_owner_demo", {
+      currency: "JPY",
+      period_start: null,
+      period_end: null,
+      period_limit_minor: 9000,
+    });
+
+    expect(budget.budget_id).toBe("bdg_nullable");
+    expect(budget.period_start).toBeNull();
+    expect(budget.period_end).toBeNull();
+  });
+
   it("validates local inputs for agent behavior updates", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",
@@ -776,6 +819,107 @@ describe("SiglumeClient", () => {
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0]?.subscription_id).toBe("whsub_123");
     expect(subscriptions[0]?.event_types).toEqual([]);
+  });
+
+  it("lists owner operations, resolves metadata, and executes owner operations", async () => {
+    const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/operations") {
+          expect(url.searchParams.get("lang")).toBe("ja");
+          return new Response(JSON.stringify(envelope({
+            items: [
+              {
+                name: "owner.charter.update",
+                summary: "Update the owner charter.",
+                params: "Supports goals and constraints.",
+                allowed_params: ["goals", "constraints"],
+                required_params: ["goals"],
+                requires_params: true,
+                page_href: "/owner/charters",
+              },
+            ],
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/operations/execute") {
+          const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+          requests.push({
+            method: String(init?.method ?? "GET"),
+            path: url.pathname,
+            body,
+          });
+          return new Response(JSON.stringify(envelope({
+            agent_id: "agt_owner_demo",
+            message: "Updated charter successfully.",
+            action: "owner_charter_update",
+            result: { version: 2 },
+          }, { request_id: "req_operation", trace_id: "trc_operation" })), { status: 200 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const operations = await client.list_operations({ agent_id: "agt_owner_demo", lang: "ja" });
+    const operation = await client.get_operation_metadata("owner.charter.update", { agent_id: "agt_owner_demo", lang: "ja" });
+    const execution = await client.execute_owner_operation(
+      "agt_owner_demo",
+      "owner.charter.update",
+      { goals: { charter_text: "Prefer budget discipline." } },
+      { lang: "ja" },
+    );
+
+    expect(operations.map((item) => item.operation_key)).toEqual(["owner.charter.update"]);
+    expect(operations[0]?.permission_class).toBe("action");
+    expect(operation.required_params).toEqual(["goals"]);
+    expect(execution.agent_id).toBe("agt_owner_demo");
+    expect(execution.action).toBe("owner_charter_update");
+    expect((execution.result as Record<string, unknown>).version).toBe(2);
+    expect(execution.trace_id).toBe("trc_operation");
+    expect(requests).toEqual([
+      {
+        method: "POST",
+        path: "/v1/owner/agents/agt_owner_demo/operations/execute",
+        body: {
+          operation: "owner.charter.update",
+          params: { goals: { charter_text: "Prefer budget discipline." } },
+          lang: "ja",
+        },
+      },
+    ]);
+  });
+
+  it("falls back to the bundled owner operation catalog when the route is unavailable", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/me/agent") {
+          return new Response(JSON.stringify(envelope({
+            agent_id: "agt_owner_demo",
+            agent_type: "personal",
+            name: "Owner Demo",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/operations") {
+          return new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "missing" } }), { status: 404 });
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const operations = await client.list_operations();
+
+    expect(operations.map((item) => item.operation_key)).toEqual(expect.arrayContaining([
+      "owner.charter.get",
+      "owner.charter.update",
+      "owner.approval_policy.get",
+      "owner.budget.update",
+    ]));
+    expect(operations.every((item) => item.agent_id === "agt_owner_demo")).toBe(true);
   });
 
   it("wraps non-Error transport failures as SiglumeClientError", async () => {

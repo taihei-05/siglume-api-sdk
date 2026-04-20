@@ -1,0 +1,137 @@
+{
+  "tool_name": "owner_charter_update",
+  "job_to_be_done": "Run the Siglume first-party operation `owner.charter.update` for an owned agent.",
+  "summary_for_model": "Wraps the built-in Siglume owner operation `owner.charter.update` and returns the structured platform response.",
+  "trigger_conditions": [
+    "owner explicitly asks to update the owner charter",
+    "agent needs to run the first-party operation owner.charter.update instead of calling an external API",
+    "request matches the owner-governance workflow described as owner charter update"
+  ],
+  "do_not_use_when": [
+    "the owner has not reviewed the preview or has not approved the requested first-party platform change",
+    "the request is unrelated to the documented owner operation or targets the wrong owned agent"
+  ],
+  "permission_class": "action",
+  "dry_run_supported": true,
+  "requires_connected_accounts": [],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "agent_id": {
+        "type": "string",
+        "description": "Owned agent to target. Defaults to the agent used during template generation.",
+        "default": "agt_owner_demo"
+      },
+      "role": {
+        "type": "string",
+        "description": "Updated owner role label, such as buyer or researcher.",
+        "default": "buyer"
+      },
+      "goals": {
+        "type": "object",
+        "description": "Updated charter goals payload.",
+        "properties": {
+          "charter_text": {
+            "type": "string",
+            "description": "Human-readable charter text to store in the owner charter.",
+            "default": "Prefer explicit approvals for unusual purchases."
+          }
+        },
+        "required": [
+          "charter_text"
+        ],
+        "additionalProperties": true
+      },
+      "target_profile": {
+        "type": "object",
+        "description": "Optional target-profile constraints for the agent.",
+        "default": {}
+      },
+      "qualification_criteria": {
+        "type": "object",
+        "description": "Optional qualification criteria for tasks the agent may accept.",
+        "default": {}
+      },
+      "success_metrics": {
+        "type": "object",
+        "description": "Optional success metrics, such as approval_rate_floor.",
+        "default": {
+          "approval_rate_floor": 0.8
+        }
+      },
+      "constraints": {
+        "type": "object",
+        "description": "Optional constraint payload applied to the charter.",
+        "default": {}
+      }
+    },
+    "required": [
+      "goals"
+    ],
+    "additionalProperties": false
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "One-line summary of the first-party operation result."
+      },
+      "action": {
+        "type": "string",
+        "description": "Structured action label returned by Siglume."
+      },
+      "result": {
+        "type": "object",
+        "description": "Raw first-party operation payload returned by Siglume."
+      }
+    },
+    "required": [
+      "summary",
+      "action",
+      "result"
+    ],
+    "additionalProperties": false
+  },
+  "usage_hints": [
+    "Use dry_run first so the owner can review the owner.charter.update preview before any live execution."
+  ],
+  "result_hints": [
+    "Lead with the summary and action, then include the structured result payload for follow-up tooling."
+  ],
+  "error_hints": [
+    "If the operation rejects the payload, surface which input field needs correction before retrying."
+  ],
+  "approval_summary_template": "Run owner.charter.update for {agent_id}.",
+  "preview_schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "Preview of the first-party operation."
+      },
+      "operation_key": {
+        "type": "string",
+        "description": "Owner operation that would run."
+      },
+      "agent_id": {
+        "type": "string",
+        "description": "Owned agent that would receive the operation."
+      },
+      "params": {
+        "type": "object",
+        "description": "Operation params after agent_id is removed from input."
+      }
+    },
+    "required": [
+      "summary",
+      "operation_key",
+      "agent_id",
+      "params"
+    ],
+    "additionalProperties": false
+  },
+  "idempotency_support": true,
+  "side_effect_summary": "Runs the first-party owner operation `owner.charter.update` against the selected owned agent.",
+  "jurisdiction": "US"
+}

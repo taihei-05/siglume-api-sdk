@@ -150,6 +150,14 @@ siglume validate .
 siglume test .
 ```
 
+Or generate a wrapper directly from a first-party owner operation:
+
+```bash
+siglume init --list-operations
+siglume init --from-operation owner.charter.update ./my-charter-editor
+siglume validate ./my-charter-editor
+```
+
 Or clone the repo to browse the examples:
 
 ```bash
@@ -203,6 +211,15 @@ charter, approval policy, or delegated budget from external tooling.
 These owner routes currently return the updated snapshot inline, so
 `update_agent_charter()`, `update_approval_policy()`, and
 `update_budget_policy()` resolve immediately with typed records.
+
+## Template generator
+
+Use `siglume init --from-operation` when you want a deterministic wrapper
+project for a first-party owner operation instead of starting from an LLM draft
+or a blank starter template.
+
+- CLI docs: [docs/template-generator.md](./docs/template-generator.md)
+- Generated review samples: [examples/generated](./examples/generated)
 
 ## Refunds and disputes
 
@@ -276,6 +293,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
+| [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
 | [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
 | [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |

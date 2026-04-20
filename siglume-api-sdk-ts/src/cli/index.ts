@@ -6,11 +6,13 @@ import {
   createSupportCaseReport,
   diffJsonFiles,
   getUsageReport,
+  listOperationCatalog,
   runHarness,
   runRegistration,
   scoreProject,
   validateProject,
   writeInitTemplate,
+  writeOperationTemplate,
 } from "./project";
 import type { CliProjectDependencies } from "./project";
 
@@ -21,6 +23,23 @@ export interface CliRunDependencies extends CliProjectDependencies {
 
 function emit(output: ((line: string) => void) | undefined, line: string): void {
   (output ?? console.log)(line);
+}
+
+function renderOperationTable(operations: Array<Record<string, unknown>>): string[] {
+  const rows = operations.map((item) => [
+    String(item.operation_key ?? ""),
+    String(item.permission_class ?? "read-only"),
+    String(item.summary ?? ""),
+  ]);
+  const headers = ["operation_key", "permission_class", "summary"];
+  const widths = headers.map((header, index) =>
+    Math.max(header.length, ...rows.map((row) => row[index]?.length ?? 0)),
+  );
+  return [
+    headers.map((header, index) => header.padEnd(widths[index] ?? header.length)).join("  "),
+    widths.map((width) => "-".repeat(width)).join("  "),
+    ...rows.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? cell.length)).join("  ")),
+  ];
 }
 
 export async function runCli(argv: string[], deps: CliRunDependencies = {}): Promise<number> {
@@ -35,18 +54,109 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
 
   program
     .command("init")
-    .option("--template <template>", "starter template", "echo")
+    .option("--template <template>", "starter template")
+    .option("--from-operation <operation_key>", "generate an AppAdapter wrapper for a first-party owner operation")
+    .option("--list-operations", "list owner operations available for template generation", false)
+    .option("--capability-key <capability_key>", "override the generated manifest capability_key")
+    .option("--agent-id <agent_id>", "owner agent_id used to resolve operation metadata")
+    .option("--lang <lang>", "catalog language for live owner operations", "en")
     .option("--json", "emit machine-readable JSON", false)
     .argument("[path]", ".", "destination")
-    .action(async (path: string, options: { template: string; json?: boolean }) => {
-      const template = options.template as "echo" | "price-compare" | "publisher" | "payment";
-      const files = await writeInitTemplate(template, path);
-      const payload = { ok: true, template, files };
+    .action(async (
+      path: string,
+      options: {
+        template?: string;
+        fromOperation?: string;
+        ["from-operation"]?: string;
+        listOperations?: boolean;
+        ["list-operations"]?: boolean;
+        capabilityKey?: string;
+        ["capability-key"]?: string;
+        agentId?: string;
+        ["agent-id"]?: string;
+        lang?: string;
+        json?: boolean;
+      },
+    ) => {
+      const template = options.template as "echo" | "price-compare" | "publisher" | "payment" | undefined;
+      const operationKey = options.fromOperation;
+      const listOperationsFlag = Boolean(options.listOperations);
+      if (listOperationsFlag && operationKey) {
+        throw new SiglumeProjectError("Choose either --list-operations or --from-operation, not both.");
+      }
+      if (listOperationsFlag && options.capabilityKey) {
+        throw new SiglumeProjectError("--capability-key is only valid together with --from-operation.");
+      }
+      if (template && (listOperationsFlag || operationKey)) {
+        throw new SiglumeProjectError("--template cannot be combined with --list-operations or --from-operation.");
+      }
+
+      if (listOperationsFlag) {
+        const payload: Record<string, unknown> = {
+          ok: true,
+          ...(await listOperationCatalog(
+            { agent_id: options.agentId, lang: options.lang },
+            deps,
+          )),
+        };
+        if (options.json) {
+          emit(stdout, renderJson(payload));
+          return;
+        }
+        const warning = typeof payload.warning === "string" ? payload.warning : "";
+        if (warning) {
+          emit(stderr, warning);
+        }
+        emit(stdout, `Owner operation catalog (${String(payload.source ?? "fallback")})`);
+        const operations = Array.isArray(payload.operations)
+          ? payload.operations.filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+          : [];
+        renderOperationTable(
+          operations,
+        ).forEach((line) => emit(stdout, line));
+        return;
+      }
+
+      if (operationKey) {
+        const result = await writeOperationTemplate(
+          operationKey,
+          path,
+          {
+            capability_key: options.capabilityKey,
+            agent_id: options.agentId,
+            lang: options.lang,
+          },
+          deps,
+        );
+        const payload = {
+          ok: true,
+          mode: "from-operation",
+          operation: toJsonSafeRecord(result.operation),
+          files: result.files,
+          report: result.report,
+        };
+        if (options.json) {
+          emit(stdout, renderJson(payload));
+          return;
+        }
+        if (result.report.warning) {
+          emit(stderr, String(result.report.warning));
+        }
+        const quality = (result.report.quality ?? {}) as { grade?: string; overall_score?: number };
+        emit(stdout, `Generated wrapper for '${result.operation.operation_key}'.`);
+        emit(stdout, `grade: ${quality.grade ?? "?"} (${quality.overall_score ?? "?"}/100)`);
+        result.files.forEach((filePath) => emit(stdout, `- ${filePath}`));
+        return;
+      }
+
+      const resolvedTemplate = (template ?? "echo") as "echo" | "price-compare" | "publisher" | "payment";
+      const files = await writeInitTemplate(resolvedTemplate, path);
+      const payload = { ok: true, mode: "template", template: resolvedTemplate, files };
       if (options.json) {
         emit(stdout, renderJson(payload));
         return;
       }
-      emit(stdout, `Initialized Siglume starter template '${template}'.`);
+      emit(stdout, `Initialized Siglume starter template '${resolvedTemplate}'.`);
       files.forEach((filePath) => emit(stdout, `- ${filePath}`));
     });
 
@@ -205,4 +315,10 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
     emit(stderr, error instanceof Error ? error.message : String(error));
     return 1;
   }
+}
+
+function toJsonSafeRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : { value: String(value) };
 }

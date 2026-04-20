@@ -8,8 +8,11 @@ import { createJiti } from "jiti";
 import {
   AppAdapter,
   AppTestHarness,
+  AppCategory,
+  ApprovalMode,
   ChangeLevel,
   PermissionClass,
+  PriceModel,
   diff_manifest,
   diff_tool_manual,
   score_tool_manual_offline,
@@ -26,6 +29,13 @@ import type {
   ToolManualIssue,
 } from "../index";
 import { SiglumeProjectError } from "../errors";
+import {
+  DEFAULT_OPERATION_AGENT_ID,
+  type OperationMetadata,
+  buildOperationMetadata,
+  defaultCapabilityKeyForOperation,
+  fallbackOperationCatalog,
+} from "../operations";
 import { isRecord, renderJson, toJsonable } from "../utils";
 
 const TEMPLATE_NAMES = ["echo", "price-compare", "publisher", "payment"] as const;
@@ -33,6 +43,8 @@ type TemplateName = (typeof TEMPLATE_NAMES)[number];
 
 const SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 const CAPABILITY_KEY_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const FALLBACK_OPERATION_WARNING =
+  "Using the bundled fallback owner-operation catalog because the live catalog is unavailable. Generated templates remain experimental until the platform operation catalog is reachable.";
 
 export interface LoadedProject {
   root_dir: string;
@@ -355,6 +367,531 @@ export async function writeInitTemplate(template: TemplateName, destination: str
   return [adapter_path, manifest_path, tool_manual_path, readme_path];
 }
 
+export async function listOperationCatalog(
+  options: { agent_id?: string; lang?: string } = {},
+  deps: CliProjectDependencies = {},
+): Promise<Record<string, unknown>> {
+  const resolvedAgentId = String(options.agent_id ?? "").trim();
+  const lang = String(options.lang ?? "en").trim() || "en";
+  let warning: string | null = null;
+  try {
+    const client = await createClient(deps);
+    const operations = await client.list_operations({
+      agent_id: resolvedAgentId || undefined,
+      lang,
+    });
+    return {
+      agent_id: operations[0]?.agent_id ?? (resolvedAgentId || null),
+      source: "live",
+      warning: null,
+      operations: operations.map((item) => toJsonable(item)),
+    };
+  } catch (error) {
+    warning = error instanceof Error ? error.message : String(error);
+  }
+  const operations = fallbackOperationCatalog(resolvedAgentId || DEFAULT_OPERATION_AGENT_ID);
+  return {
+    agent_id: operations[0]?.agent_id ?? (resolvedAgentId || DEFAULT_OPERATION_AGENT_ID),
+    source: "fallback",
+    warning: warning || FALLBACK_OPERATION_WARNING,
+    operations: operations.map((item) => toJsonable(item)),
+  };
+}
+
+async function resolveOperationMetadata(
+  operation_key: string,
+  options: { agent_id?: string; lang?: string } = {},
+  deps: CliProjectDependencies = {},
+): Promise<{ operation: OperationMetadata; warning?: string | null }> {
+  const normalizedKey = String(operation_key ?? "").trim();
+  if (!normalizedKey) {
+    throw new SiglumeProjectError("operation_key is required.");
+  }
+  const catalog = await listOperationCatalog(options, deps);
+  const items = Array.isArray(catalog.operations) ? catalog.operations : [];
+  for (const item of items) {
+    if (isRecord(item) && String(item.operation_key ?? "") === normalizedKey) {
+      return {
+        operation: buildOperationMetadata(item, {
+          agent_id: String(item.agent_id ?? options.agent_id ?? "").trim() || undefined,
+          source: String(item.source ?? catalog.source ?? "fallback"),
+        }),
+        warning: typeof catalog.warning === "string" ? catalog.warning : null,
+      };
+    }
+  }
+  throw new SiglumeProjectError(`Unknown operation key: ${normalizedKey}`);
+}
+
+function permissionClassFromOperation(operation: OperationMetadata): AppManifest["permission_class"] {
+  switch (operation.permission_class) {
+    case "action":
+      return PermissionClass.ACTION;
+    case "payment":
+      return PermissionClass.PAYMENT;
+    default:
+      return PermissionClass.READ_ONLY;
+  }
+}
+
+function approvalModeFromOperation(operation: OperationMetadata): AppManifest["approval_mode"] {
+  switch (operation.approval_mode) {
+    case "always-ask":
+      return ApprovalMode.ALWAYS_ASK;
+    case "budget-bounded":
+      return ApprovalMode.BUDGET_BOUNDED;
+    case "deny":
+      return ApprovalMode.DENY;
+    default:
+      return ApprovalMode.AUTO;
+  }
+}
+
+function toolPermissionClassFromOperation(operation: OperationMetadata): ToolManual["permission_class"] {
+  const permission = permissionClassFromOperation(operation);
+  return toolManualPermissionClass(permission);
+}
+
+function operationDisplayName(operation: OperationMetadata): string {
+  return `${operation.operation_key
+    .replaceAll(".", " ")
+    .replaceAll("-", " ")
+    .replaceAll("_", " ")
+    .split(/\s+/)
+    .filter((chunk) => chunk.length > 0)
+    .map((chunk) => `${chunk[0]?.toUpperCase() ?? ""}${chunk.slice(1)}`)
+    .join(" ")} Wrapper`;
+}
+
+function operationTaskType(operation: OperationMetadata): string {
+  return `wrap_${operation.operation_key.replaceAll(".", "_").replaceAll("-", "_")}`;
+}
+
+function operationClassName(operation: OperationMetadata): string {
+  return `${operation.operation_key
+    .replaceAll(".", " ")
+    .replaceAll("-", " ")
+    .replaceAll("_", " ")
+    .split(/\s+/)
+    .filter((chunk) => chunk.length > 0)
+    .map((chunk) => `${chunk[0]?.toUpperCase() ?? ""}${chunk.slice(1)}`)
+    .join("")}WrapperApp`;
+}
+
+function operationTriggerConditions(operation: OperationMetadata): string[] {
+  const summary = operation.summary.replace(/\.+$/, "");
+  const capability = operation.operation_key.replaceAll(".", " ");
+  if (operation.permission_class === "action" || operation.permission_class === "payment") {
+    return [
+      `owner explicitly asks to ${summary.toLowerCase()}`,
+      `agent needs to run the first-party operation ${operation.operation_key} instead of calling an external API`,
+      `request matches the owner-governance workflow described as ${capability}`,
+    ];
+  }
+  return [
+    `owner asks to inspect or review data covered by ${operation.operation_key}`,
+    `agent needs the first-party platform context described as ${summary.toLowerCase()}`,
+    `request matches the owner-operation workflow described as ${capability}`,
+  ];
+}
+
+function operationDoNotUseWhen(operation: OperationMetadata): string[] {
+  if (operation.permission_class === "action" || operation.permission_class === "payment") {
+    return [
+      "the owner has not reviewed the preview or has not approved the requested first-party platform change",
+      "the request is unrelated to the documented owner operation or targets the wrong owned agent",
+    ];
+  }
+  return [
+    "the owner wants to mutate state instead of only reading first-party platform data",
+    "the request is unrelated to the documented owner operation",
+  ];
+}
+
+function operationUsageHints(operation: OperationMetadata): string[] {
+  return [`Use dry_run first so the owner can review the ${operation.operation_key} preview before any live execution.`];
+}
+
+function operationResultHints(): string[] {
+  return ["Lead with the summary and action, then include the structured result payload for follow-up tooling."];
+}
+
+function operationErrorHints(): string[] {
+  return ["If the operation rejects the payload, surface which input field needs correction before retrying."];
+}
+
+function operationPreviewSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: {
+      summary: { type: "string", description: "Preview of the first-party operation." },
+      operation_key: { type: "string", description: "Owner operation that would run." },
+      agent_id: { type: "string", description: "Owned agent that would receive the operation." },
+      params: { type: "object", description: "Operation params after agent_id is removed from input." },
+    },
+    required: ["summary", "operation_key", "agent_id", "params"],
+    additionalProperties: false,
+  };
+}
+
+function buildOperationManifest(
+  operation: OperationMetadata,
+  capability_key_override?: string,
+): AppManifest {
+  return {
+    capability_key: String(capability_key_override ?? defaultCapabilityKeyForOperation(operation.operation_key)).trim(),
+    name: operationDisplayName(operation),
+    job_to_be_done: `Wrap the Siglume first-party operation \`${operation.operation_key}\` for owned agents.`,
+    category: AppCategory.OTHER,
+    permission_class: permissionClassFromOperation(operation),
+    approval_mode: approvalModeFromOperation(operation),
+    dry_run_supported: true,
+    required_connected_accounts: [],
+    price_model: PriceModel.FREE,
+    jurisdiction: "US",
+    short_description: operation.summary,
+    example_prompts: [`Run ${operation.operation_key} for my owned agent.`],
+  };
+}
+
+function buildOperationToolManual(
+  operation: OperationMetadata,
+  manifest: AppManifest,
+): Record<string, unknown> {
+  const manual: Record<string, unknown> = {
+    tool_name: operation.operation_key.replaceAll(".", "_").replaceAll("-", "_"),
+    job_to_be_done: `Run the Siglume first-party operation \`${operation.operation_key}\` for an owned agent.`,
+    summary_for_model: `Wraps the built-in Siglume owner operation \`${operation.operation_key}\` and returns the structured platform response.`,
+    trigger_conditions: operationTriggerConditions(operation),
+    do_not_use_when: operationDoNotUseWhen(operation),
+    permission_class: toolPermissionClassFromOperation(operation),
+    dry_run_supported: true,
+    requires_connected_accounts: [],
+    input_schema: structuredClone(operation.input_schema),
+    output_schema: structuredClone(operation.output_schema),
+    usage_hints: operationUsageHints(operation),
+    result_hints: operationResultHints(),
+    error_hints: operationErrorHints(),
+  };
+  if (manifest.permission_class === PermissionClass.ACTION || manifest.permission_class === PermissionClass.PAYMENT) {
+    manual.approval_summary_template = `Run ${operation.operation_key} for {agent_id}.`;
+    manual.preview_schema = operationPreviewSchema();
+    manual.idempotency_support = true;
+    manual.side_effect_summary = `Runs the first-party owner operation \`${operation.operation_key}\` against the selected owned agent.`;
+    manual.jurisdiction = manifest.jurisdiction;
+  }
+  return manual;
+}
+
+function operationAdapterSource(operation: OperationMetadata, manifest: AppManifest): string {
+  const className = operationClassName(operation);
+  const permissionEnumName =
+    manifest.permission_class === PermissionClass.ACTION
+      ? "ACTION"
+      : manifest.permission_class === PermissionClass.PAYMENT
+        ? "PAYMENT"
+        : "READ_ONLY";
+  const approvalEnumName =
+    manifest.approval_mode === ApprovalMode.ALWAYS_ASK
+      ? "ALWAYS_ASK"
+      : manifest.approval_mode === ApprovalMode.BUDGET_BOUNDED
+        ? "BUDGET_BOUNDED"
+        : manifest.approval_mode === ApprovalMode.DENY
+          ? "DENY"
+          : "AUTO";
+  const needsApproval =
+    manifest.permission_class === PermissionClass.ACTION || manifest.permission_class === PermissionClass.PAYMENT;
+  const examplePrompts = JSON.stringify(manifest.example_prompts ?? []);
+  return [
+    `/** Generated Siglume wrapper for \`${operation.operation_key}\`. */`,
+    "import {",
+    "  AppAdapter,",
+    "  AppCategory,",
+    "  ApprovalMode,",
+    "  PermissionClass,",
+    "  PriceModel,",
+    "  SiglumeClient,",
+    "} from \"@siglume/api-sdk\";",
+    "import type { ExecutionContext, ExecutionResult, SiglumeClientShape } from \"@siglume/api-sdk\";",
+    "import { GeneratedOperationStub } from \"./stubs\";",
+    "",
+    `const OPERATION_KEY = ${JSON.stringify(operation.operation_key)};`,
+    `const DEFAULT_AGENT_ID = ${JSON.stringify(operation.agent_id ?? DEFAULT_OPERATION_AGENT_ID)};`,
+    "const DEFAULT_LANGUAGE = \"en\";",
+    "",
+    `export default class ${className} extends AppAdapter {`,
+    "  private client: SiglumeClientShape | null;",
+    "  private stubProvider: GeneratedOperationStub;",
+    "",
+    "  constructor(client: SiglumeClientShape | null = null, stubProvider: GeneratedOperationStub | null = null) {",
+    "    super();",
+    "    this.client = client;",
+    "    this.stubProvider = stubProvider ?? new GeneratedOperationStub(OPERATION_KEY);",
+    "  }",
+    "",
+    "  manifest() {",
+    "    return {",
+    `      capability_key: ${JSON.stringify(manifest.capability_key)},`,
+    `      name: ${JSON.stringify(manifest.name)},`,
+    `      job_to_be_done: ${JSON.stringify(manifest.job_to_be_done)},`,
+    "      category: AppCategory.OTHER,",
+    `      permission_class: PermissionClass.${permissionEnumName},`,
+    `      approval_mode: ApprovalMode.${approvalEnumName},`,
+    "      dry_run_supported: true,",
+    "      required_connected_accounts: [],",
+    "      price_model: PriceModel.FREE,",
+    `      jurisdiction: ${JSON.stringify(manifest.jurisdiction)},`,
+    `      short_description: ${JSON.stringify(manifest.short_description ?? "")},`,
+    `      example_prompts: ${examplePrompts},`,
+    "    };",
+    "  }",
+    "",
+    "  async execute(ctx: ExecutionContext): Promise<ExecutionResult> {",
+    "    const payload = { ...(ctx.input_params ?? {}) } as Record<string, unknown>;",
+    "    const agentId = String((payload.agent_id ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID);",
+    "    delete payload.agent_id;",
+    "    const preview = {",
+    "      summary: `Would run ${OPERATION_KEY} for ${agentId}.`,",
+    "      operation_key: OPERATION_KEY,",
+    "      agent_id: agentId,",
+    "      params: payload,",
+    "    };",
+    "    if (ctx.execution_kind === \"dry_run\") {",
+    "      return {",
+    "        success: true,",
+    "        execution_kind: ctx.execution_kind,",
+    "        output: preview,",
+    `        needs_approval: ${needsApproval ? "true" : "false"},`,
+    ...(needsApproval ? ["        approval_prompt: `Run ${OPERATION_KEY} for ${agentId}.`,"] : []),
+    "      };",
+    "    }",
+    "",
+    "    const execution = await this.invokeOperation(agentId, payload);",
+    "    return {",
+    "      success: true,",
+    "      execution_kind: ctx.execution_kind,",
+    "      output: {",
+    "        summary: execution.message,",
+    "        action: execution.action,",
+    "        result: execution.result,",
+    "      },",
+    "      receipt_summary: {",
+    "        action: execution.action,",
+    "        operation_key: OPERATION_KEY,",
+    "        agent_id: agentId,",
+    "      },",
+    "      side_effects: ctx.execution_kind === \"dry_run\" ? [] : [",
+    "        {",
+    "          action: execution.action,",
+    "          provider: \"siglume_owner_operation\",",
+    "          external_id: agentId,",
+    "          reversible: false,",
+    "          metadata: { operation_key: OPERATION_KEY },",
+    "        },",
+    "      ],",
+    "    };",
+    "  }",
+    "",
+    "  private async invokeOperation(agentId: string, params: Record<string, unknown>) {",
+    "    if (this.client && typeof this.client.execute_owner_operation === \"function\") {",
+    "      const result = await this.client.execute_owner_operation(agentId, OPERATION_KEY, params, { lang: DEFAULT_LANGUAGE });",
+    "      return { message: result.message, action: result.action, result: result.result };",
+    "    }",
+    "    const apiKey = typeof process !== \"undefined\" && process.env ? String(process.env.SIGLUME_API_KEY ?? \"\").trim() : \"\";",
+    "    if (apiKey) {",
+    "      const client = new SiglumeClient({ api_key: apiKey });",
+    "      const result = await client.execute_owner_operation(agentId, OPERATION_KEY, params, { lang: DEFAULT_LANGUAGE });",
+    "      return { message: result.message, action: result.action, result: result.result };",
+    "    }",
+    "    return this.stubProvider.handle(\"execute\", { operation: OPERATION_KEY, agent_id: agentId, params });",
+    "  }",
+    "",
+    "  supported_task_types() {",
+    `    return [${JSON.stringify(operationTaskType(operation))}];`,
+    "  }",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function operationStubsSource(operation: OperationMetadata): string {
+  return [
+    `/** Generated stubs for \`${operation.operation_key}\`. */`,
+    "import { StubProvider } from \"@siglume/api-sdk\";",
+    "",
+    `const OPERATION_KEY = ${JSON.stringify(operation.operation_key)};`,
+    "",
+    "export class GeneratedOperationStub extends StubProvider {",
+    "  constructor(operationKey: string = OPERATION_KEY) {",
+    "    super(\"siglume_owner_operation\");",
+    "    this.operationKey = operationKey;",
+    "  }",
+    "",
+    "  operationKey: string;",
+    "",
+    "  async handle(_method: string, params: Record<string, unknown>) {",
+    `    const agentId = String(params.agent_id ?? ${JSON.stringify(operation.agent_id ?? DEFAULT_OPERATION_AGENT_ID)});`,
+    "    const payload = (params.params && typeof params.params === \"object\" && !Array.isArray(params.params))",
+    "      ? { ...(params.params as Record<string, unknown>) }",
+    "      : {};",
+    "    return {",
+    "      message: `Stubbed ${this.operationKey} for ${agentId}.`,",
+    "      action: this.operationKey.replaceAll('.', '_'),",
+    "      result: {",
+    "        operation_key: this.operationKey,",
+    "        agent_id: agentId,",
+    "        stubbed: true,",
+    "        params: payload,",
+    "      },",
+    "    };",
+    "  }",
+    "}",
+    "",
+    "export function buildStubs() {",
+    "  return { siglume_owner_operation: new GeneratedOperationStub() };",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function operationTestSource(operation: OperationMetadata): string {
+  const className = operationClassName(operation);
+  const taskType = operationTaskType(operation);
+  return [
+    "import { readFile } from \"node:fs/promises\";",
+    "import { dirname, resolve } from \"node:path\";",
+    "import { fileURLToPath } from \"node:url\";",
+    "import { describe, expect, it } from \"vitest\";",
+    "",
+    "import { AppTestHarness, score_tool_manual_offline, validate_tool_manual } from \"@siglume/api-sdk\";",
+    `import ${className} from \"../adapter\";`,
+    "import { buildStubs } from \"../stubs\";",
+    "",
+    "const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), \"..\");",
+    "",
+    "describe(\"generated operation template\", () => {",
+    "  it(\"passes harness and quality checks\", async () => {",
+    `    const harness = new AppTestHarness(new ${className}(), buildStubs());`,
+    "    const manual = JSON.parse(await readFile(resolve(ROOT, \"tool_manual.json\"), \"utf8\")) as Record<string, unknown>;",
+    "    const [ok, issues] = validate_tool_manual(manual);",
+    "    const report = score_tool_manual_offline(manual);",
+    "",
+    "    expect(ok).toBe(true);",
+    "    expect(issues).toEqual([]);",
+    "    expect([\"A\", \"B\"]).toContain(report.grade);",
+    "    expect(await harness.validate_manifest()).toEqual([]);",
+    "",
+    `    const dryRun = await harness.dry_run(${JSON.stringify(taskType)});`,
+    "    expect(dryRun.success).toBe(true);",
+    ...(operation.permission_class === "action" || operation.permission_class === "payment"
+      ? [
+          `    const action = await harness.execute_action(${JSON.stringify(taskType)});`,
+          "    expect(action.success).toBe(true);",
+          "    expect(harness.validate_receipt(action)).toEqual([]);",
+        ]
+      : []),
+    "  });",
+    "});",
+    "",
+  ].join("\n");
+}
+
+function operationReadmeTemplate(
+  operation: OperationMetadata,
+  manifest: AppManifest,
+  warning?: string | null,
+): string {
+  const warningLines = warning ? [`- Warning: ${warning}`] : [];
+  return [
+    `# ${manifest.name}`,
+    "",
+    `This starter wraps the first-party Siglume owner operation \`${operation.operation_key}\`.`,
+    "",
+    `- Source catalog: \`${operation.source}\``,
+    `- Default agent_id: \`${operation.agent_id ?? DEFAULT_OPERATION_AGENT_ID}\``,
+    `- Permission class: \`${operation.permission_class}\``,
+    `- Approval mode: \`${operation.approval_mode}\``,
+    ...warningLines,
+    `- Route page: \`${operation.page_href ?? "/owner"}\``,
+    "",
+    "## Generated files",
+    "",
+    "- `adapter.ts`: AppAdapter wrapper that previews first and then calls `SiglumeClient.execute_owner_operation()`",
+    "- `stubs.ts`: mock fallback used when `SIGLUME_API_KEY` is not set",
+    "- `manifest.json`: reviewable manifest snapshot",
+    "- `tool_manual.json`: machine-generated ToolManual scaffold",
+    "- `tests/test_adapter.ts`: smoke test for `AppTestHarness`",
+    "",
+    "## Commands",
+    "",
+    "```bash",
+    "siglume validate .",
+    "siglume test .",
+    "npm test -- tests/test_adapter.ts",
+    "```",
+    "",
+  ].join("\n");
+}
+
+export async function writeOperationTemplate(
+  operation_key: string,
+  destination: string,
+  options: { capability_key?: string; agent_id?: string; lang?: string } = {},
+  deps: CliProjectDependencies = {},
+): Promise<{ files: string[]; operation: OperationMetadata; report: Record<string, unknown> }> {
+  const root = resolve(destination);
+  await mkdir(root, { recursive: true });
+  const testsDir = join(root, "tests");
+  await mkdir(testsDir, { recursive: true });
+  const adapter_path = join(root, "adapter.ts");
+  const stubs_path = join(root, "stubs.ts");
+  const manifest_path = join(root, "manifest.json");
+  const tool_manual_path = join(root, "tool_manual.json");
+  const readme_path = join(root, "README.md");
+  const test_path = join(testsDir, "test_adapter.ts");
+  for (const filePath of [adapter_path, stubs_path, manifest_path, tool_manual_path, readme_path, test_path]) {
+    if (existsSync(filePath)) {
+      throw new SiglumeProjectError(`${basename(filePath)} already exists in ${root}`);
+    }
+  }
+
+  const { operation, warning } = await resolveOperationMetadata(operation_key, {
+    agent_id: options.agent_id,
+    lang: options.lang,
+  }, deps);
+  const manifest = buildOperationManifest(operation, options.capability_key);
+  const tool_manual = buildOperationToolManual(operation, manifest);
+  const [tool_manual_valid, tool_manual_issues] = validate_tool_manual(tool_manual);
+  const quality = score_tool_manual_offline(tool_manual);
+  if (!tool_manual_valid) {
+    throw new SiglumeProjectError(
+      `Generated tool manual for ${operation.operation_key} is invalid: ${tool_manual_issues.map((issue) => issue.message).join("; ")}`,
+    );
+  }
+  if (!["A", "B"].includes(String(quality.grade))) {
+    throw new SiglumeProjectError(
+      `Generated tool manual for ${operation.operation_key} scored below publish bar: ${String(quality.grade)}`,
+    );
+  }
+
+  await writeFile(adapter_path, operationAdapterSource(operation, manifest), "utf8");
+  await writeFile(stubs_path, operationStubsSource(operation), "utf8");
+  await writeFile(manifest_path, renderJson(manifest), "utf8");
+  await writeFile(tool_manual_path, renderJson(tool_manual), "utf8");
+  await writeFile(readme_path, operationReadmeTemplate(operation, manifest, warning), "utf8");
+  await writeFile(test_path, operationTestSource(operation), "utf8");
+  return {
+    files: [adapter_path, stubs_path, manifest_path, tool_manual_path, readme_path, test_path],
+    operation,
+    report: {
+      tool_manual_valid,
+      tool_manual_issues: (tool_manual_issues as ToolManualIssue[]).map((issue) => toJsonable(issue)),
+      quality: toJsonable(quality),
+      warning: warning ?? null,
+    },
+  };
+}
+
 async function projectValidationIssues(project: LoadedProject): Promise<string[]> {
   const harness = new AppTestHarness(project.app);
   return harness.validate_manifest();
@@ -419,7 +956,7 @@ function executionCheck(name: string, result: ExecutionResult, harness: AppTestH
   };
 }
 
-function toolManualPermissionClass(permission_class: AppManifest["permission_class"]): string {
+function toolManualPermissionClass(permission_class: AppManifest["permission_class"]): ToolManual["permission_class"] {
   switch (permission_class) {
     case PermissionClass.ACTION:
       return ToolManualPermissionClass.ACTION;

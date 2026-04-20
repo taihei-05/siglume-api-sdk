@@ -24,6 +24,7 @@ from siglume_api_sdk import (  # noqa: E402
     ToolManual,
     ToolManualPermissionClass,
 )
+from siglume_api_sdk.operations import DEFAULT_OPERATION_AGENT_ID  # noqa: E402
 from siglume_api_sdk.testing import Recorder, RecordMode  # noqa: E402
 
 
@@ -968,3 +969,153 @@ def test_update_budget_policy_rejects_payload_with_only_filtered_fields() -> Non
         except SiglumeClientError:
             return
     raise AssertionError("Expected SiglumeClientError when the only field is a stripped None")
+
+
+def test_update_budget_policy_preserves_nullable_period_boundaries() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/owner/agents/agt_owner_demo/budget"
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload == {
+            "currency": "JPY",
+            "period_start": None,
+            "period_end": None,
+            "period_limit_minor": 9000,
+        }
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "budget_id": "bdg_nullable",
+                    "agent_id": "agt_owner_demo",
+                    "currency": "JPY",
+                    "period_start": None,
+                    "period_end": None,
+                    "period_limit_minor": 9000,
+                    "spent_minor": 0,
+                    "reserved_minor": 0,
+                    "per_order_limit_minor": 0,
+                    "auto_approve_below_minor": 0,
+                    "limits": {},
+                    "metadata": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        budget = client.update_budget_policy(
+            "agt_owner_demo",
+            {
+                "currency": "JPY",
+                "period_start": None,
+                "period_end": None,
+                "period_limit_minor": 9000,
+            },
+        )
+
+    assert budget.budget_id == "bdg_nullable"
+    assert budget.period_start is None
+    assert budget.period_end is None
+
+
+def test_list_operations_uses_owner_operation_catalog_and_execute_route() -> None:
+    requests: list[tuple[str, str, dict[str, object]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations":
+            assert request.url.params["lang"] == "ja"
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "items": [
+                            {
+                                "name": "owner.charter.update",
+                                "summary": "Update the owner charter.",
+                                "params": "Supports goals and constraints.",
+                                "allowed_params": ["goals", "constraints"],
+                                "required_params": ["goals"],
+                                "requires_params": True,
+                                "page_href": "/owner/charters",
+                            }
+                        ]
+                    }
+                ),
+            )
+        if request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
+            body = json.loads(request.content.decode("utf-8")) if request.content else {}
+            requests.append((request.method, request.url.path, body))
+            assert body["operation"] == "owner.charter.update"
+            assert body["params"]["goals"]["charter_text"] == "Prefer budget discipline."
+            assert body["lang"] == "ja"
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "message": "Updated charter successfully.",
+                        "action": "owner_charter_update",
+                        "result": {"version": 2},
+                    },
+                    trace_id="trc_operation",
+                    request_id="req_operation",
+                ),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        operations = client.list_operations(agent_id=DEFAULT_OPERATION_AGENT_ID, lang="ja")
+        operation = client.get_operation_metadata("owner.charter.update", agent_id=DEFAULT_OPERATION_AGENT_ID, lang="ja")
+        execution = client.execute_owner_operation(
+            DEFAULT_OPERATION_AGENT_ID,
+            "owner.charter.update",
+            {"goals": {"charter_text": "Prefer budget discipline."}},
+            lang="ja",
+        )
+
+    assert [item.operation_key for item in operations] == ["owner.charter.update"]
+    assert operations[0].permission_class == "action"
+    assert operation.required_params == ["goals"]
+    assert execution.agent_id == DEFAULT_OPERATION_AGENT_ID
+    assert execution.action == "owner_charter_update"
+    assert execution.result["version"] == 2
+    assert execution.trace_id == "trc_operation"
+    assert requests == [
+        (
+            "POST",
+            f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute",
+            {
+                "operation": "owner.charter.update",
+                "params": {"goals": {"charter_text": "Prefer budget discipline."}},
+                "lang": "ja",
+            },
+        )
+    ]
+
+
+def test_list_operations_falls_back_to_bundled_catalog_when_route_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/me/agent":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "agent_type": "personal",
+                        "name": "Owner Demo",
+                    }
+                ),
+            )
+        if request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations":
+            return httpx.Response(404, json={"error": {"code": "NOT_FOUND", "message": "missing"}})
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        operations = client.list_operations(lang="en")
+
+    assert {item.operation_key for item in operations} >= {
+        "owner.charter.get",
+        "owner.charter.update",
+        "owner.approval_policy.get",
+        "owner.budget.update",
+    }
+    assert all(item.agent_id == DEFAULT_OPERATION_AGENT_ID for item in operations)

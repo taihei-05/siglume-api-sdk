@@ -262,6 +262,35 @@ export interface BudgetPolicy {
   raw: Record<string, unknown>;
 }
 
+export interface OperationMetadata {
+  operation_key: string;
+  summary: string;
+  params_summary: string;
+  page_href?: string | null;
+  allowed_params: string[];
+  required_params: string[];
+  requires_params: boolean;
+  param_types: Record<string, string>;
+  permission_class: string;
+  approval_mode: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  agent_id?: string | null;
+  source: string;
+  raw: Record<string, unknown>;
+}
+
+export interface OperationExecution {
+  agent_id: string;
+  operation_key: string;
+  message: string;
+  action: string;
+  result: Record<string, unknown>;
+  trace_id?: string | null;
+  request_id?: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface SettlementReceipt {
   receipt_id: string;
   chain_receipt_id?: string | null;
@@ -461,7 +490,10 @@ export interface SiglumeClientShape {
   create_sandbox_session(...args: unknown[]): Promise<SandboxSession> | SandboxSession;
   get_usage(...args: unknown[]): Promise<CursorPage<UsageEventRecord>> | CursorPage<UsageEventRecord>;
   list_agents(...args: unknown[]): Promise<AgentRecord[]> | AgentRecord[];
+  list_operations(...args: unknown[]): Promise<OperationMetadata[]> | OperationMetadata[];
+  get_operation_metadata(...args: unknown[]): Promise<OperationMetadata> | OperationMetadata;
   get_agent(...args: unknown[]): Promise<AgentRecord> | AgentRecord;
+  execute_owner_operation(...args: unknown[]): Promise<OperationExecution> | OperationExecution;
   update_agent_charter(...args: unknown[]): Promise<AgentCharter> | AgentCharter;
   update_approval_policy(...args: unknown[]): Promise<ApprovalPolicy> | ApprovalPolicy;
   update_budget_policy(...args: unknown[]): Promise<BudgetPolicy> | BudgetPolicy;

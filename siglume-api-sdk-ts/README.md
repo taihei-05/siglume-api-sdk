@@ -39,3 +39,14 @@ const anthropicTool = to_anthropic_tool(listing.tool_manual).schema;
 See [`../docs/buyer-sdk.md`](../docs/buyer-sdk.md) and
 [`../examples/buyer_claude_agent_sdk.ts`](../examples/buyer_claude_agent_sdk.ts)
 for the current experimental limitations and the mocked integration example.
+
+You can also generate deterministic first-party owner-operation wrappers from
+the CLI without using an LLM:
+
+```bash
+siglume init --list-operations
+siglume init --from-operation owner.charter.update ./my-charter-editor
+```
+
+See [`../docs/template-generator.md`](../docs/template-generator.md) for the
+generated file layout, fallback behavior, and review samples.

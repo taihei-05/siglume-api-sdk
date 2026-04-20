@@ -73,6 +73,7 @@ from .client import (  # noqa: E402, F401
     DisputeStatus,
     EnvelopeMeta,
     GrantBindingResult,
+    OperationExecution,
     RegistrationConfirmation,
     RegistrationQuality,
     Refund,
@@ -86,6 +87,7 @@ from .client import (  # noqa: E402, F401
     SupportCaseRecord,
     UsageEventRecord,
 )
+from .operations import OperationMetadata  # noqa: E402, F401
 from .buyer import (  # noqa: E402, F401
     CapabilityListing,
     SiglumeBuyerClient,
@@ -198,6 +200,8 @@ __all__ = sorted(
             "DisputeStatus",
             "EnvelopeMeta",
             "GrantBindingResult",
+            "OperationExecution",
+            "OperationMetadata",
             "BreakingChange",
             "RegistrationConfirmation",
             "RegistrationQuality",

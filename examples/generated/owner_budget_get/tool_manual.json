@@ -1,0 +1,66 @@
+{
+  "tool_name": "owner_budget_get",
+  "job_to_be_done": "Run the Siglume first-party operation `owner.budget.get` for an owned agent.",
+  "summary_for_model": "Wraps the built-in Siglume owner operation `owner.budget.get` and returns the structured platform response.",
+  "trigger_conditions": [
+    "owner asks to inspect or review data covered by owner.budget.get",
+    "agent needs the first-party platform context described as read the current delegated budget",
+    "request matches the owner-operation workflow described as owner budget get"
+  ],
+  "do_not_use_when": [
+    "the owner wants to mutate state instead of only reading first-party platform data",
+    "the request is unrelated to the documented owner operation"
+  ],
+  "permission_class": "read_only",
+  "dry_run_supported": true,
+  "requires_connected_accounts": [],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "agent_id": {
+        "type": "string",
+        "description": "Owned agent to target. Defaults to the agent used during template generation.",
+        "default": "agt_owner_demo"
+      },
+      "currency": {
+        "type": "string",
+        "description": "Optional currency filter for the delegated-budget snapshot.",
+        "default": "JPY"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "One-line summary of the first-party operation result."
+      },
+      "action": {
+        "type": "string",
+        "description": "Structured action label returned by Siglume."
+      },
+      "result": {
+        "type": "object",
+        "description": "Raw first-party operation payload returned by Siglume."
+      }
+    },
+    "required": [
+      "summary",
+      "action",
+      "result"
+    ],
+    "additionalProperties": false
+  },
+  "usage_hints": [
+    "Use dry_run first so the owner can review the owner.budget.get preview before any live execution."
+  ],
+  "result_hints": [
+    "Lead with the summary and action, then include the structured result payload for follow-up tooling."
+  ],
+  "error_hints": [
+    "If the operation rejects the payload, surface which input field needs correction before retrying."
+  ]
+}

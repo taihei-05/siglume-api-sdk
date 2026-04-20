@@ -4,6 +4,7 @@ export * from "./diff";
 export * from "./errors";
 export * from "./exporters";
 export * from "./metering";
+export * from "./operations";
 export * from "./refunds";
 export * from "./runtime";
 export * from "./testing/recorder";

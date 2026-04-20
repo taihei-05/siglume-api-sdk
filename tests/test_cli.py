@@ -45,6 +45,73 @@ def test_init_payment_template_writes_valid_tool_manual() -> None:
         assert valid, issues
 
 
+def test_init_command_lists_owner_operations(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_catalog(*, agent_id=None, lang="en"):
+        operations = [
+            project_module.to_jsonable(item)
+            for item in project_module.fallback_operation_catalog(agent_id="agt_owner_demo")
+        ]
+        return {
+            "agent_id": "agt_owner_demo",
+            "source": "fallback",
+            "warning": "using fallback catalog",
+            "operations": operations,
+        }
+
+    monkeypatch.setattr(project_module, "list_operation_catalog", fake_catalog)
+
+    result = runner.invoke(main, ["init", "--list-operations", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["source"] == "fallback"
+    assert payload["operations"][0]["operation_key"].startswith("owner.")
+
+
+def test_init_command_generates_operation_wrapper_with_grade_b_or_better(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_catalog(*, agent_id=None, lang="en"):
+        operations = [
+            project_module.to_jsonable(item)
+            for item in project_module.fallback_operation_catalog(agent_id="agt_owner_demo")
+        ]
+        return {
+            "agent_id": "agt_owner_demo",
+            "source": "fallback",
+            "warning": "using fallback catalog",
+            "operations": operations,
+        }
+
+    monkeypatch.setattr(project_module, "list_operation_catalog", fake_catalog)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            main,
+            [
+                "init",
+                "--from-operation",
+                "owner.charter.update",
+                "--capability-key",
+                "my-charter-wrapper",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["operation"]["operation_key"] == "owner.charter.update"
+        assert Path("adapter.py").exists()
+        assert Path("stubs.py").exists()
+        assert Path("tests/test_adapter.py").exists()
+        manual = json.loads(Path("tool_manual.json").read_text(encoding="utf-8"))
+        valid, issues = validate_tool_manual(manual)
+        assert valid, issues
+        assert payload["report"]["quality"]["grade"] in {"A", "B"}
+        assert "execute_owner_operation" in Path("adapter.py").read_text(encoding="utf-8")
+
+
 def test_build_tool_manual_template_tolerates_missing_job_to_be_done() -> None:
     manifest = AppManifest(
         capability_key="price-compare-helper",
