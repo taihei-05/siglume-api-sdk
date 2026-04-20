@@ -2513,7 +2513,15 @@ class SiglumeClient:
         if resolved_agent_id:
             return resolved_agent_id
         data, _meta = self._request("GET", "/me/agent")
-        agent_id_from_me = _string_or_none(data.get("agent_id"))
+        # `/me/agent` may return the identifier under either `agent_id`
+        # (current contract) or the legacy `id` field. `_parse_agent`
+        # already accepts both; mirror that here so callers that rely on
+        # the omitted-`agent_id` path do not hard-fail against servers
+        # still emitting the legacy shape.
+        agent_id_from_me = (
+            _string_or_none(data.get("agent_id"))
+            or _string_or_none(data.get("id"))
+        )
         if agent_id_from_me:
             return agent_id_from_me
         raise SiglumeClientError("agent_id is required.")

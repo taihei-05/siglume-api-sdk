@@ -2881,7 +2881,13 @@ export class SiglumeClient implements SiglumeClientShape {
       return resolvedAgentId;
     }
     const [data] = await this.request("GET", "/me/agent");
-    const agentIdFromMe = stringOrNull(data.agent_id);
+    // `/me/agent` may return the identifier under either `agent_id`
+    // (current contract) or the legacy `id` field. parseAgent already
+    // accepts both; mirror that here so callers that rely on the
+    // omitted-`agent_id` path do not hard-fail against servers still
+    // emitting the legacy shape.
+    const agentIdFromMe =
+      stringOrNull(data.agent_id) ?? stringOrNull(data.id);
     if (agentIdFromMe) {
       return agentIdFromMe;
     }
