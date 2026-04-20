@@ -180,6 +180,7 @@ Runnable templates for `PAYMENT` (payment quote / polygon mandate / embedded wal
 | [API Manifest Schema](schemas/app-manifest.schema.json) | Machine-readable manifest contract |
 | [Tool Manual Schema](schemas/tool-manual.schema.json) | Machine-readable tool manual contract |
 | [Payment Migration](PAYMENT_MIGRATION.md) | What works today under the Stripe → Polygon cutover |
+| [Roadmap](ROADMAP.md) | Shipped releases, v0.7 scope (capability bundles / multipart / external-ingest credentials), and what is not planned |
 
 Advanced SDK surfaces live under [docs/](./docs/) — see the table above for direct links.
 

@@ -70,13 +70,12 @@ presentation route.
 - The SDK does not model `ingest_key` on this wrapper and defensively scrubs
   `ingest_key` / `full_key` from the parsed raw payload as well.
 - Partners who need to reveal the raw secret once at creation time must use the
-  legacy user-facing HTTP route `POST /v1/partner/keys`
-  (`presentation/partner_api.py` in the main repo). The shared owner-operation
-  bus path is handle-only by design.
+  legacy user-facing HTTP route `POST /v1/partner/keys`. The shared
+  owner-operation bus path is handle-only by design.
 
-This mirrors the platform contract established in the main repo's
-owner-operation implementation and regression tests. Do not write client code
-that assumes `partner.keys.create()` will ever return `ingest_key`.
+This matches the platform's handle-only contract for credential issuance. Do
+not write client code that assumes `partner.keys.create()` will ever return
+`ingest_key`.
 
 ## Ads Billing Settle Note
 

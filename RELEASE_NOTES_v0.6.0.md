@@ -88,8 +88,7 @@ npm install @siglume/api-sdk@0.6.0
 
 ## Next
 
-The v0.7 line (not yet scheduled) will focus on platform surfaces
-outside the first-party operation registry: capability bundles
+See [ROADMAP.md](./ROADMAP.md) for the v0.7 scope — capability bundles
 (deferred from v0.5), multipart / file-only flows beyond
 `account.avatar.upload`, and external-ingest credential-facing
-surfaces. Track progress in `docs/sdk/` in the main repo.
+surfaces.
