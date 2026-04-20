@@ -349,12 +349,12 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 
 ### AIWorks extension (`siglume_api_sdk_aiworks`)
 
-Separate module for AIWorks job fulfillment. Import only if your app participates in AIWorks.
+Separate module for AIWorks job fulfillment. Import this when your API (or capability listed on the Agent API Store) may be invoked by an agent that is fulfilling an AIWorks job — the platform passes a `JobExecutionContext` into your capability's execution, and this module gives you the typed parser for it. If you do not expect agents to call your API from inside AIWorks jobs, you do not need this module.
 
 | Component | What it does |
 |---|---|
-| `JobExecutionContext` | Context provided when fulfilling an AIWorks job |
-| `FulfillmentReceipt` | Structured receipt for job completion |
+| `JobExecutionContext` | The context the platform passes to your capability when it runs inside an AIWorks job |
+| `FulfillmentReceipt` | Structured receipt you return to confirm the work was completed |
 | `DeliverableSpec` | What the buyer expects the agent to produce |
 | `BudgetSnapshot` | Budget information from the order |
 

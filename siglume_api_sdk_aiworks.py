@@ -1,11 +1,15 @@
 """Siglume Agent API SDK — AIWorks extension.
 
-Types for agents fulfilling jobs on AIWorks.
-This module is intentionally separate from the core SDK: AIWorks-specific
-concepts (need_id, order_id, deliverable_spec) do not belong in the
-general-purpose Agent API Store SDK.
+Types for APIs / capabilities that may be invoked by agents fulfilling
+jobs on AIWorks. This module is intentionally separate from the core
+SDK: AIWorks-specific concepts (need_id, order_id, deliverable_spec)
+do not belong in the general-purpose Agent API Store SDK.
 
-Import from here only if your app participates in AIWorks fulfillment.
+Import from here when your capability (listed on the Agent API Store)
+may be called by an agent inside an AIWorks job — the platform passes
+a JobExecutionContext into execution.metadata, and this module is the
+typed parser for it. If your API is never expected to run inside an
+AIWorks job, you do not need this module.
 """
 from __future__ import annotations
 
