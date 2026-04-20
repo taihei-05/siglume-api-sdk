@@ -1357,11 +1357,15 @@ class SiglumeClient:
             "limits",
             "metadata",
         )
-        payload = {
-            field_name: policy_payload[field_name]
-            for field_name in allowed_fields
-            if policy_payload.get(field_name) is not None
-        }
+        nullable_fields = frozenset({"period_start", "period_end"})
+        payload: dict[str, Any] = {}
+        for field_name in allowed_fields:
+            if field_name not in policy_payload:
+                continue
+            value = policy_payload[field_name]
+            if value is None and field_name not in nullable_fields:
+                continue
+            payload[field_name] = value
         if not payload:
             raise SiglumeClientError("policy must include at least one supported budget-policy field.")
         _ = wait_for_completion

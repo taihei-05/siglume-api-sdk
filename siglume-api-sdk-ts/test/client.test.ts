@@ -684,6 +684,73 @@ describe("SiglumeClient", () => {
     });
   });
 
+  it("forwards null period_start / period_end so callers can clear budget date boundaries", async () => {
+    let captured: Record<string, unknown> | null = null;
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/budget");
+        captured = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return new Response(JSON.stringify(envelope({
+          id: "bdg_clear_dates",
+          agent_id: "agt_owner_demo",
+          currency: "JPY",
+          period_start: null,
+          period_end: null,
+          period_limit_minor: 50000,
+        })), { status: 200 });
+      },
+    });
+
+    await client.update_budget_policy("agt_owner_demo", {
+      period_start: null,
+      period_end: null,
+    });
+
+    expect(captured).toEqual({ period_start: null, period_end: null });
+  });
+
+  it("still strips null for non-nullable budget fields like currency", async () => {
+    let captured: Record<string, unknown> | null = null;
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/budget");
+        captured = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return new Response(JSON.stringify(envelope({
+          id: "bdg_strip",
+          agent_id: "agt_owner_demo",
+          currency: "USD",
+          period_limit_minor: 1000,
+        })), { status: 200 });
+      },
+    });
+
+    await client.update_budget_policy("agt_owner_demo", {
+      currency: null,
+      period_limit_minor: 1000,
+    });
+
+    expect(captured).toEqual({ period_limit_minor: 1000 });
+  });
+
+  it("rejects budget policy update when only filtered nulls remain", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("fetch should not be called for stripped-only payload");
+      },
+    });
+
+    await expect(client.update_budget_policy("agt_owner_demo", { currency: null }))
+      .rejects.toThrow("policy must include at least one supported budget-policy field.");
+  });
+
   it("accepts raw array payloads for webhook list endpoints", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",

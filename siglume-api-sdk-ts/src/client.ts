@@ -1070,11 +1070,15 @@ export class SiglumeClient implements SiglumeClientShape {
       "limits",
       "metadata",
     ] as const;
-    const payload = Object.fromEntries(
-      allowedFields
-        .filter((field) => policyPayload[field] !== undefined && policyPayload[field] !== null)
-        .map((field) => [field, policyPayload[field]]),
-    );
+    const nullableFields = new Set<string>(["period_start", "period_end"]);
+    const payload: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (!Object.prototype.hasOwnProperty.call(policyPayload, field)) continue;
+      const value = policyPayload[field];
+      if (value === undefined) continue;
+      if (value === null && !nullableFields.has(field)) continue;
+      payload[field] = value;
+    }
     if (Object.keys(payload).length === 0) {
       throw new SiglumeClientError("policy must include at least one supported budget-policy field.");
     }

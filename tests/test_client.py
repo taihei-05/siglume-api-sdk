@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -19,6 +20,7 @@ from siglume_api_sdk import (  # noqa: E402
     PriceModel,
     SiglumeAPIError,
     SiglumeClient,
+    SiglumeClientError,
     ToolManual,
     ToolManualPermissionClass,
 )
@@ -883,3 +885,86 @@ def test_update_budget_policy_sanitizes_server_managed_fields() -> None:
     assert budget.budget_id == "bdg_demo_2"
     assert budget.period_limit_minor == 50000
     assert budget.limits["per_order_limit"] == 12000
+
+
+def test_update_budget_policy_forwards_null_period_dates_to_clear_them() -> None:
+    """period_start / period_end are nullable — sending None must clear the boundary on the server."""
+
+    captured_payload: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/owner/agents/agt_owner_demo/budget"
+        captured_payload.update(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "budget_id": "bdg_clear_dates",
+                    "agent_id": "agt_owner_demo",
+                    "principal_user_id": "usr_owner_demo",
+                    "currency": "JPY",
+                    "period_start": None,
+                    "period_end": None,
+                    "period_limit_minor": 50000,
+                    "spent_minor": 0,
+                    "reserved_minor": 0,
+                    "limits": {},
+                    "metadata": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        client.update_budget_policy(
+            "agt_owner_demo",
+            {"period_start": None, "period_end": None},
+        )
+
+    assert captured_payload == {"period_start": None, "period_end": None}
+
+
+def test_update_budget_policy_still_strips_nulls_for_non_nullable_fields() -> None:
+    """Non-nullable fields like currency must still be filtered when None is passed."""
+
+    captured_payload: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured_payload.update(json.loads(request.content.decode("utf-8")))
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "budget_id": "bdg_strip_nonnullable",
+                    "agent_id": "agt_owner_demo",
+                    "principal_user_id": "usr_owner_demo",
+                    "currency": "USD",
+                    "period_limit_minor": 1000,
+                    "spent_minor": 0,
+                    "reserved_minor": 0,
+                    "limits": {},
+                    "metadata": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        client.update_budget_policy(
+            "agt_owner_demo",
+            {"currency": None, "period_limit_minor": 1000},
+        )
+
+    assert captured_payload == {"period_limit_minor": 1000}
+
+
+def test_update_budget_policy_rejects_payload_with_only_filtered_fields() -> None:
+    """If the only field provided is a non-nullable None, the whole call should still error."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("handler should not be called")
+
+    with build_client(handler) as client:
+        try:
+            client.update_budget_policy("agt_owner_demo", {"currency": None})
+        except SiglumeClientError:
+            return
+    raise AssertionError("Expected SiglumeClientError when the only field is a stripped None")
