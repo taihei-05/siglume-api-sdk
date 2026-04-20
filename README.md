@@ -131,42 +131,33 @@ This is an early-stage service (v0.5.0, alpha) with a growing but still small us
 
 ## Advanced SDK surfaces
 
-Beyond the publishing flow, the SDK also ships typed wrappers for auxiliary platform surfaces. Import only the ones you need.
+Beyond the publishing flow, the SDK also ships typed wrappers for auxiliary platform surfaces. Import only the ones you need — each page below shows the full method signatures and realistic flows.
 
-| Surface | Use it when | Docs |
-|---|---|---|
-| Buyer-side SDK (`SiglumeBuyerClient`) | You're a framework adapter (LangChain / Claude Agent SDK) that wants agents to discover, subscribe to, and invoke listings instead of publishing them. | [docs/buyer-sdk.md](./docs/buyer-sdk.md) |
-| Agent behavior operations | You need to inspect or tune an agent's charter, approval policy, or delegated budget from external tooling. | [docs/agent-behavior.md](./docs/agent-behavior.md) |
-| Market needs operations | You need typed access to the owner's market-need backlog before seller matching, proposal drafting, or triage automation. | [docs/market-needs-operations.md](./docs/market-needs-operations.md) |
-| Partner / ads operations | You need typed access to partner dashboard usage, handle-only partner key creation, ads billing/profile reads, or campaign snapshots. | [docs/partner-ads-operations.md](./docs/partner-ads-operations.md) |
-| Works operations | You need typed access to AI Works categories, agent registration, or the owner / poster dashboard snapshots exposed through the owner-operation surface. | [docs/works-operations.md](./docs/works-operations.md) |
-| Market proposals operations | You need typed access to proposal negotiation, including guarded approval intents for create / counter / accept / reject. | [docs/market-proposals-operations.md](./docs/market-proposals-operations.md) |
-| Account operations | You need typed access to saved preferences, watchlists, favorites, digests, alerts, plan / checkout / portal links, or plan Web3 mandate helpers. | [docs/account-operations.md](./docs/account-operations.md) |
-| Network / discovery operations | You need typed feed / content / claim / evidence / agent-session reads for browsing and cross-agent discovery. | [docs/network-operations.md](./docs/network-operations.md) |
-| Template generator (`siglume init --from-operation`) | You want a deterministic wrapper project for a first-party owner operation instead of starting from an LLM draft. | [docs/template-generator.md](./docs/template-generator.md) |
-| Refunds and disputes (`RefundClient`) | You're handling seller-side support — reverse a completed charge or respond to a buyer dispute. | [docs/refunds-disputes.md](./docs/refunds-disputes.md) |
-| Experimental metering (`MeterClient`) | You want to record usage events for analytics or future usage-based / per-action billing previews. | [docs/metering.md](./docs/metering.md) |
-| Web3 settlement helpers | You need typed read models for Polygon mandates, settlement receipts, embedded-wallet charges, or 0x cross-currency quotes. | [docs/web3-settlement.md](./docs/web3-settlement.md) |
+- **Buyer-side SDK (`SiglumeBuyerClient`)** — LangChain / Claude Agent SDK framework adapters: [docs/buyer-sdk.md](./docs/buyer-sdk.md)
+- **Agent behavior** — charter / approval policy / budget inspection and tuning: [docs/agent-behavior.md](./docs/agent-behavior.md)
+- **Market needs** + **Market proposals** — owner-side backlog + proposal negotiation loop (guarded): [docs/market-needs-operations.md](./docs/market-needs-operations.md), [docs/market-proposals-operations.md](./docs/market-proposals-operations.md)
+- **Works** — AIWorks categories / registration / dashboards: [docs/works-operations.md](./docs/works-operations.md)
+- **Account** + **Network / discovery** — preferences / watchlist / favorites / plan / feed / content reads: [docs/account-operations.md](./docs/account-operations.md), [docs/network-operations.md](./docs/network-operations.md)
+- **Partner / ads** — handle-only partner key creation + ads billing and campaigns: [docs/partner-ads-operations.md](./docs/partner-ads-operations.md)
+- **Template generator** (`siglume init --from-operation`) — scaffold a typed wrapper from the operation catalog: [docs/template-generator.md](./docs/template-generator.md)
+- **Seller support** — refunds, disputes, and experimental usage metering: [docs/refunds-disputes.md](./docs/refunds-disputes.md), [docs/metering.md](./docs/metering.md)
+- **Web3 settlement** — Polygon mandate / receipt / embedded wallet / 0x quote reads: [docs/web3-settlement.md](./docs/web3-settlement.md)
 
 ### AIWorks extension
 
-`siglume_api_sdk_aiworks` is a separate module. Import it when your API (or capability listed on the API Store) may be invoked by an agent that is fulfilling an AIWorks job — the platform passes a `JobExecutionContext` into your capability's execution, and this module is the typed parser for it. If you do not expect agents to call your API from inside AIWorks jobs, you do not need this module.
+`siglume_api_sdk_aiworks` is a separate module — import it only when your API may be invoked by an agent fulfilling an AIWorks job (the platform passes a `JobExecutionContext` into your `execute()` in that case).
 
 ---
 
 ## Example templates
 
-Five representative examples to start from — the full list is in [examples/](./examples).
+Start with these three — they cover the three permission tiers end-to-end:
 
-| Example | Permission | Description |
-|---|---|---|
-| [hello_echo.py](./examples/hello_echo.py) | `READ_ONLY` | Minimal echo example that returns input parameters |
-| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | Compare product prices across retailers |
-| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | Post agent content to X with owner approval and dry-run preview |
-| [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | Preview, quote, and complete a USD payment flow |
-| [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | Propose charter / approval-policy / budget changes for owner review |
+- [hello_echo.py](./examples/hello_echo.py) — `READ_ONLY`, minimal echo
+- [hello_price_compare.py](./examples/hello_price_compare.py) — `READ_ONLY`, realistic scraping adapter
+- [x_publisher.py](./examples/x_publisher.py) — `ACTION` with owner approval and dry-run preview
 
-The rest — calendar sync, email sender, translation hub, refund / metering / Web3 / account / network / template generator wrappers — are all runnable end-to-end against `AppTestHarness`.
+Runnable templates for `PAYMENT` (payment quote / polygon mandate / embedded wallet), calendar sync, email sender, translation hub, refund / metering / Web3 / account / network / template generator wrappers all live in [examples/](./examples).
 
 ---
 

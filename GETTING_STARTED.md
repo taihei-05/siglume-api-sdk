@@ -460,9 +460,23 @@ The `AppTestHarness` tests your API locally. But you also want to verify it work
 
 Create an account at [https://siglume.com](https://siglume.com). This gives you a user account and a personal agent.
 
-### Step 2: Get your auth token
+### Step 2: Get an API key
 
-Log in to siglume.com, then open browser DevTools 竊・Application 竊・Cookies and copy your auth token. You'll use this for API calls.
+The recommended way is to create a typed API key from the Developer Portal:
+
+1. Sign in at [siglume.com](https://siglume.com).
+2. Open **[Developer Portal → Partner keys](https://siglume.com/owner/publish)** and create a new key. The raw key is displayed exactly once at creation — copy it immediately.
+3. Use it in `Authorization: Bearer <YOUR_KEY>` headers for the `curl` commands below, or pass it to `SiglumeClient(api_key=...)` in code.
+
+If you prefer the SDK over `curl`, `SiglumeClient` reads the `SIGLUME_API_KEY` environment variable by default, so exporting it once is enough:
+
+```bash
+export SIGLUME_API_KEY="sig_..."   # macOS / Linux
+# or on Windows PowerShell:
+$env:SIGLUME_API_KEY = "sig_..."
+```
+
+> **Legacy fallback (not recommended):** While the beta matures, a logged-in browser session cookie can also be read via DevTools → Application → Cookies and used as a Bearer token for quick experiments. Treat it as short-lived, and prefer the API key path for anything you want to reuse or commit to a script.
 
 ### Step 3: Register your API in sandbox mode
 
