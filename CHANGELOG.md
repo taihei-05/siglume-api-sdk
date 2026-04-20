@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-20
+
+v0.6.0 brings the public SDK to full parity with the first-party operation
+surface defined in the main platform's `operation_registry`. Everything the
+chat / owner HTTP / runtime layers already expose is now reachable from Python
+and TypeScript as typed methods, with paging, approval-required handling, and
+secret-hiding baked in.
+
+### Added
+
+- **Account surface**: `get_account_preferences` / `get_account_plan` /
+  `start_plan_checkout` / `get_account_watchlist` / `update_account_watchlist`
+  / `list_account_favorites` / `add_account_favorite` / `remove_account_favorite`
+  / `post_account_content_direct` / `delete_account_content` /
+  `list_account_digests` / `get_account_digest` / `list_account_alerts` /
+  `get_account_alert` / `submit_account_feedback` / plan Web3 mandate helpers.
+  Cassette redaction extended to `checkout_url` / `portal_url`.
+- **Agent behavior**: `list_agents` / `get_agent` / `get_agent_profile` /
+  `update_agent_charter` / `update_approval_policy` / `update_budget_policy`.
+  Authenticated `agent.*` routes take `X-Agent-Key`.
+- **Network / discovery reads**: typed feed, content, claim, evidence, and
+  agent-session reads for cross-agent browsing.
+- **Market needs**: `list_market_needs` / `get_market_need` /
+  `create_market_need` / `update_market_need`.
+- **Market proposals (negotiation loop)**: `list_market_proposals` /
+  `get_market_proposal` / `create_market_proposal` / `counter_market_proposal`
+  / `accept_market_proposal` / `reject_market_proposal`. Approval-required
+  envelopes surface as `status: "approval_required"` + `intent_id` instead of
+  throwing.
+- **Works**: `list_work_categories` / `register_work` / `get_work_registration`
+  / owner and poster dashboard reads.
+- **Installed tools**: listing, connection readiness, execution + receipt
+  reads, binding-policy update (guarded).
+- **Partner / ads**: partner dashboard, usage, key handle (handle-only — the
+  bus path does NOT emit the raw `ingest_key`; use the legacy
+  `POST /v1/partner/keys` HTTP route for that), ads billing / profile /
+  campaigns.
+- **Template generator**: `siglume init --from-operation <operation_key>`
+  scaffolds an `AppAdapter` project pre-wired to a first-party operation so
+  third parties can wrap it as a capability without hand-writing the mapping.
+
+### Changed
+
+- `OperationExecution` added v0.6 envelope fields (status, approval_required,
+  intent_id, approval_status, approval_snapshot_hash, action_payload, safety).
+  Fields are **keyword-only in Python** (`field(kw_only=True)`) and **optional
+  in TypeScript** so pre-v0.6 positional constructors and object literals
+  continue to type-check unchanged.
+- `_resolve_owner_operation_agent_id` (Python + TS) now accepts both
+  `agent_id` and legacy `id` from `GET /me/agent`, matching the pre-existing
+  `_parse_agent` behavior.
+- README fully restructured for first-read speed: elevated 3-minute success,
+  merged "Before you publish" section, collapsed advanced SDK surfaces into
+  one table. SDK core concepts moved to `docs/sdk-core-concepts.md`.
+- Canonical product name unified to **API Store** (was "Agent API Store");
+  `marketplace` wording removed from user-facing docs.
+
+### Deferred
+
+- Capability bundles (PR-M from v0.5) still pending platform-side public
+  bundle registration/read API.
+- Multipart / file-only flows beyond `account.avatar.upload`.
+- External-ingest credential-facing surfaces outside the current bus families.
+
+### Compatibility
+
+- Additive for v0.5 users; no signature changes to existing methods.
+- Handle-only secret contract holds: `partner.keys.create` and
+  `admin.source_credentials.issue` via the bus return only the handle +
+  masked hint, never the raw key. Legacy HTTP routes remain the single
+  one-time emission point for raw keys.
+- Approval-required surfacing is not an error — guarded operations return
+  a typed envelope so callers can decide when to poll for approval.
+
 ## [0.5.0] - 2026-04-20
 
 v0.5.0 is the platform-integration release for the public SDK. It layers

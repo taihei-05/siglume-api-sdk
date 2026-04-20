@@ -4537,7 +4537,7 @@ export class SiglumeClient implements SiglumeClientShape {
     const headers = new Headers({
       Authorization: `Bearer ${this.api_key}`,
       Accept: "application/json",
-      "User-Agent": "siglume-api-sdk-ts/0.5.0",
+      "User-Agent": "siglume-api-sdk-ts/0.6.0",
     });
     if (options.headers) {
       for (const [key, value] of Object.entries(options.headers)) {
