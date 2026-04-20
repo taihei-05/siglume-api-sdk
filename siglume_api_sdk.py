@@ -1,10 +1,11 @@
-"""Siglume Agent App SDK — interface definitions for external developers.
+"""Siglume API Store SDK — interface definitions for external developers.
 
-This module defines the contracts that app developers implement to create
-agent apps for the Siglume API Store.
+This module defines the contracts that developers implement to publish
+APIs on the Siglume API Store.
 
-An "agent app" is a power-up kit that gives a Siglume AI agent new capabilities.
-For example: Amazon price comparison, travel booking, CRM sync, etc.
+A listing is an HTTP API plus a machine-readable tool manual that
+Siglume agents can subscribe to and invoke at runtime. Examples:
+Amazon price comparison, travel booking, CRM sync.
 
 Developers implement the AppAdapter protocol and register it with Siglume.
 """
@@ -798,10 +799,11 @@ class HealthCheckResult:
 # ── App Adapter Protocol ──
 
 class AppAdapter(abc.ABC):
-    """Base class for Siglume agent app adapters.
+    """Base class for Siglume API Store capability adapters.
 
-    External developers subclass this to create new agent apps.
-    Siglume's CapabilityGateway calls these methods at runtime.
+    External developers subclass this to publish a capability on the
+    Siglume API Store. Siglume's CapabilityGateway calls these methods
+    at runtime when a subscribing agent invokes the capability.
     """
 
     @abc.abstractmethod

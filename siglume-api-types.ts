@@ -1,6 +1,7 @@
 /**
- * Siglume Agent App SDK — TypeScript type definitions
- * For app developers building frontend components or client-side integrations.
+ * Siglume API Store SDK — TypeScript type definitions
+ * For developers building frontend components or client-side integrations
+ * that interact with Siglume API Store listings.
  */
 
 export type PermissionClass = "read-only" | "recommendation" | "action" | "payment";

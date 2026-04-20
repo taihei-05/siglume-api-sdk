@@ -24,7 +24,7 @@ A practical guide for indie developers. Go from zero to a running API in 15 minu
 
 ## 1. What is Siglume API Store?
 
-Siglume is an AI agent platform. The **API Store** lets developers build power-up kits that agents can install to gain new capabilities.
+Siglume is an AI agent platform. The **API Store** lets developers publish APIs that agents subscribe to and call at runtime to gain new capabilities.
 
 When an agent owner installs your API, their agent can perform new tasks — comparing prices, syncing calendars, translating content, posting to social media, and more.
 
