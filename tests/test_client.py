@@ -2489,3 +2489,342 @@ def test_market_need_wrappers_resolve_default_agent_and_parse_sparse_payloads() 
         ("GET", "/v1/me/agent"),
         ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
     ]
+
+
+def test_works_wrappers_round_trip_through_owner_operation_cassette(tmp_path: Path) -> None:
+    cassette_path = tmp_path / "works-roundtrip.json"
+    requests: list[tuple[str, str, dict[str, object]]] = []
+
+    categories = [
+        {
+            "key": "design",
+            "name_ja": "デザイン",
+            "name_en": "Design",
+            "description_ja": "UI とブランドの制作。",
+            "description_en": "UI and brand design work.",
+            "icon_url": "https://cdn.example.test/works/design.png",
+            "open_job_count": 5,
+            "display_order": 1,
+        },
+        {
+            "key": "frontend",
+            "name_ja": "フロントエンド",
+            "name_en": "Frontend",
+            "description_ja": "Web アプリ実装。",
+            "description_en": "Web app implementation.",
+            "icon_url": "https://cdn.example.test/works/frontend.png",
+            "open_job_count": 3,
+            "display_order": 2,
+        },
+    ]
+    registration = {
+        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+        "works_registered": True,
+        "tagline": "Fast prototype builder",
+        "categories": ["design", "frontend"],
+        "capabilities": ["prototype", "react"],
+        "description": "I build and ship product prototypes quickly.",
+    }
+    owner_dashboard = {
+        "agents": [
+            {
+                "id": DEFAULT_OPERATION_AGENT_ID,
+                "name": "Owner Demo",
+                "reputation": {"works_registered": True, "works_completed": 12},
+                "capabilities": ["prototype", "react"],
+            }
+        ],
+        "pending_pitches": [
+            {
+                "proposal_id": "prop_works_1",
+                "need_id": "need_works_1",
+                "title": "Landing page redesign",
+                "title_en": "Landing page redesign",
+                "status": "proposed",
+            }
+        ],
+        "active_orders": [
+            {
+                "order_id": "ord_works_active_1",
+                "need_id": "need_works_2",
+                "title": "Build waitlist page",
+                "title_en": "Build waitlist page",
+                "status": "funds_locked",
+            }
+        ],
+        "completed_orders": [
+            {
+                "order_id": "ord_works_done_1",
+                "need_id": "need_works_3",
+                "title": "Summarize invoices",
+                "title_en": "Summarize invoices",
+                "status": "settled",
+            }
+        ],
+        "stats": {"total_agents": 1, "total_pending": 1, "total_active": 1},
+    }
+    poster_dashboard = {
+        "open_jobs": [
+            {
+                "id": "need_open_1",
+                "title": "Translate product docs",
+                "title_en": "Translate product docs",
+                "proposal_count": 4,
+                "created_at": "2026-04-20T08:00:00Z",
+            }
+        ],
+        "in_progress_orders": [
+            {
+                "order_id": "ord_poster_1",
+                "need_id": "need_active_1",
+                "title": "Prototype onboarding flow",
+                "title_en": "Prototype onboarding flow",
+                "status": "fulfillment_submitted",
+                "has_deliverable": True,
+                "deliverable_count": 2,
+                "awaiting_buyer_action": True,
+            }
+        ],
+        "completed_orders": [
+            {
+                "order_id": "ord_poster_done_1",
+                "need_id": "need_done_1",
+                "title": "Summarize invoices",
+                "title_en": "Summarize invoices",
+                "status": "settled",
+                "has_deliverable": True,
+                "deliverable_count": 1,
+                "awaiting_buyer_action": False,
+            }
+        ],
+        "stats": {"total_posted": 3, "total_completed": 1},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path != f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
+            raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        requests.append((request.method, request.url.path, body))
+        operation = body.get("operation")
+        params = body.get("params") if isinstance(body.get("params"), dict) else {}
+        if operation == "works.categories.list":
+            assert params == {}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "status": "completed",
+                        "message": "AI Works categories loaded.",
+                        "action": {"operation": "works.categories.list", "status": "completed"},
+                        "result": categories,
+                    },
+                    trace_id="trc_works_categories_list",
+                    request_id="req_works_categories_list",
+                ),
+            )
+        if operation == "works.registration.get":
+            assert params == {}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "status": "completed",
+                        "message": "AI Works registration loaded.",
+                        "action": {"operation": "works.registration.get", "status": "completed"},
+                        "result": registration,
+                    },
+                    trace_id="trc_works_registration_get",
+                    request_id="req_works_registration_get",
+                ),
+            )
+        if operation == "works.registration.register":
+            assert params == {
+                "tagline": "Fast prototype builder",
+                "description": "I build and ship product prototypes quickly.",
+                "categories": ["design", "frontend"],
+                "capabilities": ["prototype", "react"],
+            }
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "status": "completed",
+                        "message": "AI Works registration updated.",
+                        "action": {"operation": "works.registration.register", "status": "completed"},
+                        "result": {
+                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                            "works_registered": True,
+                        },
+                    },
+                    trace_id="trc_works_registration_register",
+                    request_id="req_works_registration_register",
+                ),
+            )
+        if operation == "works.owner_dashboard.get":
+            assert params == {}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "status": "completed",
+                        "message": "AI Works owner dashboard loaded.",
+                        "action": {"operation": "works.owner_dashboard.get", "status": "completed"},
+                        "result": owner_dashboard,
+                    },
+                    trace_id="trc_works_owner_dashboard_get",
+                    request_id="req_works_owner_dashboard_get",
+                ),
+            )
+        if operation == "works.poster_dashboard.get":
+            assert params == {}
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                        "status": "completed",
+                        "message": "AI Works poster dashboard loaded.",
+                        "action": {"operation": "works.poster_dashboard.get", "status": "completed"},
+                        "result": poster_dashboard,
+                    },
+                    trace_id="trc_works_poster_dashboard_get",
+                    request_id="req_works_poster_dashboard_get",
+                ),
+            )
+        raise AssertionError(f"Unexpected operation payload: {body}")
+
+    with Recorder(cassette_path, mode=RecordMode.RECORD) as recorder:
+        with recorder.wrap(build_client(handler)) as client:
+            listed_categories = client.list_works_categories(agent_id=DEFAULT_OPERATION_AGENT_ID)
+            current_registration = client.get_works_registration(agent_id=DEFAULT_OPERATION_AGENT_ID)
+            registered = client.register_for_works(
+                agent_id=DEFAULT_OPERATION_AGENT_ID,
+                tagline="Fast prototype builder",
+                description="I build and ship product prototypes quickly.",
+                categories=["design", "frontend"],
+                capabilities=["prototype", "react"],
+            )
+            owner_view = client.get_works_owner_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
+            poster_view = client.get_works_poster_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
+
+    with Recorder(cassette_path, mode=RecordMode.REPLAY) as recorder:
+        with recorder.wrap(build_client(lambda request: (_ for _ in ()).throw(AssertionError(f"Replay should not hit transport: {request.method} {request.url}")))) as client:
+            replay_categories = client.list_works_categories(agent_id=DEFAULT_OPERATION_AGENT_ID)
+            replay_registration = client.get_works_registration(agent_id=DEFAULT_OPERATION_AGENT_ID)
+            replay_registered = client.register_for_works(
+                agent_id=DEFAULT_OPERATION_AGENT_ID,
+                tagline="Fast prototype builder",
+                description="I build and ship product prototypes quickly.",
+                categories=["design", "frontend"],
+                capabilities=["prototype", "react"],
+            )
+            replay_owner_view = client.get_works_owner_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
+            replay_poster_view = client.get_works_poster_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
+
+    assert [item.key for item in listed_categories] == ["design", "frontend"]
+    assert listed_categories[0].open_job_count == 5
+    assert current_registration.tagline == "Fast prototype builder"
+    assert current_registration.categories == ["design", "frontend"]
+    assert registered.works_registered is True
+    assert registered.execution_status == "completed"
+    assert owner_view.agents[0].agent_id == DEFAULT_OPERATION_AGENT_ID
+    assert owner_view.pending_pitches[0].proposal_id == "prop_works_1"
+    assert poster_view.in_progress_orders[0].awaiting_buyer_action is True
+    assert poster_view.stats.total_posted == 3
+    assert replay_categories[1].name_en == "Frontend"
+    assert replay_registration.description == current_registration.description
+    assert replay_registered.works_registered is True
+    assert replay_owner_view.completed_orders[0].order_id == "ord_works_done_1"
+    assert replay_poster_view.open_jobs[0].job_id == "need_open_1"
+    assert [item[2]["operation"] for item in requests] == [
+        "works.categories.list",
+        "works.registration.get",
+        "works.registration.register",
+        "works.owner_dashboard.get",
+        "works.poster_dashboard.get",
+    ]
+
+
+def test_works_wrappers_resolve_default_agent_and_surface_approval_metadata() -> None:
+    requests: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/v1/me/agent":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "id": DEFAULT_OPERATION_AGENT_ID,
+                        "agent_type": "personal",
+                        "name": "Owner Demo",
+                    }
+                ),
+            )
+        if request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
+            body = json.loads(request.content.decode("utf-8")) if request.content else {}
+            operation = body.get("operation")
+            params = body.get("params") if isinstance(body.get("params"), dict) else {}
+            if operation == "works.categories.list":
+                assert params == {}
+                return httpx.Response(
+                    200,
+                    json=envelope(
+                        {
+                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                            "status": "completed",
+                            "message": "AI Works categories loaded.",
+                            "action": {"operation": "works.categories.list", "status": "completed"},
+                            "result": [{"key": "design", "open_job_count": 0}],
+                        }
+                    ),
+                )
+            if operation == "works.registration.register":
+                assert params == {"tagline": "Nimble design partner"}
+                return httpx.Response(
+                    200,
+                    json=envelope(
+                        {
+                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
+                            "status": "approval_required",
+                            "approval_required": True,
+                            "intent_id": "int_works_register",
+                            "approval_status": "pending_owner",
+                            "approval_snapshot_hash": "sha_works_register",
+                            "message": "Operation works.registration.register requires approval before live execution.",
+                            "action": {"operation": "works.registration.register", "status": "approval_required"},
+                            "result": {
+                                "preview": {
+                                    "operation_name": "works.registration.register",
+                                    "params": {"tagline": "Nimble design partner"},
+                                }
+                            },
+                        }
+                    ),
+                )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        categories = client.list_works_categories()
+        pending = client.register_for_works(tagline="Nimble design partner")
+        with pytest.raises(SiglumeClientError, match="categories must contain only strings."):
+            client.register_for_works(categories=["design", 1])  # type: ignore[list-item]
+        with pytest.raises(SiglumeClientError, match="capabilities must be a list of strings."):
+            client.register_for_works(capabilities="prototype")  # type: ignore[arg-type]
+
+    assert categories[0].key == "design"
+    assert pending.agent_id == DEFAULT_OPERATION_AGENT_ID
+    assert pending.execution_status == "approval_required"
+    assert pending.approval_required is True
+    assert pending.intent_id == "int_works_register"
+    assert pending.approval_preview["operation_name"] == "works.registration.register"
+    assert requests == [
+        ("GET", "/v1/me/agent"),
+        ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
+        ("GET", "/v1/me/agent"),
+        ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
+    ]

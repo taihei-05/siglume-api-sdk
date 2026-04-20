@@ -48,6 +48,17 @@ import type {
   ToolManualIssue,
   ToolManualQualityReport,
   UsageEventRecord,
+  WorksCategoryRecord,
+  WorksOwnerDashboard,
+  WorksOwnerDashboardAgent,
+  WorksOwnerDashboardOrder,
+  WorksOwnerDashboardPitch,
+  WorksOwnerDashboardStats,
+  WorksPosterDashboard,
+  WorksPosterDashboardJob,
+  WorksPosterDashboardOrder,
+  WorksPosterDashboardStats,
+  WorksRegistrationRecord,
 } from "./types";
 import { SiglumeAPIError, SiglumeClientError, SiglumeNotFoundError } from "./errors";
 import {
@@ -255,6 +266,30 @@ export interface SiglumeClientShape {
     status?: string;
     lang?: string;
   }): Promise<MarketNeedRecord>;
+  list_works_categories(options?: {
+    agent_id?: string;
+    lang?: string;
+  }): Promise<WorksCategoryRecord[]>;
+  get_works_registration(options?: {
+    agent_id?: string;
+    lang?: string;
+  }): Promise<WorksRegistrationRecord>;
+  register_for_works(options?: {
+    agent_id?: string;
+    tagline?: string;
+    description?: string;
+    categories?: string[];
+    capabilities?: string[];
+    lang?: string;
+  }): Promise<WorksRegistrationRecord>;
+  get_works_owner_dashboard(options?: {
+    agent_id?: string;
+    lang?: string;
+  }): Promise<WorksOwnerDashboard>;
+  get_works_poster_dashboard(options?: {
+    agent_id?: string;
+    lang?: string;
+  }): Promise<WorksPosterDashboard>;
   update_agent_charter(
     agent_id: string,
     charter_text: string,
@@ -806,6 +841,157 @@ function parseMarketNeed(data: Record<string, unknown>): MarketNeedRecord {
     detected_at: stringOrNull(data.detected_at) ?? undefined,
     created_at: stringOrNull(data.created_at) ?? undefined,
     updated_at: stringOrNull(data.updated_at) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parseWorksCategory(data: Record<string, unknown>): WorksCategoryRecord {
+  return {
+    key: String(data.key ?? ""),
+    name_ja: stringOrNull(data.name_ja) ?? undefined,
+    name_en: stringOrNull(data.name_en) ?? undefined,
+    description_ja: stringOrNull(data.description_ja) ?? undefined,
+    description_en: stringOrNull(data.description_en) ?? undefined,
+    icon_url: stringOrNull(data.icon_url) ?? undefined,
+    open_job_count: Math.trunc(Number(data.open_job_count ?? 0)),
+    display_order: Math.trunc(Number(data.display_order ?? 0)),
+    raw: { ...data },
+  };
+}
+
+function parseWorksRegistration(data: Record<string, unknown>): WorksRegistrationRecord {
+  const result = isRecord(data.result) ? data.result : {};
+  const status = String(data.status ?? "completed").trim().toLowerCase() || "completed";
+  return {
+    agent_id: String(result.agent_id ?? data.agent_id ?? ""),
+    works_registered: typeof result.works_registered === "boolean" ? result.works_registered : Boolean(result.works_registered ?? false),
+    tagline: stringOrNull(result.tagline) ?? undefined,
+    categories: Array.isArray(result.categories)
+      ? result.categories.filter((item): item is string => typeof item === "string")
+      : [],
+    capabilities: Array.isArray(result.capabilities)
+      ? result.capabilities.filter((item): item is string => typeof item === "string")
+      : [],
+    description: stringOrNull(result.description) ?? undefined,
+    execution_status: status,
+    approval_required: typeof data.approval_required === "boolean" ? data.approval_required : status === "approval_required",
+    intent_id: stringOrNull(data.intent_id) ?? undefined,
+    approval_status: stringOrNull(data.approval_status) ?? undefined,
+    approval_snapshot_hash: stringOrNull(data.approval_snapshot_hash) ?? undefined,
+    approval_preview: toRecord(result.preview),
+    raw: { ...data },
+  };
+}
+
+function parseWorksOwnerDashboardAgent(data: Record<string, unknown>): WorksOwnerDashboardAgent {
+  return {
+    agent_id: String(data.id ?? data.agent_id ?? ""),
+    name: stringOrNull(data.name) ?? undefined,
+    reputation: toRecord(data.reputation),
+    capabilities: Array.isArray(data.capabilities)
+      ? data.capabilities.filter((item): item is string => typeof item === "string")
+      : [],
+    raw: { ...data },
+  };
+}
+
+function parseWorksOwnerDashboardPitch(data: Record<string, unknown>): WorksOwnerDashboardPitch {
+  return {
+    proposal_id: String(data.proposal_id ?? data.id ?? ""),
+    need_id: stringOrNull(data.need_id) ?? undefined,
+    title: stringOrNull(data.title) ?? undefined,
+    title_en: stringOrNull(data.title_en) ?? undefined,
+    status: stringOrNull(data.status) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parseWorksOwnerDashboardOrder(data: Record<string, unknown>): WorksOwnerDashboardOrder {
+  return {
+    order_id: String(data.order_id ?? data.id ?? ""),
+    need_id: stringOrNull(data.need_id) ?? undefined,
+    title: stringOrNull(data.title) ?? undefined,
+    title_en: stringOrNull(data.title_en) ?? undefined,
+    status: stringOrNull(data.status) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parseWorksOwnerDashboardStats(data: Record<string, unknown>): WorksOwnerDashboardStats {
+  return {
+    total_agents: Math.trunc(Number(data.total_agents ?? 0)),
+    total_pending: Math.trunc(Number(data.total_pending ?? 0)),
+    total_active: Math.trunc(Number(data.total_active ?? 0)),
+    raw: { ...data },
+  };
+}
+
+function parseWorksOwnerDashboard(data: Record<string, unknown>): WorksOwnerDashboard {
+  return {
+    agents: Array.isArray(data.agents)
+      ? data.agents.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardAgent(item))
+      : [],
+    pending_pitches: Array.isArray(data.pending_pitches)
+      ? data.pending_pitches.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardPitch(item))
+      : [],
+    active_orders: Array.isArray(data.active_orders)
+      ? data.active_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardOrder(item))
+      : [],
+    completed_orders: Array.isArray(data.completed_orders)
+      ? data.completed_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardOrder(item))
+      : [],
+    stats: isRecord(data.stats) ? parseWorksOwnerDashboardStats(data.stats) : parseWorksOwnerDashboardStats({}),
+    raw: { ...data },
+  };
+}
+
+function parseWorksPosterDashboardJob(data: Record<string, unknown>): WorksPosterDashboardJob {
+  return {
+    job_id: String(data.id ?? data.job_id ?? ""),
+    title: stringOrNull(data.title) ?? undefined,
+    title_en: stringOrNull(data.title_en) ?? undefined,
+    proposal_count: Math.trunc(Number(data.proposal_count ?? 0)),
+    created_at: stringOrNull(data.created_at) ?? undefined,
+    raw: { ...data },
+  };
+}
+
+function parseWorksPosterDashboardOrder(data: Record<string, unknown>): WorksPosterDashboardOrder {
+  return {
+    order_id: String(data.order_id ?? data.id ?? ""),
+    need_id: stringOrNull(data.need_id) ?? undefined,
+    title: stringOrNull(data.title) ?? undefined,
+    title_en: stringOrNull(data.title_en) ?? undefined,
+    status: stringOrNull(data.status) ?? undefined,
+    has_deliverable: typeof data.has_deliverable === "boolean" ? data.has_deliverable : Boolean(data.has_deliverable ?? false),
+    deliverable_count: Math.trunc(Number(data.deliverable_count ?? 0)),
+    awaiting_buyer_action: typeof data.awaiting_buyer_action === "boolean"
+      ? data.awaiting_buyer_action
+      : Boolean(data.awaiting_buyer_action ?? false),
+    raw: { ...data },
+  };
+}
+
+function parseWorksPosterDashboardStats(data: Record<string, unknown>): WorksPosterDashboardStats {
+  return {
+    total_posted: Math.trunc(Number(data.total_posted ?? 0)),
+    total_completed: Math.trunc(Number(data.total_completed ?? 0)),
+    raw: { ...data },
+  };
+}
+
+function parseWorksPosterDashboard(data: Record<string, unknown>): WorksPosterDashboard {
+  return {
+    open_jobs: Array.isArray(data.open_jobs)
+      ? data.open_jobs.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksPosterDashboardJob(item))
+      : [],
+    in_progress_orders: Array.isArray(data.in_progress_orders)
+      ? data.in_progress_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksPosterDashboardOrder(item))
+      : [],
+    completed_orders: Array.isArray(data.completed_orders)
+      ? data.completed_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksPosterDashboardOrder(item))
+      : [],
+    stats: isRecord(data.stats) ? parseWorksPosterDashboardStats(data.stats) : parseWorksPosterDashboardStats({}),
     raw: { ...data },
   };
 }
@@ -1926,21 +2112,8 @@ export class SiglumeClient implements SiglumeClientShape {
     params: Record<string, unknown> = {},
     options: { lang?: string } = {},
   ): Promise<OperationExecution> {
-    const normalizedAgentId = String(agent_id ?? "").trim();
     const normalizedKey = String(operation_key ?? "").trim();
-    if (!normalizedAgentId) {
-      throw new SiglumeClientError("agent_id is required.");
-    }
-    if (!normalizedKey) {
-      throw new SiglumeClientError("operation_key is required.");
-    }
-    const [data, meta] = await this.request("POST", `/owner/agents/${normalizedAgentId}/operations/execute`, {
-      json_body: {
-        operation: normalizedKey,
-        params: toRecord(params),
-        lang: String(options.lang ?? "en").trim().toLowerCase() === "ja" ? "ja" : "en",
-      },
-    });
+    const [data, meta] = await this.requestOwnerOperation(agent_id, operation_key, params, options);
     return parseOperationExecution(data, normalizedKey, meta);
   }
 
@@ -2162,6 +2335,128 @@ export class SiglumeClient implements SiglumeClientShape {
       { lang: options.lang },
     );
     return parseMarketNeed(execution.result);
+  }
+
+  // `works.*` also uses the public owner-operation execute route. The
+  // categories list returns a top-level array in `result`, so these
+  // wrappers call the execute endpoint directly instead of relying on
+  // execute_owner_operation()'s object-only `result` parser.
+  async list_works_categories(
+    options: {
+      agent_id?: string;
+      lang?: string;
+    } = {},
+  ): Promise<WorksCategoryRecord[]> {
+    const [data] = await this.requestOwnerOperation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "works.categories.list",
+      {},
+      { lang: options.lang },
+    );
+    return Array.isArray(data.result)
+      ? data.result.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksCategory(item))
+      : [];
+  }
+
+  async get_works_registration(
+    options: {
+      agent_id?: string;
+      lang?: string;
+    } = {},
+  ): Promise<WorksRegistrationRecord> {
+    const [data] = await this.requestOwnerOperation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "works.registration.get",
+      {},
+      { lang: options.lang },
+    );
+    return parseWorksRegistration(data);
+  }
+
+  async register_for_works(options: {
+    agent_id?: string;
+    tagline?: string;
+    description?: string;
+    categories?: string[];
+    capabilities?: string[];
+    lang?: string;
+  } = {}): Promise<WorksRegistrationRecord> {
+    const payload: Record<string, unknown> = {};
+    if (options.tagline !== undefined) {
+      payload.tagline = String(options.tagline).trim();
+    }
+    if (options.description !== undefined) {
+      payload.description = String(options.description).trim();
+    }
+    if (options.categories !== undefined) {
+      if (!Array.isArray(options.categories)) {
+        throw new SiglumeClientError("categories must be a list of strings.");
+      }
+      const normalizedCategories: string[] = [];
+      for (const item of options.categories) {
+        if (typeof item !== "string") {
+          throw new SiglumeClientError("categories must contain only strings.");
+        }
+        const normalized = item.trim();
+        if (normalized) {
+          normalizedCategories.push(normalized);
+        }
+      }
+      payload.categories = normalizedCategories;
+    }
+    if (options.capabilities !== undefined) {
+      if (!Array.isArray(options.capabilities)) {
+        throw new SiglumeClientError("capabilities must be a list of strings.");
+      }
+      const normalizedCapabilities: string[] = [];
+      for (const item of options.capabilities) {
+        if (typeof item !== "string") {
+          throw new SiglumeClientError("capabilities must contain only strings.");
+        }
+        const normalized = item.trim();
+        if (normalized) {
+          normalizedCapabilities.push(normalized);
+        }
+      }
+      payload.capabilities = normalizedCapabilities;
+    }
+    const [data] = await this.requestOwnerOperation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "works.registration.register",
+      payload,
+      { lang: options.lang },
+    );
+    return parseWorksRegistration(data);
+  }
+
+  async get_works_owner_dashboard(
+    options: {
+      agent_id?: string;
+      lang?: string;
+    } = {},
+  ): Promise<WorksOwnerDashboard> {
+    const [data] = await this.requestOwnerOperation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "works.owner_dashboard.get",
+      {},
+      { lang: options.lang },
+    );
+    return parseWorksOwnerDashboard(isRecord(data.result) ? data.result : {});
+  }
+
+  async get_works_poster_dashboard(
+    options: {
+      agent_id?: string;
+      lang?: string;
+    } = {},
+  ): Promise<WorksPosterDashboard> {
+    const [data] = await this.requestOwnerOperation(
+      await this.resolveOwnerOperationAgentId(options.agent_id),
+      "works.poster_dashboard.get",
+      {},
+      { lang: options.lang },
+    );
+    return parseWorksPosterDashboard(isRecord(data.result) ? data.result : {});
   }
 
   async update_agent_charter(
@@ -2892,6 +3187,29 @@ export class SiglumeClient implements SiglumeClientShape {
       return agentIdFromMe;
     }
     throw new SiglumeClientError("agent_id is required.");
+  }
+
+  private async requestOwnerOperation(
+    agent_id: string,
+    operation_key: string,
+    params: Record<string, unknown> = {},
+    options: { lang?: string } = {},
+  ): Promise<RequestMetaTuple> {
+    const normalizedAgentId = String(agent_id ?? "").trim();
+    const normalizedKey = String(operation_key ?? "").trim();
+    if (!normalizedAgentId) {
+      throw new SiglumeClientError("agent_id is required.");
+    }
+    if (!normalizedKey) {
+      throw new SiglumeClientError("operation_key is required.");
+    }
+    return this.request("POST", `/owner/agents/${normalizedAgentId}/operations/execute`, {
+      json_body: {
+        operation: normalizedKey,
+        params: toRecord(params),
+        lang: String(options.lang ?? "en").trim().toLowerCase() === "ja" ? "ja" : "en",
+      },
+    });
   }
 
   private async request(method: string, path: string, options: RequestOptions = {}): Promise<RequestMetaTuple> {

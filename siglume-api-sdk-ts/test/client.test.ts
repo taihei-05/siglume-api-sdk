@@ -2234,6 +2234,325 @@ describe("SiglumeClient", () => {
     ]);
   });
 
+  it("round-trips works wrappers through the owner-operation recorder path", async () => {
+    const cassettePath = await makeTempCassette("works-roundtrip.json");
+    const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
+    const categories = [
+      {
+        key: "design",
+        name_ja: "デザイン",
+        name_en: "Design",
+        description_ja: "UI とブランドの制作。",
+        description_en: "UI and brand design work.",
+        icon_url: "https://cdn.example.test/works/design.png",
+        open_job_count: 5,
+        display_order: 1,
+      },
+      {
+        key: "frontend",
+        name_ja: "フロントエンド",
+        name_en: "Frontend",
+        description_ja: "Web アプリ実装。",
+        description_en: "Web app implementation.",
+        icon_url: "https://cdn.example.test/works/frontend.png",
+        open_job_count: 3,
+        display_order: 2,
+      },
+    ];
+    const registration = {
+      agent_id: "agt_owner_demo",
+      works_registered: true,
+      tagline: "Fast prototype builder",
+      categories: ["design", "frontend"],
+      capabilities: ["prototype", "react"],
+      description: "I build and ship product prototypes quickly.",
+    };
+    const ownerDashboard = {
+      agents: [
+        {
+          id: "agt_owner_demo",
+          name: "Owner Demo",
+          reputation: { works_registered: true, works_completed: 12 },
+          capabilities: ["prototype", "react"],
+        },
+      ],
+      pending_pitches: [
+        {
+          proposal_id: "prop_works_1",
+          need_id: "need_works_1",
+          title: "Landing page redesign",
+          title_en: "Landing page redesign",
+          status: "proposed",
+        },
+      ],
+      active_orders: [
+        {
+          order_id: "ord_works_active_1",
+          need_id: "need_works_2",
+          title: "Build waitlist page",
+          title_en: "Build waitlist page",
+          status: "funds_locked",
+        },
+      ],
+      completed_orders: [
+        {
+          order_id: "ord_works_done_1",
+          need_id: "need_works_3",
+          title: "Summarize invoices",
+          title_en: "Summarize invoices",
+          status: "settled",
+        },
+      ],
+      stats: { total_agents: 1, total_pending: 1, total_active: 1 },
+    };
+    const posterDashboard = {
+      open_jobs: [
+        {
+          id: "need_open_1",
+          title: "Translate product docs",
+          title_en: "Translate product docs",
+          proposal_count: 4,
+          created_at: "2026-04-20T08:00:00Z",
+        },
+      ],
+      in_progress_orders: [
+        {
+          order_id: "ord_poster_1",
+          need_id: "need_active_1",
+          title: "Prototype onboarding flow",
+          title_en: "Prototype onboarding flow",
+          status: "fulfillment_submitted",
+          has_deliverable: true,
+          deliverable_count: 2,
+          awaiting_buyer_action: true,
+        },
+      ],
+      completed_orders: [
+        {
+          order_id: "ord_poster_done_1",
+          need_id: "need_done_1",
+          title: "Summarize invoices",
+          title_en: "Summarize invoices",
+          status: "settled",
+          has_deliverable: true,
+          deliverable_count: 1,
+          awaiting_buyer_action: false,
+        },
+      ],
+      stats: { total_posted: 3, total_completed: 1 },
+    };
+
+    const recorder = await Recorder.open(cassettePath, { mode: RecordMode.RECORD });
+    try {
+      const client = recorder.wrap(new SiglumeClient({
+        api_key: "sig_test_key",
+        base_url: "https://api.example.test/v1",
+        fetch: async (input, init) => {
+          const url = requestUrl(input);
+          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+          requests.push({ method: String(init?.method ?? "GET"), path: url.pathname, body });
+          if (url.pathname !== "/v1/owner/agents/agt_owner_demo/operations/execute") {
+            return new Response("{}", { status: 500 });
+          }
+          const params = typeof body.params === "object" && body.params !== null
+            ? body.params as Record<string, unknown>
+            : {};
+          if (body.operation === "works.categories.list") {
+            expect(params).toEqual({});
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "completed",
+              message: "AI Works categories loaded.",
+              action: { operation: "works.categories.list", status: "completed" },
+              result: categories,
+            }, { request_id: "req_works_categories_list", trace_id: "trc_works_categories_list" })), { status: 200 });
+          }
+          if (body.operation === "works.registration.get") {
+            expect(params).toEqual({});
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "completed",
+              message: "AI Works registration loaded.",
+              action: { operation: "works.registration.get", status: "completed" },
+              result: registration,
+            }, { request_id: "req_works_registration_get", trace_id: "trc_works_registration_get" })), { status: 200 });
+          }
+          if (body.operation === "works.registration.register") {
+            expect(params).toEqual({
+              tagline: "Fast prototype builder",
+              description: "I build and ship product prototypes quickly.",
+              categories: ["design", "frontend"],
+              capabilities: ["prototype", "react"],
+            });
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "completed",
+              message: "AI Works registration updated.",
+              action: { operation: "works.registration.register", status: "completed" },
+              result: { agent_id: "agt_owner_demo", works_registered: true },
+            }, { request_id: "req_works_registration_register", trace_id: "trc_works_registration_register" })), { status: 200 });
+          }
+          if (body.operation === "works.owner_dashboard.get") {
+            expect(params).toEqual({});
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "completed",
+              message: "AI Works owner dashboard loaded.",
+              action: { operation: "works.owner_dashboard.get", status: "completed" },
+              result: ownerDashboard,
+            }, { request_id: "req_works_owner_dashboard_get", trace_id: "trc_works_owner_dashboard_get" })), { status: 200 });
+          }
+          if (body.operation === "works.poster_dashboard.get") {
+            expect(params).toEqual({});
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "completed",
+              message: "AI Works poster dashboard loaded.",
+              action: { operation: "works.poster_dashboard.get", status: "completed" },
+              result: posterDashboard,
+            }, { request_id: "req_works_poster_dashboard_get", trace_id: "trc_works_poster_dashboard_get" })), { status: 200 });
+          }
+          return new Response("{}", { status: 500 });
+        },
+      }));
+
+      const listedCategories = await client.list_works_categories({ agent_id: "agt_owner_demo" });
+      const currentRegistration = await client.get_works_registration({ agent_id: "agt_owner_demo" });
+      const registered = await client.register_for_works({
+        agent_id: "agt_owner_demo",
+        tagline: "Fast prototype builder",
+        description: "I build and ship product prototypes quickly.",
+        categories: ["design", "frontend"],
+        capabilities: ["prototype", "react"],
+      });
+      const ownerView = await client.get_works_owner_dashboard({ agent_id: "agt_owner_demo" });
+      const posterView = await client.get_works_poster_dashboard({ agent_id: "agt_owner_demo" });
+
+      expect(listedCategories.map((item) => item.key)).toEqual(["design", "frontend"]);
+      expect(currentRegistration.tagline).toBe("Fast prototype builder");
+      expect(registered.works_registered).toBe(true);
+      expect(registered.execution_status).toBe("completed");
+      expect(ownerView.agents[0]?.agent_id).toBe("agt_owner_demo");
+      expect(ownerView.pending_pitches[0]?.proposal_id).toBe("prop_works_1");
+      expect(posterView.in_progress_orders[0]?.awaiting_buyer_action).toBe(true);
+      expect(posterView.stats.total_posted).toBe(3);
+    } finally {
+      await recorder.close();
+    }
+
+    const replayRecorder = await Recorder.open(cassettePath, { mode: RecordMode.REPLAY });
+    try {
+      const replayClient = replayRecorder.wrap(new SiglumeClient({
+        api_key: "sig_ignored",
+        base_url: "https://api.example.test/v1",
+        fetch: async () => {
+          throw new Error("Replay should not hit fetch");
+        },
+      }));
+
+      expect((await replayClient.list_works_categories({ agent_id: "agt_owner_demo" }))[1]?.name_en).toBe("Frontend");
+      expect((await replayClient.get_works_registration({ agent_id: "agt_owner_demo" })).description)
+        .toBe("I build and ship product prototypes quickly.");
+      expect((await replayClient.register_for_works({
+        agent_id: "agt_owner_demo",
+        tagline: "Fast prototype builder",
+        description: "I build and ship product prototypes quickly.",
+        categories: ["design", "frontend"],
+        capabilities: ["prototype", "react"],
+      })).works_registered).toBe(true);
+      expect((await replayClient.get_works_owner_dashboard({ agent_id: "agt_owner_demo" })).completed_orders[0]?.order_id)
+        .toBe("ord_works_done_1");
+      expect((await replayClient.get_works_poster_dashboard({ agent_id: "agt_owner_demo" })).open_jobs[0]?.job_id)
+        .toBe("need_open_1");
+    } finally {
+      await replayRecorder.close();
+    }
+
+    expect(requests.map((request) => request.body.operation)).toEqual([
+      "works.categories.list",
+      "works.registration.get",
+      "works.registration.register",
+      "works.owner_dashboard.get",
+      "works.poster_dashboard.get",
+    ]);
+  });
+
+  it("resolves the default owner agent for works wrappers and surfaces approval metadata", async () => {
+    const requests: Array<{ method: string; path: string }> = [];
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        requests.push({ method: String(init?.method ?? "GET"), path: url.pathname });
+        if (url.pathname === "/v1/me/agent") {
+          return new Response(JSON.stringify(envelope({
+            id: "agt_owner_demo",
+            agent_type: "personal",
+            name: "Owner Demo",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/operations/execute") {
+          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+          const params = typeof body.params === "object" && body.params !== null
+            ? body.params as Record<string, unknown>
+            : {};
+          if (body.operation === "works.categories.list") {
+            expect(params).toEqual({});
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "completed",
+              message: "AI Works categories loaded.",
+              action: { operation: "works.categories.list", status: "completed" },
+              result: [{ key: "design", open_job_count: 0 }],
+            })), { status: 200 });
+          }
+          if (body.operation === "works.registration.register") {
+            expect(params).toEqual({ tagline: "Nimble design partner" });
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              status: "approval_required",
+              approval_required: true,
+              intent_id: "int_works_register",
+              approval_status: "pending_owner",
+              approval_snapshot_hash: "sha_works_register",
+              message: "Operation works.registration.register requires approval before live execution.",
+              action: { operation: "works.registration.register", status: "approval_required" },
+              result: {
+                preview: {
+                  operation_name: "works.registration.register",
+                  params: { tagline: "Nimble design partner" },
+                },
+              },
+            })), { status: 200 });
+          }
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const categories = await client.list_works_categories();
+    const pending = await client.register_for_works({ tagline: "Nimble design partner" });
+
+    expect(categories[0]?.key).toBe("design");
+    expect(pending.agent_id).toBe("agt_owner_demo");
+    expect(pending.execution_status).toBe("approval_required");
+    expect(pending.approval_required).toBe(true);
+    expect(pending.intent_id).toBe("int_works_register");
+    expect(pending.approval_preview.operation_name).toBe("works.registration.register");
+    expect(requests).toEqual([
+      { method: "GET", path: "/v1/me/agent" },
+      { method: "POST", path: "/v1/owner/agents/agt_owner_demo/operations/execute" },
+      { method: "GET", path: "/v1/me/agent" },
+      { method: "POST", path: "/v1/owner/agents/agt_owner_demo/operations/execute" },
+    ]);
+
+    await expect(client.register_for_works({ categories: ["design", 1 as unknown as string] }))
+      .rejects.toThrow("categories must contain only strings.");
+    await expect(client.register_for_works({ capabilities: "prototype" as unknown as string[] }))
+      .rejects.toThrow("capabilities must be a list of strings.");
+  });
+
   it("wraps non-Error transport failures as SiglumeClientError", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",

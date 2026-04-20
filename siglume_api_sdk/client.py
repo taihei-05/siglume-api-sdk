@@ -395,6 +395,122 @@ class MarketNeedRecord:
 
 
 @dataclass
+class WorksCategoryRecord:
+    key: str
+    name_ja: str | None = None
+    name_en: str | None = None
+    description_ja: str | None = None
+    description_en: str | None = None
+    icon_url: str | None = None
+    open_job_count: int = 0
+    display_order: int = 0
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksRegistrationRecord:
+    agent_id: str
+    works_registered: bool = False
+    tagline: str | None = None
+    categories: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    description: str | None = None
+    execution_status: str = "completed"
+    approval_required: bool = False
+    intent_id: str | None = None
+    approval_status: str | None = None
+    approval_snapshot_hash: str | None = None
+    approval_preview: dict[str, Any] = field(default_factory=dict)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksOwnerDashboardAgent:
+    agent_id: str
+    name: str | None = None
+    reputation: dict[str, Any] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksOwnerDashboardPitch:
+    proposal_id: str
+    need_id: str | None = None
+    title: str | None = None
+    title_en: str | None = None
+    status: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksOwnerDashboardOrder:
+    order_id: str
+    need_id: str | None = None
+    title: str | None = None
+    title_en: str | None = None
+    status: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksOwnerDashboardStats:
+    total_agents: int = 0
+    total_pending: int = 0
+    total_active: int = 0
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksOwnerDashboard:
+    agents: list[WorksOwnerDashboardAgent] = field(default_factory=list)
+    pending_pitches: list[WorksOwnerDashboardPitch] = field(default_factory=list)
+    active_orders: list[WorksOwnerDashboardOrder] = field(default_factory=list)
+    completed_orders: list[WorksOwnerDashboardOrder] = field(default_factory=list)
+    stats: WorksOwnerDashboardStats = field(default_factory=WorksOwnerDashboardStats)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksPosterDashboardJob:
+    job_id: str
+    title: str | None = None
+    title_en: str | None = None
+    proposal_count: int = 0
+    created_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksPosterDashboardOrder:
+    order_id: str
+    need_id: str | None = None
+    title: str | None = None
+    title_en: str | None = None
+    status: str | None = None
+    has_deliverable: bool = False
+    deliverable_count: int = 0
+    awaiting_buyer_action: bool = False
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksPosterDashboardStats:
+    total_posted: int = 0
+    total_completed: int = 0
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorksPosterDashboard:
+    open_jobs: list[WorksPosterDashboardJob] = field(default_factory=list)
+    in_progress_orders: list[WorksPosterDashboardOrder] = field(default_factory=list)
+    completed_orders: list[WorksPosterDashboardOrder] = field(default_factory=list)
+    stats: WorksPosterDashboardStats = field(default_factory=WorksPosterDashboardStats)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
 class AccountPreferences:
     language: str | None = None
     summary_depth: str | None = None
@@ -1196,6 +1312,143 @@ def _parse_market_need(data: Mapping[str, Any]) -> MarketNeedRecord:
         detected_at=_string_or_none(data.get("detected_at")),
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_works_category(data: Mapping[str, Any]) -> WorksCategoryRecord:
+    return WorksCategoryRecord(
+        key=str(data.get("key") or ""),
+        name_ja=_string_or_none(data.get("name_ja")),
+        name_en=_string_or_none(data.get("name_en")),
+        description_ja=_string_or_none(data.get("description_ja")),
+        description_en=_string_or_none(data.get("description_en")),
+        icon_url=_string_or_none(data.get("icon_url")),
+        open_job_count=int(data.get("open_job_count") or 0),
+        display_order=int(data.get("display_order") or 0),
+        raw=dict(data),
+    )
+
+
+def _parse_works_registration(data: Mapping[str, Any]) -> WorksRegistrationRecord:
+    result = data.get("result") if isinstance(data.get("result"), Mapping) else {}
+    status = str(data.get("status") or "completed").strip().lower() or "completed"
+    approval_required = bool(data.get("approval_required")) if data.get("approval_required") is not None else status == "approval_required"
+    return WorksRegistrationRecord(
+        agent_id=str(result.get("agent_id") or data.get("agent_id") or ""),
+        works_registered=bool(result.get("works_registered")) if result.get("works_registered") is not None else False,
+        tagline=_string_or_none(result.get("tagline")),
+        categories=_to_string_list(result.get("categories")),
+        capabilities=_to_string_list(result.get("capabilities")),
+        description=_string_or_none(result.get("description")),
+        execution_status=status,
+        approval_required=approval_required,
+        intent_id=_string_or_none(data.get("intent_id")),
+        approval_status=_string_or_none(data.get("approval_status")),
+        approval_snapshot_hash=_string_or_none(data.get("approval_snapshot_hash")),
+        approval_preview=_to_dict(result.get("preview")),
+        raw=dict(data),
+    )
+
+
+def _parse_works_owner_dashboard_agent(data: Mapping[str, Any]) -> WorksOwnerDashboardAgent:
+    return WorksOwnerDashboardAgent(
+        agent_id=str(data.get("id") or data.get("agent_id") or ""),
+        name=_string_or_none(data.get("name")),
+        reputation=_to_dict(data.get("reputation")),
+        capabilities=_to_string_list(data.get("capabilities")),
+        raw=dict(data),
+    )
+
+
+def _parse_works_owner_dashboard_pitch(data: Mapping[str, Any]) -> WorksOwnerDashboardPitch:
+    return WorksOwnerDashboardPitch(
+        proposal_id=str(data.get("proposal_id") or data.get("id") or ""),
+        need_id=_string_or_none(data.get("need_id")),
+        title=_string_or_none(data.get("title")),
+        title_en=_string_or_none(data.get("title_en")),
+        status=_string_or_none(data.get("status")),
+        raw=dict(data),
+    )
+
+
+def _parse_works_owner_dashboard_order(data: Mapping[str, Any]) -> WorksOwnerDashboardOrder:
+    return WorksOwnerDashboardOrder(
+        order_id=str(data.get("order_id") or data.get("id") or ""),
+        need_id=_string_or_none(data.get("need_id")),
+        title=_string_or_none(data.get("title")),
+        title_en=_string_or_none(data.get("title_en")),
+        status=_string_or_none(data.get("status")),
+        raw=dict(data),
+    )
+
+
+def _parse_works_owner_dashboard_stats(data: Mapping[str, Any]) -> WorksOwnerDashboardStats:
+    return WorksOwnerDashboardStats(
+        total_agents=int(data.get("total_agents") or 0),
+        total_pending=int(data.get("total_pending") or 0),
+        total_active=int(data.get("total_active") or 0),
+        raw=dict(data),
+    )
+
+
+def _parse_works_owner_dashboard(data: Mapping[str, Any]) -> WorksOwnerDashboard:
+    agents = data.get("agents") if isinstance(data.get("agents"), list) else []
+    pending_pitches = data.get("pending_pitches") if isinstance(data.get("pending_pitches"), list) else []
+    active_orders = data.get("active_orders") if isinstance(data.get("active_orders"), list) else []
+    completed_orders = data.get("completed_orders") if isinstance(data.get("completed_orders"), list) else []
+    return WorksOwnerDashboard(
+        agents=[_parse_works_owner_dashboard_agent(item) for item in agents if isinstance(item, Mapping)],
+        pending_pitches=[_parse_works_owner_dashboard_pitch(item) for item in pending_pitches if isinstance(item, Mapping)],
+        active_orders=[_parse_works_owner_dashboard_order(item) for item in active_orders if isinstance(item, Mapping)],
+        completed_orders=[_parse_works_owner_dashboard_order(item) for item in completed_orders if isinstance(item, Mapping)],
+        stats=_parse_works_owner_dashboard_stats(data.get("stats")) if isinstance(data.get("stats"), Mapping) else WorksOwnerDashboardStats(),
+        raw=dict(data),
+    )
+
+
+def _parse_works_poster_dashboard_job(data: Mapping[str, Any]) -> WorksPosterDashboardJob:
+    return WorksPosterDashboardJob(
+        job_id=str(data.get("id") or data.get("job_id") or ""),
+        title=_string_or_none(data.get("title")),
+        title_en=_string_or_none(data.get("title_en")),
+        proposal_count=int(data.get("proposal_count") or 0),
+        created_at=_string_or_none(data.get("created_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_works_poster_dashboard_order(data: Mapping[str, Any]) -> WorksPosterDashboardOrder:
+    return WorksPosterDashboardOrder(
+        order_id=str(data.get("order_id") or data.get("id") or ""),
+        need_id=_string_or_none(data.get("need_id")),
+        title=_string_or_none(data.get("title")),
+        title_en=_string_or_none(data.get("title_en")),
+        status=_string_or_none(data.get("status")),
+        has_deliverable=bool(data.get("has_deliverable")) if data.get("has_deliverable") is not None else False,
+        deliverable_count=int(data.get("deliverable_count") or 0),
+        awaiting_buyer_action=bool(data.get("awaiting_buyer_action")) if data.get("awaiting_buyer_action") is not None else False,
+        raw=dict(data),
+    )
+
+
+def _parse_works_poster_dashboard_stats(data: Mapping[str, Any]) -> WorksPosterDashboardStats:
+    return WorksPosterDashboardStats(
+        total_posted=int(data.get("total_posted") or 0),
+        total_completed=int(data.get("total_completed") or 0),
+        raw=dict(data),
+    )
+
+
+def _parse_works_poster_dashboard(data: Mapping[str, Any]) -> WorksPosterDashboard:
+    open_jobs = data.get("open_jobs") if isinstance(data.get("open_jobs"), list) else []
+    in_progress_orders = data.get("in_progress_orders") if isinstance(data.get("in_progress_orders"), list) else []
+    completed_orders = data.get("completed_orders") if isinstance(data.get("completed_orders"), list) else []
+    return WorksPosterDashboard(
+        open_jobs=[_parse_works_poster_dashboard_job(item) for item in open_jobs if isinstance(item, Mapping)],
+        in_progress_orders=[_parse_works_poster_dashboard_order(item) for item in in_progress_orders if isinstance(item, Mapping)],
+        completed_orders=[_parse_works_poster_dashboard_order(item) for item in completed_orders if isinstance(item, Mapping)],
+        stats=_parse_works_poster_dashboard_stats(data.get("stats")) if isinstance(data.get("stats"), Mapping) else WorksPosterDashboardStats(),
         raw=dict(data),
     )
 
@@ -2490,6 +2743,22 @@ class SiglumeClient:
         *,
         lang: str = "en",
     ) -> OperationExecution:
+        data, meta = self._request_owner_operation(
+            agent_id,
+            operation_key,
+            params,
+            lang=lang,
+        )
+        return _parse_operation_execution(data, operation_key=str(operation_key or "").strip(), meta=meta)
+
+    def _request_owner_operation(
+        self,
+        agent_id: str,
+        operation_key: str,
+        params: Mapping[str, Any] | None = None,
+        *,
+        lang: str = "en",
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
         normalized_agent_id = str(agent_id or "").strip()
         normalized_key = str(operation_key or "").strip()
         if not normalized_agent_id:
@@ -2506,7 +2775,9 @@ class SiglumeClient:
             f"/owner/agents/{normalized_agent_id}/operations/execute",
             json_body=payload,
         )
-        return _parse_operation_execution(data, operation_key=normalized_key, meta=meta)
+        if not isinstance(data, Mapping):
+            raise SiglumeClientError("Expected the owner-operation response body to be an object.")
+        return dict(data), meta
 
     def _resolve_owner_operation_agent_id(self, agent_id: str | None = None) -> str:
         resolved_agent_id = str(agent_id or "").strip()
@@ -2710,6 +2981,115 @@ class SiglumeClient:
             lang=lang,
         )
         return _parse_market_need(execution.result)
+
+    # `works.*` also uses the public owner-operation execute route. The
+    # categories list returns a top-level array inside `result`, so these
+    # helpers call the execute endpoint directly instead of relying on
+    # execute_owner_operation()'s object-only `result` parser.
+    def list_works_categories(
+        self,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> list[WorksCategoryRecord]:
+        data, _meta = self._request_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "works.categories.list",
+            {},
+            lang=lang,
+        )
+        result = data.get("result")
+        items = result if isinstance(result, list) else []
+        return [_parse_works_category(item) for item in items if isinstance(item, Mapping)]
+
+    def get_works_registration(
+        self,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> WorksRegistrationRecord:
+        data, _meta = self._request_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "works.registration.get",
+            {},
+            lang=lang,
+        )
+        return _parse_works_registration(data)
+
+    def register_for_works(
+        self,
+        *,
+        agent_id: str | None = None,
+        tagline: str | None = None,
+        description: str | None = None,
+        categories: list[str] | tuple[str, ...] | None = None,
+        capabilities: list[str] | tuple[str, ...] | None = None,
+        lang: str = "en",
+    ) -> WorksRegistrationRecord:
+        payload: dict[str, Any] = {}
+        if tagline is not None:
+            payload["tagline"] = str(tagline).strip()
+        if description is not None:
+            payload["description"] = str(description).strip()
+        if categories is not None:
+            if not isinstance(categories, (list, tuple)):
+                raise SiglumeClientError("categories must be a list of strings.")
+            normalized_categories: list[str] = []
+            for item in categories:
+                if not isinstance(item, str):
+                    raise SiglumeClientError("categories must contain only strings.")
+                normalized = item.strip()
+                if normalized:
+                    normalized_categories.append(normalized)
+            payload["categories"] = normalized_categories
+        if capabilities is not None:
+            if not isinstance(capabilities, (list, tuple)):
+                raise SiglumeClientError("capabilities must be a list of strings.")
+            normalized_capabilities: list[str] = []
+            for item in capabilities:
+                if not isinstance(item, str):
+                    raise SiglumeClientError("capabilities must contain only strings.")
+                normalized = item.strip()
+                if normalized:
+                    normalized_capabilities.append(normalized)
+            payload["capabilities"] = normalized_capabilities
+        data, _meta = self._request_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "works.registration.register",
+            payload,
+            lang=lang,
+        )
+        return _parse_works_registration(data)
+
+    def get_works_owner_dashboard(
+        self,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> WorksOwnerDashboard:
+        data, _meta = self._request_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "works.owner_dashboard.get",
+            {},
+            lang=lang,
+        )
+        result = data.get("result") if isinstance(data.get("result"), Mapping) else {}
+        return _parse_works_owner_dashboard(result)
+
+    def get_works_poster_dashboard(
+        self,
+        *,
+        agent_id: str | None = None,
+        lang: str = "en",
+    ) -> WorksPosterDashboard:
+        data, _meta = self._request_owner_operation(
+            self._resolve_owner_operation_agent_id(agent_id),
+            "works.poster_dashboard.get",
+            {},
+            lang=lang,
+        )
+        result = data.get("result") if isinstance(data.get("result"), Mapping) else {}
+        return _parse_works_poster_dashboard(result)
 
     def list_access_grants(
         self,

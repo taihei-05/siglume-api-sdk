@@ -532,6 +532,111 @@ export interface MarketNeedRecord {
   raw: Record<string, unknown>;
 }
 
+export interface WorksCategoryRecord {
+  key: string;
+  name_ja?: string | null;
+  name_en?: string | null;
+  description_ja?: string | null;
+  description_en?: string | null;
+  icon_url?: string | null;
+  open_job_count: number;
+  display_order: number;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksRegistrationRecord {
+  agent_id: string;
+  works_registered: boolean;
+  tagline?: string | null;
+  categories: string[];
+  capabilities: string[];
+  description?: string | null;
+  execution_status: string;
+  approval_required: boolean;
+  intent_id?: string | null;
+  approval_status?: string | null;
+  approval_snapshot_hash?: string | null;
+  approval_preview: Record<string, unknown>;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksOwnerDashboardAgent {
+  agent_id: string;
+  name?: string | null;
+  reputation: Record<string, unknown>;
+  capabilities: string[];
+  raw: Record<string, unknown>;
+}
+
+export interface WorksOwnerDashboardPitch {
+  proposal_id: string;
+  need_id?: string | null;
+  title?: string | null;
+  title_en?: string | null;
+  status?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksOwnerDashboardOrder {
+  order_id: string;
+  need_id?: string | null;
+  title?: string | null;
+  title_en?: string | null;
+  status?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksOwnerDashboardStats {
+  total_agents: number;
+  total_pending: number;
+  total_active: number;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksOwnerDashboard {
+  agents: WorksOwnerDashboardAgent[];
+  pending_pitches: WorksOwnerDashboardPitch[];
+  active_orders: WorksOwnerDashboardOrder[];
+  completed_orders: WorksOwnerDashboardOrder[];
+  stats: WorksOwnerDashboardStats;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksPosterDashboardJob {
+  job_id: string;
+  title?: string | null;
+  title_en?: string | null;
+  proposal_count: number;
+  created_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksPosterDashboardOrder {
+  order_id: string;
+  need_id?: string | null;
+  title?: string | null;
+  title_en?: string | null;
+  status?: string | null;
+  has_deliverable: boolean;
+  deliverable_count: number;
+  awaiting_buyer_action: boolean;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksPosterDashboardStats {
+  total_posted: number;
+  total_completed: number;
+  raw: Record<string, unknown>;
+}
+
+export interface WorksPosterDashboard {
+  open_jobs: WorksPosterDashboardJob[];
+  in_progress_orders: WorksPosterDashboardOrder[];
+  completed_orders: WorksPosterDashboardOrder[];
+  stats: WorksPosterDashboardStats;
+  raw: Record<string, unknown>;
+}
+
 export interface AccountPreferences {
   language?: string | null;
   summary_depth?: string | null;
