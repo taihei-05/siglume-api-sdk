@@ -29,6 +29,7 @@ EXAMPLE_SPECS = [
     ("calendar_sync.py", PermissionClass.ACTION),
     ("crm_sync.py", PermissionClass.ACTION),
     ("email_sender.py", PermissionClass.ACTION),
+    ("market_needs_wrapper.py", PermissionClass.READ_ONLY),
     ("network_discovery_wrapper.py", PermissionClass.READ_ONLY),
     ("news_digest.py", PermissionClass.READ_ONLY),
     ("polygon_mandate_adapter.py", PermissionClass.PAYMENT),
@@ -180,6 +181,19 @@ def test_account_plan_wrapper_example_returns_typed_account_context() -> None:
     assert output[2] == "plan: plus model=claude-sonnet-4-6"
     assert output[3] == "dry_run: True"
     assert output[4].startswith("summary: Plan plus with ja preferences loaded")
+
+
+def test_market_needs_wrapper_example_returns_typed_need_backlog() -> None:
+    module = _load_module("market_needs_wrapper.py")
+
+    output = asyncio.run(module.run_market_needs_example())
+
+    assert output[0] == "tool_manual_valid: True 0"
+    assert output[1].startswith("quality_grade: ")
+    assert output[2] == "needs_loaded: 2 first=need_demo_1"
+    assert output[3] == "titles: Localize release notes into Japanese|Summarize partner invoices"
+    assert output[4] == "dry_run: True"
+    assert output[5].startswith("summary: Loaded 2 open market needs for translation coverage triage")
 
 
 def test_account_digests_alerts_wrapper_example_returns_dashboard_snapshot() -> None:

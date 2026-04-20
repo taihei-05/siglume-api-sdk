@@ -1943,6 +1943,297 @@ describe("SiglumeClient", () => {
     expect(operations.every((item) => item.agent_id === "agt_owner_demo")).toBe(true);
   });
 
+  it("round-trips market need wrappers through the owner-operation recorder path", async () => {
+    const cassettePath = await makeTempCassette("market-needs-roundtrip.json");
+    const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
+    const needOne = {
+      need_id: "need_demo_1",
+      owner_user_id: "usr_owner_demo",
+      principal_user_id: "usr_owner_demo",
+      buyer_agent_id: "agt_owner_demo",
+      charter_id: "chr_owner_demo",
+      charter_version: 3,
+      title: "Localize release notes into Japanese",
+      problem_statement: "Need a reviewable EN->JA translation within 24 hours.",
+      category_key: "translation",
+      budget_min_minor: 8000,
+      budget_max_minor: 15000,
+      urgency: 7,
+      requirement_jsonb: { languages: ["en", "ja"], sla_hours: 24 },
+      status: "open",
+      metadata: { source: "sdk-test" },
+      detected_at: "2026-04-20T08:00:00Z",
+      created_at: "2026-04-20T08:00:00Z",
+      updated_at: "2026-04-20T08:10:00Z",
+    };
+    const needTwo = {
+      need_id: "need_demo_2",
+      owner_user_id: "usr_owner_demo",
+      principal_user_id: "usr_owner_demo",
+      buyer_agent_id: "agt_owner_demo",
+      charter_id: "chr_owner_demo",
+      charter_version: 3,
+      title: "Summarize partner invoices",
+      problem_statement: "Need an invoice anomaly summary before finance review.",
+      category_key: "finance",
+      budget_min_minor: 6000,
+      budget_max_minor: 12000,
+      urgency: 5,
+      requirement_jsonb: { period: "monthly" },
+      status: "open",
+      metadata: { source: "sdk-test" },
+      detected_at: "2026-04-19T21:00:00Z",
+      created_at: "2026-04-19T21:00:00Z",
+      updated_at: "2026-04-20T07:00:00Z",
+    };
+
+    const recorder = await Recorder.open(cassettePath, { mode: RecordMode.RECORD });
+    try {
+      const client = recorder.wrap(new SiglumeClient({
+        api_key: "sig_test_key",
+        base_url: "https://api.example.test/v1",
+        fetch: async (input, init) => {
+          const url = requestUrl(input);
+          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+          requests.push({ method: String(init?.method ?? "GET"), path: url.pathname, body });
+          if (url.pathname !== "/v1/owner/agents/agt_owner_demo/operations/execute") {
+            return new Response("{}", { status: 500 });
+          }
+          const params = typeof body.params === "object" && body.params !== null
+            ? body.params as Record<string, unknown>
+            : {};
+          if (body.operation === "market.needs.list") {
+            if (params.cursor === "next_need") {
+              return new Response(JSON.stringify(envelope({
+                agent_id: "agt_owner_demo",
+                message: "Market needs loaded.",
+                action: "market_needs_list",
+                result: { items: [needTwo], next_cursor: null },
+              }, { request_id: "req_market_needs_list_2", trace_id: "trc_market_needs_list_2" })), { status: 200 });
+            }
+            expect(params).toEqual({ limit: 1, status: "open" });
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              message: "Market needs loaded.",
+              action: "market_needs_list",
+              result: { items: [needOne], next_cursor: "next_need" },
+            }, { request_id: "req_market_needs_list_1", trace_id: "trc_market_needs_list_1" })), { status: 200 });
+          }
+          if (body.operation === "market.needs.get") {
+            expect(params).toEqual({ need_id: "need_demo_1" });
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              message: "Market need loaded.",
+              action: "market_needs_get",
+              result: needOne,
+            }, { request_id: "req_market_needs_get", trace_id: "trc_market_needs_get" })), { status: 200 });
+          }
+          if (body.operation === "market.needs.create") {
+            expect(params).toEqual({
+              title: "Draft Japanese release-note translation need",
+              problem_statement: "Need a publish-ready translation within 24 hours.",
+              category_key: "translation",
+              budget_min_minor: 9000,
+              budget_max_minor: 15000,
+              urgency: 8,
+              requirement_jsonb: { languages: ["en", "ja"] },
+              metadata: { source: "sdk-test" },
+              status: "open",
+            });
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              message: "Market need created.",
+              action: "market_needs_create",
+              result: { ...needOne, need_id: "need_created_1", title: "Draft Japanese release-note translation need" },
+            }, { request_id: "req_market_needs_create", trace_id: "trc_market_needs_create" })), { status: 200 });
+          }
+          if (body.operation === "market.needs.update") {
+            expect(params).toEqual({
+              need_id: "need_demo_1",
+              status: "closed",
+              metadata: { source: "sdk-test", reviewed: true },
+            });
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              message: "Market need updated.",
+              action: "market_needs_update",
+              result: { ...needOne, status: "closed", metadata: { source: "sdk-test", reviewed: true } },
+            }, { request_id: "req_market_needs_update", trace_id: "trc_market_needs_update" })), { status: 200 });
+          }
+          return new Response("{}", { status: 500 });
+        },
+      }));
+
+      const page = await client.list_market_needs({ agent_id: "agt_owner_demo", status: "open", limit: 1 });
+      const allNeeds = await page.all_items();
+      const detail = await client.get_market_need("need_demo_1", { agent_id: "agt_owner_demo" });
+      const created = await client.create_market_need({
+        agent_id: "agt_owner_demo",
+        title: "Draft Japanese release-note translation need",
+        problem_statement: "Need a publish-ready translation within 24 hours.",
+        category_key: "translation",
+        budget_min_minor: 9000,
+        budget_max_minor: 15000,
+        urgency: 8,
+        requirement_jsonb: { languages: ["en", "ja"] },
+        metadata: { source: "sdk-test" },
+        status: "open",
+      });
+      const updated = await client.update_market_need("need_demo_1", {
+        agent_id: "agt_owner_demo",
+        status: "closed",
+        metadata: { source: "sdk-test", reviewed: true },
+      });
+
+      expect(allNeeds.map((item) => item.need_id)).toEqual(["need_demo_1", "need_demo_2"]);
+      expect(page.meta.trace_id).toBe("trc_market_needs_list_1");
+      expect(detail.title).toBe("Localize release notes into Japanese");
+      expect(created.need_id).toBe("need_created_1");
+      expect(updated.status).toBe("closed");
+    } finally {
+      await recorder.close();
+    }
+
+    const replayRecorder = await Recorder.open(cassettePath, { mode: RecordMode.REPLAY });
+    try {
+      const replayClient = replayRecorder.wrap(new SiglumeClient({
+        api_key: "sig_ignored",
+        base_url: "https://api.example.test/v1",
+        fetch: async () => {
+          throw new Error("Replay should not hit fetch");
+        },
+      }));
+
+      const replayNeeds = await (await replayClient.list_market_needs({
+        agent_id: "agt_owner_demo",
+        status: "open",
+        limit: 1,
+      })).all_items();
+      expect(replayNeeds[1]?.title).toBe("Summarize partner invoices");
+      expect((await replayClient.get_market_need("need_demo_1", { agent_id: "agt_owner_demo" })).need_id).toBe("need_demo_1");
+      expect((await replayClient.create_market_need({
+        agent_id: "agt_owner_demo",
+        title: "Draft Japanese release-note translation need",
+        problem_statement: "Need a publish-ready translation within 24 hours.",
+        category_key: "translation",
+        budget_min_minor: 9000,
+        budget_max_minor: 15000,
+        urgency: 8,
+        requirement_jsonb: { languages: ["en", "ja"] },
+        metadata: { source: "sdk-test" },
+        status: "open",
+      })).need_id).toBe("need_created_1");
+      expect((await replayClient.update_market_need("need_demo_1", {
+        agent_id: "agt_owner_demo",
+        status: "closed",
+        metadata: { source: "sdk-test", reviewed: true },
+      })).metadata.reviewed).toBe(true);
+    } finally {
+      await replayRecorder.close();
+    }
+
+    expect(requests.map((request) => request.body.operation)).toEqual([
+      "market.needs.list",
+      "market.needs.list",
+      "market.needs.get",
+      "market.needs.create",
+      "market.needs.update",
+    ]);
+  });
+
+  it("validates market need wrapper inputs", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response("{}", { status: 500 }),
+    });
+
+    await expect(client.get_market_need("")).rejects.toThrow("need_id is required.");
+    await expect(client.create_market_need({
+      title: "",
+      problem_statement: "Need a translation.",
+      category_key: "translation",
+      budget_min_minor: 10,
+      budget_max_minor: 20,
+    })).rejects.toThrow("title is required.");
+    await expect(client.create_market_need({
+      title: "Translate release notes",
+      problem_statement: "",
+      category_key: "translation",
+      budget_min_minor: 10,
+      budget_max_minor: 20,
+    })).rejects.toThrow("problem_statement is required.");
+    await expect(client.create_market_need({
+      title: "Translate release notes",
+      problem_statement: "Need a translation.",
+      category_key: "",
+      budget_min_minor: 10,
+      budget_max_minor: 20,
+    })).rejects.toThrow("category_key is required.");
+    await expect(client.create_market_need({
+      title: "Translate release notes",
+      problem_statement: "Need a translation.",
+      category_key: "translation",
+      budget_min_minor: 30,
+      budget_max_minor: 20,
+    })).rejects.toThrow("budget_min_minor cannot exceed budget_max_minor.");
+    await expect(client.update_market_need("need_demo_1")).rejects.toThrow("update_market_need requires at least one field to update.");
+  });
+
+  it("resolves the default owner agent and parses sparse market need payloads", async () => {
+    const requests: Array<{ method: string; path: string }> = [];
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        requests.push({ method: String(init?.method ?? "GET"), path: url.pathname });
+        if (url.pathname === "/v1/me/agent") {
+          return new Response(JSON.stringify(envelope({
+            agent_id: "agt_owner_demo",
+            agent_type: "personal",
+            name: "Owner Demo",
+          })), { status: 200 });
+        }
+        if (url.pathname === "/v1/owner/agents/agt_owner_demo/operations/execute") {
+          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+          if (body.operation === "market.needs.list") {
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              message: "Market needs loaded.",
+              action: "market_needs_list",
+              result: { items: [{ need_id: "need_sparse", status: "open" }], next_cursor: "cursor_sparse" },
+            })), { status: 200 });
+          }
+          if (body.operation === "market.needs.get") {
+            return new Response(JSON.stringify(envelope({
+              agent_id: "agt_owner_demo",
+              message: "Market need loaded.",
+              action: "market_needs_get",
+              result: { need_id: "need_sparse", status: "open" },
+            })), { status: 200 });
+          }
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const page = await client.list_market_needs({ limit: 2 });
+    const detail = await client.get_market_need("need_sparse");
+
+    expect(page.items[0]?.need_id).toBe("need_sparse");
+    expect(page.items[0]?.metadata).toEqual({});
+    expect(page.next_cursor).toBe("cursor_sparse");
+    expect(detail.need_id).toBe("need_sparse");
+    expect(detail.requirement_jsonb).toEqual({});
+    expect(requests).toEqual([
+      { method: "GET", path: "/v1/me/agent" },
+      { method: "POST", path: "/v1/owner/agents/agt_owner_demo/operations/execute" },
+      { method: "GET", path: "/v1/me/agent" },
+      { method: "POST", path: "/v1/owner/agents/agt_owner_demo/operations/execute" },
+    ]);
+  });
+
   it("wraps non-Error transport failures as SiglumeClientError", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",

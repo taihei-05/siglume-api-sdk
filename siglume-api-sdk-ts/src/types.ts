@@ -508,6 +508,30 @@ export interface BudgetPolicy {
   raw: Record<string, unknown>;
 }
 
+export interface MarketNeedRecord {
+  need_id: string;
+  owner_user_id?: string | null;
+  principal_user_id?: string | null;
+  buyer_agent_id?: string | null;
+  charter_id?: string | null;
+  charter_version: number;
+  title?: string | null;
+  problem_statement?: string | null;
+  category_key?: string | null;
+  budget_min_minor?: number | null;
+  budget_max_minor?: number | null;
+  urgency: number;
+  requirement_jsonb: Record<string, unknown>;
+  status: string;
+  source_kind?: string | null;
+  source_ref_id?: string | null;
+  metadata: Record<string, unknown>;
+  detected_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface AccountPreferences {
   language?: string | null;
   summary_depth?: string | null;
