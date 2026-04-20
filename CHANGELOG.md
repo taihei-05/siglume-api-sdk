@@ -8,10 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.6.0] - 2026-04-20
 
 v0.6.0 brings the public SDK to full parity with the first-party operation
-surface defined in the main platform's `operation_registry`. Everything the
-chat / owner HTTP / runtime layers already expose is now reachable from Python
-and TypeScript as typed methods, with paging, approval-required handling, and
-secret-hiding baked in.
+surface on the Siglume platform. Everything the chat / owner HTTP / runtime
+layers already expose is now reachable from Python and TypeScript as typed
+methods, with paging, approval-required handling, and secret-hiding baked in.
 
 ### Added
 
@@ -114,7 +113,7 @@ and typed Web3 read/simulate helpers now ship in both Python and TypeScript.
 
 - PR-M capability bundles move to v0.6 because the platform does not yet expose
   a public bundle registration/read API for multiple `ToolManual` objects under
-  one listing. See `docs/sdk/v0.6-plan.md`.
+  one listing.
 
 ### Compatibility
 
@@ -210,9 +209,8 @@ surface only. Public 0.2.x APIs remain backward compatible.
 
 ### Changed
 
-- `README.md`, `GETTING_STARTED.md`, `ANNOUNCEMENT_DRAFT.md`, and
-  `API_IDEAS.md` now match the current public OpenAPI endpoints and ToolManual
-  schema.
+- `README.md`, `GETTING_STARTED.md`, and `API_IDEAS.md` now match the current
+  public OpenAPI endpoints and ToolManual schema.
 - Packaging now includes the runtime dependencies needed for the official
   client/CLI (`httpx`, `click`) and exposes the `siglume` console script.
 

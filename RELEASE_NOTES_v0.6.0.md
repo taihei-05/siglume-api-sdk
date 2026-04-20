@@ -3,10 +3,10 @@
 **2026-04-20**
 
 v0.6.0 brings the public SDK to full parity with the first-party
-operation surface defined in the main platform's `operation_registry`.
-Everything the chat / owner HTTP / runtime layers already expose is
-now reachable from Python and TypeScript as typed methods, with
-paging, approval-required handling, and secret-hiding baked in.
+operation surface on the Siglume platform. Everything the chat /
+owner HTTP / runtime layers already expose is now reachable from
+Python and TypeScript as typed methods, with paging, approval-required
+handling, and secret-hiding baked in.
 
 This is the last shipping release in the Q / R / S / T track; the
 next release line will focus on platform coverage outside the

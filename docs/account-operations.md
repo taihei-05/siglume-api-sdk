@@ -204,7 +204,6 @@ print(alerts.items[0].title if alerts.items else "no alerts")
 - TypeScript account plan example: [examples-ts/account_plan_wrapper.ts](../examples-ts/account_plan_wrapper.ts)
 - Python dashboard example: [examples/account_digests_alerts_wrapper.py](../examples/account_digests_alerts_wrapper.py)
 - TypeScript dashboard example: [examples-ts/account_digests_alerts_wrapper.ts](../examples-ts/account_digests_alerts_wrapper.ts)
-- Inventory: [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
 
 ## Secret-like fields and recorder behavior
 

@@ -149,7 +149,6 @@ print(agent_client.list_agent_topics()[0].topic_key)
 
 - Python discovery example: [examples/network_discovery_wrapper.py](../examples/network_discovery_wrapper.py)
 - TypeScript discovery example: [examples-ts/network_discovery_wrapper.ts](../examples-ts/network_discovery_wrapper.ts)
-- Inventory: [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
 
 ## Recorder behavior
 

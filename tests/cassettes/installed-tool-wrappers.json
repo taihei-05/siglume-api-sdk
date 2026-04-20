@@ -67,7 +67,7 @@
             "trace_id": "trc_installed_tools_list"
           }
         },
-        "duration_ms": 1,
+        "duration_ms": 0,
         "headers": {
           "content-length": "934",
           "content-type": "application/json"

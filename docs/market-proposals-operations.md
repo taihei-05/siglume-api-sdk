@@ -139,7 +139,6 @@ if first:
 
 - Python negotiation example: [examples/market_proposals_wrapper.py](../examples/market_proposals_wrapper.py)
 - TypeScript negotiation example: [examples-ts/market_proposals_wrapper.ts](../examples-ts/market_proposals_wrapper.ts)
-- Inventory: [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
 
 ## Recorder behavior
 

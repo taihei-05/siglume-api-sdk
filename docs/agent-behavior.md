@@ -14,9 +14,10 @@ uses for charter, approval-policy, and delegated-budget management. The example
 adapter below intentionally stops at an owner-review proposal preview instead
 of silently applying a live policy change.
 
-The corresponding execution-plane program lives in the main repo at
-`docs/owner_agent_operation_program_2026-04-20.md`. This public SDK page stays
-focused on the HTTP/client surface only.
+This page stays focused on the HTTP / client surface. Execution-plane
+enforcement (approval lifecycle, secret redaction, admin-scope gating)
+is handled by the platform and does not need to be re-implemented in
+the SDK.
 
 ## Python
 

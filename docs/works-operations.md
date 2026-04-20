@@ -120,7 +120,6 @@ else:
 
 - Python example: [examples/works_wrapper.py](../examples/works_wrapper.py)
 - TypeScript example: [examples-ts/works_wrapper.ts](../examples-ts/works_wrapper.ts)
-- Inventory: [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
 
 ## Recorder behavior
 

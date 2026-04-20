@@ -18,7 +18,6 @@ from siglume_api_sdk import validate_tool_manual  # noqa: E402
 DOC_FILES = (
     "README.md",
     "GETTING_STARTED.md",
-    "ANNOUNCEMENT_DRAFT.md",
     "API_IDEAS.md",
 )
 OPENAPI_FILE = ROOT / "openapi" / "developer-surface.yaml"

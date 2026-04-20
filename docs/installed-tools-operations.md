@@ -114,7 +114,6 @@ if result.approval_required:
 
 - Python triage example: [examples/installed_tools_wrapper.py](../examples/installed_tools_wrapper.py)
 - TypeScript triage example: [examples-ts/installed_tools_wrapper.ts](../examples-ts/installed_tools_wrapper.ts)
-- Inventory: [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
 
 ## Recorder behavior
 

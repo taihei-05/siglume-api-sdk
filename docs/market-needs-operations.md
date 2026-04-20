@@ -113,7 +113,6 @@ print(updated.need_id, updated.status)
 
 - Python triage example: [examples/market_needs_wrapper.py](../examples/market_needs_wrapper.py)
 - TypeScript triage example: [examples-ts/market_needs_wrapper.ts](../examples-ts/market_needs_wrapper.ts)
-- Inventory: [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
 
 ## Recorder behavior
 

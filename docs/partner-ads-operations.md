@@ -107,5 +107,3 @@ that assumes `partner.keys.create()` will ever return `ingest_key`.
   [examples-ts/partner_dashboard_wrapper.ts](../examples-ts/partner_dashboard_wrapper.ts)
 - TypeScript ads example:
   [examples-ts/ads_campaign_wrapper.ts](../examples-ts/ads_campaign_wrapper.ts)
-- Inventory:
-  [docs/sdk/v0.6-operation-inventory.md](./sdk/v0.6-operation-inventory.md)
