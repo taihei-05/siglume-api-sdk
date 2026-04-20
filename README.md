@@ -26,13 +26,13 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → payout setup) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> 🚀 **v0.4.0 is out** — first full multi-runtime release. Python + TypeScript
-> parity across `AppAdapter` / `AppTestHarness` / `SiglumeClient` / the
-> `siglume` CLI, offline ToolManual grader (server parity ±5), LLM-assisted
-> tool-manual drafting, tool schema exporter (Anthropic / OpenAI Chat +
-> Responses / MCP), recording harness, manifest diff, buyer-side SDK
-> (experimental), webhook handlers, and seller-side refund / dispute client.
-> See [RELEASE_NOTES_v0.4.0.md](./RELEASE_NOTES_v0.4.0.md) for the full release.
+> 🚀 **v0.5.0 is out** — the platform-integration release. Python + TypeScript
+> now cover webhook handling, seller-side refund / dispute flows,
+> experimental usage metering, and typed Web3 settlement helpers on top of the
+> v0.4 runtime, grading, diffing, exporter, recorder, buyer-SDK, and example
+> set.
+> Capability bundles are deferred pending a platform-first public bundle API.
+> See [RELEASE_NOTES_v0.5.0.md](./RELEASE_NOTES_v0.5.0.md) for the full release.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 
@@ -325,7 +325,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is an early-stage project (v0.4.0, alpha) with a growing but still
+This is an early-stage project (v0.5.0, alpha) with a growing but still
 small user base. The SDK and platform are actively evolving. Start with
 a small read-only API to learn the flow.
 

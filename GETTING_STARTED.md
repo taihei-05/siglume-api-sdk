@@ -721,7 +721,7 @@ The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
 - Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
 - Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
 
-SDK v0.4.0 (current release) ships the Web3 enum values for
+SDK v0.5.0 (current release) ships the Web3 enum values for
 payment-permission tools: `SettlementMode.POLYGON_MANDATE` and
 `SettlementMode.EMBEDDED_WALLET_CHARGE`. See
 [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.

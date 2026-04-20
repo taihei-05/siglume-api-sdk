@@ -772,7 +772,7 @@ class SiglumeClient:
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Accept": "application/json",
-                "User-Agent": "siglume-api-sdk/0.4.0",
+                "User-Agent": "siglume-api-sdk/0.5.0",
             },
         )
         self._pending_confirmations: dict[str, dict[str, Any]] = {}

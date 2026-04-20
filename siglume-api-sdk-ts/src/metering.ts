@@ -124,7 +124,7 @@ export class MeterClient {
     const headers = new Headers({
       Authorization: `Bearer ${this.api_key}`,
       Accept: "application/json",
-      "User-Agent": "siglume-api-sdk-ts/0.4.0",
+      "User-Agent": "siglume-api-sdk-ts/0.5.0",
     });
     let body: string | undefined;
     if (options.json_body) {

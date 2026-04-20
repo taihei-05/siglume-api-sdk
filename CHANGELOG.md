@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-20
+
+v0.5.0 is the platform-integration release for the public SDK. It layers
+seller-facing operations and settlement helpers on top of the v0.4 multi-runtime
+foundation: webhook verification, refund/dispute flows, experimental metering,
+and typed Web3 read/simulate helpers now ship in both Python and TypeScript.
+
+### Added
+
+- Webhook handler surface for Python and TypeScript:
+  `WebhookHandler`, typed webhook-event unions, HMAC-SHA256 signature
+  verification, timestamp tolerance checks, and idempotency/dedupe helpers.
+- Seller-side refund/dispute client:
+  `RefundClient`, typed `Refund` / `Dispute` models, partial/full refund
+  helpers, and dispute response helpers.
+- Experimental metering support:
+  `MeterClient`, `UsageRecord`, client-side batch chunking, and
+  `AppTestHarness.simulate_metering()` invoice previews.
+- Web3 settlement helpers:
+  typed Polygon mandate, settlement receipt, embedded-wallet charge, and
+  cross-currency quote models plus deterministic local simulation helpers.
+- New docs/examples for webhooks, refunds/disputes, metering, and Web3
+  settlement flows across Python and TypeScript.
+
+### Changed
+
+- The public OpenAPI surface now includes the marketplace webhook, refund,
+  dispute, metering, and Web3 settlement endpoints the SDK wraps.
+- README and Getting Started now point to the current v0.5.0 release line and
+  its new platform-integration surfaces.
+
+### Deferred
+
+- PR-M capability bundles move to v0.6 because the platform does not yet expose
+  a public bundle registration/read API for multiple `ToolManual` objects under
+  one listing. See `docs/sdk/v0.6-plan.md`.
+
+### Compatibility
+
+- v0.5.0 is additive for existing v0.4 users.
+- `usage_based` / `per_action` metering remains experimental because public
+  listing registration still accepts only `free` and `subscription`.
+- Web3 helpers mirror the public platform contract; real settlement remains
+  platform-owned.
+
 ## [0.4.0] - 2026-04-19
 
 First full multi-runtime SDK release. v0.4.0 adds offline ToolManual scoring,
