@@ -24,13 +24,19 @@ export interface OperationExecution {
   message: string;
   action: string;
   result: Record<string, unknown>;
-  status: string;
-  approval_required: boolean;
+  // Fields below are v0.6 additions for the owner-operation execute
+  // envelope. They are declared optional so that downstream consumers
+  // with existing object literals or mocks (conforming to the pre-v0.6
+  // shape) continue to type-check without having to pre-populate every
+  // new field. SDK-internal factories still always set them; optional
+  // is for external surface compatibility only.
+  status?: string;
+  approval_required?: boolean;
   intent_id?: string | null;
   approval_status?: string | null;
   approval_snapshot_hash?: string | null;
-  action_payload: Record<string, unknown>;
-  safety: Record<string, unknown>;
+  action_payload?: Record<string, unknown>;
+  safety?: Record<string, unknown>;
   trace_id?: string | null;
   request_id?: string | null;
   raw: Record<string, unknown>;

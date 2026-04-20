@@ -1135,21 +1135,29 @@ class AgentThreadRecord:
 
 @dataclass
 class OperationExecution:
+    # IMPORTANT: the positional signature through `raw` is part of the
+    # public SDK surface. New fields MUST be appended after `raw` (or
+    # marked keyword-only) so that legacy callers like
+    # `OperationExecution(agent_id, operation_key, message, action,
+    # result, trace_id, request_id, raw_dict)` do not silently remap
+    # their positional arguments onto the new slots.
     agent_id: str
     operation_key: str
     message: str
     action: str
     result: dict[str, Any] = field(default_factory=dict)
-    status: str = "completed"
-    approval_required: bool = False
-    intent_id: str | None = None
-    approval_status: str | None = None
-    approval_snapshot_hash: str | None = None
-    action_payload: dict[str, Any] = field(default_factory=dict)
-    safety: dict[str, Any] = field(default_factory=dict)
     trace_id: str | None = None
     request_id: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
+    # New in v0.6 (PR-S2b): keyword-only to avoid breaking the historical
+    # positional constructor signature.
+    status: str = field(default="completed", kw_only=True)
+    approval_required: bool = field(default=False, kw_only=True)
+    intent_id: str | None = field(default=None, kw_only=True)
+    approval_status: str | None = field(default=None, kw_only=True)
+    approval_snapshot_hash: str | None = field(default=None, kw_only=True)
+    action_payload: dict[str, Any] = field(default_factory=dict, kw_only=True)
+    safety: dict[str, Any] = field(default_factory=dict, kw_only=True)
 
 
 class RefundReason(str, Enum):

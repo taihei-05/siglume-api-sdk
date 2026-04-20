@@ -1901,7 +1901,15 @@ function parseOperationExecution(
     action,
     result: toRecord(data.result),
     status: String(data.status ?? "completed"),
-    approval_required: Boolean(data.approval_required ?? String(data.status ?? "").trim().toLowerCase() === "approval_required"),
+    // Use logical OR (not nullish coalescing) so that an explicit
+    // `approval_required: false` from the server still gets upgraded to
+    // true when `status === "approval_required"`. This matches the
+    // Python client's `bool(data.get("approval_required") or status ==
+    // "approval_required")` behavior and prevents partially-rolled-out
+    // or defaulted server payloads from silently skipping owner approval.
+    approval_required: Boolean(
+      data.approval_required || String(data.status ?? "").trim().toLowerCase() === "approval_required",
+    ),
     intent_id: stringOrNull(data.intent_id) ?? undefined,
     approval_status: stringOrNull(data.approval_status) ?? undefined,
     approval_snapshot_hash: stringOrNull(data.approval_snapshot_hash) ?? undefined,
@@ -1920,8 +1928,8 @@ function parseMarketProposalActionResult(execution: OperationExecution): MarketP
       ? execution.result
       : null;
   return {
-    status: execution.status,
-    approval_required: execution.approval_required,
+    status: execution.status ?? "completed",
+    approval_required: execution.approval_required ?? false,
     intent_id: execution.intent_id ?? null,
     approval_status: execution.approval_status ?? null,
     approval_snapshot_hash: execution.approval_snapshot_hash ?? null,
