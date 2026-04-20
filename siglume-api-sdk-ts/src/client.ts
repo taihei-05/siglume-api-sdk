@@ -161,9 +161,13 @@ export interface SiglumeClientShape {
   remove_account_favorite(agent_id: string): Promise<FavoriteAgentMutation>;
   post_account_content_direct(text: string, options?: { lang?: string }): Promise<AccountContentPostResult>;
   delete_account_content(content_id: string): Promise<AccountContentDeleteResult>;
-  list_account_digests(): Promise<CursorPage<AccountDigestSummary>>;
+  list_account_digests(
+    options?: { cursor?: string; limit?: number },
+  ): Promise<CursorPage<AccountDigestSummary>>;
   get_account_digest(digest_id: string): Promise<AccountDigest>;
-  list_account_alerts(): Promise<CursorPage<AccountAlert>>;
+  list_account_alerts(
+    options?: { cursor?: string; limit?: number },
+  ): Promise<CursorPage<AccountAlert>>;
   get_account_alert(alert_id: string): Promise<AccountAlert>;
   submit_account_feedback(
     ref_type: string,
@@ -1407,9 +1411,13 @@ export class SiglumeClient implements SiglumeClientShape {
       throw new SiglumeClientError("agent_id is required.");
     }
     const [data] = await this.request("PUT", `/me/favorites/${normalizedAgentId}/remove`);
+    // Only infer status="removed" when the server actually confirmed
+    // success. Forcing the default on every response masked failures
+    // (e.g. {"ok": false} with no status field) as successful removals.
+    const defaultStatus = Boolean((data as { ok?: unknown }).ok) ? "removed" : undefined;
     return parseFavoriteAgentMutation(data, {
       defaultAgentId: normalizedAgentId,
-      defaultStatus: "removed",
+      defaultStatus,
     });
   }
 
@@ -1438,18 +1446,32 @@ export class SiglumeClient implements SiglumeClientShape {
     return parseAccountContentDeleteResult(data);
   }
 
-  async list_account_digests(): Promise<CursorPage<AccountDigestSummary>> {
-    const [data, meta] = await this.request("GET", "/digests");
+  async list_account_digests(
+    options: { cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<AccountDigestSummary>> {
+    const params: Record<string, string | number | boolean | null | undefined> = {};
+    if (options.cursor !== undefined && String(options.cursor).trim()) {
+      params.cursor = String(options.cursor).trim();
+    }
+    if (options.limit !== undefined) {
+      params.limit = Number(options.limit);
+    }
+    const requestOptions = Object.keys(params).length > 0 ? { params } : undefined;
+    const [data, meta] = await this.request("GET", "/digests", requestOptions);
     const items = Array.isArray(data.items)
       ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseAccountDigestSummary(item))
       : [];
-    return {
+    const next_cursor = stringOrNull(data.next_cursor);
+    return new CursorPageResult({
       items,
-      next_cursor: stringOrNull(data.next_cursor) ?? null,
-      limit: null,
-      offset: null,
+      next_cursor,
+      limit: typeof data.limit === "number" ? data.limit : options.limit ?? null,
+      offset: typeof data.offset === "number" ? data.offset : null,
       meta,
-    };
+      fetchNext: next_cursor
+        ? (cursor) => this.list_account_digests({ cursor, limit: options.limit }) as Promise<CursorPageResult<AccountDigestSummary>>
+        : undefined,
+    });
   }
 
   async get_account_digest(digest_id: string): Promise<AccountDigest> {
@@ -1461,18 +1483,32 @@ export class SiglumeClient implements SiglumeClientShape {
     return parseAccountDigest(data);
   }
 
-  async list_account_alerts(): Promise<CursorPage<AccountAlert>> {
-    const [data, meta] = await this.request("GET", "/alerts");
+  async list_account_alerts(
+    options: { cursor?: string; limit?: number } = {},
+  ): Promise<CursorPage<AccountAlert>> {
+    const params: Record<string, string | number | boolean | null | undefined> = {};
+    if (options.cursor !== undefined && String(options.cursor).trim()) {
+      params.cursor = String(options.cursor).trim();
+    }
+    if (options.limit !== undefined) {
+      params.limit = Number(options.limit);
+    }
+    const requestOptions = Object.keys(params).length > 0 ? { params } : undefined;
+    const [data, meta] = await this.request("GET", "/alerts", requestOptions);
     const items = Array.isArray(data.items)
       ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseAccountAlert(item))
       : [];
-    return {
+    const next_cursor = stringOrNull(data.next_cursor);
+    return new CursorPageResult({
       items,
-      next_cursor: stringOrNull(data.next_cursor) ?? null,
-      limit: null,
-      offset: null,
+      next_cursor,
+      limit: typeof data.limit === "number" ? data.limit : options.limit ?? null,
+      offset: typeof data.offset === "number" ? data.offset : null,
       meta,
-    };
+      fetchNext: next_cursor
+        ? (cursor) => this.list_account_alerts({ cursor, limit: options.limit }) as Promise<CursorPageResult<AccountAlert>>
+        : undefined,
+    });
   }
 
   async get_account_alert(alert_id: string): Promise<AccountAlert> {

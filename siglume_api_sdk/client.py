@@ -1842,10 +1842,14 @@ class SiglumeClient:
         if not normalized_agent_id:
             raise SiglumeClientError("agent_id is required.")
         data, _meta = self._request("PUT", f"/me/favorites/{normalized_agent_id}/remove")
+        # Only infer status="removed" when the server actually confirmed
+        # success. Forcing the default on every response masked failures
+        # (e.g. {"ok": false} with no status field) as successful removals.
+        default_status = "removed" if bool(data.get("ok")) else None
         return _parse_favorite_agent_mutation(
             data,
             default_agent_id=normalized_agent_id,
-            default_status="removed",
+            default_status=default_status,
         )
 
     def post_account_content_direct(
@@ -1870,13 +1874,27 @@ class SiglumeClient:
         data, _meta = self._request("DELETE", f"/content/{normalized_content_id}")
         return _parse_account_content_delete_result(data)
 
-    def list_account_digests(self) -> CursorPage[AccountDigestSummary]:
-        data, meta = self._request("GET", "/digests")
+    def list_account_digests(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int | None = None,
+    ) -> CursorPage[AccountDigestSummary]:
+        params: dict[str, Any] = {}
+        if cursor is not None and str(cursor).strip():
+            params["cursor"] = str(cursor).strip()
+        if limit is not None:
+            params["limit"] = int(limit)
+        data, meta = self._request("GET", "/digests", params=params or None)
         items = data.get("items") if isinstance(data.get("items"), list) else []
+        next_cursor = _string_or_none(data.get("next_cursor"))
         return CursorPage(
             items=[_parse_account_digest_summary(item) for item in items if isinstance(item, Mapping)],
-            next_cursor=_string_or_none(data.get("next_cursor")),
+            next_cursor=next_cursor,
             meta=meta,
+            _fetch_next=(
+                lambda next_value: self.list_account_digests(cursor=next_value, limit=limit)
+            ) if next_cursor else None,
         )
 
     def get_account_digest(self, digest_id: str) -> AccountDigest:
@@ -1886,13 +1904,27 @@ class SiglumeClient:
         data, _meta = self._request("GET", f"/digests/{normalized_digest_id}")
         return _parse_account_digest(data)
 
-    def list_account_alerts(self) -> CursorPage[AccountAlert]:
-        data, meta = self._request("GET", "/alerts")
+    def list_account_alerts(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int | None = None,
+    ) -> CursorPage[AccountAlert]:
+        params: dict[str, Any] = {}
+        if cursor is not None and str(cursor).strip():
+            params["cursor"] = str(cursor).strip()
+        if limit is not None:
+            params["limit"] = int(limit)
+        data, meta = self._request("GET", "/alerts", params=params or None)
         items = data.get("items") if isinstance(data.get("items"), list) else []
+        next_cursor = _string_or_none(data.get("next_cursor"))
         return CursorPage(
             items=[_parse_account_alert(item) for item in items if isinstance(item, Mapping)],
-            next_cursor=_string_or_none(data.get("next_cursor")),
+            next_cursor=next_cursor,
             meta=meta,
+            _fetch_next=(
+                lambda next_value: self.list_account_alerts(cursor=next_value, limit=limit)
+            ) if next_cursor else None,
         )
 
     def get_account_alert(self, alert_id: str) -> AccountAlert:
