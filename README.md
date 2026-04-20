@@ -188,7 +188,7 @@ Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before using the helper or the bundl
 ## Using Siglume from LangChain / Claude Agent SDK
 
 The buyer-side SDK is available as `SiglumeBuyerClient` for framework adapters
-that consume marketplace listings instead of publishing them.
+that consume Agent API Store listings instead of publishing them.
 
 - Python bridge example: [examples/buyer_langchain.py](./examples/buyer_langchain.py)
 - TypeScript bridge example: [examples/buyer_claude_agent_sdk.ts](./examples/buyer_claude_agent_sdk.ts)
@@ -236,7 +236,7 @@ or a blank starter template.
 
 ## Refunds and disputes
 
-Use `RefundClient` when you need to reverse a completed marketplace charge or
+Use `RefundClient` when you need to reverse a completed Agent API Store charge or
 respond to a buyer dispute from seller support tooling.
 
 - Python example: [examples/refund_partial.py](./examples/refund_partial.py)
@@ -268,7 +268,7 @@ quotes.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked Agent API Store receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 `account_plan_wrapper.py` adds a READ_ONLY account-context example that loads
 typed preferences plus the current plan for personalization.

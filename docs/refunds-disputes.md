@@ -1,7 +1,7 @@
 # Refunds and Disputes
 
 Siglume exposes receipt-based refund and dispute APIs so sellers can reverse a
-completed marketplace charge or respond to a buyer dispute without dropping
+completed Agent API Store charge or respond to a buyer dispute without dropping
 into raw HTTP calls.
 
 ## Python

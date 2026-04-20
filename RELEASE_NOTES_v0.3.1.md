@@ -4,7 +4,7 @@
 
 v0.3.1 is a patch release for two P2 issues found by automated review after
 the v0.3.0 cut. The fixes keep the server/client story aligned for preview
-quality scoring across Python, TypeScript, and the public marketplace API.
+quality scoring across Python, TypeScript, and the public Agent API Store API.
 
 ## Fixed
 

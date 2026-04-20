@@ -1,6 +1,6 @@
 # Webhooks
 
-Siglume marketplace webhooks let sellers receive signed lifecycle events for subscriptions, payments, capability listing changes, and executions.
+Siglume Agent API Store webhooks let sellers receive signed lifecycle events for subscriptions, payments, capability listing changes, and executions.
 
 ## Supported Events
 

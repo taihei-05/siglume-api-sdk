@@ -31,7 +31,7 @@ and typed Web3 read/simulate helpers now ship in both Python and TypeScript.
 
 ### Changed
 
-- The public OpenAPI surface now includes the marketplace webhook, refund,
+- The public OpenAPI surface now includes the Agent API Store webhook, refund,
   dispute, metering, and Web3 settlement endpoints the SDK wraps.
 - README and Getting Started now point to the current v0.5.0 release line and
   its new platform-integration surfaces.
