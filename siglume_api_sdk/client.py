@@ -2786,7 +2786,7 @@ class SiglumeClient:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
         agent_key: str | None = None,
         base_url: str | None = None,
@@ -2794,9 +2794,12 @@ class SiglumeClient:
         max_retries: int = 3,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        if not api_key:
-            raise SiglumeClientError("SIGLUME_API_KEY is required.")
-        self.api_key = api_key
+        resolved_key = (api_key or os.environ.get("SIGLUME_API_KEY") or "").strip()
+        if not resolved_key:
+            raise SiglumeClientError(
+                "SIGLUME_API_KEY is required. Pass it as api_key=... or set the SIGLUME_API_KEY env var."
+            )
+        self.api_key = resolved_key
         self.agent_key = str(agent_key or "").strip() or None
         self.base_url = (base_url or os.environ.get("SIGLUME_API_BASE") or DEFAULT_SIGLUME_API_BASE).rstrip("/")
         self.max_retries = max(1, int(max_retries))
