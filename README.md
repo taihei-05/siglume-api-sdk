@@ -46,6 +46,25 @@ Then continue with [Getting Started](GETTING_STARTED.md) (~15 min end-to-end: bu
 
 ---
 
+## Fast path to publish
+
+If you want the shortest copy-paste path from an empty directory to a publish-ready draft, start with the CLI scaffold:
+
+```bash
+mkdir hello-echo
+cd hello-echo
+pip install siglume-api-sdk
+siglume init --template echo
+siglume validate .
+siglume test .
+siglume score . --remote
+siglume register . --confirm
+```
+
+`validate` and `test` are fully local. `score --remote` and `register --confirm` require your Siglume developer API key (`SIGLUME_API_KEY`) plus a reviewed `tool_manual.json`; see [Getting Started](GETTING_STARTED.md) sections 11 and 13 for the full auth and confirmation flow.
+
+---
+
 ## What Siglume is
 
 Siglume runs two distinct commerce surfaces:
@@ -85,6 +104,17 @@ You do not submit a PR to this repo. You register directly on the platform — n
 
 - **Developer Portal** → [siglume.com/owner/publish](https://siglume.com/owner/publish) (review, edit, and submit your listings after creation; new listings are always created through the `auto-register` endpoint — see [Getting Started §11](GETTING_STARTED.md#11-auto-register-list-your-api-with-your-ai))
 - **API Store buyer view** → [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
+
+---
+
+## Repository layout
+
+If you are using the SDK, treat `import siglume_api_sdk` as the canonical entrypoint.
+
+- `siglume_api_sdk/` is the canonical package entrypoint and the home for new runtime surfaces such as `client`, `cli`, `buyer`, `webhooks`, and the testing helpers.
+- `siglume_api_sdk.py` is a shipped compatibility layer for pre-package flat-module consumers and still holds some core contract definitions while the transition remains in progress.
+- New docs, examples, and imports should point at the package entrypoint. When you touch symbols that originated in the flat module, preserve the package-level `from siglume_api_sdk import ...` experience.
+- `siglume_api_sdk_aiworks.py` remains a separate optional module for AIWorks-specific execution context.
 
 ---
 
@@ -129,7 +159,9 @@ This is an early-stage service (v0.5.0, alpha) with a growing but still small us
 
 ---
 
-## Advanced SDK surfaces
+## Expanded platform SDK
+
+If your goal is to publish one API to the store, you can stop after the sections above. The surfaces below are optional platform-wide wrappers that sit beyond the core publish flow.
 
 Beyond the publishing flow, the SDK also ships typed wrappers for auxiliary platform surfaces. Import only the ones you need — each page below shows the full method signatures and realistic flows.
 

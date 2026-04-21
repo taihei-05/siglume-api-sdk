@@ -15,7 +15,7 @@ Before cutting a version tag:
 - [ ] Version in `pyproject.toml` (`[project].version`) matches the tag you're about to cut
 - [ ] `RELEASE_NOTES_vX.Y.Z.md` exists at the repo root, written as the GitHub Release body (highlights, revenue model, quick start, what's next, honest note)
 - [ ] `examples/hello_price_compare.py` and `examples/x_publisher.py` still run end-to-end against `AppTestHarness`
-- [ ] `docs/` and `README.md` are coherent with the shipped `siglume_api_sdk.py` surface (no references to removed symbols)
+- [ ] `docs/` and `README.md` are coherent with the shipped `siglume_api_sdk` public surface (package entrypoint plus legacy compatibility exports; no references to removed symbols)
 - [ ] There is **no** stale `siglume_app_sdk` / `siglume-app-sdk` / `siglume-app-types` reference (`grep -rn` expects zero matches)
 
 ## Build artifacts

@@ -51,6 +51,15 @@ siglume validate .
 siglume test .
 ```
 
+For the shortest publish-ready loop, continue in the same project with:
+
+```bash
+siglume score . --remote
+siglume register . --confirm
+```
+
+`validate` and `test` are fully local. `score --remote` and `register --confirm` require `SIGLUME_API_KEY` plus a tool manual you are ready to submit; the full auth and confirmation flow is covered in [Section 11](#11-auto-register-list-your-api-with-your-ai) and [Section 13](#13-tool-manual-guide).
+
 Or clone the repo to browse the examples:
 
 ```bash

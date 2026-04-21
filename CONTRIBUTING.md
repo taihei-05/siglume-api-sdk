@@ -36,6 +36,15 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
+## Repository layout
+
+Treat `import siglume_api_sdk` as the canonical public entrypoint.
+
+- `siglume_api_sdk/` is the canonical package entrypoint and the home for new runtime surfaces such as `client`, `cli`, `buyer`, `webhooks`, and testing helpers.
+- `siglume_api_sdk.py` is the legacy compatibility layer that preserves the pre-package flat-module API and still carries some shared core contracts during the migration.
+- `siglume_api_sdk_aiworks.py` is a separate optional module for AIWorks-specific runtime types.
+- New docs and examples should point at the package entrypoint. If you move or refactor legacy-exported symbols, preserve `from siglume_api_sdk import ...` for downstream users.
+
 ## Dev Container (optional)
 
 This repository includes a `.devcontainer/` configuration.
