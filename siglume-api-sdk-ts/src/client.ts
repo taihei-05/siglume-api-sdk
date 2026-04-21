@@ -205,11 +205,21 @@ export interface SiglumeClientShape {
   // Connected accounts (v0.7 track 3)
   list_connected_account_providers(): Promise<ConnectedAccountProvider[]>;
   start_connected_account_oauth(input: {
-    provider_key: string;
+    listing_id: string;
     redirect_uri: string;
     scopes?: string[];
     account_role?: string;
   }): Promise<ConnectedAccountOAuthStart>;
+  set_listing_oauth_credentials(
+    listing_id: string,
+    input: {
+      provider_key: string;
+      client_id: string;
+      client_secret: string;
+      required_scopes?: string[];
+    },
+  ): Promise<Record<string, unknown>>;
+  get_listing_oauth_credentials_status(listing_id: string): Promise<Record<string, unknown>>;
   complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>>;
   refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
   revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
@@ -2377,13 +2387,13 @@ export class SiglumeClient implements SiglumeClientShape {
   }
 
   async start_connected_account_oauth(input: {
-    provider_key: string;
+    listing_id: string;
     redirect_uri: string;
     scopes?: string[];
     account_role?: string;
   }): Promise<ConnectedAccountOAuthStart> {
     const body: Record<string, unknown> = {
-      provider_key: input.provider_key,
+      listing_id: input.listing_id,
       redirect_uri: input.redirect_uri,
     };
     if (input.scopes !== undefined) body.scopes = input.scopes;
@@ -2394,7 +2404,7 @@ export class SiglumeClient implements SiglumeClientShape {
     return {
       authorize_url: String(data.authorize_url ?? ""),
       state: String(data.state ?? ""),
-      provider_key: String(data.provider_key ?? input.provider_key),
+      provider_key: String(data.provider_key ?? ""),
       scopes: Array.isArray(data.scopes)
         ? data.scopes.filter((s: unknown): s is string => typeof s === "string")
         : [],
@@ -2417,6 +2427,32 @@ export class SiglumeClient implements SiglumeClientShape {
   async revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
     const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/revoke`);
     return parseConnectedAccountLifecycle(data);
+  }
+
+  async set_listing_oauth_credentials(
+    listing_id: string,
+    input: {
+      provider_key: string;
+      client_id: string;
+      client_secret: string;
+      required_scopes?: string[];
+    },
+  ): Promise<Record<string, unknown>> {
+    const body: Record<string, unknown> = {
+      provider_key: input.provider_key,
+      client_id: input.client_id,
+      client_secret: input.client_secret,
+    };
+    if (input.required_scopes !== undefined) body.required_scopes = input.required_scopes;
+    const [data] = await this.request("PUT", `/market/capabilities/${listing_id}/oauth-credentials`, {
+      json_body: body,
+    });
+    return { ...data };
+  }
+
+  async get_listing_oauth_credentials_status(listing_id: string): Promise<Record<string, unknown>> {
+    const [data] = await this.request("GET", `/market/capabilities/${listing_id}/oauth-credentials`);
+    return { ...data };
   }
 
   // ----- end connected accounts --------------------------------------------

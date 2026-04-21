@@ -62,7 +62,7 @@ def test_list_providers_parses_registry() -> None:
     assert providers[1].pkce_required is True
 
 
-def test_start_oauth_posts_and_returns_authorize_url() -> None:
+def test_start_oauth_posts_listing_id_and_returns_authorize_url() -> None:
     captured: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -70,7 +70,7 @@ def test_start_oauth_posts_and_returns_authorize_url() -> None:
         captured["path"] = request.url.path
         captured["body"] = json.loads(request.content.decode("utf-8"))
         return httpx.Response(201, json=envelope({
-            "authorize_url": "https://slack.com/oauth/v2/authorize?state=s&client_id=...",
+            "authorize_url": "https://slack.com/oauth/v2/authorize?state=s&client_id=sato-cid",
             "state": "s-abc",
             "provider_key": "slack",
             "scopes": ["chat:write"],
@@ -78,7 +78,7 @@ def test_start_oauth_posts_and_returns_authorize_url() -> None:
         }))
 
     start = _build(handler).start_connected_account_oauth(
-        provider_key="slack",
+        listing_id="lst_abc",
         redirect_uri="https://siglume.example/cb",
         scopes=["chat:write"],
         account_role="bot",
@@ -86,17 +86,18 @@ def test_start_oauth_posts_and_returns_authorize_url() -> None:
     assert captured["method"] == "POST"
     assert captured["path"] == "/v1/me/connected-accounts/oauth/authorize"
     body = captured["body"]
-    assert body["provider_key"] == "slack"
+    # Responsibility-correction: callers pass listing_id, not provider_key.
+    # Platform derives provider_key from the listing's seller-registered creds.
+    assert body["listing_id"] == "lst_abc"
+    assert "provider_key" not in body
     assert body["scopes"] == ["chat:write"]
-    assert body["account_role"] == "bot"
     assert isinstance(start, ConnectedAccountOAuthStart)
     assert start.state == "s-abc"
 
 
 def test_start_oauth_never_sends_client_secret() -> None:
-    """Regression: the SDK must not surface client_secret in its API.
-    Client secrets are server-side credentials and belong in platform
-    settings, not in SDK call sites."""
+    """Regression: client_secret is a server-side credential and
+    must never appear in SDK request bodies."""
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content.decode("utf-8"))
         assert "client_secret" not in body
@@ -108,9 +109,50 @@ def test_start_oauth_never_sends_client_secret() -> None:
         }))
 
     _build(handler).start_connected_account_oauth(
-        provider_key="slack",
+        listing_id="lst_abc",
         redirect_uri="https://siglume.example/cb",
     )
+
+
+def test_seller_can_set_and_read_listing_oauth_credentials() -> None:
+    """Seller registers their Slack app credentials against their
+    listing. The read path never returns the secret."""
+    calls: list[tuple[str, str, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        calls.append((request.method, request.url.path, body))
+        if request.method == "PUT":
+            return httpx.Response(200, json=envelope({
+                "listing_id": "lst_abc",
+                "provider_key": "slack",
+                "required_scopes": ["chat:write"],
+                "configured": True,
+            }))
+        return httpx.Response(200, json=envelope({
+            "listing_id": "lst_abc",
+            "provider_key": "slack",
+            "configured": True,
+            "required_scopes": ["chat:write"],
+        }))
+
+    client = _build(handler)
+    result = client.set_listing_oauth_credentials(
+        "lst_abc",
+        provider_key="slack",
+        client_id="sato-cid",
+        client_secret="sato-secret",
+        required_scopes=["chat:write"],
+    )
+    assert result["configured"] is True
+    assert calls[0][0] == "PUT"
+    assert calls[0][1] == "/v1/market/capabilities/lst_abc/oauth-credentials"
+    assert calls[0][2]["client_secret"] == "sato-secret"
+
+    status = client.get_listing_oauth_credentials_status("lst_abc")
+    assert status["configured"] is True
+    assert "client_secret" not in status
+    assert "client_id" not in status
 
 
 def test_complete_oauth_returns_account_summary() -> None:
