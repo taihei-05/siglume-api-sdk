@@ -24,6 +24,9 @@ import type {
   ApprovalPolicy,
   BundleListingRecord,
   BundleMember,
+  ConnectedAccountLifecycleResult,
+  ConnectedAccountOAuthStart,
+  ConnectedAccountProvider,
   AutoRegistrationReceipt,
   BillingPortalLink,
   BudgetPolicy,
@@ -198,6 +201,18 @@ export interface SiglumeClientShape {
   add_bundle_capability(bundle_id: string, input: { capability_listing_id: string; position?: number }): Promise<BundleListingRecord>;
   remove_bundle_capability(bundle_id: string, capability_listing_id: string): Promise<BundleListingRecord>;
   submit_bundle_for_review(bundle_id: string): Promise<BundleListingRecord>;
+
+  // Connected accounts (v0.7 track 3)
+  list_connected_account_providers(): Promise<ConnectedAccountProvider[]>;
+  start_connected_account_oauth(input: {
+    provider_key: string;
+    redirect_uri: string;
+    scopes?: string[];
+    account_role?: string;
+  }): Promise<ConnectedAccountOAuthStart>;
+  complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>>;
+  refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
+  revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
 
   get_developer_portal(): Promise<DeveloperPortalSummary>;
   create_sandbox_session(options: { agent_id: string; capability_key: string }): Promise<SandboxSession>;
@@ -819,6 +834,39 @@ function parseBundleMember(data: Record<string, unknown>): BundleMember {
     status: stringOrNull(data.status),
     added_at: stringOrNull(data.added_at),
     link_id: stringOrNull(data.link_id),
+  };
+}
+
+function parseConnectedAccountProvider(data: Record<string, unknown>): ConnectedAccountProvider {
+  return {
+    provider_key: String(data.provider_key ?? ""),
+    display_name: String(data.display_name ?? ""),
+    auth_type: String(data.auth_type ?? "oauth2"),
+    refresh_supported: Boolean(data.refresh_supported ?? false),
+    pkce_required: Boolean(data.pkce_required ?? false),
+    default_scopes: Array.isArray(data.default_scopes)
+      ? data.default_scopes.filter((s): s is string => typeof s === "string")
+      : [],
+    available_scopes: Array.isArray(data.available_scopes)
+      ? data.available_scopes.filter((s): s is string => typeof s === "string")
+      : [],
+    scope_separator: String(data.scope_separator ?? " "),
+    notes: stringOrNull(data.notes),
+  };
+}
+
+function parseConnectedAccountLifecycle(data: Record<string, unknown>): ConnectedAccountLifecycleResult {
+  return {
+    connected_account_id: String(data.connected_account_id ?? ""),
+    provider_key: String(data.provider_key ?? ""),
+    expires_at: stringOrNull(data.expires_at),
+    scopes: Array.isArray(data.scopes)
+      ? data.scopes.filter((s): s is string => typeof s === "string")
+      : [],
+    refreshed_at: stringOrNull(data.refreshed_at),
+    connection_status: stringOrNull(data.connection_status),
+    provider_revoked: typeof data.provider_revoked === "boolean" ? data.provider_revoked : null,
+    revoked_at: stringOrNull(data.revoked_at),
   };
 }
 
@@ -2316,6 +2364,62 @@ export class SiglumeClient implements SiglumeClientShape {
   }
 
   // ----- end bundles -------------------------------------------------------
+
+  // ----- Connected accounts (v0.7 track 3) ---------------------------------
+  // `resolve()` is intentionally NOT wrapped: runtime-only, never over the wire.
+
+  async list_connected_account_providers(): Promise<ConnectedAccountProvider[]> {
+    const [data] = await this.request("GET", "/me/connected-accounts/providers");
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items
+      .filter((item: unknown): item is Record<string, unknown> => isRecord(item))
+      .map(parseConnectedAccountProvider);
+  }
+
+  async start_connected_account_oauth(input: {
+    provider_key: string;
+    redirect_uri: string;
+    scopes?: string[];
+    account_role?: string;
+  }): Promise<ConnectedAccountOAuthStart> {
+    const body: Record<string, unknown> = {
+      provider_key: input.provider_key,
+      redirect_uri: input.redirect_uri,
+    };
+    if (input.scopes !== undefined) body.scopes = input.scopes;
+    if (input.account_role !== undefined) body.account_role = input.account_role;
+    const [data] = await this.request("POST", "/me/connected-accounts/oauth/authorize", {
+      json_body: body,
+    });
+    return {
+      authorize_url: String(data.authorize_url ?? ""),
+      state: String(data.state ?? ""),
+      provider_key: String(data.provider_key ?? input.provider_key),
+      scopes: Array.isArray(data.scopes)
+        ? data.scopes.filter((s: unknown): s is string => typeof s === "string")
+        : [],
+      pkce_method: stringOrNull(data.pkce_method),
+    };
+  }
+
+  async complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>> {
+    const [data] = await this.request("POST", "/me/connected-accounts/oauth/callback", {
+      json_body: { state: input.state, code: input.code },
+    });
+    return { ...data };
+  }
+
+  async refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
+    const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/refresh`);
+    return parseConnectedAccountLifecycle(data);
+  }
+
+  async revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
+    const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/revoke`);
+    return parseConnectedAccountLifecycle(data);
+  }
+
+  // ----- end connected accounts --------------------------------------------
 
   async get_developer_portal(): Promise<DeveloperPortalSummary> {
     const [data, meta] = await this.request("GET", "/market/developer/portal");

@@ -283,6 +283,37 @@ export interface AppListingRecord {
   raw: Record<string, unknown>;
 }
 
+export interface ConnectedAccountProvider {
+  provider_key: string;
+  display_name: string;
+  auth_type: string;
+  refresh_supported: boolean;
+  pkce_required: boolean;
+  default_scopes: string[];
+  available_scopes: string[];
+  scope_separator: string;
+  notes?: string | null;
+}
+
+export interface ConnectedAccountOAuthStart {
+  authorize_url: string;
+  state: string;
+  provider_key: string;
+  scopes: string[];
+  pkce_method?: string | null;
+}
+
+export interface ConnectedAccountLifecycleResult {
+  connected_account_id: string;
+  provider_key: string;
+  expires_at?: string | null;
+  scopes: string[];
+  refreshed_at?: string | null;
+  connection_status?: string | null;
+  provider_revoked?: boolean | null;
+  revoked_at?: string | null;
+}
+
 export interface BundleMember {
   capability_listing_id: string;
   capability_key?: string | null;
