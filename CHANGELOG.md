@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-04-21
+
+v0.7.1 is a responsibility-correction release over v0.7.0.
+
+### Breaking
+
+- `start_connected_account_oauth(...)` now takes **`listing_id`**
+  instead of `provider_key`. OAuth client credentials
+  (`client_id` / `client_secret`) are registered by the **seller**
+  against their listing, not by the platform in env vars. The
+  platform resolves the seller's credentials from the listing
+  when the buyer initiates OAuth. This applies to both Python
+  and TypeScript.
+
+### Added
+
+- Seller-side: `set_listing_oauth_credentials(listing_id, ...)` +
+  `get_listing_oauth_credentials_status(listing_id)` in both
+  bindings. The setter encrypts `client_secret` at rest; the
+  reader never returns the secret values.
+
+### Migration guide (v0.7.0 → v0.7.1)
+
+- v0.7.0 required deploying
+  `AGENT_SNS_PROVIDER_<KEY>_CLIENT_{ID,SECRET}` env vars on the
+  platform. v0.7.1 removes that path entirely — each seller
+  registers their own OAuth app and calls
+  `set_listing_oauth_credentials()` once per listing.
+- Existing v0.7.0 `ConnectedAccount` rows have no
+  `source_listing_id`. They remain usable for resolve / revoke
+  but **cannot be refreshed** and **do not satisfy** the new
+  subscribe-time scope gate. Reconnect to regenerate them under
+  the new model.
+
+### Platform requirement
+
+Requires platform PR taihei-05/siglume#143 deployed.
+
 ## [0.7.0] - 2026-04-21
 
 v0.7.0 wraps the v0.7 platform tracks — capability bundles and
