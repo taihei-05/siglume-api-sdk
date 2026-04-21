@@ -3212,7 +3212,7 @@ class SiglumeClient:
         return ConnectedAccountOAuthStart(
             authorize_url=str(data.get("authorize_url") or ""),
             state=str(data.get("state") or ""),
-            provider_key=str(data.get("provider_key") or provider_key),
+            provider_key=str(data.get("provider_key") or ""),
             scopes=[str(s) for s in (data.get("scopes") or []) if isinstance(s, str)],
             pkce_method=_string_or_none(data.get("pkce_method")),
         )

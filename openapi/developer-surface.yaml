@@ -978,6 +978,130 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConnectedAccountEnvelope'
 
+  /me/connected-accounts/providers:
+    get:
+      operationId: listConnectedAccountProviders
+      summary: List the connected-account provider registry
+      responses:
+        '200':
+          description: Provider registry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountProviderListEnvelope'
+
+  /me/connected-accounts/oauth/authorize:
+    post:
+      operationId: startConnectedAccountOAuth
+      summary: Begin the buyer OAuth flow for a specific listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectedAccountOAuthAuthorizeRequest'
+      responses:
+        '201':
+          description: Authorization URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountOAuthStartEnvelope'
+
+  /me/connected-accounts/oauth/callback:
+    post:
+      operationId: completeConnectedAccountOAuth
+      summary: Complete the buyer OAuth flow with provider callback params
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectedAccountOAuthCallbackRequest'
+      responses:
+        '200':
+          description: Connected-account lifecycle summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
+
+  /me/connected-accounts/{accountId}/refresh:
+    post:
+      operationId: refreshConnectedAccount
+      summary: Refresh a connected account without exposing provider tokens
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Refreshed connected-account lifecycle summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
+
+  /me/connected-accounts/{accountId}/revoke:
+    post:
+      operationId: revokeConnectedAccount
+      summary: Revoke a connected account and return lifecycle metadata
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revoked connected-account lifecycle summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
+
+  /market/capabilities/{listingId}/oauth-credentials:
+    get:
+      operationId: getListingOAuthCredentialsStatus
+      summary: Read whether a listing has OAuth credentials configured
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Listing OAuth credential status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
+    put:
+      operationId: setListingOAuthCredentials
+      summary: Store seller-owned OAuth client credentials for a listing
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingOAuthCredentialsRequest'
+      responses:
+        '200':
+          description: Listing OAuth credential status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
+
   /market/sandbox/sessions:
     post:
       operationId: createSandboxSession
@@ -1685,6 +1809,147 @@ components:
         metadata: { type: object }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    ConnectedAccountProvider:
+      type: object
+      properties:
+        provider_key: { type: string }
+        display_name: { type: string }
+        auth_type: { type: string, default: oauth2 }
+        refresh_supported: { type: boolean, default: false }
+        pkce_required: { type: boolean, default: false }
+        default_scopes:
+          type: array
+          items: { type: string }
+        available_scopes:
+          type: array
+          items: { type: string }
+        scope_separator: { type: string, default: ' ' }
+        notes: { type: string, nullable: true }
+
+    ConnectedAccountProviderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectedAccountProvider'
+
+    ConnectedAccountOAuthAuthorizeRequest:
+      type: object
+      required: [listing_id, redirect_uri]
+      properties:
+        listing_id: { type: string }
+        redirect_uri: { type: string, format: uri }
+        scopes:
+          type: array
+          items: { type: string }
+        account_role: { type: string, nullable: true }
+
+    ConnectedAccountOAuthStart:
+      type: object
+      properties:
+        authorize_url: { type: string, format: uri }
+        state: { type: string }
+        provider_key: { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+        pkce_method: { type: string, nullable: true }
+
+    ConnectedAccountLifecycle:
+      type: object
+      properties:
+        connected_account_id: { type: string }
+        provider_key: { type: string }
+        expires_at: { type: string, format: date-time, nullable: true }
+        scopes:
+          type: array
+          items: { type: string }
+        refreshed_at: { type: string, format: date-time, nullable: true }
+        connection_status: { type: string, nullable: true }
+        provider_revoked: { type: boolean, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+
+    ConnectedAccountProviderListEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ConnectedAccountProviderList'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ConnectedAccountOAuthStartEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ConnectedAccountOAuthStart'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ConnectedAccountOAuthCallbackRequest:
+      type: object
+      required: [state, code]
+      properties:
+        state: { type: string }
+        code: { type: string }
+
+    ConnectedAccountLifecycleEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ConnectedAccountLifecycle'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    ListingOAuthCredentialsRequest:
+      type: object
+      required: [provider_key, client_id, client_secret]
+      properties:
+        provider_key: { type: string }
+        client_id: { type: string }
+        client_secret: { type: string }
+        required_scopes:
+          type: array
+          items: { type: string }
+
+    ListingOAuthCredentialsStatus:
+      type: object
+      properties:
+        listing_id: { type: string }
+        provider_key: { type: string }
+        configured: { type: boolean }
+        required_scopes:
+          type: array
+          items: { type: string }
+
+    ListingOAuthCredentialsStatusEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/ListingOAuthCredentialsStatus'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
 
     ConnectedAccountPage:
       type: object

@@ -124,6 +124,25 @@ jobs:
             exit 1
           fi
 
+      - name: Verify TS package version matches tag
+        env:
+          RESOLVED_TAG: ${{ steps.resolve.outputs.resolved-tag }}
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${RESOLVED_TAG#v}"
+          PACKAGE_VERSION=$(python - <<'PY'
+          import json
+          with open("siglume-api-sdk-ts/package.json", "r", encoding="utf-8") as fh:
+              print(json.load(fh)["version"])
+          PY
+          )
+          echo "Tag version:        $TAG_VERSION"
+          echo "package.json ver.:  $PACKAGE_VERSION"
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "::error::Tag version '$TAG_VERSION' does not match siglume-api-sdk-ts/package.json version '$PACKAGE_VERSION'"
+            exit 1
+          fi
+
       - name: Build sdist and wheel
         run: python -m build
 
@@ -194,6 +213,8 @@ jobs:
       url: https://www.npmjs.com/package/@siglume/api-sdk
     permissions:
       contents: read
+      # Required for `npm publish --provenance` on GitHub-hosted runners.
+      id-token: write
     steps:
       - name: Check out the tag
         uses: actions/checkout@v4

@@ -114,6 +114,27 @@ def test_start_oauth_never_sends_client_secret() -> None:
     )
 
 
+def test_start_oauth_tolerates_missing_provider_key_in_response() -> None:
+    """Regression: v0.7.1 switched the input to listing_id, so the
+    response parser must not reference the removed provider_key arg."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/me/connected-accounts/oauth/authorize"
+        return httpx.Response(201, json=envelope({
+            "authorize_url": "https://slack.com/oauth/v2/authorize",
+            "state": "s-abc",
+            "scopes": ["chat:write"],
+            "pkce_method": None,
+        }))
+
+    start = _build(handler).start_connected_account_oauth(
+        listing_id="lst_abc",
+        redirect_uri="https://siglume.example/cb",
+    )
+    assert start.state == "s-abc"
+    assert start.provider_key == ""
+
+
 def test_seller_can_set_and_read_listing_oauth_credentials() -> None:
     """Seller registers their Slack app credentials against their
     listing. The read path never returns the secret."""
