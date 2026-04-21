@@ -3185,18 +3185,21 @@ class SiglumeClient:
     def start_connected_account_oauth(
         self,
         *,
-        provider_key: str,
+        listing_id: str,
         redirect_uri: str,
         scopes: list[str] | None = None,
         account_role: str | None = None,
     ) -> ConnectedAccountOAuthStart:
-        """Begin the OAuth dance. Point the owner's browser at the
-        returned ``authorize_url`` and expect the provider to redirect
-        back to ``redirect_uri`` with ``code`` + ``state`` query
-        params. Those values are passed to
-        ``complete_connected_account_oauth``."""
+        """Begin the OAuth dance for a specific listing.
+
+        v0.7.1 responsibility-correction: OAuth client credentials
+        live on the LISTING (the seller registered their own app
+        with the provider). The SDK caller passes the ``listing_id``
+        they're connecting for; the platform resolves the provider
+        + client credentials from that listing.
+        """
         body: dict[str, Any] = {
-            "provider_key": provider_key,
+            "listing_id": listing_id,
             "redirect_uri": redirect_uri,
         }
         if scopes is not None:
@@ -3240,6 +3243,41 @@ class SiglumeClient:
             "POST", f"/me/connected-accounts/{account_id}/revoke",
         )
         return _parse_connected_account_lifecycle(data)
+
+    def set_listing_oauth_credentials(
+        self,
+        listing_id: str,
+        *,
+        provider_key: str,
+        client_id: str,
+        client_secret: str,
+        required_scopes: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Seller-side: register the OAuth client credentials for
+        your listing. v0.7.1 responsibility-correction — the seller
+        is the OAuth party, not the platform. ``client_secret`` is
+        stored encrypted server-side and is never returned on reads.
+        """
+        body: dict[str, Any] = {
+            "provider_key": provider_key,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
+        if required_scopes is not None:
+            body["required_scopes"] = list(required_scopes)
+        data, _meta = self._request(
+            "PUT", f"/market/capabilities/{listing_id}/oauth-credentials",
+            json_body=body,
+        )
+        return dict(data)
+
+    def get_listing_oauth_credentials_status(self, listing_id: str) -> dict[str, Any]:
+        """Read-only: is OAuth configured on this listing? Never
+        returns the secret values themselves."""
+        data, _meta = self._request(
+            "GET", f"/market/capabilities/{listing_id}/oauth-credentials",
+        )
+        return dict(data)
 
     # ----- end connected accounts ----------------------------------------
 

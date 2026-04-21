@@ -44,8 +44,8 @@ describe("Connected accounts SDK wrap (v0.7 track 3)", () => {
     client.close();
     expect(calls[0]).toBe("/v1/me/connected-accounts/providers");
     expect(providers).toHaveLength(1);
-    expect(providers[0].provider_key).toBe("slack");
-    expect(providers[0].refresh_supported).toBe(true);
+    expect(providers[0]!.provider_key).toBe("slack");
+    expect(providers[0]!.refresh_supported).toBe(true);
   });
 
   it("starts OAuth and never sends client_secret in the body", async () => {
@@ -66,7 +66,7 @@ describe("Connected accounts SDK wrap (v0.7 track 3)", () => {
       );
     });
     const result = await client.start_connected_account_oauth({
-      provider_key: "slack",
+      listing_id: "lst_abc",
       redirect_uri: "https://siglume.example/cb",
       scopes: ["chat:write"],
     });
