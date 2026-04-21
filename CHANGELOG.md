@@ -5,18 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-04-21
+
+v0.7.0 wraps the v0.7 platform tracks — capability bundles and
+connected-account OAuth — in the public Python + TypeScript SDK.
+Both surfaces reach parity at ship; the "no resolve on the wire"
+contract is pinned by regression tests in both language bindings.
 
 ### Added
 
-- **Capability bundles** (v0.7 track 2 wrap): typed Python + TypeScript
-  client methods for the platform's `/v1/market/bundles` surface —
+- **Capability bundles** (track 2): typed Python + TypeScript
+  client methods for `/v1/market/bundles` —
   `list_bundles` / `get_bundle` / `create_bundle` / `update_bundle` /
   `add_bundle_capability` / `remove_bundle_capability` /
   `submit_bundle_for_review`. New `BundleListingRecord` and
-  `BundleMember` dataclasses / interfaces. A bundle exposes multiple
-  capability listings as one subscription; member adds enforce
-  same-seller and grade-B gates server-side.
+  `BundleMember` types. A bundle exposes multiple capability
+  listings as one subscription; the platform enforces
+  same-seller, 10-member cap, and grade-B-per-member gates.
+- **Connected accounts** (track 3): Python + TypeScript wrap over
+  `/v1/me/connected-accounts` — `list_connected_account_providers` /
+  `start_connected_account_oauth` /
+  `complete_connected_account_oauth` / `refresh_connected_account` /
+  `revoke_connected_account`. New types
+  `ConnectedAccountProvider`, `ConnectedAccountOAuthStart`,
+  `ConnectedAccountLifecycleResult`.
+
+### Security
+
+- `resolve()` is intentionally NOT exposed on the wire — pinned
+  by regression tests in both Python and TypeScript test suites.
+  Capability runtimes resolve tokens in-process via the platform's
+  `CapabilityGateway`, never over HTTP.
+- `client_secret` is never accepted in HTTP request bodies. The
+  platform reads per-provider client credentials from server-side
+  env vars (`AGENT_SNS_PROVIDER_<KEY>_CLIENT_SECRET`). Sending
+  `client_secret` from the SDK is blocked at the type layer.
+
+### Compatibility
+
+- Fully additive on top of v0.6.0 — no signature changes to
+  existing methods.
+- Platform requirement: the v0.7 launch-readiness PR series
+  (taihei-05/siglume #138, #139, #140, #141, #142) must be
+  deployed for the new surfaces to respond; against older
+  platform builds the new methods return 404.
 
 ## [0.6.0] - 2026-04-20
 
