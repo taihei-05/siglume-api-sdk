@@ -168,3 +168,70 @@ jobs:
         with:
           # PEP 740 digital attestations for each artifact, published on PyPI.
           attestations: true
+
+  # Job 3: publish the TypeScript package to npm. Independent of PyPI —
+  # runs on the same tag push. Uses NPM_TOKEN from the repo secrets
+  # (automation token with 2FA-exempt publish scope).
+  #
+  # SETUP (one-time, npm-side — operator task):
+  #   1. Sign in to https://www.npmjs.com/
+  #   2. Create an Automation access token (Settings → Access Tokens →
+  #      Generate New Token → Automation). This is 2FA-exempt and meant
+  #      for CI.
+  #   3. Add the token as a GitHub secret named NPM_TOKEN:
+  #      https://github.com/taihei-05/siglume-api-sdk/settings/secrets/actions/new
+  #   4. Ensure package.json "name" matches the npm scope you control
+  #      (currently @siglume/api-sdk).
+  #
+  # If NPM_TOKEN is not set, the job skips with a warning so
+  # PyPI-only releases still succeed.
+  publish-npm:
+    name: Publish TS to npm
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@siglume/api-sdk
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check for NPM_TOKEN
+        id: npm_token
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "NPM_TOKEN is not set; skipping npm publish."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies (TS package)
+        if: steps.npm_token.outputs.present == 'true'
+        working-directory: siglume-api-sdk-ts
+        run: npm ci
+
+      - name: Build TS package
+        if: steps.npm_token.outputs.present == 'true'
+        working-directory: siglume-api-sdk-ts
+        run: npm run build
+
+      - name: Publish to npm
+        if: steps.npm_token.outputs.present == 'true'
+        working-directory: siglume-api-sdk-ts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # --access public because the package is scoped (@siglume/...)
+        # and npm defaults scoped packages to private.
+        run: npm publish --access public --provenance
