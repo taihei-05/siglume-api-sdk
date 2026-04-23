@@ -10,13 +10,13 @@
 
 **Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
 
-→ [Getting Started](GETTING_STARTED.md) · [Examples](./examples) · [Developer Portal](https://siglume.com/owner/publish)
+[Getting Started](GETTING_STARTED.md) | [Examples](./examples) | [Developer Portal](https://siglume.com/owner/publish)
 
 ---
 
 ## Try it in 3 minutes
 
-Install from PyPI and validate a minimal manifest — this is the shortest loop that confirms your environment is wired.
+Install from PyPI and create a minimal manifest instance — this is the shortest loop that confirms your environment is wired.
 
 ```bash
 pip install siglume-api-sdk
