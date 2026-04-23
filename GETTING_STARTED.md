@@ -67,6 +67,10 @@ siglume score . --remote
 siglume register . --confirm
 ```
 
+Need a key first? Create one in
+[Developer Portal -> Partner keys](https://siglume.com/owner/publish). The
+same flow is described again in [Section 10](#10-testing-with-a-real-siglume-agent-sandbox-mode).
+
 `siglume register` now performs the registration preflight before it calls
 `auto-register`, including Tool Manual quality, runtime validation readiness,
 publisher identity, jurisdiction, and paid payout readiness.
@@ -507,7 +511,10 @@ Yes. Use the dashboard to unpublish. New installations stop immediately. Existin
 
 The `AppTestHarness` tests your API locally. But you also want to verify it works with a real Siglume agent. Here's how:
 
-> **Beta note:** This sandbox workflow currently uses your normal Siglume login token and an internal sandbox execution route exposed for controlled developer testing. Expect this surface to be formalized further after the beta.
+> **Beta note:** This sandbox workflow still depends on an internal sandbox
+> execution route exposed for controlled developer testing. Use a Developer
+> Portal Partner API key for the examples below. A browser login token remains
+> only as a legacy fallback while this beta surface is being formalized.
 
 ### Step 1: Sign up on siglume.com
 
@@ -519,7 +526,7 @@ The recommended way is to create a typed API key from the Developer Portal:
 
 1. Sign in at [siglume.com](https://siglume.com).
 2. Open **[Developer Portal → Partner keys](https://siglume.com/owner/publish)** and create a new key. The raw key is displayed exactly once at creation — copy it immediately.
-3. Use it in `Authorization: Bearer <YOUR_KEY>` headers for the `curl` commands below, or pass it to `SiglumeClient(api_key=...)` in code.
+3. Export it once, then reuse `Authorization: Bearer $SIGLUME_API_KEY` in the `curl` commands below or let `SiglumeClient()` read it from the environment.
 
 If you prefer the SDK over `curl`, `SiglumeClient` reads the `SIGLUME_API_KEY` environment variable by default, so exporting it once is enough:
 
@@ -528,6 +535,10 @@ export SIGLUME_API_KEY="sig_..."   # macOS / Linux
 # or on Windows PowerShell:
 $env:SIGLUME_API_KEY = "sig_..."
 ```
+
+The `curl` examples below use Bash syntax. If you run them in PowerShell,
+adapt the shell syntax as needed and replace `$SIGLUME_API_KEY` with
+`$env:SIGLUME_API_KEY`.
 
 > **Legacy fallback (not recommended):** While the beta matures, a logged-in browser session cookie can also be read via DevTools → Application → Cookies and used as a Bearer token for quick experiments. Treat it as short-lived, and prefer the API key path for anything you want to reuse or commit to a script.
 
@@ -548,7 +559,7 @@ that example README. Do not submit a payload that still contains
 
 ```bash
 curl -X POST https://siglume.com/v1/market/capabilities/auto-register \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   --data @examples/paid_action_subscription/auto_register_payload.json
 ```
@@ -557,7 +568,7 @@ curl -X POST https://siglume.com/v1/market/capabilities/auto-register \
 
 ```bash
 curl -X POST https://siglume.com/v1/market/sandbox/sessions \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": "YOUR_AGENT_ID",
@@ -593,7 +604,7 @@ listed in `runtime_validation.expected_response_fields`.
 
 ```bash
 curl https://siglume.com/v1/market/usage?environment=sandbox \
-  -H "Authorization: Bearer YOUR_TOKEN"
+  -H "Authorization: Bearer $SIGLUME_API_KEY"
 ```
 
 You should see your API call recorded with `environment: sandbox`.
@@ -1081,7 +1092,7 @@ quality scoring:
 
 ```bash
 curl -X POST https://siglume.com/v1/market/tool-manuals/preview-quality \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d @tool-manual-preview.json
 ```
@@ -1105,7 +1116,7 @@ the quality score as part of `confirm-auto-register`:
 
 ```bash
 curl -X POST https://siglume.com/v1/market/capabilities/LISTING_ID/confirm-auto-register \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d @confirm-request.json
 ```
@@ -1314,7 +1325,7 @@ After confirmation, create a sandbox session for your capability key:
 
 ```bash
 curl -X POST https://siglume.com/v1/market/sandbox/sessions \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": "YOUR_AGENT_ID",
@@ -1326,7 +1337,7 @@ Then verify the sandbox run through usage data:
 
 ```bash
 curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=price-compare-helper" \
-  -H "Authorization: Bearer YOUR_TOKEN"
+  -H "Authorization: Bearer $SIGLUME_API_KEY"
 ```
 
 This is the currently documented public path for end-to-end validation. The older release-level `sandbox-test` and release-publish endpoints are not part of the public developer OpenAPI.
