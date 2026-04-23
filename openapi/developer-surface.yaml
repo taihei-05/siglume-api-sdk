@@ -139,9 +139,12 @@ paths:
         should include `manifest`, `tool_manual`, `runtime_validation`,
         `docs_url`, `support_contact`, and `jurisdiction`.
 
-        The validation path `legal.publisher_identity` maps to `docs_url` plus
-        `support_contact`; those fields may be top-level, inside `manifest`, or
-        supplied as `legal.publisher_identity.documentation_url` and
+        The validation path `legal.jurisdiction` maps to the listing
+        jurisdiction, which may be supplied as top-level `jurisdiction` or
+        `manifest.jurisdiction`. The validation path
+        `legal.publisher_identity` maps to `docs_url` plus `support_contact`;
+        those fields may be top-level, inside `manifest`, or supplied as
+        `legal.publisher_identity.documentation_url` and
         `legal.publisher_identity.support_contact`.
 
         Paid subscription APIs also require a verified Polygon payout
@@ -163,11 +166,30 @@ paths:
                 - anyOf:
                     - required: [jurisdiction]
                     - required: [manifest]
+                      properties:
+                        manifest:
+                          required: [jurisdiction]
                 - anyOf:
                     - required: [publisher_identity]
+                      properties:
+                        publisher_identity:
+                          anyOf:
+                            - required: [documentation_url, support_contact]
+                            - required: [docs_url, support_contact]
                     - required: [legal]
+                      properties:
+                        legal:
+                          required: [publisher_identity]
+                          properties:
+                            publisher_identity:
+                              anyOf:
+                                - required: [documentation_url, support_contact]
+                                - required: [docs_url, support_contact]
                     - required: [docs_url, support_contact]
                     - required: [manifest]
+                      properties:
+                        manifest:
+                          required: [docs_url, support_contact]
               required:
                 - tool_manual
                 - runtime_validation
@@ -208,7 +230,7 @@ paths:
                   description: Optional metadata persisted with the draft
                 manifest:
                   type: object
-                  description: Optional manifest seed. Top-level request fields override this object. Include docs_url, support_contact, jurisdiction, and required_connected_accounts here if you do not repeat them top-level.
+                  description: Optional manifest seed. Top-level request fields override this object. Deterministic SDK/CLI registration includes docs_url, support_contact, jurisdiction, and required_connected_accounts here if they are not repeated top-level.
                 publisher_identity:
                   type: object
                   description: Alias source for docs/support fields.
@@ -224,11 +246,8 @@ paths:
                       description: Support email address or support URL
                 legal:
                   type: object
-                  description: Optional legal namespace. `legal.publisher_identity` is accepted as an alias source for docs/support fields; `legal.jurisdiction` is accepted as an alias for the listing jurisdiction.
+                  description: Optional legal namespace. `legal.publisher_identity` is accepted as an alias source for docs/support fields. Use top-level `jurisdiction` or `manifest.jurisdiction` for the listing jurisdiction.
                   properties:
-                    jurisdiction:
-                      type: string
-                      description: Governing ISO 3166-1 alpha-2 country code for this API
                     publisher_identity:
                       type: object
                       properties:

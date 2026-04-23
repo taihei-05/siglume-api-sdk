@@ -217,12 +217,17 @@ export class InMemoryWebhookDedupe {
     if (!key) {
       return false;
     }
-    if (this.entries.has(key)) {
-      return true;
+    return this.entries.has(key);
+  }
+
+  mark_processed(idempotency_key: string, nowMs = Date.now()): void {
+    this.purge(nowMs);
+    const key = String(idempotency_key ?? "").trim();
+    if (!key) {
+      return;
     }
     this.entries.set(key, nowMs + (this.ttl_seconds * 1000));
     this.purge(nowMs);
-    return false;
   }
 }
 
@@ -611,11 +616,13 @@ export class WebhookHandler {
         callback_results: [],
       };
     }
+    const callbackResults = await this.dispatch(event);
+    this.deduper?.mark_processed(event.idempotency_key);
     return {
       event,
       verification,
       duplicate: false,
-      callback_results: await this.dispatch(event),
+      callback_results: callbackResults,
     };
   }
 

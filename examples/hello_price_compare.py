@@ -44,7 +44,7 @@ class PriceCompareApp(AppAdapter):
             jurisdiction="US",
             short_description="Find the best price for any product across major retailers",
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/hello_price_compare.py",
-            support_contact="support@example.com",
+            support_contact="https://github.com/taihei-05/siglume-api-sdk/issues",
             example_prompts=[
                 "Compare prices for Sony WH-1000XM5",
                 "Compare prices for AirPods Pro across retailers",

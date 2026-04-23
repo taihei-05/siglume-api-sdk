@@ -331,15 +331,37 @@ function ensureManifestPublisherIdentity(project: LoadedProject): void {
   const docsUrl = String(manifestPayload.docs_url ?? manifestPayload.documentation_url ?? "").trim();
   const supportContact = String(manifestPayload.support_contact ?? "").trim();
   const jurisdiction = String(manifestPayload.jurisdiction ?? "").trim();
-  const missing: string[] = [];
-  if (!docsUrl) missing.push("manifest.docs_url");
-  if (!supportContact) missing.push("manifest.support_contact");
-  if (!jurisdiction) missing.push("manifest.jurisdiction");
-  if (missing.length > 0) {
+  const issues: string[] = [];
+  if (!docsUrl) {
+    issues.push("manifest.docs_url is required");
+  } else if (looksLikePlaceholder(docsUrl)) {
+    issues.push("manifest.docs_url must be replaced with your public documentation URL");
+  }
+  if (!supportContact) {
+    issues.push("manifest.support_contact is required");
+  } else if (looksLikePlaceholder(supportContact)) {
+    issues.push("manifest.support_contact must be replaced with your real support email or support URL");
+  }
+  if (!jurisdiction) issues.push("manifest.jurisdiction is required");
+  if (issues.length > 0) {
     throw new SiglumeProjectError(
-      `Production auto-register requires publisher identity before calling Siglume. Set ${missing.join(", ")} in manifest.json or your AppAdapter manifest().`,
+      `Production auto-register requires real publisher identity before calling Siglume:\n${issues.map((issue) => `- ${issue}`).join("\n")}`,
     );
   }
+}
+
+function looksLikePlaceholder(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized.includes("example.com") ||
+    normalized.startsWith("replace-with-") ||
+    normalized.startsWith("your-") ||
+    normalized.includes("your-domain") ||
+    normalized.includes("localhost") ||
+    normalized.includes("127.0.0.1") ||
+    normalized.includes("0.0.0.0")
+  );
 }
 
 function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): string[] {
@@ -359,7 +381,7 @@ function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): s
 
   for (const fieldName of ["public_base_url", "healthcheck_url", "invoke_url"]) {
     const value = String(runtimeValidation[fieldName] ?? "").trim().toLowerCase();
-    if (value.includes("api.example.com") || value.includes("localhost") || value.includes("127.0.0.1") || value.includes("0.0.0.0")) {
+    if (looksLikePlaceholder(value)) {
       issues.push(`runtime_validation.${fieldName} must be replaced with your public production URL`);
     }
   }
@@ -399,15 +421,54 @@ function ensureRuntimeValidationReady(project: LoadedProject): void {
   }
 }
 
+function ensureExplicitToolManual(project: LoadedProject): void {
+  if (!project.tool_manual_path) {
+    throw new SiglumeProjectError(
+      "tool_manual.json is required for `siglume register`. Run `siglume init`, or create a Tool Manual explicitly before registering.",
+    );
+  }
+}
+
+async function registrationPreflight(project: LoadedProject, client: SiglumeClientShape): Promise<Record<string, unknown>> {
+  const manifestIssues = await projectValidationIssues(project);
+  const [toolManualValid, toolManualIssues] = validate_tool_manual(project.tool_manual);
+  const remoteQuality = await client.preview_quality_score(project.tool_manual);
+  const errors = [
+    ...manifestIssues.map((issue) => String(issue)),
+    ...toolManualIssues.map((issue) => issue.message),
+  ];
+  if (!toolManualValid) {
+    errors.push("tool_manual.json is not valid for production registration");
+  }
+  if (!remoteQualityOk(remoteQuality)) {
+    errors.push(`remote Tool Manual quality is not publishable: ${remoteQuality.grade} (${remoteQuality.overall_score}/100)`);
+  }
+  const preflight = {
+    manifest_issues: manifestIssues,
+    tool_manual_valid: toolManualValid,
+    tool_manual_issues: toolManualIssues.map((issue) => toJsonable(issue)),
+    remote_quality: toJsonable(remoteQuality),
+    ok: errors.length === 0,
+  };
+  if (errors.length > 0) {
+    throw new SiglumeProjectError(
+      `Registration preflight failed. Fix these before calling auto-register:\n${errors.map((error) => `- ${error}`).join("\n")}`,
+    );
+  }
+  return preflight;
+}
+
 export async function runRegistration(
   path = ".",
   options: { confirm?: boolean; submit_review?: boolean } = {},
   deps: CliProjectDependencies = {},
 ): Promise<Record<string, unknown>> {
   const project = await loadProject(path);
+  ensureExplicitToolManual(project);
   ensureManifestPublisherIdentity(project);
   ensureRuntimeValidationReady(project);
   const client = await createClient(deps);
+  const preflight = await registrationPreflight(project, client);
   let developerPortalPreflight: unknown = null;
   if (String(project.manifest.price_model ?? "free").toLowerCase() !== "free") {
     const portal = await client.get_developer_portal();
@@ -424,6 +485,7 @@ export async function runRegistration(
   });
   const result: Record<string, unknown> = {
     receipt: toJsonable(receipt),
+    registration_preflight: preflight,
     runtime_validation_path: project.runtime_validation_path ?? null,
   };
   if (developerPortalPreflight) {

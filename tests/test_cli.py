@@ -24,6 +24,95 @@ from siglume_api_sdk import (  # noqa: E402
 )
 
 
+def _write_register_project(
+    project_dir: Path,
+    *,
+    include_tool_manual: bool = True,
+    runtime_validation: dict | None = None,
+    docs_url: str = "https://docs.siglume.test/register-project",
+    support_contact: str = "https://support.siglume.test/register-project",
+) -> None:
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / "adapter.py").write_text(
+        "\n".join(
+            [
+                "from siglume_api_sdk import AppAdapter, AppManifest",
+                "",
+                "class RegisterProject(AppAdapter):",
+                "    def manifest(self):",
+                "        return AppManifest(",
+                "            capability_key='register-project',",
+                "            name='Register Project',",
+                "            job_to_be_done='Echo a registration test request.',",
+                "            jurisdiction='US',",
+                "            dry_run_supported=True,",
+                f"            docs_url='{docs_url}',",
+                f"            support_contact='{support_contact}',",
+                "            example_prompts=['Echo this registration test query.'],",
+                "        )",
+                "    async def execute(self, ctx):",
+                "        return {'success': True, 'output': {'summary': 'ok'}}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    if include_tool_manual:
+        (project_dir / "tool_manual.json").write_text(
+            json.dumps(
+                {
+                    "tool_name": "register_project",
+                    "job_to_be_done": "Echo a registration test request.",
+                    "summary_for_model": "Echoes a test request for SDK registration coverage.",
+                    "trigger_conditions": [
+                        "owner asks for a registration test echo",
+                        "agent needs to verify a CLI registration fixture",
+                        "request is to smoke-test registration output",
+                    ],
+                    "do_not_use_when": [
+                        "the request is unrelated to echo testing",
+                        "the owner expects the adapter to call an external service",
+                    ],
+                    "permission_class": "read_only",
+                    "dry_run_supported": True,
+                    "requires_connected_accounts": [],
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                        "additionalProperties": False,
+                    },
+                    "output_schema": {
+                        "type": "object",
+                        "properties": {"summary": {"type": "string"}},
+                        "required": ["summary"],
+                        "additionalProperties": False,
+                    },
+                    "usage_hints": ["Use for registration smoke tests."],
+                    "result_hints": ["Return the summary."],
+                    "error_hints": ["Ask for a query if missing."],
+                    "jurisdiction": "US",
+                }
+            ),
+            encoding="utf-8",
+        )
+    (project_dir / "runtime_validation.json").write_text(
+        json.dumps(
+            runtime_validation
+            or {
+                "public_base_url": "https://runtime.example.test",
+                "healthcheck_url": "https://runtime.example.test/health",
+                "invoke_url": "https://runtime.example.test/invoke",
+                "test_auth_header_name": "X-Siglume-Review-Key",
+                "test_auth_header_value": "review-secret",
+                "request_payload": {"query": "hello"},
+                "expected_response_fields": ["summary"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_init_command_writes_template_files() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -57,6 +146,151 @@ def test_register_blocks_generated_runtime_placeholder() -> None:
         assert register_result.exit_code == 1
         assert "runtime_validation.json is not ready for production registration" in register_result.output
         assert "runtime_validation.public_base_url" in register_result.output
+
+
+def test_register_blocks_publisher_identity_placeholders(tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "publisher-placeholder"
+    _write_register_project(
+        project_dir,
+        docs_url="https://example.com/docs",
+        support_contact="support@example.com",
+    )
+
+    register_result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert register_result.exit_code == 1
+    assert "Production auto-register requires real publisher identity" in register_result.output
+    assert "manifest.docs_url" in register_result.output
+    assert "manifest.support_contact" in register_result.output
+
+
+def test_register_requires_explicit_tool_manual(tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "missing-manual"
+    _write_register_project(project_dir, include_tool_manual=False)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "tool_manual.json is required for `siglume register`" in result.output
+
+
+def test_register_blocks_runtime_placeholders_after_publisher_identity_is_real(tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "runtime-placeholder"
+    _write_register_project(
+        project_dir,
+        runtime_validation={
+            "public_base_url": "https://api.example.com",
+            "healthcheck_url": "https://api.example.com/health",
+            "invoke_url": "https://api.example.com/invoke",
+            "test_auth_header_name": "X-Siglume-Review-Key",
+            "test_auth_header_value": "review-secret",
+            "request_payload": {"query": "hello"},
+            "expected_response_fields": ["summary"],
+        },
+    )
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "runtime_validation.json is not ready for production registration" in result.output
+    assert "runtime_validation.public_base_url" in result.output
+
+
+def test_register_blocks_non_publishable_remote_quality(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "quality-blocked"
+    _write_register_project(project_dir)
+
+    class FakeClient:
+        auto_register_called = False
+
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualIssue, ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=62,
+                grade="C",
+                issues=[ToolManualIssue(code="LOW_QUALITY", message="Too vague", field="summary_for_model")],
+                keyword_coverage_estimate=10,
+                improvement_suggestions=["Add clearer trigger conditions."],
+                publishable=False,
+                validation_ok=True,
+            )
+
+        def auto_register(self, *args, **kwargs):
+            self.auto_register_called = True
+            raise AssertionError("auto_register should not run after failed preflight")
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "Registration preflight failed" in result.output
+    assert "remote Tool Manual quality is not publishable: C (62/100)" in result.output
+    assert FakeClient.auto_register_called is False
+
+
+def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "human-output"
+    _write_register_project(project_dir)
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=91,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=72,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            return SimpleNamespace(
+                listing_id="lst_123",
+                status="draft",
+                review_url="https://siglume.com/owner/publish?listing=lst_123",
+                trace_id="trc_reg",
+                request_id="req_reg",
+            )
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "review_url: https://siglume.com/owner/publish?listing=lst_123" in result.output
+    assert "trace_id: trc_reg" in result.output
+    assert "request_id: req_reg" in result.output
+    assert "preflight_quality: A (91/100)" in result.output
 
 
 def test_init_command_lists_owner_operations(monkeypatch) -> None:
@@ -268,8 +502,9 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
                 "            job_to_be_done='Echo a registration test request.',",
                 "            jurisdiction='US',",
                 "            dry_run_supported=True,",
-                "            docs_url='https://docs.example.com/register-project',",
-                "            support_contact='support@example.com',",
+                "            docs_url='https://docs.siglume.test/register-project',",
+                "            support_contact='https://support.siglume.test/register-project',",
+                "            example_prompts=['Echo this registration test query.'],",
                 "        )",
                 "    async def execute(self, ctx):",
                 "        return {'success': True, 'output': {'summary': 'ok'}}",
@@ -284,8 +519,15 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
                 "tool_name": "register_project",
                 "job_to_be_done": "Echo a registration test request.",
                 "summary_for_model": "Echoes a test request for SDK registration coverage.",
-                "trigger_conditions": ["owner asks for a registration test echo"],
-                "do_not_use_when": ["the request is unrelated to echo testing"],
+                "trigger_conditions": [
+                    "owner asks for a registration test echo",
+                    "agent needs to verify a CLI registration fixture",
+                    "request is to smoke-test registration output",
+                ],
+                "do_not_use_when": [
+                    "the request is unrelated to echo testing",
+                    "the owner expects the adapter to call an external service",
+                ],
                 "permission_class": "read_only",
                 "dry_run_supported": True,
                 "requires_connected_accounts": [],
@@ -342,7 +584,26 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
 
         def auto_register(self, manifest, tool_manual, **kwargs):
             assert kwargs["runtime_validation"]["invoke_url"] == "https://runtime.example.test/invoke"
-            return SimpleNamespace(listing_id="lst_123", status="draft")
+            return SimpleNamespace(
+                listing_id="lst_123",
+                status="draft",
+                review_url="https://siglume.com/owner/publish?listing=lst_123",
+                trace_id="trc_reg",
+                request_id="req_reg",
+            )
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=88,
+                grade="B",
+                issues=[],
+                keyword_coverage_estimate=64,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
 
         def confirm_registration(self, listing_id: str):
             return SimpleNamespace(
@@ -375,6 +636,8 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
 
     assert register_result.exit_code == 0, register_result.output
     assert '"listing_id": "lst_123"' in register_result.output
+    assert '"review_url": "https://siglume.com/owner/publish?listing=lst_123"' in register_result.output
+    assert '"registration_preflight"' in register_result.output
     assert support_result.exit_code == 0, support_result.output
     assert '"support_case_id": "sup_123"' in support_result.output
     assert usage_result.exit_code == 0, usage_result.output

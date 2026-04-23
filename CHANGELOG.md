@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-04-23
+
+v0.7.3 closes the remaining production-facing review findings after the
+auto-register documentation alignment release.
+
+### Added
+
+- TypeScript CI coverage for typecheck, vitest, build, and package checks.
+- Register CLI preflight that runs manifest validation, canonical Tool Manual
+  validation, remote Tool Manual quality preview, runtime placeholder checks,
+  and paid payout readiness before calling `auto-register`.
+- Register CLI output now surfaces `review_url`, `trace_id`, `request_id`, and
+  the preflight quality score in human-readable mode.
+- Webhook retry tests for callback-failure retries in both Python and
+  TypeScript.
+
+### Changed
+
+- Webhook dedupe now marks idempotency keys only after callbacks dispatch
+  successfully, so a failed callback can be retried instead of being consumed
+  as a duplicate.
+- OpenAPI and examples now match the server source of truth: jurisdiction is
+  supplied top-level or via `manifest.jurisdiction`; `legal.publisher_identity`
+  remains the docs/support alias.
+- Getting Started emphasizes the CLI publish path (`validate`, `test`,
+  `score --remote`, `register --confirm`) before raw curl examples.
+
+### Fixed
+
+- Placeholder `docs_url`, `support_contact`, runtime URLs, and review-key values
+  are blocked locally before registration.
+- Generated examples and register fixtures use real support/documentation
+  shapes instead of `example.com` publisher identity values.
+- Release workflow now exercises TypeScript typecheck/test/pack even when npm
+  publishing is skipped due to a missing `NPM_TOKEN`.
+
 ## [0.7.2] - 2026-04-23
 
 v0.7.2 aligns the public SDK and developer docs with the production
@@ -25,7 +61,7 @@ server.
 
 - Python and TypeScript `auto_register()` payloads now include manifest,
   ToolManual, publisher identity, runtime validation, validation report
-  parsing, and `legal.jurisdiction` aliases expected by the live server.
+  parsing, and the jurisdiction fields expected by the live server.
 - Example manifests now include `docs_url` and `support_contact` so
   `siglume init` output is production-registration ready after runtime
   placeholder replacement.

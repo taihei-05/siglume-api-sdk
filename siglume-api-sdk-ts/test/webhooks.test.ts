@@ -103,6 +103,38 @@ describe("webhooks", () => {
     expect(seen).toEqual(["sub_demo_123"]);
   });
 
+  it("does not mark failed callbacks as duplicate before retry succeeds", async () => {
+    const event = buildEvent();
+    const rawBody = JSON.stringify(event);
+    const signatureHeader = await build_webhook_signature_header("whsec_test_secret", rawBody, {
+      timestamp: 1713571200,
+    });
+    const attempts: string[] = [];
+    const handler = new WebhookHandler({
+      signing_secret: "whsec_test_secret",
+      deduper: new InMemoryWebhookDedupe({ ttl_seconds: 600 }),
+    });
+    handler.on("subscription.created", async (typedEvent) => {
+      attempts.push(typedEvent.id);
+      if (attempts.length === 1) {
+        throw new Error("temporary callback failure");
+      }
+    });
+    const headers = {
+      "siglume-signature": signatureHeader,
+      "siglume-event-id": event.id,
+      "siglume-event-type": event.type,
+    };
+
+    await expect(handler.handle(rawBody, headers, { now: 1713571200 })).rejects.toThrow("temporary callback failure");
+    const retry = await handler.handle(rawBody, headers, { now: 1713571200 });
+    const duplicate = await handler.handle(rawBody, headers, { now: 1713571200 });
+
+    expect(retry.duplicate).toBe(false);
+    expect(duplicate.duplicate).toBe(true);
+    expect(attempts).toEqual([event.id, event.id]);
+  });
+
   it("rejects stale timestamps and mismatched headers", async () => {
     const event = buildEvent();
     const rawBody = JSON.stringify(event);

@@ -83,8 +83,8 @@ You do not submit a PR to this repo. You register directly on the platform — n
 
 1. Build your API with `AppAdapter` (see examples for templates)
 2. Test locally with `AppTestHarness`
-3. Register: `POST /v1/market/capabilities/auto-register`
-4. Write a tool manual (this determines whether agents select your API — see [Before you publish](#before-you-publish))
+3. Write the Tool Manual and runtime validation contract
+4. Register: `POST /v1/market/capabilities/auto-register` with `manifest`, `tool_manual`, `runtime_validation`, publisher identity, and source provenance
 5. Confirm → quality check → admin review → listed in the API Store
 6. Agent owners subscribe → you earn 93.4% of revenue
 
@@ -133,7 +133,7 @@ payout readiness check are blocking validations before admin review.
 
 Publishing does not guarantee revenue. Agent owners (and their agents) choose what to install. Real revenue depends on whether they find your API useful.
 
-This is an early-stage service (v0.5.0, alpha) with a growing but still small user base. Do not expect significant income in the initial period. Start with a small `READ_ONLY` API to learn the flow; build something genuinely useful; let the value speak for itself.
+This is an early-stage service with a growing but still small user base. Do not expect significant income in the initial period. Start with a small `READ_ONLY` API to learn the flow; build something genuinely useful; let the value speak for itself.
 
 ---
 

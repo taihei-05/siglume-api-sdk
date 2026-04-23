@@ -51,6 +51,19 @@ siglume validate .
 siglume test .
 ```
 
+When you are ready to publish, edit the generated `tool_manual.json`,
+`runtime_validation.json`, and manifest publisher fields, then run the same
+production path the server will enforce:
+
+```bash
+siglume score . --remote
+siglume register . --confirm
+```
+
+`siglume register` now performs the registration preflight before it calls
+`auto-register`, including Tool Manual quality, runtime validation readiness,
+publisher identity, jurisdiction, and paid payout readiness.
+
 Or clone the repo to browse the examples:
 
 ```bash
@@ -486,23 +499,18 @@ validation expects the same complete contract described in
 manifest, Tool Manual, runtime validation, publisher identity, and payout
 readiness for paid APIs.
 
-The snippet below only shows the bearer-auth shape; use the complete payload in
+Use the complete payload shape in
 [examples/paid_action_subscription](examples/paid_action_subscription/) for a
-real publish flow.
+real publish flow. Before sending it, replace every placeholder documented in
+that example README. Do not submit a payload that still contains
+`https://api.example.com`, `https://docs.example.com`, `support@example.com`, or
+`replace-with-dedicated-review-key`.
 
 ```bash
 curl -X POST https://siglume.com/v1/market/capabilities/auto-register \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "source_code": "... your python code ...",
-    "i18n": {
-      "job_to_be_done_en": "My test API",
-      "job_to_be_done_ja": "テストAPI",
-      "short_description_en": "Testing in sandbox",
-      "short_description_ja": "サンドボックステスト"
-    }
-  }'
+  --data @examples/paid_action_subscription/auto_register_payload.json
 ```
 
 ### Step 4: Create a sandbox session
@@ -521,8 +529,25 @@ This returns a `session_id` and auto-creates stub connected accounts.
 
 ### Step 5: Execute a dry-run
 
-> **Note:** Use `AppTestHarness` for local testing, and `auto-register` + the owner
-> console for end-to-end testing with a real agent.
+Run the same dry-run-safe request locally first:
+
+```bash
+siglume test . --json
+```
+
+For HTTP runtime validation, Siglume uses the JSON object in
+`runtime_validation.request_payload`. To reproduce the live call manually:
+
+```bash
+curl -X POST "$SIGLUME_INVOKE_URL" \
+  -H "Content-Type: application/json" \
+  -H "X-Siglume-Review-Key: $SIGLUME_REVIEW_KEY" \
+  --data @runtime_request.json
+```
+
+`runtime_request.json` should contain the same JSON object you placed in
+`runtime_validation.request_payload`, and your response must include every path
+listed in `runtime_validation.expected_response_fields`.
 
 ### Step 6: Check your usage
 
@@ -695,111 +720,123 @@ Give your AI these instructions:
 > Include `i18n` with English and Japanese versions of `job_to_be_done`
 > and `short_description`. Then call the auto-register endpoint."
 
-Your AI will produce something like this:
+Your AI should produce a complete production payload, not a source-only
+request. The exact values depend on your API, but the shape should look like
+this:
 
 ```python
+import json
 import requests
+
+payload = {
+    "source_url": "https://github.com/you/slack-digest-api",
+    "source_code": open("my_api.py", encoding="utf-8").read(),
+    "manifest": {
+        "capability_key": "slack-digest-publisher",
+        "name": "Slack Digest Publisher",
+        "job_to_be_done": "Summarize recent discussions and post a digest to Slack after owner approval.",
+        "category": "communication",
+        "permission_class": "action",
+        "approval_mode": "always-ask",
+        "dry_run_supported": True,
+        "required_connected_accounts": ["slack"],
+        "price_model": "subscription",
+        "price_value_minor": 500,
+        "jurisdiction": "US",
+        "docs_url": "https://your-company.com/docs/slack-digest",
+        "support_contact": "support@your-company.com",
+    },
+    "publisher_identity": {
+        "documentation_url": "https://your-company.com/docs/slack-digest",
+        "support_contact": "support@your-company.com",
+    },
+    "legal": {
+        "publisher_identity": {
+            "documentation_url": "https://your-company.com/docs/slack-digest",
+            "support_contact": "support@your-company.com",
+        },
+    },
+    "tool_manual": {
+        "tool_name": "slack_digest_publisher",
+        "job_to_be_done": "Summarize recent discussions and post a digest to Slack after owner approval.",
+        "summary_for_model": "Creates a Slack digest preview, asks for approval, then posts it to the selected channel.",
+        "trigger_conditions": [
+            "owner asks to summarize recent discussion and publish the digest to Slack",
+            "agent needs an approval-gated Slack publishing tool for a named channel",
+            "request includes enough channel and period context to create a dry-run preview",
+        ],
+        "do_not_use_when": [
+            "the owner only wants a local summary and does not want anything posted",
+            "the target Slack channel or workspace is unknown or not connected",
+        ],
+        "permission_class": "action",
+        "dry_run_supported": True,
+        "requires_connected_accounts": ["slack"],
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "channel": {"type": "string", "description": "Slack channel name or ID."},
+                "period": {"type": "string", "description": "Time window to summarize, such as today or this week."},
+                "dry_run": {"type": "boolean", "description": "Whether to create a preview without posting."},
+            },
+            "required": ["channel", "period"],
+            "additionalProperties": False,
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "One-line summary of the generated digest."},
+                "posted": {"type": "boolean", "description": "Whether the digest was posted to Slack."},
+                "channel": {"type": "string", "description": "Slack channel that received or would receive the digest."},
+            },
+            "required": ["summary", "posted", "channel"],
+            "additionalProperties": False,
+        },
+        "usage_hints": ["Run dry-run first so the owner can review the digest before posting."],
+        "result_hints": ["Show the channel, posted flag, and digest summary in the final response."],
+        "error_hints": ["If Slack rejects the request, show the response body and ask the owner to reconnect Slack."],
+        "approval_summary_template": "Post a Slack digest to {channel} for {period}.",
+        "idempotency_support": True,
+        "side_effect_summary": "Posts a discussion digest into the specified Slack channel.",
+        "jurisdiction": "US",
+    },
+    "runtime_validation": {
+        "public_base_url": "https://api.your-company.com",
+        "healthcheck_url": "https://api.your-company.com/health",
+        "invoke_url": "https://api.your-company.com/slack/digest",
+        "invoke_method": "POST",
+        "test_auth_header_name": "X-Siglume-Review-Key",
+        "test_auth_header_value": "dedicated-review-secret",
+        "request_payload": {"channel": "#general", "period": "today", "dry_run": True},
+        "expected_response_fields": ["summary", "posted", "channel"],
+    },
+    "i18n": {
+        "job_to_be_done_en": "Summarize recent discussions and post a digest to Slack after owner approval.",
+        "job_to_be_done_ja": "最近の議論を要約し、オーナー承認後にSlackへダイジェストを投稿します。",
+        "short_description_en": "Create a Slack digest preview, ask for approval, and publish it.",
+        "short_description_ja": "Slackダイジェストのプレビューを作成し、承認後に投稿します。",
+    },
+}
 
 response = requests.post(
     "https://siglume.com/v1/market/capabilities/auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
-    json={
-        "source_code": open("my_api.py").read(),
-        "i18n": {
-            "job_to_be_done_en": "Summarize daily discussions and publish a report to Slack.",
-            "job_to_be_done_ja": "日々の議論を要約してSlackチャンネルにレポートを投稿します。",
-            "short_description_en": "Your agent posts daily discussion summaries to Slack automatically.",
-            "short_description_ja": "エージェントが毎日の議論サマリーをSlackに自動投稿します。"
-        }
-    }
+    json=payload,
 )
-draft = response.json()["data"]
-listing_id = draft["listing_id"]
-print(f"Listing created: {draft['listing_id']}")
-print(f"Name: {draft['auto_manifest']['name']}")
-print(f"Status: {draft['status']}")
+response.raise_for_status()
+listing_id = response.json()["data"]["listing_id"]
 
-# Confirm and submit for review — include your tool manual.
-# Note: overrides are merged with auto-detected values.
-# Fields like tool_name, permission_class, summary_for_model etc.
-# are auto-detected from source code; you only need to override
-# what the auto-detection cannot infer (e.g., trigger_conditions).
 requests.post(
     f"https://siglume.com/v1/market/capabilities/{listing_id}/confirm-auto-register",
     headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
-    json={
-        "approved": True,
-        "overrides": {
-            "tool_manual": {
-                "tool_name": "slack_digest_publisher",
-                "job_to_be_done": "Summarize recent discussion points and post the digest to a Slack channel the owner controls.",
-                "summary_for_model": "Builds a concise discussion digest and posts it to a specified Slack channel after preview and owner approval.",
-                "trigger_conditions": [
-                    "owner asks to summarize daily discussions and post the result to Slack",
-                    "agent needs to deliver a channel digest to a Slack workspace after reviewing recent messages",
-                    "request is to publish a recurring daily or weekly summary into Slack"
-                ],
-                "do_not_use_when": [
-                    "the owner wants a local summary only and does not want any external post",
-                    "the request targets a Slack workspace or channel the agent cannot access",
-                    "the request is to send email or update a non-Slack destination"
-                ],
-                "permission_class": "action",
-                "dry_run_supported": True,
-                "requires_connected_accounts": ["slack"],
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "channel": {"type": "string", "description": "Slack channel name or ID where the digest should be posted."},
-                        "period": {"type": "string", "description": "Time window to summarize, such as today, yesterday, or this week.", "default": "today"},
-                        "tone": {"type": "string", "description": "Writing tone for the digest, such as concise, neutral, or executive.", "default": "concise"}
-                    },
-                    "required": ["channel", "period"],
-                    "additionalProperties": False
-                },
-                "output_schema": {
-                    "type": "object",
-                    "properties": {
-                        "summary": {"type": "string", "description": "One-line recap of what was posted to Slack."},
-                        "highlights": {"type": "array", "items": {"type": "string"}},
-                        "posted": {"type": "boolean", "description": "Whether the digest was posted successfully."},
-                        "channel": {"type": "string", "description": "Slack channel that received the digest."}
-                    },
-                    "required": ["summary", "posted", "channel"],
-                    "additionalProperties": False
-                },
-                "usage_hints": [
-                    "Use this tool only after you already know which Slack channel should receive the digest.",
-                    "Prefer a dry run first so the owner can review the summary before it is posted."
-                ],
-                "result_hints": [
-                    "Show the posted channel and the one-line summary so the owner can confirm the destination and content.",
-                    "If highlights are returned, surface them before offering the next follow-up action."
-                ],
-                "error_hints": [
-                    "If the Slack channel is missing or inaccessible, ask the owner to reconnect Slack or provide a valid channel.",
-                    "If posting fails after preview, suggest retrying with the same idempotency key."
-                ],
-                "approval_summary_template": "Post a Slack digest to {channel} for {period}.",
-                "preview_schema": {
-                    "type": "object",
-                    "properties": {
-                        "summary": {"type": "string", "description": "Preview text that will be posted to Slack."},
-                        "channel": {"type": "string", "description": "Slack channel that will receive the digest."},
-                        "estimated_message_count": {"type": "integer", "description": "Approximate number of source messages included in the digest."}
-                    },
-                    "required": ["summary", "channel"],
-                    "additionalProperties": False
-                },
-                "idempotency_support": True,
-                "side_effect_summary": "Posts a discussion digest message into the specified Slack channel.",
-                "jurisdiction": "US"
-            }
-        }
-    }
-)
-# Done.
+    json={"approved": True},
+).raise_for_status()
 ```
+
+The paid Action template in
+[examples/paid_action_subscription](examples/paid_action_subscription/) contains
+the same contract as JSON files you can adapt for curl.
+
 
 ### Required `i18n` fields
 
@@ -834,15 +871,29 @@ But **descriptions will be English-only** unless you provide `i18n`.
 | **Free** | No charge. Anyone can install. | - |
 | **Subscription** | Monthly recurring charge (USD). | $5.00/month |
 
-Set this in your auto-register call:
+Set pricing in the `manifest` you send to auto-register. Pricing alone is not
+enough for production registration; the same request must also include
+`tool_manual`, `runtime_validation`, publisher identity, jurisdiction, and
+source provenance.
 
-```python
-# Free API
-json={"source_code": code, "i18n": {...}, "price_model": "free"}
-
-# Subscription API ($9.99/month)
-json={"source_code": code, "i18n": {...}, "price_model": "subscription", "price_value_minor": 999}
+```jsonc
+{
+  "source_url": "https://github.com/you/your-api",
+  "manifest": {
+    "price_model": "subscription",
+    "price_value_minor": 999,
+    "jurisdiction": "US",
+    "docs_url": "https://your-domain.example/docs",
+    "support_contact": "support@your-domain.example"
+  },
+  "tool_manual": { "...": "..." },
+  "runtime_validation": { "...": "..." }
+}
 ```
+
+For a complete paid Action API request, start from
+[examples/paid_action_subscription/auto_register_payload.json](examples/paid_action_subscription/auto_register_payload.json)
+and replace every placeholder listed in that example's README.
 
 `price_value_minor` is in cents. $5.00 = 500, $9.99 = 999, $29.99 = 2999.
 
@@ -880,8 +931,8 @@ The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
 - Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
 - Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
 
-SDK v0.5.0 (current release) ships the Web3 enum values for
-payment-permission tools: `SettlementMode.POLYGON_MANDATE` and
+Current SDK releases ship the Web3 enum values for payment-permission tools:
+`SettlementMode.POLYGON_MANDATE` and
 `SettlementMode.EMBEDDED_WALLET_CHARGE`. See
 [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.
 

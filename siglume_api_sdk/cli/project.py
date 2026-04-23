@@ -1042,18 +1042,36 @@ def _ensure_manifest_publisher_identity(project: LoadedProject) -> None:
     docs_url = str(manifest_payload.get("docs_url") or manifest_payload.get("documentation_url") or "").strip()
     support_contact = str(manifest_payload.get("support_contact") or "").strip()
     jurisdiction = str(manifest_payload.get("jurisdiction") or "").strip()
-    missing = []
+    issues = []
     if not docs_url:
-        missing.append("manifest.docs_url")
+        issues.append("manifest.docs_url is required")
+    elif _looks_like_placeholder(docs_url):
+        issues.append("manifest.docs_url must be replaced with your public documentation URL")
     if not support_contact:
-        missing.append("manifest.support_contact")
+        issues.append("manifest.support_contact is required")
+    elif _looks_like_placeholder(support_contact):
+        issues.append("manifest.support_contact must be replaced with your real support email or support URL")
     if not jurisdiction:
-        missing.append("manifest.jurisdiction")
-    if missing:
+        issues.append("manifest.jurisdiction is required")
+    if issues:
         raise click.ClickException(
-            "Production auto-register requires publisher identity before calling Siglume. "
-            f"Set {', '.join(missing)} in manifest.json or your AppAdapter manifest()."
+            "Production auto-register requires real publisher identity before calling Siglume:\n"
+            + "\n".join(f"- {issue}" for issue in issues)
         )
+
+
+def _looks_like_placeholder(value: str) -> bool:
+    normalized = value.strip().lower()
+    return (
+        not normalized
+        or "example.com" in normalized
+        or normalized.startswith("replace-with-")
+        or normalized.startswith("your-")
+        or "your-domain" in normalized
+        or "localhost" in normalized
+        or "127.0.0.1" in normalized
+        or "0.0.0.0" in normalized
+    )
 
 
 def _runtime_placeholder_issues(runtime_validation: dict[str, Any]) -> list[str]:
@@ -1072,7 +1090,7 @@ def _runtime_placeholder_issues(runtime_validation: dict[str, Any]) -> list[str]
 
     for field_name in ("public_base_url", "healthcheck_url", "invoke_url"):
         value = str(runtime_validation.get(field_name) or "").strip().lower()
-        if "api.example.com" in value or "localhost" in value or "127.0.0.1" in value or "0.0.0.0" in value:
+        if _looks_like_placeholder(value):
             issues.append(f"runtime_validation.{field_name} must be replaced with your public production URL")
 
     auth_value = str(runtime_validation.get("test_auth_header_value") or "").strip()
@@ -1113,12 +1131,50 @@ def _ensure_runtime_validation_ready(project: LoadedProject) -> None:
         )
 
 
+def _ensure_explicit_tool_manual(project: LoadedProject) -> None:
+    if project.tool_manual_path is None:
+        raise click.ClickException(
+            "tool_manual.json is required for `siglume register`. "
+            "Run `siglume init`, or create a Tool Manual explicitly before registering."
+        )
+
+
+def _registration_preflight(project: LoadedProject, client: SiglumeClient) -> dict[str, Any]:
+    manifest_issues = project_validation_issues(project)
+    manual_valid, manual_issues = validate_tool_manual(project.tool_manual)
+    remote_quality = client.preview_quality_score(project.tool_manual)
+    errors: list[str] = []
+    errors.extend(str(issue) for issue in manifest_issues)
+    errors.extend(str(issue.message) for issue in manual_issues)
+    if not manual_valid:
+        errors.append("tool_manual.json is not valid for production registration")
+    if not _remote_quality_ok(remote_quality):
+        grade = getattr(remote_quality, "grade", "?")
+        score = getattr(remote_quality, "overall_score", "?")
+        errors.append(f"remote Tool Manual quality is not publishable: {grade} ({score}/100)")
+    preflight = {
+        "manifest_issues": manifest_issues,
+        "tool_manual_valid": manual_valid,
+        "tool_manual_issues": [to_jsonable(issue) for issue in manual_issues],
+        "remote_quality": to_jsonable(remote_quality),
+        "ok": not errors,
+    }
+    if errors:
+        raise click.ClickException(
+            "Registration preflight failed. Fix these before calling auto-register:\n"
+            + "\n".join(f"- {error}" for error in errors)
+        )
+    return preflight
+
+
 def run_registration(path: str | Path, *, confirm: bool, submit_review: bool) -> dict[str, Any]:
     project = load_project(path)
+    _ensure_explicit_tool_manual(project)
     _ensure_manifest_publisher_identity(project)
     _ensure_runtime_validation_ready(project)
     api_key = resolve_api_key()
     with SiglumeClient(api_key=api_key) as client:
+        registration_preflight = _registration_preflight(project, client)
         portal_preflight = _ensure_paid_payout_ready(project, client)
         receipt = client.auto_register(
             project.manifest,
@@ -1127,6 +1183,7 @@ def run_registration(path: str | Path, *, confirm: bool, submit_review: bool) ->
         )
         result: dict[str, Any] = {
             "receipt": to_jsonable(receipt),
+            "registration_preflight": registration_preflight,
             "runtime_validation_path": str(project.runtime_validation_path) if project.runtime_validation_path else None,
         }
         if portal_preflight is not None:

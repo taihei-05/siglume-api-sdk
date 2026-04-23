@@ -260,11 +260,16 @@ class InMemoryWebhookDedupe:
         key = str(idempotency_key or "").strip()
         if not key:
             return False
-        if key in self._entries:
-            return True
+        return key in self._entries
+
+    def mark_processed(self, idempotency_key: str, *, now: float | None = None) -> None:
+        moment = float(now if now is not None else time.time())
+        self._purge(moment)
+        key = str(idempotency_key or "").strip()
+        if not key:
+            return
         self._entries[key] = moment + self.ttl_seconds
         self._purge(moment)
-        return False
 
 
 def _to_dict(value: Any) -> dict[str, Any]:
@@ -548,11 +553,14 @@ class WebhookHandler:
                 duplicate=True,
                 callback_results=[],
             )
+        callback_results = self.dispatch(event)
+        if self.deduper is not None:
+            self.deduper.mark_processed(event.idempotency_key)
         return WebhookDispatchResult(
             event=event,
             verification=verification,
             duplicate=False,
-            callback_results=self.dispatch(event),
+            callback_results=callback_results,
         )
 
     def as_flask_view(self) -> Callable[[], Any]:

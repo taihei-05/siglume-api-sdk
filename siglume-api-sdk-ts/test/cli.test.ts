@@ -27,6 +27,9 @@ function createMockClient() {
       return {
         listing_id: "lst_123",
         status: "draft",
+        review_url: "https://siglume.com/owner/publish?listing=lst_123",
+        trace_id: "trc_reg",
+        request_id: "req_reg",
         auto_manifest: {},
         confidence: {},
       };
@@ -156,8 +159,8 @@ async function createTestProject(): Promise<string> {
     "      required_connected_accounts: [],",
     "      price_model: PriceModel.FREE,",
     "      jurisdiction: \"US\",",
-    "      docs_url: \"https://docs.example.com/payment-quote\",",
-    "      support_contact: \"support@example.com\",",
+    "      docs_url: \"https://docs.siglume.test/payment-quote\",",
+    "      support_contact: \"https://support.siglume.test/payment-quote\",",
     "      short_description: \"Preview, quote, and complete a USD payment flow with explicit approval.\",",
     "      example_prompts: [\"Quote the charge for this premium report purchase.\"],",
     "    };",
@@ -336,7 +339,7 @@ describe("siglume CLI", () => {
     expect(validatePayload.ok).toBe(true);
   });
 
-  it("blocks generated runtime_validation placeholders before remote registration", async () => {
+  it("blocks generated publisher identity placeholders before remote registration", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "siglume-ts-placeholder-"));
     const stderr: string[] = [];
 
@@ -347,6 +350,36 @@ describe("siglume CLI", () => {
     });
 
     expect(initExit).toBe(0);
+    expect(registerExit).toBe(1);
+    expect(stderr.join("\n")).toContain("Production auto-register requires real publisher identity");
+    expect(stderr.join("\n")).toContain("manifest.docs_url");
+  });
+
+  it("blocks runtime_validation placeholders after publisher identity is real", async () => {
+    const projectDir = await createTestProject();
+    const stderr: string[] = [];
+    await writeFile(
+      join(projectDir, "runtime_validation.json"),
+      JSON.stringify(
+        {
+          public_base_url: "https://api.example.com",
+          healthcheck_url: "https://api.example.com/health",
+          invoke_url: "https://api.example.com/invoke",
+          test_auth_header_name: "X-Siglume-Review-Key",
+          test_auth_header_value: "review-secret",
+          request_payload: { amount_usd: 12.5 },
+          expected_response_fields: ["summary", "amount_usd", "currency"],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const registerExit = await runCli(["register", projectDir, "--json"], {
+      stderr: (line) => stderr.push(line),
+    });
+
     expect(registerExit).toBe(1);
     expect(stderr.join("\n")).toContain("runtime_validation.json is not ready for production registration");
     expect(stderr.join("\n")).toContain("runtime_validation.public_base_url");
@@ -447,9 +480,28 @@ describe("siglume CLI", () => {
     expect(supportExit).toBe(0);
     expect(usageExit).toBe(0);
     expect(stdout.some((line) => line.includes("\"review\""))).toBe(true);
+    expect(stdout.some((line) => line.includes("\"registration_preflight\""))).toBe(true);
+    expect(stdout.some((line) => line.includes("\"review_url\": \"https://siglume.com/owner/publish?listing=lst_123\""))).toBe(true);
     expect(stdout.some((line) => line.includes("\"case\""))).toBe(true);
     expect(stdout.some((line) => line.includes("\"window\": \"7d\""))).toBe(true);
     expect(seen.submit_review_calls).toBe(1);
     expect(seen.trace_id).toBe("trc_123");
+  });
+
+  it("prints register review metadata in human-readable mode", async () => {
+    const projectDir = await createTestProject();
+    const stdout: string[] = [];
+
+    const registerExit = await runCli(["register", projectDir], {
+      stdout: (line) => stdout.push(line),
+      client_factory: (() => createMockClient()) as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+
+    expect(registerExit).toBe(0);
+    expect(stdout.join("\n")).toContain("review_url: https://siglume.com/owner/publish?listing=lst_123");
+    expect(stdout.join("\n")).toContain("trace_id: trc_reg");
+    expect(stdout.join("\n")).toContain("request_id: req_reg");
+    expect(stdout.join("\n")).toContain("preflight_quality: A (92/100)");
   });
 });

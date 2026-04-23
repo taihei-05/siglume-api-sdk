@@ -2222,16 +2222,13 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     const docsUrl = String(manifestPayload.docs_url ?? manifestPayload.documentation_url ?? "").trim();
     const supportContact = String(manifestPayload.support_contact ?? "").trim();
-    const jurisdiction = String(manifestPayload.jurisdiction ?? "").trim();
     if (docsUrl || supportContact) {
       const publisherIdentity = {
         documentation_url: docsUrl || null,
         support_contact: supportContact || null,
       };
       payload.publisher_identity = publisherIdentity;
-      payload.legal = jurisdiction ? { publisher_identity: publisherIdentity, jurisdiction } : { publisher_identity: publisherIdentity };
-    } else if (jurisdiction) {
-      payload.legal = { jurisdiction };
+      payload.legal = { publisher_identity: publisherIdentity };
     }
     const [data, meta] = await this.request("POST", "/market/capabilities/auto-register", { json_body: payload });
     const listing_id = String(data.listing_id ?? "");

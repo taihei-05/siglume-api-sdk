@@ -119,6 +119,42 @@ def test_webhook_handler_dispatches_once_and_marks_duplicate() -> None:
     assert seen == ["sub_demo_123"]
 
 
+def test_webhook_handler_does_not_mark_failed_callback_as_duplicate() -> None:
+    event = build_event()
+    raw_body = json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    signature_header = build_webhook_signature_header(
+        "whsec_test_secret",
+        raw_body,
+        timestamp=1713571200,
+    )
+    attempts: list[str] = []
+    handler = WebhookHandler(
+        signing_secret="whsec_test_secret",
+        deduper=InMemoryWebhookDedupe(ttl_seconds=600),
+    )
+
+    @handler.on("subscription.created")
+    def on_created(event) -> None:
+        attempts.append(str(event.id))
+        if len(attempts) == 1:
+            raise RuntimeError("temporary callback failure")
+
+    headers = {
+        "Siglume-Signature": signature_header,
+        "Siglume-Event-Id": event["id"],
+        "Siglume-Event-Type": event["type"],
+    }
+
+    with pytest.raises(RuntimeError, match="temporary callback failure"):
+        handler.handle(raw_body, headers, now=1713571200)
+    retry = handler.handle(raw_body, headers, now=1713571200)
+    duplicate = handler.handle(raw_body, headers, now=1713571200)
+
+    assert retry.duplicate is False
+    assert duplicate.duplicate is True
+    assert attempts == [event["id"], event["id"]]
+
+
 def test_webhook_handler_rejects_stale_timestamp() -> None:
     event = build_event()
     raw_body = json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

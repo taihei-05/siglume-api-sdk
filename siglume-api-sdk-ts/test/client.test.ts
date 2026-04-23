@@ -137,9 +137,9 @@ describe("SiglumeClient", () => {
           expect(body.runtime_validation).toMatchObject({ invoke_url: runtimeValidation.invoke_url });
           expect(body.publisher_identity).toMatchObject({ documentation_url: manifest.docs_url });
           expect(body.legal).toMatchObject({
-            jurisdiction: manifest.jurisdiction,
             publisher_identity: { support_contact: manifest.support_contact },
           });
+          expect(body.jurisdiction).toBe(manifest.jurisdiction);
           return new Response(
             JSON.stringify(
               envelope({

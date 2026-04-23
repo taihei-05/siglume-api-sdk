@@ -239,14 +239,24 @@ jobs:
           fi
 
       - name: Install dependencies (TS package)
-        if: steps.npm_token.outputs.present == 'true'
         working-directory: siglume-api-sdk-ts
         run: npm ci
 
+      - name: Typecheck TS package
+        working-directory: siglume-api-sdk-ts
+        run: npm run typecheck
+
+      - name: Test TS package
+        working-directory: siglume-api-sdk-ts
+        run: npm run test -- --coverage.enabled=false
+
       - name: Build TS package
-        if: steps.npm_token.outputs.present == 'true'
         working-directory: siglume-api-sdk-ts
         run: npm run build
+
+      - name: Pack TS package
+        working-directory: siglume-api-sdk-ts
+        run: npm run pack:check
 
       - name: Publish to npm
         if: steps.npm_token.outputs.present == 'true'

@@ -37,3 +37,32 @@ jobs:
       - name: Run examples (smoke test)
         run: |
           python examples/hello_price_compare.py
+
+  typescript:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install TypeScript dependencies
+        working-directory: siglume-api-sdk-ts
+        run: npm ci
+
+      - name: Typecheck TypeScript package
+        working-directory: siglume-api-sdk-ts
+        run: npm run typecheck
+
+      - name: Test TypeScript package
+        working-directory: siglume-api-sdk-ts
+        run: npm run test -- --coverage.enabled=false
+
+      - name: Build and pack TypeScript package
+        working-directory: siglume-api-sdk-ts
+        run: |
+          npm run build
+          npm run pack:check

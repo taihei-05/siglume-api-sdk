@@ -1483,19 +1483,13 @@ def _build_auto_register_request(
 
     docs_url = str(manifest_payload.get("docs_url") or manifest_payload.get("documentation_url") or "").strip()
     support_contact = str(manifest_payload.get("support_contact") or "").strip()
-    jurisdiction = str(manifest_payload.get("jurisdiction") or "").strip()
     if docs_url or support_contact:
         publisher_identity = {
             "documentation_url": docs_url or None,
             "support_contact": support_contact or None,
         }
         payload["publisher_identity"] = publisher_identity
-        legal: dict[str, Any] = {"publisher_identity": publisher_identity}
-        if jurisdiction:
-            legal["jurisdiction"] = jurisdiction
-        payload["legal"] = legal
-    elif jurisdiction:
-        payload["legal"] = {"jurisdiction": jurisdiction}
+        payload["legal"] = {"publisher_identity": publisher_identity}
     return payload
 
 

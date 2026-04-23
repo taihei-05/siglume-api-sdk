@@ -245,7 +245,7 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
 
   program
     .command("register")
-    .option("--confirm", "confirm the draft registration immediately", false)
+    .option("--confirm", "confirm the draft registration immediately and submit it for review", false)
     .option("--submit-review", "submit the draft for review if --confirm is not used", false)
     .option("--json", "emit machine-readable JSON", false)
     .argument("[path]", ".", "project path")
@@ -254,10 +254,23 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
       if (options.json) {
         emit(stdout, renderJson(report));
       } else {
-        const receipt = report.receipt as { listing_id: string; status: string };
+        const receipt = report.receipt as {
+          listing_id: string;
+          status: string;
+          review_url?: string | null;
+          trace_id?: string | null;
+          request_id?: string | null;
+        };
         emit(stdout, "Draft listing created.");
         emit(stdout, `listing_id: ${receipt.listing_id}`);
         emit(stdout, `status: ${receipt.status}`);
+        if (receipt.review_url) emit(stdout, `review_url: ${receipt.review_url}`);
+        if (receipt.trace_id) emit(stdout, `trace_id: ${receipt.trace_id}`);
+        if (receipt.request_id) emit(stdout, `request_id: ${receipt.request_id}`);
+        const preflight = report.registration_preflight as { remote_quality?: { grade?: string; overall_score?: number } } | undefined;
+        if (preflight?.remote_quality) {
+          emit(stdout, `preflight_quality: ${preflight.remote_quality.grade} (${preflight.remote_quality.overall_score}/100)`);
+        }
       }
     });
 

@@ -26,7 +26,6 @@
     "support_contact": "support@example.com"
   },
   "legal": {
-    "jurisdiction": "US",
     "publisher_identity": {
       "documentation_url": "https://docs.example.com/growpost-monthly-publisher",
       "support_contact": "support@example.com"

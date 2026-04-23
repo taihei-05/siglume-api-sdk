@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -37,8 +37,8 @@ function manifestBase(permission_class: PermissionClass = PermissionClass.READ_O
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
     jurisdiction: "US",
-    docs_url: "https://docs.example.com/price-compare-helper",
-    support_contact: "support@example.com",
+    docs_url: "https://docs.siglume.test/price-compare-helper",
+    support_contact: "https://support.siglume.test/price-compare-helper",
     short_description:
       permission_class === PermissionClass.PAYMENT
         ? "Preview, quote, and capture a USD payment with approval."
@@ -161,6 +161,21 @@ function usageClientFactory(
   };
 }
 
+function publishableQualityReport(overrides: Record<string, unknown> = {}) {
+  return {
+    overall_score: 91,
+    grade: "A",
+    issues: [],
+    keyword_coverage_estimate: 64,
+    improvement_suggestions: [],
+    publishable: true,
+    validation_ok: true,
+    validation_errors: [],
+    validation_warnings: [],
+    ...overrides,
+  };
+}
+
 describe("cli project helpers", () => {
   it("builds action and payment tool-manual templates with required fields", () => {
     const actionTemplate = buildToolManualTemplate(manifestBase(PermissionClass.ACTION));
@@ -255,6 +270,48 @@ describe("cli project helpers", () => {
     expect(receivedApiKey).toBe("siglume_test_key");
   });
 
+  it("requires an explicit tool manual before registration", async () => {
+    const projectDir = await createObjectProject();
+    await rm(join(projectDir, "tool_manual.json"));
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () => ({}) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("tool_manual.json is required for `siglume register`");
+  });
+
+  it("blocks registration before auto-register when remote quality is not publishable", async () => {
+    const projectDir = await createObjectProject();
+    let autoRegisterCalled = false;
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport({ overall_score: 61, grade: "C", publishable: false });
+              },
+              async auto_register() {
+                autoRegisterCalled = true;
+                throw new Error("auto_register should not run");
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("remote Tool Manual quality is not publishable: C (61/100)");
+    expect(autoRegisterCalled).toBe(false);
+  });
+
   it("covers registration, support, and usage helper branches", async () => {
     const projectDir = await createObjectProject();
     const usageCapture = { api_key: undefined as string | undefined, usage_calls: 0 };
@@ -266,8 +323,19 @@ describe("cli project helpers", () => {
         env: { SIGLUME_API_KEY: "sig_test_key" },
         client_factory: () =>
           ({
+            async preview_quality_score() {
+              return publishableQualityReport();
+            },
             async auto_register() {
-              return { listing_id: "lst_123", status: "draft", auto_manifest: {}, confidence: {} };
+              return {
+                listing_id: "lst_123",
+                status: "draft",
+                review_url: "https://siglume.com/owner/publish?listing=lst_123",
+                trace_id: "trc_reg",
+                request_id: "req_reg",
+                auto_manifest: {},
+                confidence: {},
+              };
             },
             async submit_review() {
               return {
@@ -293,6 +361,9 @@ describe("cli project helpers", () => {
         env: { SIGLUME_API_KEY: "sig_test_key" },
         client_factory: () =>
           ({
+            async preview_quality_score() {
+              return publishableQualityReport();
+            },
             async auto_register() {
               return { listing_id: "lst_123", status: "draft", auto_manifest: {}, confidence: {} };
             },
@@ -381,6 +452,8 @@ describe("cli project helpers", () => {
     }
 
     expect((submitReview.review as { listing_id: string }).listing_id).toBe("lst_123");
+    expect((submitReview.receipt as { review_url: string }).review_url).toBe("https://siglume.com/owner/publish?listing=lst_123");
+    expect((submitReview.registration_preflight as { ok: boolean }).ok).toBe(true);
     expect(confirmSkip.submit_review_skipped).toBe(true);
     expect((supportReport.case as { summary: string }).summary).toBe("Need help:details:trc_123");
     expect(usageCapture.usage_calls).toBe(1);
