@@ -83,7 +83,7 @@ export class SiglumeBuyerClient {
 
   constructor(options: SiglumeBuyerClientOptions) {
     this.client = new SiglumeClient(options);
-    this.api_key = options.api_key;
+    this.api_key = this.client.api_key;
     this.base_url = (options.base_url ?? DEFAULT_SIGLUME_API_BASE).replace(/\/+$/, "");
     this.timeout_ms = Math.max(1, options.timeout_ms ?? 15_000);
     this.max_retries = Math.max(1, Math.trunc(options.max_retries ?? 3));
@@ -294,7 +294,7 @@ export class SiglumeBuyerClient {
     const headers = new Headers({
       Authorization: `Bearer ${this.api_key}`,
       Accept: "application/json",
-      "User-Agent": "siglume-api-sdk-ts/0.6.0",
+      "User-Agent": "siglume-api-sdk-ts/0.7.6",
     });
     let body: string | undefined;
     if (options.json_body) {

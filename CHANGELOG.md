@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.6] - 2026-04-23
+
+v0.7.6 closes the remaining production-onboarding review findings for paid
+Action APIs and restores the documented SDK API-key behavior.
+
+### Changed
+
+- Python and TypeScript `SiglumeClient` now read `SIGLUME_API_KEY` from the
+  environment when an explicit API key argument is not supplied.
+- Python and TypeScript Buyer/Meter helper clients now use the resolved
+  `SIGLUME_API_KEY` fallback consistently.
+- The paid Action subscription template now includes the Tool Manual
+  `jurisdiction` required for `permission_class="action"`.
+- Paid Action examples no longer place platform-injected `dry_run` in
+  `input_schema.properties`; runtime validation can still send it in
+  `request_payload`.
+- Getting Started now uses an executable `os.environ["SIGLUME_API_KEY"]`
+  Python sample and documents action/payment conditional Tool Manual fields.
+- Generated Python and TypeScript project READMEs now show the local no-key
+  workflow before API-key-backed validation and registration.
+
 ## [0.7.5] - 2026-04-23
 
 v0.7.5 fixes npm provenance publishing for the TypeScript SDK and tightens the

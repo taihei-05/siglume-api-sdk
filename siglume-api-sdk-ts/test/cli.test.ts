@@ -334,8 +334,11 @@ describe("siglume CLI", () => {
     expect(initExit).toBe(0);
     expect(validateExit).toBe(0);
     const manifest = JSON.parse(await readFile(join(projectDir, "manifest.json"), "utf8")) as Record<string, unknown>;
+    const readmeText = await readFile(join(projectDir, "README.md"), "utf8");
     const validatePayload = JSON.parse(stdout.at(-1) as string) as Record<string, unknown>;
     expect(manifest.capability_key).toBe("echo-starter");
+    expect(readmeText).toContain("Start locally without a Siglume API key");
+    expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(validatePayload.ok).toBe(true);
   });
 
@@ -428,6 +431,8 @@ describe("siglume CLI", () => {
     expect(adapterText).toContain("support_contact: \"support@example.com\"");
     expect(adapterText).toContain("docs_url: \"https://example.com/docs\"");
     expect(readmeText).toContain("replace `docs_url` and `support_contact`");
+    expect(readmeText).toContain("Start locally without a Siglume API key");
+    expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(readmeText.indexOf("npm test -- tests/test_adapter.ts")).toBeLessThan(
       readmeText.indexOf("siglume register . --confirm"),
     );

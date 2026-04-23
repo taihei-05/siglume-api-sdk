@@ -840,10 +840,18 @@ def _operation_readme_template(operation: OperationMetadata, manifest: AppManife
             "",
             "## Commands",
             "",
+            "Start locally without a Siglume API key:",
+            "",
             "```bash",
-            "siglume validate .",
             "siglume test .",
             "pytest tests/test_adapter.py",
+            "siglume score . --offline",
+            "```",
+            "",
+            "After placeholders are replaced and `SIGLUME_API_KEY` is set, run the server-aligned checks and register:",
+            "",
+            "```bash",
+            "siglume validate .",
             "siglume score . --remote",
             "siglume register . --confirm",
             "```",
@@ -1540,9 +1548,17 @@ def _readme_template(template: str) -> str:
 
         Suggested workflow:
 
+        Start locally without a Siglume API key:
+
+        ```bash
+        siglume test .
+        siglume score . --offline
+        ```
+
+        After placeholders are replaced and `SIGLUME_API_KEY` is set, run the server-aligned checks and register:
+
         ```bash
         siglume validate .
-        siglume test .
         siglume score . --remote
         siglume register . --confirm
         ```

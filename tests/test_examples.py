@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import inspect
+import json
 import sys
 from pathlib import Path
 
@@ -102,6 +103,18 @@ def test_generate_tool_manual_example_requires_explicit_llm_api_key(monkeypatch)
 
     with pytest.raises(SystemExit, match="Set ANTHROPIC_API_KEY or OPENAI_API_KEY"):
         module.main()
+
+
+def test_paid_action_subscription_payload_tool_manual_validates() -> None:
+    payload = json.loads((ROOT / "examples" / "paid_action_subscription" / "auto_register_payload.json").read_text())
+    tool_manual = payload["tool_manual"]
+
+    ok, issues = validate_tool_manual(tool_manual)
+
+    assert ok, issues
+    assert tool_manual["jurisdiction"] == "US"
+    assert "dry_run" not in tool_manual["input_schema"]["properties"]
+    assert not any(issue.field == "input_schema.properties.dry_run" for issue in issues)
 
 
 def test_buyer_langchain_example_runs_with_mock_client(capsys) -> None:

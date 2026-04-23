@@ -768,6 +768,7 @@ this:
 
 ```python
 import json
+import os
 import requests
 
 payload = {
@@ -819,7 +820,6 @@ payload = {
             "properties": {
                 "channel": {"type": "string", "description": "Slack channel name or ID."},
                 "period": {"type": "string", "description": "Time window to summarize, such as today or this week."},
-                "dry_run": {"type": "boolean", "description": "Whether to create a preview without posting."},
             },
             "required": ["channel", "period"],
             "additionalProperties": False,
@@ -838,6 +838,16 @@ payload = {
         "result_hints": ["Show the channel, posted flag, and digest summary in the final response."],
         "error_hints": ["If Slack rejects the request, show the response body and ask the owner to reconnect Slack."],
         "approval_summary_template": "Post a Slack digest to {channel} for {period}.",
+        "preview_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "Preview summary shown to the owner."},
+                "channel": {"type": "string", "description": "Slack channel that would receive the digest."},
+                "posted": {"type": "boolean", "description": "Always false for preview responses."},
+            },
+            "required": ["summary", "channel", "posted"],
+            "additionalProperties": False,
+        },
         "idempotency_support": True,
         "side_effect_summary": "Posts a discussion digest into the specified Slack channel.",
         "jurisdiction": "US",
@@ -860,9 +870,10 @@ payload = {
     },
 }
 
+api_key = os.environ["SIGLUME_API_KEY"]
 response = requests.post(
     "https://siglume.com/v1/market/capabilities/auto-register",
-    headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
+    headers={"Authorization": f"Bearer {api_key}"},
     json=payload,
 )
 response.raise_for_status()
@@ -870,7 +881,7 @@ listing_id = response.json()["data"]["listing_id"]
 
 requests.post(
     f"https://siglume.com/v1/market/capabilities/{listing_id}/confirm-auto-register",
-    headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
+    headers={"Authorization": f"Bearer {api_key}"},
     json={"approved": True},
 ).raise_for_status()
 ```
@@ -1013,6 +1024,29 @@ agents will NEVER select it — even if the API works perfectly.**
 | `result_hints` | How to interpret results | `"Highlight best offer"` |
 | `error_hints` | How to handle errors | `"Ask for clearer query"` |
 
+### Conditional required fields
+
+`permission_class="action"` and `permission_class="payment"` add approval and
+side-effect fields. These are required by the same validator that runs during
+production registration:
+
+| Field | Required for | Description | Example |
+|---|---|---|---|
+| `approval_summary_template` | `action`, `payment` | Short owner approval text with placeholders from `input_schema` | `"Post digest to {channel}."` |
+| `preview_schema` | `action`, `payment` | JSON Schema for the dry-run / approval preview response | `{"type": "object", ...}` |
+| `side_effect_summary` | `action`, `payment` | Plain-language description of what changes outside Siglume after approval | `"Posts a digest to Slack."` |
+| `jurisdiction` | `action`, `payment` | ISO 3166-1 alpha-2 governing law for execution | `"US"` |
+| `idempotency_support` | `action`, `payment` | Must be `true`; action/payment tools must be retry-safe | `true` |
+| `quote_schema` | `payment` | JSON Schema for the pre-payment quote response | `{"type": "object", ...}` |
+| `currency` | `payment` | Settlement currency; today this must be `USD` | `"USD"` |
+| `settlement_mode` | `payment` | Payment execution rail | `"embedded_wallet_charge"` |
+| `refund_or_cancellation_note` | `payment` | Owner-facing refund or cancellation rule | `"Refunds follow merchant policy."` |
+
+Do not put platform-injected fields such as `dry_run`, `trace_id`, or
+`idempotency_key` in `input_schema.properties`. Siglume may send those fields
+to your runtime during validation or execution, but agents should not provide
+them as user input.
+
 > **Note:** Treat `confirm-auto-register` overrides as a post-draft correction
 > path only. Production `auto-register` should already include a complete
 > `tool_manual` object that passes `validate_tool_manual()`.
@@ -1061,7 +1095,7 @@ siglume score . --remote
 ```python
 from siglume_api_sdk import SiglumeClient
 
-with SiglumeClient(api_key="YOUR_TOKEN") as client:
+with SiglumeClient() as client:  # reads SIGLUME_API_KEY from the environment
     report = client.preview_quality_score(tool_manual)
     print(report.grade, report.overall_score)
 ```

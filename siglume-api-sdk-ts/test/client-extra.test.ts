@@ -88,7 +88,38 @@ function buildRuntimeValidation() {
 
 describe("SiglumeClient extra branches", () => {
   it("requires an api key at construction time", () => {
-    expect(() => new SiglumeClient({ api_key: "" })).toThrow("SIGLUME_API_KEY is required.");
+    const previous = process.env.SIGLUME_API_KEY;
+    delete process.env.SIGLUME_API_KEY;
+    try {
+      expect(() => new SiglumeClient({ api_key: "" })).toThrow("Pass it as the api_key option");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
+  it("reads SIGLUME_API_KEY from the environment and lets explicit options override it", () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = " sig_env_key ";
+    try {
+      const envClient = new SiglumeClient({ base_url: "https://api.example.test/v1" });
+      const explicitClient = new SiglumeClient({
+        api_key: "sig_explicit_key",
+        base_url: "https://api.example.test/v1",
+      });
+
+      expect(envClient.api_key).toBe("sig_env_key");
+      expect(explicitClient.api_key).toBe("sig_explicit_key");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
   });
 
   it("prefers source_url or source_code and allows confirmation overrides", async () => {

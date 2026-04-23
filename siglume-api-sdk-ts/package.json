@@ -1,6 +1,6 @@
 {
   "name": "@siglume/api-sdk",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "TypeScript runtime for building and testing Siglume developer apps",
   "license": "MIT",
   "repository": {
