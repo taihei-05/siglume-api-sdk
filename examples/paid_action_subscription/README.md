@@ -23,6 +23,12 @@ Before you run the registration curl, replace every placeholder in
 
 | JSON path | Replace with |
 |---|---|
+| `source_url`, `source_context.repository_url`, `source_context.source_paths`, `source_context.doc_paths` | Your public source repository URL, branch/ref, and file paths for the API runtime and docs. |
+| `capability_key`, `manifest.capability_key` | Your stable listing key, using lowercase letters, numbers, and hyphens. |
+| `name`, `manifest.name` | Your API's public listing name. |
+| `job_to_be_done`, `short_description`, `manifest.job_to_be_done`, `manifest.short_description` | Your API's actual use case. Remove the GrowPost-specific wording unless you are publishing GrowPost. |
+| `required_connected_accounts`, `manifest.required_connected_accounts`, `tool_manual.requires_connected_accounts` | The provider keys your API really needs, or `[]` if none. Keep all three lists consistent. |
+| `tool_manual.tool_name` | Your stable agent-facing tool name, using lowercase letters, numbers, and underscores. |
 | `docs_url`, `documentation_url`, `legal.publisher_identity.documentation_url`, `manifest.docs_url` | Your public API docs URL. |
 | `support_contact`, `legal.publisher_identity.support_contact`, `manifest.support_contact` | Your real support email or support URL. |
 | `runtime_validation.public_base_url` | Your public production API base URL. Do not use localhost, private IPs, or `example.com`. |
@@ -34,7 +40,10 @@ Before you run the registration curl, replace every placeholder in
 
 Do not run the curl while `https://api.example.com`,
 `https://docs.example.com`, `support@example.com`, or
-`replace-with-dedicated-review-key` are still present.
+`replace-with-dedicated-review-key` are still present. Also replace the
+example GitHub URLs, `growpost-*` keys, `GrowPost` copy, and `["growpost"]`
+connected-account placeholders unless this API really is a GrowPost
+integration.
 
 Register after those replacements:
 

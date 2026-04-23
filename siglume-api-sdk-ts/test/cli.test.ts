@@ -428,6 +428,9 @@ describe("siglume CLI", () => {
     expect(adapterText).toContain("support_contact: \"support@example.com\"");
     expect(adapterText).toContain("docs_url: \"https://example.com/docs\"");
     expect(readmeText).toContain("replace `docs_url` and `support_contact`");
+    expect(readmeText.indexOf("npm test -- tests/test_adapter.ts")).toBeLessThan(
+      readmeText.indexOf("siglume register . --confirm"),
+    );
     expect(await readFile(join(projectDir, "tool_manual.json"), "utf8")).toContain("\"owner_charter_update\"");
     expect(await readFile(join(projectDir, "runtime_validation.json"), "utf8")).toContain("\"expected_response_fields\"");
   });

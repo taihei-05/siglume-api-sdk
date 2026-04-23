@@ -1,8 +1,13 @@
 {
   "name": "@siglume/api-sdk",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "TypeScript runtime for building and testing Siglume developer apps",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/taihei-05/siglume-api-sdk",
+    "directory": "siglume-api-sdk-ts"
+  },
   "type": "module",
   "engines": {
     "node": ">=18"

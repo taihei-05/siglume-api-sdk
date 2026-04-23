@@ -1052,9 +1052,9 @@ function operationReadmeTemplate(
     "```bash",
     "siglume validate .",
     "siglume test .",
+    "npm test -- tests/test_adapter.ts",
     "siglume score . --remote",
     "siglume register . --confirm",
-    "npm test -- tests/test_adapter.ts",
     "```",
     "",
   ].join("\n");

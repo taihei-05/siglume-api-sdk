@@ -843,9 +843,9 @@ def _operation_readme_template(operation: OperationMetadata, manifest: AppManife
             "```bash",
             "siglume validate .",
             "siglume test .",
+            "pytest tests/test_adapter.py",
             "siglume score . --remote",
             "siglume register . --confirm",
-            "pytest tests/test_adapter.py",
             "```",
             "",
         ]

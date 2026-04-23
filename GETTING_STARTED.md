@@ -38,6 +38,7 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 
 - Python 3.11+
 - pip
+- A Siglume API key for server-aligned validation and registration
 
 ### Install and run
 
@@ -45,17 +46,23 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 # Install from PyPI
 pip install siglume-api-sdk
 
-# Generate a starter and validate it
+# Generate a starter and run the local loop
 siglume init --template price-compare
-siglume validate .
 siglume test .
+siglume score . --offline
 ```
 
-When you are ready to publish, edit the generated `tool_manual.json`,
-`runtime_validation.json`, and manifest publisher fields, then run the same
-production path the server will enforce:
+When you are ready to use server-aligned validation, export your API key and
+run the same production path the server will enforce:
 
 ```bash
+export SIGLUME_API_KEY="sig_..."   # macOS / Linux
+# or on Windows PowerShell:
+$env:SIGLUME_API_KEY = "sig_..."
+
+# First replace placeholders in tool_manual.json, runtime_validation.json,
+# and the manifest publisher fields.
+siglume validate .
 siglume score . --remote
 siglume register . --confirm
 ```
@@ -79,12 +86,16 @@ python examples/hello_price_compare.py
 
 ```
 my-awesome-app/
-├── my_app.py          # Your API (subclasses AppAdapter)
-├── stubs.py           # Mock external APIs for testing
-├── tests/
-│   └── test_app.py    # Tests
-└── requirements.txt
+├── adapter.py              # Your AppAdapter implementation
+├── manifest.json           # AppManifest snapshot, including publisher identity
+├── tool_manual.json        # Agent-facing Tool Manual used at registration time
+├── runtime_validation.json # Public HTTP validation contract
+└── README.md               # Generated next steps for this project
 ```
+
+`siglume init --from-operation ...` also generates `stubs.py` and
+`tests/test_adapter.py` / `tests/test_adapter.ts` for the operation-wrapper
+route.
 
 ---
 
@@ -301,9 +312,9 @@ Does your API write to anything external?
 
 ```
 1. Build and test locally (AppTestHarness)
-2. Register via auto-register endpoint
-3. Write your tool manual (CRITICAL - see Section 13)
-4. Confirm with tool manual - quality check runs automatically
+2. Write your Tool Manual and runtime validation contract
+3. Validate with the same server checks used by production registration
+4. Register with `siglume register . --confirm`
 5. Admin reviews (3-5 business days)
 6. Published to the API Store
 ```
@@ -343,19 +354,31 @@ contract the server validates:
 The easiest path is:
 
 ```bash
-siglume validate .
 siglume test .
+siglume validate .
 siglume score . --remote
 ```
 
+`siglume validate .` and `siglume score . --remote` require
+`SIGLUME_API_KEY`; use `siglume test .` and `siglume score . --offline` for a
+local-only loop before you have a key.
+
 See [Section 11](#11-auto-register-list-your-api-with-your-ai) for the full payload shape.
 
-### Step 3: Register via auto-register and confirm
+### Step 3: Register with the CLI and confirm
 
 The **only** way to create a new API listing is via the auto-register endpoint.
-There is no manual form or developer portal for listing creation. Production
-`auto-register` must include `tool_manual`; do not wait until
-`confirm-auto-register` to provide it.
+There is no manual form or developer portal for listing creation. The standard
+SDK route is the CLI; it calls `auto-register` with your `manifest`,
+`tool_manual`, `runtime_validation`, publisher identity, and source provenance.
+
+```bash
+siglume register . --confirm
+```
+
+Production `auto-register` must include `tool_manual`; do not wait until
+`confirm-auto-register` to provide it. Use the raw REST endpoint only when you
+are building custom automation around the same complete contract.
 
 The tool manual determines whether agents select your API -- it is the most
 important thing you write. See [Section 13](#13-tool-manual-guide).
@@ -586,8 +609,10 @@ You don't need to fill any forms. Give your AI this guide and your source code �
 ### How it works
 
 1. Your AI reads your source code
-2. Your AI generates the listing manifest, including English + Japanese descriptions
-3. Your AI calls the auto-register endpoint
+2. Your AI generates the complete registration contract: manifest, Tool Manual,
+   runtime validation, publisher identity, source provenance, and English +
+   Japanese descriptions
+3. Your AI calls the auto-register endpoint with that complete contract
 4. You review the draft and confirm
 
 Siglume does NOT translate for you. Your AI generates both languages.
@@ -988,7 +1013,9 @@ agents will NEVER select it — even if the API works perfectly.**
 | `result_hints` | How to interpret results | `"Highlight best offer"` |
 | `error_hints` | How to handle errors | `"Ask for clearer query"` |
 
-> **Note:** `confirm-auto-register` can merge your overrides with auto-detected fields, but the safest direct-API path is to send a complete `tool_manual` object that already passes `validate_tool_manual()`.
+> **Note:** Treat `confirm-auto-register` overrides as a post-draft correction
+> path only. Production `auto-register` should already include a complete
+> `tool_manual` object that passes `validate_tool_manual()`.
 
 ### Quality scoring
 
@@ -1039,8 +1066,8 @@ with SiglumeClient(api_key="YOUR_TOKEN") as client:
     print(report.grade, report.overall_score)
 ```
 
-For end-to-end draft registration, the server still returns the quality score as
-part of `confirm-auto-register`:
+If you need to correct a draft after `auto-register`, the server still returns
+the quality score as part of `confirm-auto-register`:
 
 ```bash
 curl -X POST https://siglume.com/v1/market/capabilities/LISTING_ID/confirm-auto-register \
@@ -1049,7 +1076,7 @@ curl -X POST https://siglume.com/v1/market/capabilities/LISTING_ID/confirm-auto-
   -d @confirm-request.json
 ```
 
-Example request payload:
+Optional correction payload:
 
 ```json
 {

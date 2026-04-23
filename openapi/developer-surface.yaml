@@ -446,10 +446,11 @@ paths:
       description: |
         Confirms the auto-registered listing, runs quality check on the tool manual,
         creates a CapabilityRelease, and submits for admin review.
-        This is the canonical publish gate for the final agent contract.
-        Include tool_manual in overrides for best quality score and explicit
-        input_schema / output_schema control. If input_form_spec was already
-        seeded during auto-register, confirm reuses it unless you override it here.
+        This is the canonical publish gate for a draft that was already created
+        by production auto-register. Production auto-register should already
+        include a complete tool_manual; use confirm overrides only to correct a
+        draft after creation. If input_form_spec was already seeded during
+        auto-register, confirm reuses it unless you override it here.
       tags: [Capabilities]
       parameters:
         - name: listingId
@@ -470,7 +471,7 @@ paths:
                   description: Must be true to confirm
                 overrides:
                   type: object
-                  description: Override auto-detected fields including tool_manual
+                  description: Optional post-draft corrections, including tool_manual only when it changed after auto-register
                   properties:
                     tool_manual:
                       $ref: '#/components/schemas/ToolManual'
