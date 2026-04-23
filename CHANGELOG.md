@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] - 2026-04-23
+
+v0.7.5 fixes npm provenance publishing for the TypeScript SDK and tightens the
+last onboarding docs gaps.
+
+### Changed
+
+- TypeScript package metadata now declares the GitHub repository so npm can
+  verify `npm publish --provenance` against the GitHub Actions source.
+- The release workflow now uses Node.js 24 for npm publishing.
+- Quick Start now starts with a local-only loop, then explicitly introduces
+  `SIGLUME_API_KEY` before server-aligned validation.
+- Publishing docs now present `siglume register . --confirm` as the standard
+  SDK route and raw HTTP as the automation route.
+- Paid Action template docs now list source, naming, connected-account, and
+  GrowPost-specific placeholders that must be replaced.
+- Confirm-auto-register docs now frame Tool Manual overrides as post-draft
+  corrections only.
+
 ## [0.7.4] - 2026-04-23
 
 v0.7.4 tightens the last onboarding edge cases found after v0.7.3.

@@ -421,6 +421,7 @@ def test_init_command_generates_operation_wrapper_with_grade_b_or_better(monkeyp
         assert 'support_contact="support@example.com"' in adapter_text
         assert 'docs_url="https://example.com/docs"' in adapter_text
         assert "replace `docs_url` and `support_contact`" in readme_text
+        assert readme_text.index("pytest tests/test_adapter.py") < readme_text.index("siglume register . --confirm")
 
 
 def test_build_tool_manual_template_tolerates_missing_job_to_be_done() -> None:

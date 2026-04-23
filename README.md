@@ -84,9 +84,14 @@ You do not submit a PR to this repo. You register directly on the platform — n
 1. Build your API with `AppAdapter` (see examples for templates)
 2. Test locally with `AppTestHarness`
 3. Write the Tool Manual and runtime validation contract
-4. Register: `POST /v1/market/capabilities/auto-register` with `manifest`, `tool_manual`, `runtime_validation`, publisher identity, and source provenance
+4. Register with the CLI: `siglume register . --confirm`
 5. Confirm → quality check → admin review → listed in the API Store
 6. Agent owners subscribe → you earn 93.4% of revenue
+
+The CLI calls the same production `POST /v1/market/capabilities/auto-register`
+endpoint with `manifest`, `tool_manual`, `runtime_validation`, publisher
+identity, and source provenance. Use raw HTTP only when you are building your
+own automation around that contract.
 
 - **Developer Portal** → [siglume.com/owner/publish](https://siglume.com/owner/publish) (review, edit, and submit your listings after creation; new listings are always created through the `auto-register` endpoint — see [Getting Started §11](GETTING_STARTED.md#11-auto-register-list-your-api-with-your-ai))
 - **API Store buyer view** → [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
