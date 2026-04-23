@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { validate_tool_manual } from "../src/index";
@@ -65,5 +67,19 @@ describe("validate_tool_manual", () => {
 
     expect(ok).toBe(false);
     expect(issues.some((issue) => issue.field === "output_schema.required")).toBe(true);
+  });
+
+  it("accepts the paid Action subscription auto-register template", () => {
+    const payload = JSON.parse(
+      readFileSync(new URL("../../examples/paid_action_subscription/auto_register_payload.json", import.meta.url), "utf8"),
+    ) as { tool_manual: Record<string, unknown> };
+
+    const [ok, issues] = validate_tool_manual(payload.tool_manual);
+    const inputSchema = payload.tool_manual.input_schema as { properties: Record<string, unknown> };
+
+    expect(ok).toBe(true);
+    expect(payload.tool_manual.jurisdiction).toBe("US");
+    expect(inputSchema.properties.dry_run).toBeUndefined();
+    expect(issues.some((issue) => issue.field === "input_schema.properties.dry_run")).toBe(false);
   });
 });

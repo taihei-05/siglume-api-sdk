@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   SiglumeBuyerClient,
+  SiglumeClientError,
   SiglumeExperimentalError,
 } from "../src/index";
 import { runMockBuyerClaudeExample } from "../../examples/buyer_claude_agent_sdk";
@@ -46,6 +47,78 @@ afterEach(() => {
 });
 
 describe("SiglumeBuyerClient", () => {
+  it("uses SIGLUME_API_KEY fallback for buyer Authorization headers", async () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = " sig_env_key ";
+    const emitWarning = vi.spyOn(process, "emitWarning").mockImplementation(() => process);
+    try {
+      const client = new SiglumeBuyerClient({
+        base_url: "https://api.example.test/v1",
+        fetch: async (_input, init) => {
+          expect((init?.headers as Headers).get("Authorization")).toBe("Bearer sig_env_key");
+          return new Response(JSON.stringify(envelope({ items: [], next_cursor: null, limit: 20, offset: 0 })), {
+            status: 200,
+          });
+        },
+      });
+
+      await client.search_capabilities({ query: "currency", limit: 1 });
+      client.close();
+      expect(emitWarning).toHaveBeenCalledOnce();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
+  it("lets explicit buyer API keys override SIGLUME_API_KEY", async () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = "sig_env_key";
+    const emitWarning = vi.spyOn(process, "emitWarning").mockImplementation(() => process);
+    try {
+      const client = new SiglumeBuyerClient({
+        api_key: " sig_explicit_key ",
+        base_url: "https://api.example.test/v1",
+        fetch: async (_input, init) => {
+          expect((init?.headers as Headers).get("Authorization")).toBe("Bearer sig_explicit_key");
+          return new Response(JSON.stringify(envelope({ items: [], next_cursor: null, limit: 20, offset: 0 })), {
+            status: 200,
+          });
+        },
+      });
+
+      await client.search_capabilities({ query: "currency", limit: 1 });
+      client.close();
+      expect(emitWarning).toHaveBeenCalledOnce();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
+  it("rejects explicit empty buyer API keys even when SIGLUME_API_KEY is set", () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = "sig_env_key";
+    try {
+      expect(() => new SiglumeBuyerClient({
+        api_key: "",
+        base_url: "https://api.example.test/v1",
+      })).toThrow(SiglumeClientError);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
   it("searches with local substring scoring and returns the strongest match first", async () => {
     const emitWarning = vi.spyOn(process, "emitWarning").mockImplementation(() => process);
     const client = buildClient(async (input) => {

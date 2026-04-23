@@ -133,7 +133,7 @@ type RequestOptions = {
 };
 
 export interface SiglumeClientOptions {
-  api_key: string;
+  api_key?: string;
   agent_key?: string;
   base_url?: string;
   timeout_ms?: number;
@@ -2146,11 +2146,15 @@ export class SiglumeClient implements SiglumeClientShape {
   private readonly fetchImpl: FetchLike;
   private readonly pendingConfirmations = new Map<string, PendingConfirmation>();
 
-  constructor(options: SiglumeClientOptions) {
-    if (!options.api_key) {
-      throw new SiglumeClientError("SIGLUME_API_KEY is required.");
+  constructor(options: SiglumeClientOptions = {}) {
+    const envApiKey = typeof process !== "undefined" ? process.env?.SIGLUME_API_KEY : undefined;
+    const resolvedApiKey = (options.api_key ?? envApiKey ?? "").trim();
+    if (!resolvedApiKey) {
+      throw new SiglumeClientError(
+        "SIGLUME_API_KEY is required. Pass it as the api_key option or set the SIGLUME_API_KEY env var.",
+      );
     }
-    this.api_key = options.api_key;
+    this.api_key = resolvedApiKey;
     this.agent_key = options.agent_key?.trim() || undefined;
     this.base_url = (options.base_url ?? DEFAULT_SIGLUME_API_BASE).replace(/\/+$/, "");
     this.timeout_ms = Math.max(1, options.timeout_ms ?? 15_000);
@@ -4905,7 +4909,7 @@ export class SiglumeClient implements SiglumeClientShape {
     const headers = new Headers({
       Authorization: `Bearer ${this.api_key}`,
       Accept: "application/json",
-      "User-Agent": "siglume-api-sdk-ts/0.6.0",
+      "User-Agent": "siglume-api-sdk-ts/0.7.6",
     });
     if (options.headers) {
       for (const [key, value] of Object.entries(options.headers)) {

@@ -123,6 +123,9 @@ def test_init_command_writes_template_files() -> None:
         assert Path("tool_manual.json").exists()
         assert Path("runtime_validation.json").exists()
         assert Path("README.md").exists()
+        readme_text = Path("README.md").read_text(encoding="utf-8")
+        assert "Start locally without a Siglume API key" in readme_text
+        assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
 
 
 def test_init_payment_template_writes_valid_tool_manual() -> None:
@@ -421,6 +424,8 @@ def test_init_command_generates_operation_wrapper_with_grade_b_or_better(monkeyp
         assert 'support_contact="support@example.com"' in adapter_text
         assert 'docs_url="https://example.com/docs"' in adapter_text
         assert "replace `docs_url` and `support_contact`" in readme_text
+        assert "Start locally without a Siglume API key" in readme_text
+        assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
         assert readme_text.index("pytest tests/test_adapter.py") < readme_text.index("siglume register . --confirm")
 
 

@@ -74,6 +74,70 @@ def build_meter_client(handler) -> MeterClient:
     )
 
 
+def test_meter_client_reads_api_key_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", " sig_env_key ")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer sig_env_key"
+        return httpx.Response(
+            202,
+            json=envelope({"items": [{"accepted": True, "external_id": "evt_env", "replayed": False}], "count": 1}),
+        )
+
+    client = MeterClient(
+        base_url="https://api.example.test/v1",
+        transport=httpx.MockTransport(handler),
+    )
+    result = client.record(
+        UsageRecord(
+            capability_key="translation-hub",
+            dimension="tokens_in",
+            units=42,
+            external_id="evt_env",
+            occurred_at_iso="2026-04-23T00:00:00Z",
+        )
+    )
+    assert result.accepted is True
+    client.close()
+
+
+def test_meter_client_explicit_api_key_overrides_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", "sig_env_key")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer sig_explicit_key"
+        return httpx.Response(
+            202,
+            json=envelope(
+                {"items": [{"accepted": True, "external_id": "evt_override", "replayed": False}], "count": 1}
+            ),
+        )
+
+    client = MeterClient(
+        api_key=" sig_explicit_key ",
+        base_url="https://api.example.test/v1",
+        transport=httpx.MockTransport(handler),
+    )
+    result = client.record(
+        UsageRecord(
+            capability_key="translation-hub",
+            dimension="tokens_in",
+            units=42,
+            external_id="evt_override",
+            occurred_at_iso="2026-04-23T00:00:00Z",
+        )
+    )
+    assert result.accepted is True
+    client.close()
+
+
+def test_meter_client_rejects_explicit_empty_api_key_even_with_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", "sig_env_key")
+
+    with pytest.raises(SiglumeClientError, match="SIGLUME_API_KEY is required"):
+        MeterClient(api_key="", base_url="https://api.example.test/v1")
+
+
 def test_meter_client_records_single_usage_event() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/market/usage-events"

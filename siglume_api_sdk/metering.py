@@ -52,7 +52,7 @@ class MeterClient:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
         base_url: str | None = None,
         timeout: float = 15.0,

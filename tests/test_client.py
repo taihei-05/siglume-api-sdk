@@ -117,6 +117,46 @@ def build_runtime_validation() -> dict[str, object]:
     }
 
 
+def test_client_reads_api_key_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", " sig_env_key ")
+
+    client = SiglumeClient(
+        base_url="https://api.example.test/v1",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=envelope({}))),
+    )
+
+    try:
+        assert client.api_key == "sig_env_key"
+    finally:
+        client.close()
+
+
+def test_client_explicit_api_key_overrides_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", "sig_env_key")
+
+    client = SiglumeClient(
+        api_key=" sig_explicit_key ",
+        base_url="https://api.example.test/v1",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=envelope({}))),
+    )
+
+    try:
+        assert client.api_key == "sig_explicit_key"
+    finally:
+        client.close()
+
+
+def test_client_rejects_explicit_empty_api_key_even_with_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", "sig_env_key")
+
+    with pytest.raises(SiglumeClientError, match="SIGLUME_API_KEY is required"):
+        SiglumeClient(
+            api_key="",
+            base_url="https://api.example.test/v1",
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json=envelope({}))),
+        )
+
+
 def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: Path) -> None:
     manifest = build_manifest()
     tool_manual = build_tool_manual()

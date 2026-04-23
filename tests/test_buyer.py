@@ -12,7 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from siglume_api_sdk import SiglumeBuyerClient, SiglumeExperimentalError, SiglumeExperimentalWarning  # noqa: E402
+from siglume_api_sdk import (  # noqa: E402
+    SiglumeBuyerClient,
+    SiglumeClientError,
+    SiglumeExperimentalError,
+    SiglumeExperimentalWarning,
+)
 
 
 def load_fixture_listings() -> list[dict[str, object]]:
@@ -35,6 +40,46 @@ def build_client(handler, **kwargs) -> SiglumeBuyerClient:
         transport=httpx.MockTransport(handler),
         **kwargs,
     )
+
+
+def test_buyer_client_reads_api_key_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", " sig_env_key ")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer sig_env_key"
+        return httpx.Response(200, json=envelope({"items": [], "next_cursor": None, "limit": 20, "offset": 0}))
+
+    client = SiglumeBuyerClient(
+        base_url="https://api.example.test/v1",
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.warns(SiglumeExperimentalWarning, match="substring matching"):
+        assert client.search_capabilities(query="anything") == []
+    client.close()
+
+
+def test_buyer_client_explicit_api_key_overrides_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", "sig_env_key")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer sig_explicit_key"
+        return httpx.Response(200, json=envelope({"items": [], "next_cursor": None, "limit": 20, "offset": 0}))
+
+    client = SiglumeBuyerClient(
+        api_key=" sig_explicit_key ",
+        base_url="https://api.example.test/v1",
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.warns(SiglumeExperimentalWarning, match="substring matching"):
+        assert client.search_capabilities(query="anything") == []
+    client.close()
+
+
+def test_buyer_client_rejects_explicit_empty_api_key_even_with_environment(monkeypatch) -> None:
+    monkeypatch.setenv("SIGLUME_API_KEY", "sig_env_key")
+
+    with pytest.raises(SiglumeClientError, match="SIGLUME_API_KEY is required"):
+        SiglumeBuyerClient(api_key="", base_url="https://api.example.test/v1")
 
 
 def test_search_capabilities_uses_local_scoring_and_returns_best_match_first() -> None:

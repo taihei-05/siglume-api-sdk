@@ -15,7 +15,7 @@
           "content-length": "60",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"
@@ -90,7 +90,7 @@
           "content-length": "76",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"
@@ -152,7 +152,7 @@
           "content-length": "212",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"
@@ -229,7 +229,7 @@
           "content-length": "93",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"
@@ -307,7 +307,7 @@
           "content-length": "110",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"
@@ -358,7 +358,7 @@
             "trace_id": "trc_installed_tools_receipts_list"
           }
         },
-        "duration_ms": 0,
+        "duration_ms": 1,
         "headers": {
           "content-length": "918",
           "content-type": "application/json"
@@ -383,7 +383,7 @@
           "content-length": "93",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"
@@ -457,7 +457,7 @@
           "content-length": "99",
           "content-type": "application/json",
           "host": "api.example.test",
-          "user-agent": "siglume-api-sdk/0.6.0"
+          "user-agent": "siglume-api-sdk/0.7.6"
         },
         "method": "POST",
         "url": "https://api.example.test/v1/owner/agents/agt_owner_demo/operations/execute"

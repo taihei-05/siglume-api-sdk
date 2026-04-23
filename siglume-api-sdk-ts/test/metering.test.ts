@@ -63,6 +63,92 @@ class MeteredApp extends AppAdapter {
 }
 
 describe("metering", () => {
+  it("uses SIGLUME_API_KEY fallback for metering Authorization headers", async () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = " sig_env_key ";
+    try {
+      const client = new MeterClient({
+        base_url: "https://api.example.test/v1",
+        fetch: async (_input, init) => {
+          expect((init?.headers as Headers).get("Authorization")).toBe("Bearer sig_env_key");
+          return new Response(JSON.stringify(envelope({
+            items: [{ accepted: true, external_id: "evt_env", replayed: false }],
+            count: 1,
+          })), { status: 202 });
+        },
+      });
+
+      const result = await client.record({
+        capability_key: "translation-hub",
+        dimension: "tokens_in",
+        units: 42,
+        external_id: "evt_env",
+        occurred_at_iso: "2026-04-23T00:00:00Z",
+      });
+
+      expect(result.accepted).toBe(true);
+      client.close();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
+  it("lets explicit metering API keys override SIGLUME_API_KEY", async () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = "sig_env_key";
+    try {
+      const client = new MeterClient({
+        api_key: " sig_explicit_key ",
+        base_url: "https://api.example.test/v1",
+        fetch: async (_input, init) => {
+          expect((init?.headers as Headers).get("Authorization")).toBe("Bearer sig_explicit_key");
+          return new Response(JSON.stringify(envelope({
+            items: [{ accepted: true, external_id: "evt_override", replayed: false }],
+            count: 1,
+          })), { status: 202 });
+        },
+      });
+
+      const result = await client.record({
+        capability_key: "translation-hub",
+        dimension: "tokens_in",
+        units: 42,
+        external_id: "evt_override",
+        occurred_at_iso: "2026-04-23T00:00:00Z",
+      });
+
+      expect(result.accepted).toBe(true);
+      client.close();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
+  it("rejects explicit empty metering API keys even when SIGLUME_API_KEY is set", () => {
+    const previous = process.env.SIGLUME_API_KEY;
+    process.env.SIGLUME_API_KEY = "sig_env_key";
+    try {
+      expect(() => new MeterClient({
+        api_key: "",
+        base_url: "https://api.example.test/v1",
+      })).toThrow(SiglumeClientError);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGLUME_API_KEY;
+      } else {
+        process.env.SIGLUME_API_KEY = previous;
+      }
+    }
+  });
+
   it("records a single usage event", async () => {
     const client = new MeterClient({
       api_key: "sig_test_key",

@@ -75,11 +75,6 @@
           "type": "string",
           "description": "Desired writing tone, such as concise, friendly, or launch.",
           "default": "concise"
-        },
-        "dry_run": {
-          "type": "boolean",
-          "description": "Set true for runtime validation and owner preview calls.",
-          "default": true
         }
       },
       "required": ["topic"],
@@ -142,7 +137,8 @@
       "additionalProperties": false
     },
     "idempotency_support": true,
-    "side_effect_summary": "Publishes a social post through the owner's connected GrowPost account after approval."
+    "side_effect_summary": "Publishes a social post through the owner's connected GrowPost account after approval.",
+    "jurisdiction": "US"
   },
   "runtime_validation": {
     "public_base_url": "https://api.example.com",
