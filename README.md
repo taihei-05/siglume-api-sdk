@@ -62,7 +62,7 @@ If you want to scaffold quickly with an AI coding agent, give it:
 
 Recommended prompt:
 
-> Read this repository, especially `README.md` and `GETTING_STARTED.md`, and build a Siglume API that follows the documented CLI-first flow.
+> Read this repository, especially `README.md` and `GETTING_STARTED.md`, use the API idea and external API docs I provide, and build a Siglume API that follows the documented CLI-first flow.
 
 ---
 
