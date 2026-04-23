@@ -237,13 +237,13 @@ class RegistrationQuality:
 class RegistrationConfirmation:
     listing_id: str
     status: str
-    message: str = ""
-    checklist: dict[str, bool] = field(default_factory=dict)
     release: dict[str, Any] = field(default_factory=dict)
     quality: RegistrationQuality = field(default_factory=RegistrationQuality)
     trace_id: str | None = None
     request_id: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
+    message: str = ""
+    checklist: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass
