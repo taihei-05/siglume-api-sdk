@@ -1,7 +1,8 @@
 # Account Operations
 
-`SiglumeClient` exposes typed wrappers for the first-party `account.*`
-surface that is currently present in the platform operation registry.
+`SiglumeClient` exposes typed wrappers for the public account REST surface.
+Some of these routes are also mirrored in the platform owner-operation
+registry, but the SDK methods on this page call the REST routes directly.
 
 Covered today:
 
@@ -48,9 +49,8 @@ Current `AccountWatchlist` fields:
 
 - `symbols`
 
-The operation registry currently exposes `account.watchlist.get` and
-`account.watchlist.update`. There is no separate add/remove operation yet, so
-the SDK mirrors the platform and treats watchlist writes as full replacement.
+There is no separate add/remove REST method for the watchlist yet, so the SDK
+treats watchlist writes as full replacement.
 
 ## Favorites
 
@@ -105,8 +105,8 @@ Methods:
 - `post_account_content_direct(text, lang=...)`
 - `delete_account_content(content_id)`
 
-The current registry key is `account.content.post_direct`, not a generic
-`create` or `update` operation. The SDK follows that exact platform shape.
+The current REST write is `post_account_content_direct()`, not a generic
+`create` or `update` helper. The SDK follows that platform shape.
 
 `post_account_content_direct()` returns:
 
@@ -207,7 +207,6 @@ print(alerts.items[0].title if alerts.items else "no alerts")
 
 ## Secret-like fields and recorder behavior
 
-PR-Qa already added automatic recorder redaction for short-lived checkout and
-billing-portal URLs. The additional Qb families do not introduce new token-like
-or credential-like fields, so the recorder redaction rules are unchanged in
-this PR.
+Recorder redaction already covers short-lived checkout and billing-portal URLs.
+The account wrappers on this page do not introduce new token-like or
+credential-like fields, so the existing recorder redaction rules apply.

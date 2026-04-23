@@ -92,7 +92,7 @@ Describes what external state changed.
 | `action` | yes | e.g. "tweet_created", "email_sent", "payment_charged" |
 | `provider` | yes | e.g. "x-twitter", "stripe" |
 | `external_id` | no | Provider-side reference |
-| `reversible` | yes | Can this be undone? |
+| `reversible` | yes in the serialized contract | Can this be undone? Python defaults to `False`; TypeScript callers should set it explicitly for wire parity. |
 | `reversal_hint` | no | How to undo (e.g. "DELETE /tweets/{id}") |
 | `timestamp_iso` | no | When the side effect occurred |
 | `metadata` | no | Extra data |
@@ -138,13 +138,13 @@ result = ExecutionResult(
 | `currency` | no | ISO currency code |
 | `side_effects` | no | Plain-text list of what will change |
 | `preview` | no | Structured preview payload |
-| `reversible` | yes | Can the action be undone? |
+| `reversible` | yes in the serialized contract | Can the action be undone? Python defaults to `False`; TypeScript callers should set it explicitly for wire parity. |
 
 ## Good Practices
 
 - Keep receipts structured, not prose-only
 - Do not include secrets or raw tokens
 - Include identifiers that help support investigate problems
-- When the API is in `dry_run`, return a preview receipt instead of a fake live one
+- When the API is in `dry_run`, return preview data in `ExecutionResult.output`, `receipt_summary`, or structured artifacts / side effects; leave `receipt_ref` unset because the runtime owns receipt references
 - Use `SideEffectRecord.reversible` honestly — it affects dispute resolution
 - Always include `external_id` when the provider returns one

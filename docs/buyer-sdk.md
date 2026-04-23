@@ -6,7 +6,7 @@ Siglume API Store capabilities.
 
 ## Current platform shape
 
-As of 2026-04-19, the public platform exposes:
+The public platform exposes:
 
 - `GET /v1/market/capabilities`
 - `GET /v1/market/capabilities/{listing_id}`
@@ -19,7 +19,7 @@ The public platform does **not** currently expose:
 - a public buyer execution endpoint
 - the full `tool_manual` payload on listing reads
 
-Because of those gaps, PR-N ships with explicit experimental fallbacks:
+Because of those gaps, the buyer SDK uses explicit experimental fallbacks:
 
 - `search_capabilities()` uses SDK-side substring scoring over `list_capabilities()`
 - `get_listing()` synthesizes a minimal `tool_manual` from listing metadata

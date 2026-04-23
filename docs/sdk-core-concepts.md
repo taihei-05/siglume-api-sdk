@@ -53,7 +53,7 @@ time): `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, `PER_ACTION`.
 |---|---|
 | `ToolManual` | Machine-readable contract that agents read to decide whether to call your API. |
 | `ToolManualIssue` | Single validation or quality issue (raised by the grader). |
-| `ToolManualQualityReport` | Aggregated quality score (0–100 / grade A–F). Grade B is the minimum to publish. |
+| `ToolManualQualityReport` | Aggregated quality score (0-100 / grade A-F). Grade B is the minimum to publish. |
 | `validate_tool_manual()` | Client-side validation that mirrors the server rules. |
 | `draft_tool_manual()` | Generate a ToolManual skeleton from a job description using an LLM provider. |
 | `fill_tool_manual_gaps()` | Repair / fill missing fields on an existing ToolManual. |

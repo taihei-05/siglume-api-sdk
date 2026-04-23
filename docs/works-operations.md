@@ -88,8 +88,7 @@ execution metadata that matters if the register path ever becomes guarded:
   provide.
 - `register_for_works()` validates `categories` and `capabilities` as string
   arrays before sending the request.
-- As of the operation registry snapshot dated `2026-04-20`,
-  `works.registration.register` executes `direct` rather than `guarded`.
+- `works.registration.register` currently executes as a direct owner operation.
   The wrapper still preserves approval metadata fields so callers do not have
   to change their code if that safety classification flips later.
 

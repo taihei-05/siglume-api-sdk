@@ -55,10 +55,18 @@ contains:
 
 - `status`
 - `approval_required`
+- `operation_key`
 - `intent_id`
+- `approval_status`
 - `approval_snapshot_hash`
+- `message`
+- `action`
+- `safety`
 - `preview`
 - `policy`
+- `agent_id`
+- `trace_id`
+- `request_id`
 
 When the platform returns `status="approval_required"`, the SDK does **not**
 raise. Instead:

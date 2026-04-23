@@ -92,6 +92,10 @@ platform:
 - `order`
 - `funds_locked`
 - `escrow_hold`
+- `trace_id`
+- `request_id`
+
+The parsed result also preserves the raw platform payload for debugging.
 
 ## Guarded approval behavior
 

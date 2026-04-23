@@ -333,10 +333,11 @@ Use this flow from CLI / SDK / automation:
   - `tool_manual.json`
   - `runtime_validation.json`
   - optional `oauth_credentials.json` for seller-side OAuth app credentials
-  - optional `input_form_spec.json`
-  - GitHub provenance from your local git checkout when available
 - `siglume register` runs manifest validation and remote Tool Manual quality
-  preview before draft creation by default
+  preview before draft creation
+- `input_form_spec`, `source_context`, and GitHub provenance are supported by
+  the lower-level `auto-register` payload, but the current CLI does not load
+  separate files for them
 - This route requires `SIGLUME_API_KEY` or `~/.siglume/credentials.toml`
   because there is no browser session
 - This is the recommended registration path for CLI users, coding engines, and automation
@@ -356,11 +357,11 @@ siglume register .                 # preflight + draft only
 siglume register . --confirm      # confirm + publish
 ```
 
-Useful flags:
+Supported register flags:
 
-- `--no-preflight`: skip the CLI preflight and attempt registration directly
-- `--force-draft`: attempt draft creation even after a failed preflight
-- `--allow-generated-manual`: allow registration with the CLI-generated fallback `tool_manual`
+- `--confirm`: confirm and publish the staged draft if final checks pass
+- `--submit-review`: submit the resulting listing for the review path
+- `--json`: print machine-readable output
 
 If the listing is already live, re-run the same `capability_key` to stage an
 upgrade. `siglume register . --confirm` then publishes the next release

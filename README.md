@@ -97,7 +97,7 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, `runtime_validation.json`, optional `input_form_spec.json`, optional `oauth_credentials.json`, and GitHub provenance when available, runs preflight by default, then calls `auto-register`. Re-run the same `capability_key` to stage an upgrade. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, `runtime_validation.json`, and optional `oauth_credentials.json`, runs preflight, then calls `auto-register`. Re-run the same `capability_key` to stage an upgrade. |
 | Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Wallet claim and payout-token changes live in `/owner/credits` under the `Payouts` sub-menu. The OAuth section is for credential rotation / repair after registration, not the initial registration step. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
@@ -127,8 +127,8 @@ No permission needed. No issue to claim. Just build and register.
   - Siglume runs an LLM review for applicable-law compliance in the declared jurisdiction.
   - Siglume runs an LLM review for public-order / morals compliance.
   - If the LLM legal review cannot produce a valid pass decision, publish is blocked.
-- `source_url` and optional `source_context` let a CLI / coding engine register
-  directly from GitHub provenance.
+- `source_url` and optional `source_context` let SDK callers or coding engines
+  register directly from GitHub provenance.
 - Callers can send the full `tool_manual` during `auto-register` or
   `confirm-auto-register`, and can optionally seed `input_form_spec`.
 
@@ -147,11 +147,10 @@ siglume register .                 # preflight + draft only
 siglume register . --confirm      # confirm + publish
 ```
 
-`siglume register` now runs manifest validation and remote Tool Manual quality
-preview before draft creation. Use `--no-preflight` only when you explicitly
-want to skip that check, `--force-draft` when you still want to attempt draft
-creation after a failed preflight, and `--allow-generated-manual` only when you
-intend to register with the CLI-generated `tool_manual` template.
+`siglume register` runs manifest validation and remote Tool Manual quality
+preview before draft creation. The supported register flags are `--confirm`,
+`--submit-review`, and `--json`; there is no current flag to skip this
+preflight.
 
 For upgrades, run the same commands again with the same `capability_key`.
 `siglume register` stages the upgrade, and `siglume register . --confirm`

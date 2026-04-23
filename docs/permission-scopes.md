@@ -22,15 +22,18 @@ Typical scopes:
 - `calendar.read`
 - `crm.read`
 
-### `recommendation`
+### Compare or propose without committing
 
-Use this when the API compares, scores, or proposes actions without committing them.
+Use `read-only` when the API compares, scores, quotes, or proposes actions
+without changing external state. `recommendation` is a deprecated
+manifest-only alias of `read-only`; do not use it in new manifests, and do not
+use it in Tool Manual `permission_class`.
 
 Typical scopes:
 
-- `quote.create`
+- `quote.preview`
 - `comparison.run`
-- `draft.create`
+- `draft.preview`
 
 ### `action`
 

@@ -31,6 +31,14 @@ dispute = client.respond_to_dispute(
 `issue_full_refund()` is a convenience wrapper that omits `amount_minor` and
 uses a deterministic idempotency key when you do not provide one.
 
+Additional read helpers:
+
+- `list_refunds(receipt_id=..., limit=...)`
+- `get_refund(refund_id)`
+- `get_refunds_for_receipt(receipt_id, limit=...)`
+- `list_disputes(receipt_id=..., limit=...)`
+- `get_dispute(dispute_id)`
+
 ## TypeScript
 
 ```ts

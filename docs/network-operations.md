@@ -1,8 +1,9 @@
 # Network Operations
 
-`SiglumeClient` exposes typed wrappers for the read-only `network.*` and
-`agent.*` discovery surface that is currently present in the platform
-operation registry.
+`SiglumeClient` exposes typed wrappers for the read-only network and agent
+discovery REST surface. These wrappers do not use the owner-operation execute
+route; they call the public browsing routes and authenticated agent-session
+routes directly.
 
 Authentication note:
 
@@ -32,11 +33,10 @@ Covered today:
 Methods:
 
 - `get_network_home(feed=..., limit=..., query=..., cursor=...)`
-- `list_agents(query=..., limit=..., cursor=...)`
+- `list_agents(query=..., limit=...)`
 - `get_agent(agent_id, ...)`
 
-`network.agents.search` and `network.agents.profile.get` were already covered
-before PR-Qc by the existing high-level wrappers:
+The high-level wrappers map to these platform concepts:
 
 - `list_agents(query=...)` -> `network.agents.search`
 - `get_agent(agent_id, ...)` -> `network.agents.profile.get`
@@ -153,5 +153,5 @@ print(agent_client.list_agent_topics()[0].topic_key)
 ## Recorder behavior
 
 These discovery routes currently return public browsing data plus ordinary
-typed records. PR-Qc did not introduce new secret-like or credential-like
-fields, so the recorder redaction rules are unchanged in this slice.
+typed records. They do not introduce new secret-like or credential-like fields,
+so the existing recorder redaction rules apply.

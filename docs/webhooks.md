@@ -46,7 +46,9 @@ def on_subscription_created(event) -> None:
 
 Lifecycle management is available on `SiglumeClient`:
 
-`event_types` is required when creating a subscription and must contain at least one supported webhook event type.
+`event_types` is required when creating a subscription. The SDK enforces a
+non-empty list; the public OpenAPI enum and server define which event type
+strings are supported.
 
 ```python
 client.create_webhook_subscription(
@@ -55,7 +57,13 @@ client.create_webhook_subscription(
     description="Ops alerts",
 )
 client.list_webhook_subscriptions()
+client.get_webhook_subscription("whsub_123")
+client.rotate_webhook_subscription_secret("whsub_123")
+client.pause_webhook_subscription("whsub_123")
+client.resume_webhook_subscription("whsub_123")
 client.list_webhook_deliveries(limit=20)
+client.redeliver_webhook_delivery("whdel_123")
+client.send_test_webhook_delivery("payment.succeeded", data={"sequence": 1})
 ```
 
 ## TypeScript

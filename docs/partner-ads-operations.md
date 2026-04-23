@@ -70,7 +70,8 @@ presentation route.
 - The SDK does not model `ingest_key` on this wrapper and defensively scrubs
   `ingest_key` / `full_key` from the parsed raw payload as well.
 - Partners who need to reveal the raw secret once at creation time must use the
-  legacy user-facing HTTP route `POST /v1/partner/keys`. The shared
+  legacy user-facing HTTP route `POST /v1/partner/keys`, which is outside the
+  public SDK wrapper and OpenAPI surface documented here. The shared
   owner-operation bus path is handle-only by design.
 
 This matches the platform's handle-only contract for credential issuance. Do
@@ -82,11 +83,10 @@ not write client code that assumes `partner.keys.create()` will ever return
 - `settle_ads_billing()` exists for parity with the operation registry.
 - The current platform implementation raises a conflict because Ads Web3
   billing auto-settles at month end, so callers should expect a
-  `SiglumeAPIError` in the current production contract rather than a rich
-  success payload.
-- The SDK still ships a typed `AdsBillingSettlement` parser so the surface can
-  stay forward-compatible if the platform later returns structured settlement
-  status instead of only an error.
+  `SiglumeAPIError` from the live production contract.
+- The SDK also ships a typed `AdsBillingSettlement` parser. Mock transports and
+  future platform versions may return structured settlement status such as
+  `status="auto_settles"` and `settles_automatically=true`.
 
 ## Validation Behavior
 

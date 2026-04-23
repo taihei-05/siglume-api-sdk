@@ -95,21 +95,21 @@ By default, the CLI expects:
 - `tool_manual.json`
 - `runtime_validation.json`
 
-It also uses these when present:
+It also uses this when present:
 
 - `oauth_credentials.json` for seller-side OAuth app credentials
-- `input_form_spec.json`
-- `source_context.json`
-- Git metadata from the local checkout to derive `source_url` and `source_context`
+
+`input_form_spec` and `source_context` are supported by the lower-level
+`SiglumeClient.auto_register(...)` API, but the current CLI does not load
+`input_form_spec.json`, `source_context.json`, or Git provenance files.
 
 Before draft creation, `siglume register` runs:
 
 - local manifest validation
 - remote Tool Manual quality preview
 
-Use `--no-preflight` to skip that step, `--force-draft` to continue after a
-failed preflight, and `--allow-generated-manual` only if you intentionally want
-to register with the CLI-generated Tool Manual template.
+The current CLI has no skip flag for this preflight. The supported register
+flags are `--confirm`, `--submit-review`, and `--json`.
 
 ## What is required today
 

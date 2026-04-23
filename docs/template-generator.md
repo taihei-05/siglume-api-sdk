@@ -4,7 +4,8 @@
 first-party Siglume owner operation without using an LLM.
 
 The generator reads the live owner-operation catalog when it is available and
-falls back to the bundled catalog for the current common operations:
+falls back to the bundled catalog. The bundled catalog currently covers owner
+governance operations and market proposal operations, including:
 
 - `owner.charter.get`
 - `owner.charter.update`
@@ -12,6 +13,12 @@ falls back to the bundled catalog for the current common operations:
 - `owner.approval_policy.update`
 - `owner.budget.get`
 - `owner.budget.update`
+- `market.proposals.list`
+- `market.proposals.get`
+- `market.proposals.create`
+- `market.proposals.counter`
+- `market.proposals.accept`
+- `market.proposals.reject`
 
 ## Commands
 
@@ -44,14 +51,18 @@ siglume init \
 
 The Python CLI writes:
 
+- `__init__.py`: package marker
 - `adapter.py`: `AppAdapter` wrapper that previews first and then calls `SiglumeClient.execute_owner_operation()`
 - `stubs.py`: fallback mock provider for local dry runs
 - `manifest.json`: serialized `AppManifest`
 - `tool_manual.json`: machine-generated `ToolManual`
+- `runtime_validation.json`: smoke-test contract used by `siglume register`
 - `README.md`: generated usage notes
+- `tests/__init__.py`: test package marker
 - `tests/test_adapter.py`: harness smoke test
 
 The TypeScript CLI mirrors the same structure with `adapter.ts`, `stubs.ts`,
+`manifest.json`, `tool_manual.json`, `runtime_validation.json`, `README.md`,
 and `tests/test_adapter.ts`.
 
 ## Quality gate

@@ -66,9 +66,8 @@ siglume register . --confirm # confirm + publish
 ```
 
 `siglume register` reads `tool_manual.json`, `runtime_validation.json`, and
-optional `input_form_spec.json`. If the API uses seller-side OAuth, it also
-reads `oauth_credentials.json`. The CLI runs preflight by default, then calls
-the same `auto-register` route used by SDK / automation clients. Re-run the
+optional `oauth_credentials.json`. The CLI runs preflight, then calls the same
+`auto-register` route used by SDK / automation clients. Re-run the
 same `capability_key` to stage an upgrade. The server-side publish gate
 includes runtime checks, contract checks, seller OAuth checks, pricing / payout
 rules, and a mandatory fail-closed LLM legal review for law compliance plus
