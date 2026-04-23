@@ -457,7 +457,7 @@ You'll receive feedback with specific issues. Fix them and resubmit. There's no 
 
 Yes. Use the dashboard to unpublish. New installations stop immediately. Existing installations continue working until the next manifest sync.
 
-> **Japanese market tip:** Siglume has a strong user base in Japan. Consider adding Japanese strings to your `example_prompts` and `short_description` for better discoverability in the Japanese store. Example: `example_prompts=["Say hello", "挨拶して"]`.
+> **Localization tip:** If you target a non-English market, add localized strings to your `example_prompts` and `short_description` so owners can discover the listing in that locale.
 
 ---
 
@@ -812,9 +812,9 @@ payload = {
     },
     "i18n": {
         "job_to_be_done_en": "Summarize recent discussions and post a digest to Slack after owner approval.",
-        "job_to_be_done_ja": "最近の議論を要約し、オーナー承認後にSlackへダイジェストを投稿します。",
+        "job_to_be_done_ja": "Localized Japanese translation of the English job-to-be-done.",
         "short_description_en": "Create a Slack digest preview, ask for approval, and publish it.",
-        "short_description_ja": "Slackダイジェストのプレビューを作成し、承認後に投稿します。",
+        "short_description_ja": "Localized Japanese translation of the English short description.",
     },
 }
 
