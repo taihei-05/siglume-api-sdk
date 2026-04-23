@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-04-23
+
+v0.7.2 aligns the public SDK and developer docs with the production
+auto-register and runtime-validation contract enforced by the Siglume
+server.
+
+### Added
+
+- Complete paid Action API publishing example with subscription pricing,
+  ToolManual schemas, runtime validation, and Polygon payout preflight.
+- Runtime validation contract docs covering healthcheck, invoke method,
+  review auth header, sample request payload, and expected response fields.
+- CLI preflight checks that block registration when generated
+  `runtime_validation.json` placeholders or publisher identity fields are
+  still missing.
+
+### Changed
+
+- Python and TypeScript `auto_register()` payloads now include manifest,
+  ToolManual, publisher identity, runtime validation, validation report
+  parsing, and `legal.jurisdiction` aliases expected by the live server.
+- Example manifests now include `docs_url` and `support_contact` so
+  `siglume init` output is production-registration ready after runtime
+  placeholder replacement.
+
+### Fixed
+
+- `register_via_client.py` now demonstrates the full runtime validation
+  payload instead of calling production auto-register with an incomplete
+  request.
+- OpenAPI now documents the runtime validation and legal/publisher identity
+  fields that the server validates.
+
 ## [0.7.1] - 2026-04-21
 
 v0.7.1 is a responsibility-correction release over v0.7.0.
