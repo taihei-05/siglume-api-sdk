@@ -4,6 +4,37 @@ This project publishes to **PyPI** as [`siglume-api-sdk`](https://pypi.org/proje
 
 The sections below are the full checklist. Follow them top-to-bottom for every release.
 
+## Mirror rule
+
+`packages/contracts/sdk/` inside the private monorepo is the public SDK mirror,
+not a second source of truth.
+
+- If you change public SDK docs, OpenAPI, examples, Python SDK, or TypeScript
+  SDK files under `packages/contracts/sdk/`, you must sync the same change to
+  `taihei-05/siglume-api-sdk` before the work is considered complete.
+- The private repo now carries a CI guard at
+  `.github/workflows/public-sdk-sync.yml` that clones the public repo and fails
+  if the mirror drifts. It runs on SDK-tree pushes, pull requests, and a
+  6-hour schedule so public-first drift also gets caught.
+- `public-sync-ignore.txt` and `scripts/check_public_sdk_sync.py` are mirrored
+  into the public repo root as well, so both repos carry the same file-level
+  allowlist and the same local/manual drift checker. The GitHub Actions
+  workflow itself stays private-repo only because public Actions runners cannot
+  read the private monorepo mirror without extra secrets.
+- Run the same guard locally with:
+
+```bash
+# private monorepo
+python packages/contracts/sdk/scripts/check_public_sdk_sync.py
+
+# public siglume-api-sdk clone (requires auth to read the private repo)
+python scripts/check_public_sdk_sync.py --peer-repo https://github.com/taihei-05/siglume.git
+```
+
+- Intentional private-only files must be listed in
+  `packages/contracts/sdk/public-sync-ignore.txt`. If a file is not in that
+  file-level allowlist, divergence is treated as a bug.
+
 ---
 
 ## Pre-release checklist

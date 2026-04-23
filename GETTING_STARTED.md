@@ -290,10 +290,11 @@ Does your API write to anything external?
 1. Build and test locally (AppTestHarness)
 2. Deploy the real API to a public URL
 3. Keep `tool_manual.json` and `runtime_validation.json` with the project
-4. Run `siglume validate .`, `siglume score . --remote`, and `siglume register`
-5. Review the draft in the developer portal
-6. Confirm the draft and publish immediately when all checks pass
-7. Live in the API Store
+4. If the API uses seller-side OAuth, also keep `oauth_credentials.json` with the project
+5. Run `siglume validate .`, `siglume score . --remote`, and `siglume register`
+6. Review the result in the developer portal when needed
+7. Confirm and publish immediately when all checks pass
+8. Live in the API Store
 ```
 
 ### Step 1: Run local tests
@@ -331,6 +332,7 @@ Use this flow from CLI / SDK / automation:
 - `siglume register` reads:
   - `tool_manual.json`
   - `runtime_validation.json`
+  - optional `oauth_credentials.json` for seller-side OAuth app credentials
   - optional `input_form_spec.json`
   - GitHub provenance from your local git checkout when available
 - `siglume register` runs manifest validation and remote Tool Manual quality
@@ -341,6 +343,8 @@ Use this flow from CLI / SDK / automation:
 - If you need a token, issue it from the `CLI / API keys` submenu in the developer portal
 - The developer portal is used afterward to inspect the result, blockers, and
   live status
+- The developer portal OAuth panel is for rotating or repairing seller OAuth
+  app credentials after registration, not for the initial registration step
 
 Minimal CLI flow:
 
@@ -357,6 +361,10 @@ Useful flags:
 - `--no-preflight`: skip the CLI preflight and attempt registration directly
 - `--force-draft`: attempt draft creation even after a failed preflight
 - `--allow-generated-manual`: allow registration with the CLI-generated fallback `tool_manual`
+
+If the listing is already live, re-run the same `capability_key` to stage an
+upgrade. `siglume register . --confirm` then publishes the next release
+immediately when the checks pass.
 
 See [docs/publish-flow.md](./docs/publish-flow.md) and
 [Section 11](#11-auto-register-cli--automation-route) for the automation path.
@@ -396,6 +404,12 @@ A quality check runs automatically at confirmation time:
   - `input_schema` must accept the runtime sample request payload
   - `output_schema` must declare and match the live response fields
   - `requires_connected_accounts` must match the listing / Tool Manual contract
+- Seller OAuth app credentials during `auto-register`
+  - if `required_connected_accounts` includes a seller-side OAuth provider
+    such as X, Slack, Google, GitHub, Linear, or Notion, include that
+    provider in `oauth_credentials.json`
+  - if an upgrade adds a new seller-side OAuth provider and the seed is
+    missing, registration is rejected
 - Tool Manual quality grade **B** or above
   - `input_schema` and `output_schema` are part of the canonical contract
   - if you need a stricter contract than the auto-generated seed, send a full
@@ -474,6 +488,11 @@ Setting `AUTO` on an `ACTION` or `PAYMENT` API will fail manifest validation.
 
 If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, a third-party provider API key), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
 
+If the API itself also needs a seller-owned OAuth app configuration to broker
+that provider flow, include the seller app credentials in
+`oauth_credentials.json` during registration. Do not wait to create that
+configuration in the portal after publish.
+
 ---
 
 ## 9. FAQ
@@ -484,11 +503,15 @@ If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter
 
 ### How do I update my API?
 
-Submit again with the same `capability_key`. Minor updates (bug fixes, UI improvements) ship immediately without review. Changes to `permission_class` require re-review.
+Submit again with the same `capability_key`.
+
+- If the listing is live, `siglume register` stages an upgrade instead of creating a new product.
+- `siglume register . --confirm` publishes the next release immediately when the self-serve checks pass again.
+- If the upgrade adds a new seller-side OAuth provider, update `oauth_credentials.json` before registering or the upgrade is rejected.
 
 ### How do I manage external API credentials?
 
-Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. **Never hardcode secrets in your API code.**
+Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. If the API also needs a seller-owned OAuth app, provide that app's Client ID / Client Secret in `oauth_credentials.json` during registration or upgrade. **Never hardcode secrets in your API code.**
 
 ### What's the difference between free and paid APIs?
 
@@ -586,7 +609,7 @@ curl https://siglume.com/v1/market/usage?environment=sandbox \
 
 You should see your API call recorded with `environment: sandbox`.
 
-> **Note:** Sandbox mode is isolated from live data. No real payments or side effects occur. When you're ready to go live, submit your listing for review.
+> **Note:** Sandbox mode is isolated from live data. No real payments or side effects occur. When you're ready to go live, publish your listing with the self-serve checks.
 
 ---
 
@@ -933,6 +956,7 @@ Give your AI these instructions:
 
 > "Read my source code. Generate a listing for the Siglume API Store.
 > Include `manifest`, `tool_manual`, and `runtime_validation`.
+> If the API uses seller-side OAuth, also include `oauth_credentials`.
 > Use `source_url` when GitHub is the source of truth, then call the
 > auto-register endpoint."
 
@@ -950,7 +974,7 @@ response = requests.post(
             "repository_url": "https://github.com/example/my-api",
             "repo_ref": "main",
             "source_paths": ["my_api.py"],
-            "doc_paths": ["README.md", "tool_manual.json"],
+            "doc_paths": ["README.md", "tool_manual.json", "oauth_credentials.json"],
             "generated_by": "codex",
         },
         "manifest": {
@@ -1005,6 +1029,16 @@ response = requests.post(
             "usage_hints": ["Prefer a dry run first."],
             "result_hints": ["Show the posted channel and summary."],
             "error_hints": ["Ask the owner to reconnect Slack if posting fails."],
+        },
+        "oauth_credentials": {
+            "items": [
+                {
+                    "provider_key": "slack",
+                    "client_id": "seller-slack-client-id",
+                    "client_secret": "seller-slack-client-secret",
+                    "required_scopes": ["chat:write", "channels:read"],
+                }
+            ]
         },
         "runtime_validation": {
             "public_base_url": "https://api.example.com",

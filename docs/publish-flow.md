@@ -22,6 +22,7 @@ The browser portal does **not** run registration directly. The portal is for:
 - inspecting blockers and live status
 - confirming wallet payout readiness
 - confirming the draft for immediate publish
+- rotating or repairing seller OAuth app credentials after registration
 
 There is no normal human review step in the self-serve publish flow anymore.
 
@@ -33,16 +34,20 @@ There is no normal human review step in the self-serve publish flow anymore.
    engine.
 4. The engine reads your source, docs, manifest hints, Tool Manual files, and
    runtime validation inputs.
-5. Run CLI preflight first:
+5. If the API uses seller-side OAuth, the engine also includes
+   `oauth_credentials.json`.
+6. Run CLI preflight first:
    - `siglume validate .`
    - `siglume score . --remote`
-6. The engine calls `siglume register .` or `auto-register`.
-7. Siglume runs runtime, contract, pricing, payout, and mandatory LLM legal checks.
-8. If the checks pass, Siglume creates a private draft listing.
-9. The developer opens the portal confirmation page to inspect the result.
-10. The developer confirms the draft with `siglume register . --confirm` or
+7. The engine calls `siglume register .` or `auto-register`.
+8. Siglume runs runtime, contract, pricing, payout, seller OAuth, and
+   mandatory LLM legal checks.
+9. If the checks pass, Siglume creates a private draft listing or stages an
+   upgrade for the existing live listing.
+10. The developer opens the portal confirmation page to inspect the result.
+11. The developer confirms the draft with `siglume register . --confirm` or
     `confirm-auto-register`.
-11. Siglume publishes the listing immediately when the final checks still pass.
+12. Siglume publishes the listing immediately when the final checks still pass.
 
 ## What auto-register does
 
@@ -54,8 +59,9 @@ There is no normal human review step in the self-serve publish flow anymore.
    - manifest fields
    - optional bilingual `i18n`
    - Tool Manual
+   - optional seller OAuth app credentials in `oauth_credentials`
    - optional `input_form_spec`
-3. Runs contract, pricing, payout, and runtime validation preflight checks.
+3. Runs contract, pricing, payout, seller OAuth, and runtime validation preflight checks.
 4. Runs a mandatory fail-closed LLM legal review.
 5. Verifies the public API is reachable from the internet.
 6. Sends a functional test request using your dedicated review/test key.
@@ -91,6 +97,7 @@ By default, the CLI expects:
 
 It also uses these when present:
 
+- `oauth_credentials.json` for seller-side OAuth app credentials
 - `input_form_spec.json`
 - `source_context.json`
 - Git metadata from the local checkout to derive `source_url` and `source_context`
@@ -116,6 +123,10 @@ to register with the CLI-generated Tool Manual template.
   - dedicated review/test auth header name + value
   - sample request payload in `request_payload`
   - expected response fields
+- For OAuth-backed APIs that use seller-owned OAuth apps:
+  - declare the provider in `required_connected_accounts`
+  - include the seller OAuth app credentials in `oauth_credentials.json`
+  - upgrades that add a new provider are blocked until the new seed is included
 - Listing metadata such as:
   - `name`
   - `job_to_be_done`
@@ -168,6 +179,7 @@ The intended advanced flow is:
    - manifest hints
    - Tool Manual files
    - deployment endpoints and review/test key settings
+   - seller OAuth app credentials when the API requires them
 3. It generates the registration payload.
 4. If only one language is present in the listing text, Siglume fills the
    missing Japanese or English fields with LLM translation during
@@ -178,6 +190,7 @@ The intended advanced flow is:
    - `manifest`
    - `tool_manual`
    - `runtime_validation`
+   - optional `oauth_credentials`
    - optional `input_form_spec`
 6. You review the resulting draft in the portal.
 7. You confirm the draft and publish immediately if the final checks pass.
@@ -241,4 +254,5 @@ Use the portal to:
 - inspect publish blockers
 - confirm the draft and verify live status
 - confirm wallet payout readiness
+- rotate or repair seller OAuth app credentials after registration
 - issue, delete, or rotate CLI tokens when needed

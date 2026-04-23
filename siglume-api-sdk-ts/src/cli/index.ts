@@ -246,7 +246,7 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
   program
     .command("register")
     .option("--confirm", "confirm the draft registration immediately and publish it when the self-serve checks pass", false)
-    .option("--submit-review", "submit the draft for review if --confirm is not used", false)
+    .option("--submit-review", "legacy alias: publish immediately if your environment still routes through submit-review", false)
     .option("--json", "emit machine-readable JSON", false)
     .argument("[path]", ".", "project path")
     .action(async (path: string, options: { confirm?: boolean; submitReview?: boolean; json?: boolean; ["submit-review"]?: boolean }) => {
@@ -257,13 +257,28 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         const receipt = report.receipt as {
           listing_id: string;
           status: string;
+          registration_mode?: string | null;
+          listing_status?: string | null;
+          oauth_status?: { configured?: boolean } | null;
           review_url?: string | null;
           trace_id?: string | null;
           request_id?: string | null;
         };
-        emit(stdout, report.confirmation ? "Listing confirmed." : "Draft listing created.");
+        if (report.confirmation) {
+          emit(stdout, "Listing published.");
+        } else if (report.review) {
+          emit(stdout, "Listing published via legacy submit-review alias.");
+        } else if (receipt.registration_mode === "upgrade") {
+          emit(stdout, "Upgrade staged.");
+        } else if (receipt.registration_mode === "refresh") {
+          emit(stdout, "Draft refreshed.");
+        } else {
+          emit(stdout, "Draft listing created.");
+        }
         emit(stdout, `listing_id: ${receipt.listing_id}`);
         emit(stdout, `receipt_status: ${receipt.status}`);
+        if (receipt.listing_status) emit(stdout, `listing_status: ${receipt.listing_status}`);
+        if (receipt.oauth_status) emit(stdout, `oauth_configured: ${Boolean(receipt.oauth_status.configured)}`);
         if (receipt.review_url) emit(stdout, `review_url: ${receipt.review_url}`);
         if (receipt.trace_id) emit(stdout, `trace_id: ${receipt.trace_id}`);
         if (receipt.request_id) emit(stdout, `request_id: ${receipt.request_id}`);
@@ -274,6 +289,9 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
           };
           if (confirmation.status) emit(stdout, `confirmation_status: ${confirmation.status}`);
           if (confirmation.release?.release_status) emit(stdout, `release_status: ${confirmation.release.release_status}`);
+        } else if (report.review) {
+          const review = report.review as { status?: string | null };
+          if (review.status) emit(stdout, `publish_status: ${review.status}`);
         }
         const preflight = report.registration_preflight as { remote_quality?: { grade?: string; overall_score?: number } } | undefined;
         if (preflight?.remote_quality) {

@@ -27,6 +27,9 @@ function createMockClient() {
       return {
         listing_id: "lst_123",
         status: "draft",
+        registration_mode: "upgrade",
+        listing_status: "active",
+        oauth_status: { configured: true },
         review_url: "https://siglume.com/owner/publish?listing=lst_123",
         trace_id: "trc_reg",
         request_id: "req_reg",
@@ -54,7 +57,7 @@ function createMockClient() {
         listing_id: "lst_123",
         capability_key: "payment-quote",
         name: "Payment Quote",
-        status: "pending_review",
+        status: "active",
         dry_run_supported: true,
         price_value_minor: 0,
         currency: "USD",
@@ -452,7 +455,7 @@ describe("siglume CLI", () => {
           listing_id: "lst_123",
           capability_key: "payment-quote",
           name: "Payment Quote",
-          status: "pending_review",
+          status: "active",
           dry_run_supported: true,
           price_value_minor: 0,
           currency: "USD",
@@ -515,10 +518,28 @@ describe("siglume CLI", () => {
     });
 
     expect(registerExit).toBe(0);
+    expect(stdout.join("\n")).toContain("Upgrade staged.");
+    expect(stdout.join("\n")).toContain("listing_status: active");
+    expect(stdout.join("\n")).toContain("oauth_configured: true");
     expect(stdout.join("\n")).toContain("review_url: https://siglume.com/owner/publish?listing=lst_123");
     expect(stdout.join("\n")).toContain("trace_id: trc_reg");
     expect(stdout.join("\n")).toContain("request_id: req_reg");
     expect(stdout.join("\n")).toContain("preflight_quality: A (92/100)");
+  });
+
+  it("prints legacy submit-review publish wording in human-readable mode", async () => {
+    const projectDir = await createTestProject();
+    const stdout: string[] = [];
+
+    const registerExit = await runCli(["register", projectDir, "--submit-review"], {
+      stdout: (line) => stdout.push(line),
+      client_factory: (() => createMockClient()) as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+
+    expect(registerExit).toBe(0);
+    expect(stdout.join("\n")).toContain("Listing published via legacy submit-review alias.");
+    expect(stdout.join("\n")).toContain("publish_status: active");
   });
 
   it("prints immediate-publish confirmation details in human-readable confirm mode", async () => {
@@ -532,8 +553,10 @@ describe("siglume CLI", () => {
     });
 
     expect(registerExit).toBe(0);
-    expect(stdout.join("\n")).toContain("Listing confirmed.");
+    expect(stdout.join("\n")).toContain("Listing published.");
     expect(stdout.join("\n")).toContain("receipt_status: draft");
+    expect(stdout.join("\n")).toContain("listing_status: active");
+    expect(stdout.join("\n")).toContain("oauth_configured: true");
     expect(stdout.join("\n")).toContain("confirmation_status: active");
     expect(stdout.join("\n")).toContain("release_status: published");
   });

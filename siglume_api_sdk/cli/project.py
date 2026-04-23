@@ -69,6 +69,8 @@ class LoadedProject:
     tool_manual: dict[str, Any]
     runtime_validation_path: Path | None
     runtime_validation: dict[str, Any] | None
+    oauth_credentials_path: Path | None
+    oauth_credentials: dict[str, Any] | list[Any] | None
 
 
 def to_jsonable(value: Any) -> Any:
@@ -261,6 +263,15 @@ def load_project(path: str | Path = ".") -> LoadedProject:
         if runtime_validation_path is not None
         else None
     )
+    oauth_credentials_path = _find_oauth_credentials_path(root_dir)
+    oauth_credentials = None
+    if oauth_credentials_path is not None:
+        try:
+            oauth_credentials = json.loads(oauth_credentials_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise click.ClickException(f"{oauth_credentials_path.name} is not valid JSON: {exc}") from exc
+        if not isinstance(oauth_credentials, (dict, list)):
+            raise click.ClickException("oauth_credentials must be a JSON object or array")
     return LoadedProject(
         root_dir=root_dir,
         adapter_path=adapter_path,
@@ -270,11 +281,116 @@ def load_project(path: str | Path = ".") -> LoadedProject:
         tool_manual=tool_manual,
         runtime_validation_path=runtime_validation_path,
         runtime_validation=runtime_validation,
+        oauth_credentials_path=oauth_credentials_path,
+        oauth_credentials=oauth_credentials,
     )
 
 
 def render_json(data: Any) -> str:
     return json.dumps(to_jsonable(data), ensure_ascii=False, indent=2)
+
+
+_OAUTH_PROVIDER_ALIASES = {
+    "x": "twitter",
+    "x-twitter": "twitter",
+    "twitter": "twitter",
+    "slack": "slack",
+    "google": "google",
+    "gmail": "google",
+    "google-drive": "google",
+    "google-calendar": "google",
+    "github": "github",
+    "linear": "linear",
+    "notion": "notion",
+}
+
+
+def _oauth_provider_key_from_requirement(value: Any) -> str | None:
+    raw = str(value or "").strip().lower().replace("_", "-")
+    if not raw:
+        return None
+    if raw in _OAUTH_PROVIDER_ALIASES:
+        return _OAUTH_PROVIDER_ALIASES[raw]
+    for token in raw.replace("/", "-").replace(":", "-").split("-"):
+        token = token.strip()
+        if token in _OAUTH_PROVIDER_ALIASES:
+            return _OAUTH_PROVIDER_ALIASES[token]
+    return None
+
+
+def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) -> list[str]:
+    providers: list[str] = []
+    for item in requirements or []:
+        provider_key = _oauth_provider_key_from_requirement(item)
+        if provider_key and provider_key not in providers:
+            providers.append(provider_key)
+    return providers
+
+
+def _oauth_provider_records_map(payload: dict[str, Any] | list[Any] | None) -> dict[str, dict[str, Any]]:
+    if payload is None:
+        return {}
+    items: Any = payload
+    if isinstance(payload, dict):
+        items = payload.get("items") if isinstance(payload.get("items"), list) else [payload]
+    if not isinstance(items, list):
+        raise click.ClickException("oauth_credentials must be a JSON object or array.")
+    resolved: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise click.ClickException(f"oauth_credentials[{index}] must be a JSON object.")
+        provider_key = _oauth_provider_key_from_requirement(
+            item.get("provider_key") or item.get("provider")
+        )
+        if not provider_key:
+            raise click.ClickException(f"oauth_credentials[{index}].provider_key is unsupported.")
+        client_id = str(item.get("client_id") or "").strip()
+        client_secret = str(item.get("client_secret") or "").strip()
+        if not client_id or not client_secret:
+            raise click.ClickException(
+                f"oauth_credentials[{index}] must include client_id and client_secret."
+            )
+        raw_scopes = item.get("required_scopes")
+        if raw_scopes is None:
+            raw_scopes = item.get("scopes")
+        if raw_scopes is None:
+            scopes: list[str] = []
+        elif not isinstance(raw_scopes, list):
+            raise click.ClickException(
+                f"oauth_credentials[{index}].required_scopes must be a JSON array."
+            )
+        else:
+            scopes = [str(scope).strip() for scope in raw_scopes if str(scope).strip()]
+        resolved[provider_key] = {
+            "provider_key": provider_key,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "required_scopes": scopes,
+        }
+    return resolved
+
+
+def _canonical_oauth_credentials_payload(
+    payload: dict[str, Any] | list[Any] | None,
+) -> dict[str, list[dict[str, Any]]] | None:
+    records = _oauth_provider_records_map(payload)
+    if not records:
+        return None
+    return {"items": [records[provider_key] for provider_key in sorted(records)]}
+
+
+def _ensure_required_oauth_credentials(project: LoadedProject) -> None:
+    required_providers = _required_oauth_providers(project.manifest.required_connected_accounts)
+    if not required_providers:
+        return
+    provided = _oauth_provider_records_map(project.oauth_credentials).keys()
+    missing = [provider for provider in required_providers if provider not in provided]
+    if not missing:
+        return
+    path = project.oauth_credentials_path or (project.root_dir / "oauth_credentials.json")
+    raise click.ClickException(
+        f"{path} is required for OAuth-backed APIs. Missing provider seeds: {', '.join(missing)}"
+    )
 
 
 def _sample_value_for_schema(schema: dict[str, Any]) -> Any:
@@ -1158,6 +1274,11 @@ def _registration_preflight(project: LoadedProject, client: SiglumeClient) -> di
     manifest_issues = project_validation_issues(project)
     manual_valid, manual_issues = validate_tool_manual(project.tool_manual)
     remote_quality = client.preview_quality_score(project.tool_manual)
+    required_oauth_providers = _required_oauth_providers(project.manifest.required_connected_accounts)
+    oauth_provider_records = _oauth_provider_records_map(project.oauth_credentials)
+    missing_oauth_providers = [
+        provider for provider in required_oauth_providers if provider not in oauth_provider_records
+    ]
     errors: list[str] = []
     errors.extend(str(issue) for issue in manifest_issues)
     blocking_manual_issues = [
@@ -1172,11 +1293,19 @@ def _registration_preflight(project: LoadedProject, client: SiglumeClient) -> di
         grade = getattr(remote_quality, "grade", "?")
         score = getattr(remote_quality, "overall_score", "?")
         errors.append(f"remote Tool Manual quality is not publishable: {grade} ({score}/100)")
+    if missing_oauth_providers:
+        errors.append(
+            "oauth_credentials.json is required for OAuth-backed APIs: "
+            + ", ".join(missing_oauth_providers)
+        )
     preflight = {
         "manifest_issues": manifest_issues,
         "tool_manual_valid": manual_valid,
         "tool_manual_issues": [to_jsonable(issue) for issue in manual_issues],
         "remote_quality": to_jsonable(remote_quality),
+        "required_oauth_providers": required_oauth_providers,
+        "oauth_credentials_path": str(project.oauth_credentials_path) if project.oauth_credentials_path else None,
+        "oauth_missing_providers": missing_oauth_providers,
         "ok": not errors,
     }
     if errors:
@@ -1192,6 +1321,8 @@ def run_registration(path: str | Path, *, confirm: bool, submit_review: bool) ->
     _ensure_explicit_tool_manual(project)
     _ensure_manifest_publisher_identity(project)
     _ensure_runtime_validation_ready(project)
+    _ensure_required_oauth_credentials(project)
+    canonical_oauth_credentials = _canonical_oauth_credentials_payload(project.oauth_credentials)
     api_key = resolve_api_key()
     with SiglumeClient(api_key=api_key) as client:
         registration_preflight = _registration_preflight(project, client)
@@ -1200,11 +1331,13 @@ def run_registration(path: str | Path, *, confirm: bool, submit_review: bool) ->
             project.manifest,
             project.tool_manual,
             runtime_validation=project.runtime_validation,
+            oauth_credentials=canonical_oauth_credentials,
         )
         result: dict[str, Any] = {
             "receipt": to_jsonable(receipt),
             "registration_preflight": registration_preflight,
             "runtime_validation_path": str(project.runtime_validation_path) if project.runtime_validation_path else None,
+            "oauth_credentials_path": str(project.oauth_credentials_path) if project.oauth_credentials_path else None,
         }
         if portal_preflight is not None:
             result["developer_portal_preflight"] = portal_preflight
@@ -1368,6 +1501,14 @@ def _find_tool_manual_path(root_dir: Path) -> Path | None:
 
 def _find_runtime_validation_path(root_dir: Path) -> Path | None:
     for name in ("runtime_validation.json", "runtime-validation.json"):
+        candidate = root_dir / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _find_oauth_credentials_path(root_dir: Path) -> Path | None:
+    for name in ("oauth_credentials.json", "oauth-credentials.json"):
         candidate = root_dir / name
         if candidate.exists():
             return candidate

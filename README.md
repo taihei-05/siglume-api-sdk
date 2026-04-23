@@ -77,11 +77,18 @@ This is the main use case. You build an API, register it, and earn revenue.
 2. Test locally with AppTestHarness
 3. Deploy the real API to a public URL
 4. Keep `tool_manual.json` and `runtime_validation.json` next to your adapter
-5. Run `siglume register . --confirm`
-6. Review the draft in the developer portal
+5. If the API uses seller-side OAuth, also keep `oauth_credentials.json` next to your adapter
+6. Run `siglume register . --confirm`
+7. Review the result in the developer portal when needed
 7. Confirm → immediately published to the API Store when all checks pass
 8. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
+
+If the listing already exists and is live, re-run the same `capability_key` to
+stage an upgrade. `siglume register . --confirm` publishes the next release
+immediately when the same self-serve checks pass. If the upgrade adds a new
+seller-side OAuth provider, `oauth_credentials.json` must already include that
+provider or the upgrade is rejected.
 
 **You do not submit a PR to this repo.** You register directly on the platform.
 No permission needed. No issue to claim. Just build and register.
@@ -90,8 +97,8 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Draft creation and confirmation | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, `runtime_validation.json`, optional `input_form_spec.json`, and GitHub provenance when available, runs preflight by default, then calls `auto-register`. |
-| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft. Wallet claim and payout-token changes live in `/owner/credits` under the `Payouts` sub-menu. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, `runtime_validation.json`, optional `input_form_spec.json`, optional `oauth_credentials.json`, and GitHub provenance when available, runs preflight by default, then calls `auto-register`. Re-run the same `capability_key` to stage an upgrade. |
+| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Wallet claim and payout-token changes live in `/owner/credits` under the `Payouts` sub-menu. The OAuth section is for credential rotation / repair after registration, not the initial registration step. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
 
@@ -100,6 +107,11 @@ No permission needed. No issue to claim. Just build and register.
 - Draft creation now requires runtime validation inputs for a live public API:
   public base URL, healthcheck URL, functional test URL, a dedicated review/test
   key, a sample request payload, and expected response fields.
+- OAuth-backed APIs now require seller-owned OAuth app credentials during
+  registration and upgrade:
+  - declare the provider in `required_connected_accounts`
+  - include the seller app credentials in `oauth_credentials.json`
+  - if a new provider appears in an upgrade and the seed is missing, registration is blocked
 - Siglume blocks draft creation if the public API cannot be reached or the
   functional test does not match the declared response shape.
 - Siglume also blocks draft creation when the Tool Manual contract is incomplete
@@ -127,6 +139,7 @@ siglume init --template price-compare
 # edit adapter.py
 # edit tool_manual.json
 # edit runtime_validation.json with your real deployed API URL and review/test key
+# if the API uses seller-side OAuth, add oauth_credentials.json with the seller OAuth app credentials
 siglume validate .
 siglume score . --remote
 siglume test .
@@ -139,6 +152,10 @@ preview before draft creation. Use `--no-preflight` only when you explicitly
 want to skip that check, `--force-draft` when you still want to attempt draft
 creation after a failed preflight, and `--allow-generated-manual` only when you
 intend to register with the CLI-generated `tool_manual` template.
+
+For upgrades, run the same commands again with the same `capability_key`.
+`siglume register` stages the upgrade, and `siglume register . --confirm`
+publishes the next release immediately when the checks pass.
 
 - **Developer Portal** → [siglume.com/owner/publish](https://siglume.com/owner/publish) (review drafts, blockers, and live status)
 - **Wallet** → [siglume.com/owner/credits](https://siglume.com/owner/credits) (claim the embedded wallet, then use the `Payouts` sub-menu to change the payout token)

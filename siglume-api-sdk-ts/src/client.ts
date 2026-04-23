@@ -157,6 +157,7 @@ export interface SiglumeClientShape {
       source_code?: string;
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
+      oauth_credentials?: Record<string, unknown> | unknown[];
       metadata?: Record<string, unknown>;
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
@@ -2171,6 +2172,7 @@ export class SiglumeClient implements SiglumeClientShape {
       source_code?: string;
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
+      oauth_credentials?: Record<string, unknown> | unknown[];
       metadata?: Record<string, unknown>;
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
@@ -2192,6 +2194,15 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     if (options.runtime_validation) {
       payload.runtime_validation = coerceMapping(options.runtime_validation, "runtime_validation");
+    }
+    if (options.oauth_credentials) {
+      payload.oauth_credentials = Array.isArray(options.oauth_credentials)
+        ? {
+            items: options.oauth_credentials.map((item, index) =>
+              coerceMapping(item, `oauth_credentials[${index}]`),
+            ),
+          }
+        : coerceMapping(options.oauth_credentials, "oauth_credentials");
     }
     if (options.metadata) {
       payload.metadata = coerceMapping(options.metadata, "metadata");
@@ -2243,9 +2254,12 @@ export class SiglumeClient implements SiglumeClientShape {
     return {
       listing_id,
       status: String(data.status ?? "draft"),
+      registration_mode: stringOrNull(data.registration_mode),
+      listing_status: stringOrNull(data.listing_status),
       auto_manifest: toRecord(data.auto_manifest),
       confidence: toRecord(data.confidence),
       validation_report: toRecord(data.validation_report),
+      oauth_status: toRecord(data.oauth_status),
       review_url: stringOrNull(data.review_url),
       trace_id: meta.trace_id,
       request_id: meta.request_id,
@@ -2274,9 +2288,16 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     const [data, meta] = await this.request("POST", `/market/capabilities/${listing_id}/confirm-auto-register`, { json_body: payload });
     this.pendingConfirmations.delete(listing_id);
+    const checklist = isRecord(data.checklist)
+      ? Object.fromEntries(
+          Object.entries(data.checklist).map(([key, value]) => [key, Boolean(value)]),
+        )
+      : {};
     return {
       listing_id: String(data.listing_id ?? listing_id),
       status: String(data.status ?? ""),
+      message: stringOrNull(data.message),
+      checklist,
       release: toRecord(data.release),
       quality: parseRegistrationQuality(toRecord(data.quality)),
       trace_id: meta.trace_id,

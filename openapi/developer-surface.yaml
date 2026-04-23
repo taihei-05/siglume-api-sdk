@@ -80,20 +80,27 @@ paths:
   /market/capabilities/auto-register:
     post:
       operationId: autoRegisterApi
-      summary: Register a new API draft for CLI / automation review
+      summary: Register or upgrade an API listing for self-serve publish
       description: |
-        The canonical draft-creation endpoint for CLI / SDK / automation flows.
+        The canonical draft / upgrade endpoint for CLI / SDK / automation flows.
         A coding engine such as Codex can read your GitHub repository, generate
         the manifest + Tool Manual contract, and send them here together with
         runtime validation inputs.
 
-        Before a draft is created, Siglume validates the Tool Manual contract,
+        Before a draft or upgrade receipt is created, Siglume validates the Tool
+        Manual contract,
         checks Tool Manual quality, compares the runtime sample request / response
         to the declared `input_schema` and `output_schema`, verifies connected-account
         consistency, enforces paid-listing pricing / payout prerequisites, and
         runs a mandatory fail-closed LLM legal review for applicable-law
         compliance plus public-order / morals compliance in the declared
         jurisdiction.
+
+        The `201` response is the registration receipt consumed by the CLI and
+        SDK before optional immediate publish. It includes whether the operation
+        created a fresh draft, refreshed an existing draft, or staged an upgrade
+        against an already-published listing, plus seller OAuth readiness when
+        connected-account seeds were provided.
 
         `source_code` is still accepted when you want the platform to infer
         fields heuristically. `source_url` is also accepted as the provenance
@@ -231,6 +238,20 @@ paths:
                   description: Manifest/listing connected-account provider keys. Must match ToolManual.requires_connected_accounts.
                   items:
                     type: string
+                oauth_credentials:
+                  type: object
+                  description: |
+                    Optional seller-owned OAuth app credentials. Required when
+                    the API uses seller-side OAuth providers declared in
+                    `required_connected_accounts`. Include these during the
+                    initial registration and during upgrades that add a new
+                    provider. The portal OAuth panel is for rotation / repair
+                    after registration, not the initial setup step.
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ListingOAuthCredentialsRequest'
                 runtime_validation:
                   type: object
                   description: |
@@ -311,17 +332,28 @@ paths:
                       description: Optional timeout override for the runtime checks
       responses:
         '201':
-          description: Draft listing created
+          description: Draft or upgrade receipt created
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - listing_id
+                  - status
                 properties:
                   listing_id:
                     type: string
+                    description: Listing identifier that should be confirmed or published next.
                   status:
                     type: string
-                    enum: [draft]
+                    description: Registration receipt state, typically `draft` before publish confirmation.
+                  registration_mode:
+                    type: string
+                    enum: [create, refresh, upgrade]
+                    description: Whether the receipt created a new draft, refreshed an existing draft, or staged an upgrade.
+                  listing_status:
+                    type: string
+                    description: Existing listing status before the final publish step, when the receipt targets an existing listing.
                   auto_manifest:
                     type: object
                   confidence:
@@ -353,8 +385,20 @@ paths:
                             metadata:
                               type: object
                               additionalProperties: true
+                  oauth_status:
+                    type: object
+                    description: Seller OAuth seed readiness derived from the submitted oauth_credentials payload.
+                    properties:
+                      configured:
+                        type: boolean
+                      missing_providers:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties: true
                   review_url:
                     type: string
+                    description: Dashboard URL where the seller can inspect the receipt before publishing.
 
   /market/capabilities/{listingId}/confirm-auto-register:
     post:
@@ -1271,7 +1315,7 @@ paths:
   /market/capabilities/{listingId}/oauth-credentials:
     get:
       operationId: getListingOAuthCredentialsStatus
-      summary: Read whether a listing has OAuth credentials configured
+      summary: Read the post-registration seller OAuth credential status for a listing
       parameters:
         - name: listingId
           in: path
@@ -1287,7 +1331,7 @@ paths:
                 $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
     put:
       operationId: setListingOAuthCredentials
-      summary: Store seller-owned OAuth client credentials for a listing
+      summary: Rotate or repair seller-owned OAuth client credentials for a listing
       parameters:
         - name: listingId
           in: path
@@ -2058,6 +2102,20 @@ components:
         required_scopes:
           type: array
           items: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              provider_key: { type: string }
+              configured: { type: boolean }
+              required_scopes:
+                type: array
+                items: { type: string }
+              updated_at:
+                anyOf:
+                  - type: string
+                  - type: 'null'
 
     ListingOAuthCredentialsStatusEnvelope:
       type: object

@@ -87,6 +87,7 @@ async function createObjectProject(options: {
   manualFileName?: "tool_manual.json" | "tool-manual.json";
   toolManual?: Record<string, unknown>;
   manifest?: Record<string, unknown>;
+  oauthCredentials?: Record<string, unknown> | unknown[];
 } = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "siglume-ts-project-"));
   const adapterSource = [
@@ -124,6 +125,9 @@ async function createObjectProject(options: {
     ),
     "utf8",
   );
+  if (options.oauthCredentials !== undefined) {
+    await writeFile(join(dir, "oauth_credentials.json"), JSON.stringify(options.oauthCredentials, null, 2), "utf8");
+  }
   return dir;
 }
 
@@ -312,6 +316,115 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(false);
   });
 
+  it("blocks registration when an OAuth-backed API does not provide oauth_credentials.json", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: ["twitter"],
+      },
+    });
+    let autoRegisterCalled = false;
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport();
+              },
+              async auto_register() {
+                autoRegisterCalled = true;
+                throw new Error("auto_register should not run");
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("oauth_credentials.json is required for OAuth-backed APIs");
+    expect(autoRegisterCalled).toBe(false);
+  });
+
+  it("canonicalizes OAuth seed payloads before auto-register", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: ["google-drive"],
+      },
+      oauthCredentials: [
+        {
+          provider: "gmail",
+          client_id: "google-client",
+          client_secret: "google-secret",
+          scopes: ["gmail.readonly"],
+        },
+      ],
+    });
+
+    const report = await runRegistration(
+      projectDir,
+      {},
+      {
+        env: { SIGLUME_API_KEY: "sig_test_key" },
+        client_factory: () =>
+          ({
+            async preview_quality_score() {
+              return publishableQualityReport();
+            },
+            async auto_register(
+              _manifest: unknown,
+              _tool_manual: unknown,
+              options?: { oauth_credentials?: Record<string, unknown> | unknown[] },
+            ) {
+              expect(options?.oauth_credentials).toEqual({
+                items: [
+                  {
+                    provider_key: "google",
+                    client_id: "google-client",
+                    client_secret: "google-secret",
+                    required_scopes: ["gmail.readonly"],
+                  },
+                ],
+              });
+              return { listing_id: "lst_oauth", status: "draft", auto_manifest: {}, confidence: {} };
+            },
+          }) as unknown as SiglumeClientShape,
+      },
+    );
+
+    expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_oauth");
+  });
+
+  it("rejects string OAuth scopes", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: ["google"],
+      },
+      oauthCredentials: [
+        {
+          provider: "gmail",
+          client_id: "google-client",
+          client_secret: "google-secret",
+          scopes: "gmail.readonly",
+        },
+      ],
+    });
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () => ({}) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("required_scopes must be a JSON array");
+  });
+
   it("allows Tool Manual warnings during registration preflight", async () => {
     const toolManual = manualBase();
     (toolManual.input_schema.properties as Record<string, unknown>).trace_id = {
@@ -374,7 +487,7 @@ describe("cli project helpers", () => {
                 listing_id: "lst_123",
                 capability_key: "price-compare-helper",
                 name: "Price Compare Helper",
-                status: "pending_review",
+                status: "active",
                 dry_run_supported: true,
                 price_value_minor: 0,
                 currency: "USD",

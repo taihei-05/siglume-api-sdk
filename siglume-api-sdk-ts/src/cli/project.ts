@@ -55,6 +55,8 @@ export interface LoadedProject {
   tool_manual: Record<string, unknown>;
   runtime_validation_path?: string;
   runtime_validation?: Record<string, unknown>;
+  oauth_credentials_path?: string;
+  oauth_credentials?: Record<string, unknown> | unknown[];
 }
 
 export interface CliProjectDependencies {
@@ -270,6 +272,15 @@ export async function loadProject(path = "."): Promise<LoadedProject> {
   const runtime_validation = runtime_validation_path
     ? await loadJsonObject(runtime_validation_path, "runtime_validation")
     : undefined;
+  const oauth_credentials_path = await findOauthCredentialsPath(root_dir);
+  let oauth_credentials: Record<string, unknown> | unknown[] | undefined;
+  if (oauth_credentials_path) {
+    const parsed = JSON.parse(await readFile(oauth_credentials_path, "utf8")) as unknown;
+    if (!isRecord(parsed) && !Array.isArray(parsed)) {
+      throw new SiglumeProjectError("oauth_credentials must be a JSON object or array");
+    }
+    oauth_credentials = parsed;
+  }
 
   return {
     root_dir,
@@ -280,7 +291,120 @@ export async function loadProject(path = "."): Promise<LoadedProject> {
     tool_manual,
     runtime_validation_path: runtime_validation_path ?? undefined,
     runtime_validation,
+    oauth_credentials_path: oauth_credentials_path ?? undefined,
+    oauth_credentials,
   };
+}
+
+const OAUTH_PROVIDER_ALIASES: Record<string, string> = {
+  x: "twitter",
+  "x-twitter": "twitter",
+  twitter: "twitter",
+  slack: "slack",
+  google: "google",
+  gmail: "google",
+  "google-drive": "google",
+  "google-calendar": "google",
+  github: "github",
+  linear: "linear",
+  notion: "notion",
+};
+
+function oauthProviderKeyFromRequirement(value: unknown): string | null {
+  const raw = String(value ?? "").trim().toLowerCase().replaceAll("_", "-");
+  if (!raw) return null;
+  if (OAUTH_PROVIDER_ALIASES[raw]) {
+    return OAUTH_PROVIDER_ALIASES[raw];
+  }
+  for (const token of raw.replaceAll("/", "-").replaceAll(":", "-").split("-")) {
+    const next = token.trim();
+    if (OAUTH_PROVIDER_ALIASES[next]) {
+      return OAUTH_PROVIDER_ALIASES[next];
+    }
+  }
+  return null;
+}
+
+function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
+  const providers: string[] = [];
+  for (const item of requirements ?? []) {
+    const providerKey = oauthProviderKeyFromRequirement(item);
+    if (providerKey && !providers.includes(providerKey)) {
+      providers.push(providerKey);
+    }
+  }
+  return providers;
+}
+
+function oauthProviderRecordsMap(payload: Record<string, unknown> | unknown[] | undefined): Record<string, Record<string, unknown>> {
+  if (!payload) {
+    return {};
+  }
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.items)
+      ? payload.items
+      : [payload];
+  const resolved: Record<string, Record<string, unknown>> = {};
+  for (const [index, item] of items.entries()) {
+    if (!isRecord(item)) {
+      throw new SiglumeProjectError(`oauth_credentials[${index}] must be a JSON object.`);
+    }
+    const providerKey = oauthProviderKeyFromRequirement(item.provider_key ?? item.provider);
+    if (!providerKey) {
+      throw new SiglumeProjectError(`oauth_credentials[${index}].provider_key is unsupported.`);
+    }
+    const clientId = String(item.client_id ?? "").trim();
+    const clientSecret = String(item.client_secret ?? "").trim();
+    if (!clientId || !clientSecret) {
+      throw new SiglumeProjectError(`oauth_credentials[${index}] must include client_id and client_secret.`);
+    }
+    const rawScopes = item.required_scopes ?? item.scopes;
+    let scopes: string[] = [];
+    if (rawScopes == null) {
+      scopes = [];
+    } else if (!Array.isArray(rawScopes)) {
+      throw new SiglumeProjectError(`oauth_credentials[${index}].required_scopes must be a JSON array.`);
+    } else {
+      scopes = rawScopes.map((scope) => String(scope ?? "").trim()).filter(Boolean);
+    }
+    resolved[providerKey] = {
+      provider_key: providerKey,
+      client_id: clientId,
+      client_secret: clientSecret,
+      required_scopes: scopes,
+    };
+  }
+  return resolved;
+}
+
+function canonicalOauthCredentialsPayload(
+  payload: Record<string, unknown> | unknown[] | undefined,
+): Record<string, unknown> | undefined {
+  const records = oauthProviderRecordsMap(payload);
+  const providerKeys = Object.keys(records).sort();
+  if (providerKeys.length === 0) {
+    return undefined;
+  }
+  return {
+    items: providerKeys.map((providerKey) => records[providerKey]),
+  };
+}
+
+function ensureRequiredOauthCredentials(project: LoadedProject): void {
+  const requiredProviders = requiredOauthProviders(project.manifest.required_connected_accounts ?? []);
+  if (requiredProviders.length === 0) {
+    return;
+  }
+  const provided = new Set(Object.keys(oauthProviderRecordsMap(project.oauth_credentials)));
+  const missing = requiredProviders.filter((provider) => !provided.has(provider));
+  if (missing.length === 0) {
+    return;
+  }
+  const path = project.oauth_credentials_path ?? join(project.root_dir, "oauth_credentials.json");
+  throw new SiglumeProjectError(
+    `${path} is required for OAuth-backed APIs. Missing provider seeds: ${missing.join(", ")}`,
+  );
 }
 
 export async function validateProject(path = ".", deps: CliProjectDependencies = {}): Promise<Record<string, unknown>> {
@@ -433,6 +557,9 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
   const manifestIssues = await projectValidationIssues(project);
   const [toolManualValid, toolManualIssues] = validate_tool_manual(project.tool_manual);
   const remoteQuality = await client.preview_quality_score(project.tool_manual);
+  const requiredOauthProvidersList = requiredOauthProviders(project.manifest.required_connected_accounts ?? []);
+  const oauthProviderRecords = oauthProviderRecordsMap(project.oauth_credentials);
+  const missingOauthProviders = requiredOauthProvidersList.filter((provider) => !oauthProviderRecords[provider]);
   const blockingToolManualIssues = toolManualIssues.filter((issue) => issue.severity === "error");
   const errors = [
     ...manifestIssues.map((issue) => String(issue)),
@@ -444,11 +571,17 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
   if (!remoteQualityOk(remoteQuality)) {
     errors.push(`remote Tool Manual quality is not publishable: ${remoteQuality.grade} (${remoteQuality.overall_score}/100)`);
   }
+  if (missingOauthProviders.length > 0) {
+    errors.push(`oauth_credentials.json is required for OAuth-backed APIs: ${missingOauthProviders.join(", ")}`);
+  }
   const preflight = {
     manifest_issues: manifestIssues,
     tool_manual_valid: toolManualValid,
     tool_manual_issues: toolManualIssues.map((issue) => toJsonable(issue)),
     remote_quality: toJsonable(remoteQuality),
+    required_oauth_providers: requiredOauthProvidersList,
+    oauth_credentials_path: project.oauth_credentials_path ?? null,
+    oauth_missing_providers: missingOauthProviders,
     ok: errors.length === 0,
   };
   if (errors.length > 0) {
@@ -468,6 +601,7 @@ export async function runRegistration(
   ensureExplicitToolManual(project);
   ensureManifestPublisherIdentity(project);
   ensureRuntimeValidationReady(project);
+  ensureRequiredOauthCredentials(project);
   const client = await createClient(deps);
   const preflight = await registrationPreflight(project, client);
   let developerPortalPreflight: unknown = null;
@@ -483,11 +617,13 @@ export async function runRegistration(
   }
   const receipt = await client.auto_register(project.manifest, project.tool_manual, {
     runtime_validation: project.runtime_validation,
+    oauth_credentials: canonicalOauthCredentialsPayload(project.oauth_credentials),
   });
   const result: Record<string, unknown> = {
     receipt: toJsonable(receipt),
     registration_preflight: preflight,
     runtime_validation_path: project.runtime_validation_path ?? null,
+    oauth_credentials_path: project.oauth_credentials_path ?? null,
   };
   if (developerPortalPreflight) {
     result.developer_portal_preflight = developerPortalPreflight;
@@ -1297,6 +1433,16 @@ async function findToolManualPath(root_dir: string): Promise<string | null> {
 
 async function findRuntimeValidationPath(root_dir: string): Promise<string | null> {
   for (const name of ["runtime_validation.json", "runtime-validation.json"]) {
+    const candidate = join(root_dir, name);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+async function findOauthCredentialsPath(root_dir: string): Promise<string | null> {
+  for (const name of ["oauth_credentials.json", "oauth-credentials.json"]) {
     const candidate = join(root_dir, name);
     if (existsSync(candidate)) {
       return candidate;

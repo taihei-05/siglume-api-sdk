@@ -9,6 +9,7 @@ from click.testing import CliRunner
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EXAMPLES_ROOT = ROOT / "examples"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -29,6 +30,8 @@ def _write_register_project(
     *,
     include_tool_manual: bool = True,
     runtime_validation: dict | None = None,
+    required_connected_accounts: list[str] | None = None,
+    oauth_credentials: dict | list | None = None,
     docs_url: str = "https://docs.siglume.test/register-project",
     support_contact: str = "https://support.siglume.test/register-project",
 ) -> None:
@@ -46,6 +49,7 @@ def _write_register_project(
                 "            job_to_be_done='Echo a registration test request.',",
                 "            jurisdiction='US',",
                 "            dry_run_supported=True,",
+                f"            required_connected_accounts={required_connected_accounts or []!r},",
                 f"            docs_url='{docs_url}',",
                 f"            support_contact='{support_contact}',",
                 "            example_prompts=['Echo this registration test query.'],",
@@ -111,6 +115,11 @@ def _write_register_project(
         ),
         encoding="utf-8",
     )
+    if oauth_credentials is not None:
+        (project_dir / "oauth_credentials.json").write_text(
+            json.dumps(oauth_credentials),
+            encoding="utf-8",
+        )
 
 
 def test_init_command_writes_template_files() -> None:
@@ -247,6 +256,131 @@ def test_register_blocks_non_publishable_remote_quality(monkeypatch, tmp_path) -
     assert FakeClient.auto_register_called is False
 
 
+def test_register_requires_oauth_seed_for_oauth_backed_api(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "oauth-required"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=["twitter"],
+    )
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=90,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=70,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "oauth_credentials.json" in result.output
+    assert "twitter" in result.output
+
+
+def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "oauth-canonical"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=["google-drive"],
+        oauth_credentials=[
+            {
+                "provider": "gmail",
+                "client_id": "google-client",
+                "client_secret": "google-secret",
+                "scopes": ["gmail.readonly"],
+            }
+        ],
+    )
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=90,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=70,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            assert kwargs["oauth_credentials"] == {
+                "items": [
+                    {
+                        "provider_key": "google",
+                        "client_id": "google-client",
+                        "client_secret": "google-secret",
+                        "required_scopes": ["gmail.readonly"],
+                    }
+                ]
+            }
+            return SimpleNamespace(listing_id="lst_oauth", status="draft")
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert '"listing_id": "lst_oauth"' in result.output
+
+
+def test_register_rejects_string_oauth_scopes(tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "oauth-bad-scopes"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=["google"],
+        oauth_credentials=[
+            {
+                "provider": "gmail",
+                "client_id": "google-client",
+                "client_secret": "google-secret",
+                "scopes": "gmail.readonly",
+            }
+        ],
+    )
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "required_scopes must be a JSON array" in result.output
+
+
 def test_register_preflight_allows_tool_manual_warnings(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "warning-allowed"
@@ -330,6 +464,9 @@ def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, t
             return SimpleNamespace(
                 listing_id="lst_123",
                 status="draft",
+                registration_mode="upgrade",
+                listing_status="active",
+                oauth_status={"configured": True},
                 review_url="https://siglume.com/owner/publish?listing=lst_123",
                 trace_id="trc_reg",
                 request_id="req_reg",
@@ -341,10 +478,122 @@ def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, t
     result = runner.invoke(main, ["register", str(project_dir)])
 
     assert result.exit_code == 0, result.output
+    assert "Upgrade staged." in result.output
+    assert "receipt_status: draft" in result.output
+    assert "listing_status: active" in result.output
+    assert "oauth_configured: True" in result.output
     assert "review_url: https://siglume.com/owner/publish?listing=lst_123" in result.output
     assert "trace_id: trc_reg" in result.output
     assert "request_id: req_reg" in result.output
     assert "preflight_quality: A (91/100)" in result.output
+
+
+def test_register_submit_review_human_output_uses_publish_wording(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "legacy-submit-review"
+    _write_register_project(project_dir)
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=89,
+                grade="B",
+                issues=[],
+                keyword_coverage_estimate=68,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            return SimpleNamespace(
+                listing_id="lst_legacy",
+                status="draft",
+            )
+
+        def submit_review(self, listing_id: str):
+            assert listing_id == "lst_legacy"
+            return SimpleNamespace(status="active")
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--submit-review"])
+
+    assert result.exit_code == 0, result.output
+    assert "receipt_status: draft" in result.output
+    assert "Listing published via legacy submit-review alias." in result.output
+    assert "Submitted for review." not in result.output
+    assert "publish_status: active" in result.output
+
+
+def test_register_confirm_human_output_includes_release_status(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "confirm-human-output"
+    _write_register_project(project_dir)
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=90,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=70,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            return SimpleNamespace(
+                listing_id="lst_confirm",
+                status="draft",
+                review_url="https://siglume.com/owner/publish?listing=lst_confirm",
+                trace_id="trc_confirm_reg",
+                request_id="req_confirm_reg",
+            )
+
+        def confirm_registration(self, listing_id: str):
+            assert listing_id == "lst_confirm"
+            return {
+                "listing_id": listing_id,
+                "status": "active",
+                "release": {"release_status": "published"},
+                "quality": {"overall_score": 84, "grade": "B"},
+            }
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--confirm"])
+
+    assert result.exit_code == 0, result.output
+    assert "Listing published." in result.output
+    assert "receipt_status: draft" in result.output
+    assert "confirmation_status: active" in result.output
+    assert "release_status: published" in result.output
 
 
 def test_init_command_lists_owner_operations(monkeypatch) -> None:
@@ -480,8 +729,9 @@ def test_validate_and_score_commands_use_remote_preview(monkeypatch) -> None:
     monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
     monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
 
-    validate_result = runner.invoke(main, ["validate", "examples/hello_echo.py", "--json"])
-    score_result = runner.invoke(main, ["score", "examples/hello_echo.py", "--remote", "--json"])
+    example_path = str(EXAMPLES_ROOT / "hello_echo.py")
+    validate_result = runner.invoke(main, ["validate", example_path, "--json"])
+    score_result = runner.invoke(main, ["score", example_path, "--remote", "--json"])
 
     assert validate_result.exit_code == 0, validate_result.output
     assert '"grade": "B"' in validate_result.output
@@ -518,8 +768,9 @@ def test_validate_and_score_fail_when_remote_preview_is_not_publishable(monkeypa
     monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
     monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
 
-    validate_result = runner.invoke(main, ["validate", "examples/hello_echo.py", "--json"])
-    score_result = runner.invoke(main, ["score", "examples/hello_echo.py", "--remote", "--json"])
+    example_path = str(EXAMPLES_ROOT / "hello_echo.py")
+    validate_result = runner.invoke(main, ["validate", example_path, "--json"])
+    score_result = runner.invoke(main, ["score", example_path, "--remote", "--json"])
 
     assert validate_result.exit_code == 1, validate_result.output
     assert '"ok": false' in validate_result.output
@@ -535,7 +786,8 @@ def test_score_command_supports_offline_mode_without_api_key(monkeypatch) -> Non
 
     monkeypatch.setattr(project_module, "resolve_api_key", fail_resolve_api_key)
 
-    result = runner.invoke(main, ["score", "examples/payment_quote.py", "--offline", "--json"])
+    example_path = str(EXAMPLES_ROOT / "payment_quote.py")
+    result = runner.invoke(main, ["score", example_path, "--offline", "--json"])
 
     assert result.exit_code == 0, result.output
     assert '"mode": "offline"' in result.output
@@ -544,7 +796,8 @@ def test_score_command_supports_offline_mode_without_api_key(monkeypatch) -> Non
 
 def test_test_command_runs_harness() -> None:
     runner = CliRunner()
-    result = runner.invoke(main, ["test", "examples/hello_price_compare.py", "--json"])
+    example_path = str(EXAMPLES_ROOT / "hello_price_compare.py")
+    result = runner.invoke(main, ["test", example_path, "--json"])
     assert result.exit_code == 0, result.output
     assert '"ok": true' in result.output
     assert '"dry_run"' in result.output

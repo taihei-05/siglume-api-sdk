@@ -346,9 +346,12 @@ export interface BundleListingRecord {
 export interface AutoRegistrationReceipt {
   listing_id: string;
   status: string;
+  registration_mode?: string | null;
+  listing_status?: string | null;
   auto_manifest: Record<string, unknown>;
   confidence: Record<string, unknown>;
   validation_report?: Record<string, unknown>;
+  oauth_status?: Record<string, unknown>;
   review_url?: string | null;
   trace_id?: string | null;
   request_id?: string | null;
@@ -365,6 +368,8 @@ export interface RegistrationQuality {
 export interface RegistrationConfirmation {
   listing_id: string;
   status: string;
+  message?: string | null;
+  checklist?: Record<string, boolean>;
   release: Record<string, unknown>;
   quality: RegistrationQuality;
   trace_id?: string | null;

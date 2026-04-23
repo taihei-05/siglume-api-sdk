@@ -124,6 +124,16 @@ describe("SiglumeClient", () => {
     const manifest = buildManifest();
     const toolManual = buildToolManual();
     const runtimeValidation = buildRuntimeValidation();
+    const oauthCredentials = {
+      items: [
+        {
+          provider_key: "twitter",
+          client_id: "client-id",
+          client_secret: "client-secret",
+          required_scopes: ["tweet.write", "users.read"],
+        },
+      ],
+    };
     const client = new SiglumeClient({
       api_key: "sig_test_key",
       base_url: "https://api.example.test/v1",
@@ -135,6 +145,7 @@ describe("SiglumeClient", () => {
           expect(body.manifest).toMatchObject({ docs_url: manifest.docs_url });
           expect(body.tool_manual).toMatchObject({ tool_name: toolManual.tool_name });
           expect(body.runtime_validation).toMatchObject({ invoke_url: runtimeValidation.invoke_url });
+          expect((body.oauth_credentials as { items?: Array<{ provider_key?: string }> }).items?.[0]?.provider_key).toBe("twitter");
           expect(body.publisher_identity).toMatchObject({ documentation_url: manifest.docs_url });
           expect(body.legal).toMatchObject({
             publisher_identity: { support_contact: manifest.support_contact },
@@ -145,9 +156,12 @@ describe("SiglumeClient", () => {
               envelope({
                 listing_id: "lst_123",
                 status: "draft",
+                registration_mode: "upgrade",
+                listing_status: "active",
                 auto_manifest: { capability_key: "price-compare-helper" },
                 confidence: { overall: 0.94 },
                 validation_report: { checks: [] },
+                oauth_status: { configured: true, missing_providers: [] },
                 review_url: "/owner/publish?listing=lst_123",
               }),
             ),
@@ -160,6 +174,8 @@ describe("SiglumeClient", () => {
               envelope({
                 listing_id: "lst_123",
                 status: "active",
+                message: "Listing published automatically after the self-serve checks passed.",
+                checklist: { docs_url: true, seller_onboarding: true },
                 release: { release_id: "rel_123", release_status: "published" },
                 quality: {
                   overall_score: 84,
@@ -178,18 +194,79 @@ describe("SiglumeClient", () => {
 
     const receipt = await client.auto_register(manifest, toolManual, {
       runtime_validation: runtimeValidation,
+      oauth_credentials: oauthCredentials,
     });
     const confirmation = await client.confirm_registration(receipt.listing_id);
 
     expect(receipt.listing_id).toBe("lst_123");
     expect(receipt.trace_id).toBe("trc_test");
+    expect(receipt.registration_mode).toBe("upgrade");
+    expect(receipt.listing_status).toBe("active");
+    expect(receipt.oauth_status).toEqual({ configured: true, missing_providers: [] });
     expect(confirmation.listing_id).toBe("lst_123");
     expect(confirmation.status).toBe("active");
+    expect(confirmation.message).toBe("Listing published automatically after the self-serve checks passed.");
+    expect(confirmation.checklist).toEqual({ docs_url: true, seller_onboarding: true });
     expect((confirmation.release as { release_status?: string }).release_status).toBe("published");
     expect(confirmation.quality.overall_score).toBe(84);
     expect(confirmation.trace_id).toBe("trc_confirm");
     expect(requests[0]?.path).toBe("/v1/market/capabilities/auto-register");
     expect(requests[1]?.path).toBe("/v1/market/capabilities/lst_123/confirm-auto-register");
+  });
+
+  it("wraps oauth_credentials arrays in the canonical items envelope", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect((body.oauth_credentials as { items?: Array<{ provider_key?: string }> }).items?.[0]?.provider_key).toBe("twitter");
+          return new Response(
+            JSON.stringify(
+              envelope({
+                listing_id: "lst_seq",
+                status: "draft",
+                auto_manifest: {},
+                confidence: {},
+              }),
+            ),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const receipt = await client.auto_register(buildManifest(), buildToolManual(), {
+      runtime_validation: buildRuntimeValidation(),
+      oauth_credentials: [
+        {
+          provider_key: "twitter",
+          client_id: "client-id",
+          client_secret: "client-secret",
+          required_scopes: ["tweet.write"],
+        },
+      ],
+    });
+
+    expect(receipt.listing_id).toBe("lst_seq");
+  });
+
+  it("rejects non-object oauth_credentials sequence entries before sending the request", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response("{}", { status: 500 }),
+    });
+
+    await expect(
+      client.auto_register(buildManifest(), buildToolManual(), {
+        runtime_validation: buildRuntimeValidation(),
+        oauth_credentials: [123 as unknown as Record<string, unknown>],
+      }),
+    ).rejects.toThrow("oauth_credentials[0] must be a mapping-like object");
   });
 
   it("follows cursor pagination for capabilities and usage", async () => {

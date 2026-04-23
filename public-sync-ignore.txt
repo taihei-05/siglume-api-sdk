@@ -1,0 +1,11 @@
+ANNOUNCEMENT_DRAFT.md
+COMMUNITY_LAUNCH.md
+announcements/GITHUB_ISSUE_CONTENT.md
+announcements/POST_HACKERNEWS.md
+announcements/POST_REDDIT.md
+announcements/POST_X_TWITTER.md
+announcements/POST_ZENN.md
+announcements/README.md
+docs/sdk/v0.6-operation-inventory.md
+docs/sdk/v0.6-plan.md
+scripts/bootstrap-community-launch.ps1

@@ -213,9 +213,12 @@ class BundleListingRecord:
 class AutoRegistrationReceipt:
     listing_id: str
     status: str
+    registration_mode: str | None = None
+    listing_status: str | None = None
     auto_manifest: dict[str, Any] = field(default_factory=dict)
     confidence: dict[str, Any] = field(default_factory=dict)
     validation_report: dict[str, Any] = field(default_factory=dict)
+    oauth_status: dict[str, Any] = field(default_factory=dict)
     review_url: str | None = None
     trace_id: str | None = None
     request_id: str | None = None
@@ -1438,6 +1441,7 @@ def _build_auto_register_request(
     source_code: str | None,
     source_url: str | None,
     runtime_validation: Mapping[str, Any] | None,
+    oauth_credentials: Mapping[str, Any] | Sequence[Any] | None,
     metadata: Mapping[str, Any] | None,
     source_context: Mapping[str, Any] | None,
     input_form_spec: Mapping[str, Any] | None,
@@ -1455,6 +1459,18 @@ def _build_auto_register_request(
         payload["source_code"] = _build_registration_stub_source(manifest_payload, tool_manual_payload)
     if runtime_validation is not None:
         payload["runtime_validation"] = _coerce_mapping(runtime_validation, "runtime_validation")
+    if oauth_credentials is not None:
+        if isinstance(oauth_credentials, Mapping):
+            payload["oauth_credentials"] = dict(oauth_credentials)
+        elif isinstance(oauth_credentials, Sequence) and not isinstance(oauth_credentials, (str, bytes, bytearray)):
+            payload["oauth_credentials"] = {
+                "items": [
+                    _coerce_mapping(item, f"oauth_credentials[{index}]")
+                    for index, item in enumerate(oauth_credentials)
+                ]
+            }
+        else:
+            raise TypeError("oauth_credentials must be a mapping or a sequence of mappings")
     if metadata is not None:
         payload["metadata"] = _coerce_mapping(metadata, "metadata")
     if source_context is not None:
@@ -2973,6 +2989,7 @@ class SiglumeClient:
         source_code: str | None = None,
         source_url: str | None = None,
         runtime_validation: Mapping[str, Any] | None = None,
+        oauth_credentials: Mapping[str, Any] | Sequence[Any] | None = None,
         metadata: Mapping[str, Any] | None = None,
         source_context: Mapping[str, Any] | None = None,
         input_form_spec: Mapping[str, Any] | None = None,
@@ -2990,6 +3007,7 @@ class SiglumeClient:
             source_code=source_code,
             source_url=source_url,
             runtime_validation=runtime_validation,
+            oauth_credentials=oauth_credentials,
             metadata=metadata,
             source_context=source_context,
             input_form_spec=input_form_spec_payload,
@@ -3006,9 +3024,12 @@ class SiglumeClient:
         return AutoRegistrationReceipt(
             listing_id=listing_id,
             status=str(data.get("status") or "draft"),
+            registration_mode=_string_or_none(data.get("registration_mode")),
+            listing_status=_string_or_none(data.get("listing_status")),
             auto_manifest=_to_dict(data.get("auto_manifest")),
             confidence=_to_dict(data.get("confidence")),
             validation_report=_to_dict(data.get("validation_report")),
+            oauth_status=_to_dict(data.get("oauth_status")),
             review_url=_string_or_none(data.get("review_url")),
             trace_id=meta.trace_id,
             request_id=meta.request_id,
