@@ -79,17 +79,19 @@ There is no normal human review step in the self-serve publish flow anymore.
    `input_schema` and `output_schema`.
 8. Checks connected-account requirements and paid pricing rules.
 9. Persists a private draft only if those checks pass.
-10. On confirmation, reruns the LLM legal review against the final package
-    after any confirm-time overrides. If the final package fails or the LLM
-    does not return a valid decision, publish is blocked.
+10. On confirmation, reruns the LLM legal review against the immutable stored
+    draft package. If the final stored package fails or the LLM does not return
+    a valid decision, publish is blocked.
 
 ## The mandatory LLM legal review
 
 The legal check is not a simple keyword blocklist. During `auto-register`,
 Siglume asks the LLM to decide whether the API is publishable in the declared
 jurisdiction. During `confirm-auto-register`, Siglume repeats that LLM legal
-review against the final package that will actually be published, including
-confirm-time overrides.
+review against the stored package that will actually be published. Confirmation
+does not accept content overrides; to change buyer-facing copy, Tool Manual,
+tags, scopes, pricing, or connected-account requirements, rerun
+`auto-register` and confirm the new reviewed draft.
 
 The review must explicitly pass:
 

@@ -514,8 +514,12 @@ the registration blockers earlier.
   - Siglume asks the LLM whether the API is publishable in the declared jurisdiction
   - The review must explicitly pass both applicable-law compliance and
     public-order / morals compliance
-  - The confirmation-time review uses the final package after any overrides,
-    so changed buyer-facing copy cannot bypass the legal gate
+  - The confirmation-time review uses the immutable stored package that passed
+    auto-register validation; `confirm-auto-register` does not accept content
+    overrides
+  - To change buyer-facing copy, Tool Manual, tags, scopes, pricing, or
+    connected-account requirements, rerun `auto-register` and confirm the new
+    reviewed draft
   - If the LLM is unavailable or does not return a valid pass result, publish is blocked
 - For paid APIs: minimum price and an active embedded Polygon wallet before publish
 
