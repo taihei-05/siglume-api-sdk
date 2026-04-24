@@ -1481,11 +1481,20 @@ def _build_auto_register_request(
     if input_form_spec is not None:
         payload["input_form_spec"] = _coerce_mapping(input_form_spec, "input_form_spec")
 
+    # Manifest fields forwarded to the top-level auto-register payload.
+    # ``version`` is intentionally NOT forwarded — the platform auto-assigns
+    # ``release_semver`` and rejects submissions that declare a version.
+    # ``description`` (long-form sales copy), ``permission_scopes``, and
+    # ``compatibility_tags`` are forwarded so the seller's buyer-facing
+    # description, OAuth scope declarations, and discovery tags actually
+    # survive the auto-register pipeline (they previously got dropped
+    # silently and ended up null/[] on the public detail page).
     for field_name in (
         "capability_key",
         "name",
         "job_to_be_done",
         "short_description",
+        "description",
         "category",
         "docs_url",
         "documentation_url",
@@ -1499,10 +1508,19 @@ def _build_auto_register_request(
         "approval_mode",
         "dry_run_supported",
         "required_connected_accounts",
+        "permission_scopes",
+        "compatibility_tags",
     ):
         value = manifest_payload.get(field_name)
         if value is not None:
             payload[field_name] = _enum_value(value)
+
+    # Strip ``version`` from the embedded manifest sub-dict too so the
+    # platform's reject-on-manifest-version check cannot trip on the SDK's
+    # local-tracking default. The SDK's AppManifest.version is documented
+    # as local-only and must not reach the server.
+    if isinstance(payload.get("manifest"), dict):
+        payload["manifest"].pop("version", None)
 
     docs_url = str(manifest_payload.get("docs_url") or manifest_payload.get("documentation_url") or "").strip()
     support_contact = str(manifest_payload.get("support_contact") or "").strip()

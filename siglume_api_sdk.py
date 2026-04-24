@@ -101,6 +101,13 @@ class AppManifest:
         subscription decision. Default market is "US".
     """
     capability_key: str                    # unique identifier e.g. "amazon-purchase-assistant"
+    # ``version`` is LOCAL-ONLY identification for your own adapter tracking
+    # (tests, git tags, internal release docs). The Siglume platform never
+    # reads it on auto_register / confirm_auto_register and will reject a
+    # submission that sends it, because the platform controls the
+    # authoritative ``release_semver`` per the bump rules documented in the
+    # confirm-auto-register endpoint (see ``confirm_registration(..., version_bump=...)``).
+    # Leave at default or use it locally only.
     version: str = "0.1.0"
     name: str = ""                         # display name
     job_to_be_done: str = ""               # what this app enables the agent to do
@@ -125,6 +132,12 @@ class AppManifest:
     # not something the platform enforces. The platform surfaces `jurisdiction`
     # as a flag icon so buyers can make informed decisions.
     short_description: str = ""
+    # Long-form sales description shown on the buyer-facing API detail page.
+    # Complements ``short_description`` (one-liner for cards) with a fuller
+    # pitch: who this is for, what it can and cannot do, limits, required
+    # connected accounts. The Tool Manual is agent-facing and not shown to
+    # buyers; put the buyer-facing story here.
+    description: str = ""
     docs_url: str = ""                     # public API usage guide; not a seller homepage
     support_contact: str = ""              # real support email address or public support URL
     seller_homepage_url: str = ""          # optional official seller homepage, separate from docs_url

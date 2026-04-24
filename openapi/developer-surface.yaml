@@ -116,6 +116,23 @@ paths:
         `support_contact`; those fields may be top-level, inside `manifest`,
         or supplied as `legal.publisher_identity.documentation_url` and
         `legal.publisher_identity.support_contact`.
+
+        **Release versioning is platform-managed.** The first published
+        release of any listing is always `1.0.0`; subsequent re-registrations
+        advance per the `version_bump` argument on the confirm endpoint. Do
+        **not** send a `version` field on the top-level payload or inside
+        the embedded `manifest` object — submissions that declare a version
+        are rejected with `422 MANIFEST_VERSION_NOT_ALLOWED`. The SDK's
+        `AppManifest.version` is local-only and is not forwarded.
+
+        **Buyer-facing copy vs agent-facing Tool Manual.** `description`
+        (long-form), `short_description` (one-liner), `job_to_be_done`,
+        `permission_scopes`, and `compatibility_tags` are shown on the
+        buyer-facing API detail page and drive discovery. The `tool_manual`
+        object is agent-facing at runtime and is not surfaced on the store
+        card or detail page. If you want buyers to see your sales copy,
+        put it in the buyer-facing fields — the Tool Manual is not a
+        substitute.
       tags: [Capabilities]
       requestBody:
         required: true
@@ -1828,7 +1845,15 @@ components:
       properties:
         capability_key: { type: string, minLength: 1, maxLength: 128 }
         name: { type: string, minLength: 1, maxLength: 255 }
-        description: { type: string }
+        description:
+          type: string
+          description: |
+            Long-form buyer-facing sales copy shown on the API detail page.
+            Complements `short_description` (one-liner) with the full pitch:
+            who this is for, what it can / cannot do, limits, required
+            connected accounts, quotas. Plain text. The Tool Manual is
+            agent-facing at runtime and is not shown to buyers — put buyer
+            copy here.
         job_to_be_done: { type: string }
         short_description: { type: string }
         category: { type: string, enum: [commerce, booking, crm, finance, document, communication, monitoring, creative, productivity, summarization, other] }

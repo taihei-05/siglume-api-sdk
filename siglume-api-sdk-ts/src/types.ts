@@ -80,6 +80,13 @@ export interface ConnectedAccountRef {
 
 export interface AppManifest {
   capability_key: string;
+  /**
+   * LOCAL-ONLY identification. The Siglume platform never reads this on
+   * auto_register / confirm_auto_register and rejects submissions that
+   * declare a version — the authoritative `release_semver` is controlled
+   * by the platform per the bump rules on the confirm endpoint
+   * (see `confirm_registration({ version_bump: ... })`).
+   */
   version?: string;
   name: string;
   job_to_be_done: string;
@@ -96,6 +103,14 @@ export interface AppManifest {
   applicable_regulations?: string[];
   data_residency?: string;
   short_description?: string;
+  /**
+   * Long-form sales description shown on the buyer-facing API detail
+   * page. Complements `short_description` (one-liner) with a fuller
+   * pitch: who this is for, what it can / cannot do, limits, required
+   * connected accounts. The Tool Manual is agent-facing and not shown
+   * to buyers; put buyer-facing story here.
+   */
+  description?: string;
   docs_url?: string;
   support_contact?: string;
   seller_homepage_url?: string;

@@ -1784,6 +1784,36 @@ server (and caught client-side as well). The platform does NOT let you
 pick an arbitrary version string — always one bump above the latest
 published release.
 
+#### `AppManifest.version` is local-only
+
+The SDK's `AppManifest.version` (default `"0.1.0"`) is **for your own
+adapter tracking only** — the Siglume platform ignores it on
+`auto_register` / `confirm_auto_register`. The SDK explicitly strips it
+from the submitted payload, and the server rejects submissions that
+slip a `version` field through (HTTP 422 `MANIFEST_VERSION_NOT_ALLOWED`).
+Use `version_bump` on confirm to control the published `release_semver`
+instead.
+
+### Buyer-facing fields vs. agent-facing Tool Manual
+
+If you want the Store detail page to show your pitch, put it in the
+**buyer-facing fields**. The Tool Manual is the agent contract at
+runtime and is **not** surfaced on the store card or detail page.
+
+| Shown to buyers on the detail page | Not shown to buyers |
+|---|---|
+| `name`, `short_description`, `description` (long-form sales copy), `job_to_be_done` | `tool_manual.summary_for_model` |
+| `permission_class`, `permission_scopes`, `required_connected_accounts` | `tool_manual.trigger_conditions`, `do_not_use_when` |
+| `category`, `compatibility_tags` (discovery), `latency_tier`, `data_sensitivity_tier` | `input_schema`, `output_schema`, `preview_schema`, `quote_schema` |
+| `example_prompts` (min 2, see above), `docs_url`, `support_contact`, `jurisdiction` | `approval_summary_template`, `side_effect_summary` |
+
+The platform already returns `description` / `permission_scopes` /
+`compatibility_tags` on the detail endpoint — if they come back as
+`null` / `[]` on your listing, the most likely cause is that your
+`AppManifest` left them at default. The SDK dataclass exposes every
+buyer-facing field, so set them explicitly when you want the Store UI
+to reflect them.
+
 ---
 
 ## Next Steps

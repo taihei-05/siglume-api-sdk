@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-25
+
+### Breaking
+
+- The SDK no longer forwards `AppManifest.version` on `auto_register` /
+  `confirm_auto_register`. The platform rejects submissions that
+  declare a `version` field (top-level or inside the embedded
+  `manifest`) with `422 MANIFEST_VERSION_NOT_ALLOWED`. Use
+  `confirm_registration(..., version_bump=...)` to control the
+  published `release_semver`. `AppManifest.version` remains in the
+  dataclass and is now documented as local-only.
+
+### Added
+
+- `AppManifest.description` — long-form buyer-facing sales copy shown
+  on the API detail page. Complements `short_description`
+  (one-liner). Previously the field existed only server-side and
+  couldn't be populated from the SDK. Same change in the TypeScript
+  `AppManifest` interface.
+- `auto_register` payload builder now forwards `description`,
+  `permission_scopes`, and `compatibility_tags` to the top-level
+  submission. Previously these three fields travelled inside the
+  embedded `manifest` sub-dict only, and the server silently dropped
+  them on listing creation — listings ended up with `description:
+  null`, `permission_scopes: []`, `compatibility_tags: []` on the
+  public detail page despite the seller filling them in. The paired
+  backend change (landing alongside in the main repo) persists all
+  three.
+
+### Docs
+
+- `GETTING_STARTED.md` has a new subsection under "Version numbering"
+  clarifying `AppManifest.version` is local-only, and a new table
+  distinguishing buyer-facing fields from agent-facing Tool Manual
+  fields.
+- `openapi/developer-surface.yaml` documents the
+  `MANIFEST_VERSION_NOT_ALLOWED` reject rule on the auto-register
+  endpoint description and enriches the `description` field schema.
+
+### Migration guide (v0.9.x → v0.10.0)
+
+If your adapter currently sends `manifest.version` on auto-register or
+confirm-auto-register, the server will start rejecting it. The SDK
+strips `version` from the outbound payload before the request leaves
+your process, so typical Python / TypeScript usage is unaffected —
+but if you are calling the HTTP endpoint directly, remove the
+`version` field from your request body.
+
+If your listings show `description: null` / `permission_scopes: []`
+/ `compatibility_tags: []` on the Store detail page despite your
+`AppManifest` populating them, upgrade to 0.10.0 and re-register: the
+new forward list carries them through, and the backend persists them
+as of the paired main-repo release.
+
 ## [0.9.1] - 2026-04-24
 
 ### Added

@@ -2216,11 +2216,19 @@ export class SiglumeClient implements SiglumeClientShape {
     if (options.input_form_spec) {
       payload.input_form_spec = coerceMapping(options.input_form_spec, "input_form_spec");
     }
+    // Manifest fields forwarded to the top-level auto-register payload.
+    // `version` is intentionally NOT forwarded — the platform auto-assigns
+    // `release_semver` and rejects submissions that declare a version.
+    // `description` (long-form sales copy), `permission_scopes`, and
+    // `compatibility_tags` are forwarded so the seller's buyer-facing
+    // description, OAuth scope declarations, and discovery tags actually
+    // survive the auto-register pipeline.
     for (const fieldName of [
       "capability_key",
       "name",
       "job_to_be_done",
       "short_description",
+      "description",
       "category",
       "docs_url",
       "documentation_url",
@@ -2234,11 +2242,20 @@ export class SiglumeClient implements SiglumeClientShape {
       "approval_mode",
       "dry_run_supported",
       "required_connected_accounts",
+      "permission_scopes",
+      "compatibility_tags",
     ]) {
       const value = manifestPayload[fieldName];
       if (value !== undefined && value !== null) {
         payload[fieldName] = value;
       }
+    }
+    // Strip `version` from the embedded manifest sub-dict too so the
+    // platform's reject-on-manifest-version check cannot trip on the SDK's
+    // local-tracking default. The SDK's AppManifest.version is local-only
+    // and must not reach the server.
+    if (payload.manifest && typeof payload.manifest === "object") {
+      delete (payload.manifest as Record<string, unknown>).version;
     }
     const docsUrl = String(manifestPayload.docs_url ?? manifestPayload.documentation_url ?? "").trim();
     const supportContact = String(manifestPayload.support_contact ?? "").trim();
