@@ -1382,22 +1382,6 @@ def _coerce_mapping(value: Any, label: str) -> dict[str, Any]:
     return payload
 
 
-def _build_default_i18n(manifest_payload: Mapping[str, Any]) -> dict[str, str]:
-    job = str(manifest_payload.get("job_to_be_done") or "").strip()
-    short_description = str(
-        manifest_payload.get("short_description")
-        or manifest_payload.get("job_to_be_done")
-        or manifest_payload.get("name")
-        or ""
-    ).strip()
-    return {
-        "job_to_be_done_en": job,
-        "job_to_be_done_ja": job,
-        "short_description_en": short_description,
-        "short_description_ja": short_description,
-    }
-
-
 def _camel_case_from_capability_key(capability_key: str) -> str:
     words = [part for part in capability_key.replace("_", "-").split("-") if part]
     if not words:
@@ -1450,7 +1434,6 @@ def _build_auto_register_request(
     input_form_spec: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "i18n": _build_default_i18n(manifest_payload),
         "manifest": dict(manifest_payload),
         "tool_manual": dict(tool_manual_payload),
     }

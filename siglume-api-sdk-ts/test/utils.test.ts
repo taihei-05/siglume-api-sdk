@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildDefaultI18n,
   buildRegistrationStubSource,
   camelCaseFromCapabilityKey,
   coerceMapping,
@@ -61,18 +60,6 @@ describe("utils", () => {
   it("builds registration helpers from capability metadata", () => {
     expect(camelCaseFromCapabilityKey("price_compare-helper")).toBe("PriceCompareHelperApp");
     expect(camelCaseFromCapabilityKey("")).toBe("GeneratedRegistrationApp");
-
-    const i18n = buildDefaultI18n({
-      name: "Quote App",
-      job_to_be_done: "Quote a USD charge",
-      short_description: "Preview a payment before approval",
-    });
-    expect(i18n).toEqual({
-      job_to_be_done_en: "Quote a USD charge",
-      job_to_be_done_ja: "Quote a USD charge",
-      short_description_en: "Preview a payment before approval",
-      short_description_ja: "Preview a payment before approval",
-    });
 
     const source = buildRegistrationStubSource(
       {

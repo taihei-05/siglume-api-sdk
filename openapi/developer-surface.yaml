@@ -133,6 +133,12 @@ paths:
         card or detail page. If you want buyers to see your sales copy,
         put it in the buyer-facing fields — the Tool Manual is not a
         substitute.
+
+        **Localization is platform-generated.** Submit the buyer-facing
+        listing fields in the language you have. The platform translates and
+        stores Japanese and English copies in `metadata.i18n`. Do not submit
+        an `i18n` object; unsupported or extra request fields are rejected
+        with `422 INVALID_PAYLOAD`.
       tags: [Capabilities]
       requestBody:
         required: true
@@ -140,6 +146,7 @@ paths:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               anyOf:
                 - required: [source_code]
                 - required: [source_url]
@@ -222,9 +229,6 @@ paths:
                 input_form_spec:
                   type: object
                   description: Optional structured UI input form spec to seed the release contract
-                i18n:
-                  type: object
-                  description: Optional reviewed bilingual listing text overrides. If omitted or incomplete, the platform translates buyer-facing listing text from the top-level manifest fields.
                 capability_key:
                   type: string
                   description: Override auto-detected capability key

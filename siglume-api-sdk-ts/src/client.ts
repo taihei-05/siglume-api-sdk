@@ -109,7 +109,6 @@ import {
   fallbackOperationCatalog,
 } from "./operations";
 import {
-  buildDefaultI18n,
   buildRegistrationStubSource,
   coerceMapping,
   isRecord,
@@ -2184,7 +2183,6 @@ export class SiglumeClient implements SiglumeClientShape {
     const manifestPayload = coerceMapping(manifest, "manifest");
     const toolManualPayload = coerceMapping(tool_manual, "tool_manual");
     const payload: Record<string, unknown> = {
-      i18n: buildDefaultI18n(manifestPayload),
       manifest: { ...manifestPayload },
       tool_manual: { ...toolManualPayload },
     };

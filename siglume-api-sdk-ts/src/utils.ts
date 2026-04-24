@@ -84,19 +84,6 @@ export function camelCaseFromCapabilityKey(capabilityKey: string): string {
   return `${words.map((word) => word[0]!.toUpperCase() + word.slice(1)).join("")}App`;
 }
 
-export function buildDefaultI18n(manifestPayload: Record<string, unknown>): Record<string, string> {
-  const job = String(manifestPayload.job_to_be_done ?? "").trim();
-  const shortDescription = String(
-    manifestPayload.short_description ?? manifestPayload.job_to_be_done ?? manifestPayload.name ?? "",
-  ).trim();
-  return {
-    job_to_be_done_en: job,
-    job_to_be_done_ja: job,
-    short_description_en: shortDescription,
-    short_description_ja: shortDescription,
-  };
-}
-
 export function buildRegistrationStubSource(
   manifestPayload: Record<string, unknown>,
   toolManualPayload: Record<string, unknown>,
