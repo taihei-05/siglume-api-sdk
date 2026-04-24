@@ -1831,6 +1831,12 @@ The platform already returns `description` / `permission_scopes` /
 buyer-facing field, so set them explicitly when you want the Store UI
 to reflect them.
 
+Use `compatibility_tags` for integrations, workflows, protocols, and discovery
+topics such as `x-twitter`, `crm`, or `content-publishing`. Do not use
+standalone locale tags such as `japanese`, `japan`, `jp`, `english`, or `en`;
+the Store shows country / jurisdiction separately, and the platform filters
+locale-only compatibility tags.
+
 ---
 
 ## Next Steps
