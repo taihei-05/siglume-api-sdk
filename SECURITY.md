@@ -33,25 +33,30 @@ Security-sensitive areas include:
 - receipt and audit logging
 - sandbox escape or privilege escalation paths
 
-## Release Token Hygiene
+## Release Credential Hygiene
 
-The SDK is published to PyPI. If you are publishing a release on behalf
-of the project, follow these rules:
+Production releases are published by GitHub Actions with PyPI Trusted
+Publisher / OIDC. Do not create a PyPI API token or local `.pypirc` for the
+normal release path.
 
-1. **Use a project-scoped PyPI API token.** Go to
-   <https://pypi.org/manage/account/token/>, create a token with
-   **Scope = `Project: siglume-api-sdk`** (not `Entire account`).
-2. **Do not paste tokens into shell history.** Prefer environment
-   variables set in a short-lived subshell, or use `keyring`-backed
-   `twine` configuration.
-3. **Rotate after every release.** Revoke the token on the PyPI token
-   management page immediately after `twine upload` completes, then
-   issue a fresh project-scoped token for the next release.
-4. **Do not commit tokens.** `.pypirc`, `.env`, and any file matching
-   `pypi-*` is excluded by `.gitignore`; verify with `git status`
-   before every commit.
+For a production release:
 
-If a token is accidentally exposed (in shell history, a screenshot, a
-paste into chat, etc.), revoke it immediately via the PyPI token
-management page. The old token becomes invalid; all prior uploads
-remain valid.
+1. Verify `.github/workflows/release.yml` still publishes with the `pypi`
+   environment and `id-token: write`.
+2. Push an annotated `vX.Y.Z` tag that matches `pyproject.toml`.
+3. Let GitHub Actions build, check, and publish the artifacts via OIDC.
+
+Only use a PyPI API token for emergency bootstrapping or local publish testing
+when OIDC is unavailable. If a token is unavoidable:
+
+1. Use a project-scoped token for `siglume-api-sdk`, never an account-wide
+   token.
+2. Pass it through short-lived environment variables; do not write `.pypirc`
+   unless there is no other practical option.
+3. Revoke it immediately after the fallback upload or if it appears in shell
+   history, screenshots, logs, commits, or chat.
+
+Generated developer projects may contain local review keys in
+`runtime_validation.json` and OAuth client secrets in `oauth_credentials.json`.
+The SDK templates generate a `.gitignore` that excludes those files; verify
+with `git status --ignored` before publishing your own API source repository.

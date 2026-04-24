@@ -66,6 +66,8 @@ class OwnerApprovalPolicyUpdateWrapperApp(AppAdapter):
             price_model=PriceModel.FREE,
             jurisdiction="US",
             short_description="Update the owner approval policy.",
+            support_contact="support@example.com",
+            docs_url="https://example.com/docs",
             example_prompts=["Run owner.approval_policy.update for my owned agent."],
         )
 

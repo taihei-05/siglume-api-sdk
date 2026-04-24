@@ -340,7 +340,11 @@ describe("siglume CLI", () => {
     const readmeText = await readFile(join(projectDir, "README.md"), "utf8");
     const validatePayload = JSON.parse(stdout.at(-1) as string) as Record<string, unknown>;
     expect(manifest.capability_key).toBe("echo-starter");
+    const gitignoreText = await readFile(join(projectDir, ".gitignore"), "utf8");
+    expect(gitignoreText).toContain("runtime_validation.json");
+    expect(gitignoreText).toContain("oauth_credentials.json");
     expect(readmeText).toContain("Start locally without a Siglume API key");
+    expect(readmeText).toContain("Do not commit real review keys or OAuth client secrets");
     expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(validatePayload.ok).toBe(true);
   });
@@ -428,13 +432,17 @@ describe("siglume CLI", () => {
     const manifest = JSON.parse(await readFile(join(projectDir, "manifest.json"), "utf8")) as Record<string, unknown>;
     const adapterText = await readFile(join(projectDir, "adapter.ts"), "utf8");
     const readmeText = await readFile(join(projectDir, "README.md"), "utf8");
+    const gitignoreText = await readFile(join(projectDir, ".gitignore"), "utf8");
     expect(manifest.docs_url).toBe("https://example.com/docs");
     expect(manifest.support_contact).toBe("support@example.com");
+    expect(gitignoreText).toContain("runtime_validation.json");
+    expect(gitignoreText).toContain("oauth_credentials.json");
     expect(adapterText).toContain("execute_owner_operation");
     expect(adapterText).toContain("support_contact: \"support@example.com\"");
     expect(adapterText).toContain("docs_url: \"https://example.com/docs\"");
     expect(readmeText).toContain("replace `docs_url` and `support_contact`");
     expect(readmeText).toContain("Start locally without a Siglume API key");
+    expect(readmeText).toContain("Do not commit real review keys or OAuth client secrets");
     expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(readmeText.indexOf("npm test -- tests/test_adapter.ts")).toBeLessThan(
       readmeText.indexOf("siglume register . --confirm"),

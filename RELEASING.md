@@ -82,8 +82,8 @@ Inspect the sdist manifest (`tar -tzf dist/*.tar.gz`) — it should contain `LIC
 There are three ways to publish. In decreasing order of recommendation:
 
 - **Option 0 (strongest): GitHub Actions Trusted Publisher (OIDC)** — no token anywhere, just push a tag
-- **Option A: Persistent `.pypirc`** — convenience, accept a longer-lived token on disk
-- **Option B: Per-release env vars** — strictest token rotation, most manual friction
+- **Option A: Per-release env vars** — fallback only, no token left on disk
+- **Option B: Persistent `.pypirc`** — last-resort fallback only, accepts a longer-lived token on disk
 
 ### Option 0: Trusted Publisher via GitHub Actions (recommended for all production releases)
 
@@ -130,13 +130,29 @@ You can monitor the run at <https://github.com/taihei-05/siglume-api-sdk/actions
 
 ---
 
-### Options A / B: token-based (for bootstrapping before OIDC is set up, or local testing)
+### Options A / B: token-based fallback only
 
-Get a project-scoped API token from <https://pypi.org/manage/account/token/> (see [SECURITY.md](./SECURITY.md#release-token-hygiene)).
+Use this only for emergency bootstrapping or local publish testing when OIDC is
+unavailable. Get a project-scoped API token from
+<https://pypi.org/manage/account/token/> (see
+[SECURITY.md](./SECURITY.md#release-credential-hygiene)).
 
 **Two ways to pass the token** — pick one:
 
-### Option A: Persistent `.pypirc` (recommended, set up once)
+### Option A: Per-release env vars
+
+```powershell
+$env:TWINE_USERNAME = "__token__"
+$env:TWINE_PASSWORD = "pypi-..."   # paste the project-scoped fallback token
+py -3.11 -m twine upload dist\*
+Remove-Item env:TWINE_USERNAME
+Remove-Item env:TWINE_PASSWORD
+```
+
+Use this if OIDC is unavailable and you do not want credentials on disk. Revoke
+the token immediately after the fallback upload.
+
+### Option B: Persistent `.pypirc` (last resort)
 
 Create `~/.pypirc` (on Windows: `%USERPROFILE%\.pypirc`, e.g. `D:\Users\<you>\.pypirc`).
 
@@ -153,7 +169,7 @@ username = __token__
 password = pypi-AgENdGVzdC5weXBpLm9yZwIk...
 ```
 
-After this, every release is just:
+After this, the fallback upload command is:
 
 ```bash
 # bash / WSL / macOS
@@ -165,21 +181,10 @@ python3.11 -m twine upload dist/*
 py -3.11 -m twine upload dist\*
 ```
 
-No token prompts, no env var dance on subsequent releases.
-
-**Security tradeoff — read before choosing Option A:** [SECURITY.md](./SECURITY.md#release-token-hygiene) rule 3 recommends rotating the token after every release. Persistent `.pypirc` trades that per-release rotation for convenience; the token stays valid on disk between releases. Choose Option A only if you accept the longer-lived token and keep the file on a trusted disk (no shared machine, no cloud sync of your user profile). For strict compliance with the rotate-every-release policy, use **Option B** below. In either case, rotate immediately if you suspect compromise, change machines, or see unexpected releases.
-
-### Option B: Per-release env vars
-
-```powershell
-$env:TWINE_USERNAME = "__token__"
-$env:TWINE_PASSWORD = "pypi-..."   # paste the token
-py -3.11 -m twine upload dist\*
-Remove-Item env:TWINE_USERNAME
-Remove-Item env:TWINE_PASSWORD
-```
-
-Use this if you don't want credentials on disk. Revoke the token after each release.
+**Security tradeoff — read before choosing Option B:** Persistent `.pypirc`
+keeps a valid upload token on disk. Prefer OIDC, then env vars. If `.pypirc` is
+unavoidable, keep it on a trusted local disk only, delete it immediately after
+the fallback upload, and revoke the token.
 
 ### Windows terminal encoding workaround
 

@@ -66,6 +66,8 @@ class OwnerBudgetGetWrapperApp(AppAdapter):
             price_model=PriceModel.FREE,
             jurisdiction="US",
             short_description="Read the current delegated budget.",
+            support_contact="support@example.com",
+            docs_url="https://example.com/docs",
             example_prompts=["Run owner.budget.get for my owned agent."],
         )
 

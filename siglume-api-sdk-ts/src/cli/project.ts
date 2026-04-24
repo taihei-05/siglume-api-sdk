@@ -701,9 +701,10 @@ export async function writeInitTemplate(template: TemplateName, destination: str
   const manifest_path = join(root, "manifest.json");
   const tool_manual_path = join(root, "tool_manual.json");
   const runtime_validation_path = join(root, "runtime_validation.json");
+  const gitignore_path = join(root, ".gitignore");
   const readme_path = join(root, "README.md");
 
-  for (const filePath of [adapter_path, manifest_path, tool_manual_path, runtime_validation_path, readme_path]) {
+  for (const filePath of [adapter_path, manifest_path, tool_manual_path, runtime_validation_path, gitignore_path, readme_path]) {
     if (existsSync(filePath)) {
       throw new SiglumeProjectError(`${basename(filePath)} already exists in ${root}`);
     }
@@ -715,8 +716,9 @@ export async function writeInitTemplate(template: TemplateName, destination: str
   await writeFile(manifest_path, renderJson(manifest), "utf8");
   await writeFile(tool_manual_path, renderJson(toolManual), "utf8");
   await writeFile(runtime_validation_path, renderJson(buildRuntimeValidationTemplate(toolManual)), "utf8");
+  await writeFile(gitignore_path, generatedGitignore(), "utf8");
   await writeFile(readme_path, readmeTemplate(template), "utf8");
-  return [adapter_path, manifest_path, tool_manual_path, runtime_validation_path, readme_path];
+  return [adapter_path, manifest_path, tool_manual_path, runtime_validation_path, gitignore_path, readme_path];
 }
 
 export async function listOperationCatalog(
@@ -1176,12 +1178,16 @@ function operationReadmeTemplate(
     "- `stubs.ts`: mock fallback used when `SIGLUME_API_KEY` is not set",
     "- `manifest.json`: reviewable manifest snapshot",
     "- `tool_manual.json`: machine-generated ToolManual scaffold",
-    "- `runtime_validation.json`: public endpoint and review-key checks used by auto-register",
+    "- `runtime_validation.json`: local public endpoint and review-key checks used by auto-register",
+    "- `.gitignore`: keeps runtime review keys and OAuth client secrets out of Git",
     "- `tests/test_adapter.ts`: smoke test for `AppTestHarness`",
     "",
     "Before registering, replace all generated placeholders:",
     "- In `adapter.ts` and `manifest.json`, replace `docs_url` and `support_contact` with your public documentation and support contact.",
-    "- In `runtime_validation.json`, replace the public URL and review-key placeholders.",
+    "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
+    "- If the API uses seller-side OAuth, create a local `oauth_credentials.json` next to the adapter.",
+    "- Do not commit real review keys or OAuth client secrets; the generated `.gitignore` excludes those files.",
+    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
     "",
     "## Commands",
     "",
@@ -1204,6 +1210,35 @@ function operationReadmeTemplate(
   ].join("\n");
 }
 
+function generatedGitignore(): string {
+  return [
+    "# Local secrets and registration-only runtime checks.",
+    ".env",
+    ".env.*",
+    "!.env.example",
+    "runtime_validation.json",
+    "runtime-validation.json",
+    "oauth_credentials.json",
+    "oauth-credentials.json",
+    "",
+    "# Python / test artifacts.",
+    "__pycache__/",
+    "*.py[cod]",
+    ".pytest_cache/",
+    ".mypy_cache/",
+    ".coverage",
+    "htmlcov/",
+    "dist/",
+    "build/",
+    "*.egg-info/",
+    "",
+    "# JavaScript tooling if this project also uses TypeScript helpers.",
+    "node_modules/",
+    "coverage/",
+    "",
+  ].join("\n");
+}
+
 export async function writeOperationTemplate(
   operation_key: string,
   destination: string,
@@ -1219,9 +1254,19 @@ export async function writeOperationTemplate(
   const manifest_path = join(root, "manifest.json");
   const tool_manual_path = join(root, "tool_manual.json");
   const runtime_validation_path = join(root, "runtime_validation.json");
+  const gitignore_path = join(root, ".gitignore");
   const readme_path = join(root, "README.md");
   const test_path = join(testsDir, "test_adapter.ts");
-  for (const filePath of [adapter_path, stubs_path, manifest_path, tool_manual_path, runtime_validation_path, readme_path, test_path]) {
+  for (const filePath of [
+    adapter_path,
+    stubs_path,
+    manifest_path,
+    tool_manual_path,
+    runtime_validation_path,
+    gitignore_path,
+    readme_path,
+    test_path,
+  ]) {
     if (existsSync(filePath)) {
       throw new SiglumeProjectError(`${basename(filePath)} already exists in ${root}`);
     }
@@ -1251,10 +1296,20 @@ export async function writeOperationTemplate(
   await writeFile(manifest_path, renderJson(manifest), "utf8");
   await writeFile(tool_manual_path, renderJson(tool_manual), "utf8");
   await writeFile(runtime_validation_path, renderJson(buildRuntimeValidationTemplate(tool_manual)), "utf8");
+  await writeFile(gitignore_path, generatedGitignore(), "utf8");
   await writeFile(readme_path, operationReadmeTemplate(operation, manifest, warning), "utf8");
   await writeFile(test_path, operationTestSource(operation), "utf8");
   return {
-    files: [adapter_path, stubs_path, manifest_path, tool_manual_path, runtime_validation_path, readme_path, test_path],
+    files: [
+      adapter_path,
+      stubs_path,
+      manifest_path,
+      tool_manual_path,
+      runtime_validation_path,
+      gitignore_path,
+      readme_path,
+      test_path,
+    ],
     operation,
     report: {
       tool_manual_valid,
@@ -1697,11 +1752,15 @@ function readmeTemplate(template: TemplateName): string {
     "- `adapter.ts`: your AppAdapter implementation",
     "- `manifest.json`: serialized AppManifest snapshot",
     "- `tool_manual.json`: editable ToolManual draft for validation and registration",
-    "- `runtime_validation.json`: live API smoke-test contract used during registration",
+    "- `runtime_validation.json`: local live API smoke-test contract used during registration",
+    "- `.gitignore`: keeps runtime review keys and OAuth client secrets out of Git",
     "",
     "Before registering, replace all generated placeholders:",
     "- In `adapter.ts` and `manifest.json`, replace `docs_url` and `support_contact` with your public documentation and support contact.",
-    "- In `runtime_validation.json`, replace the public URL and review-key placeholders.",
+    "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
+    "- If the API uses seller-side OAuth, create a local `oauth_credentials.json` next to the adapter.",
+    "- Do not commit real review keys or OAuth client secrets; the generated `.gitignore` excludes those files.",
+    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
     "",
     "Suggested workflow:",
     "",

@@ -34,20 +34,23 @@ There is no normal human review step in the self-serve publish flow anymore.
    engine.
 4. The engine reads your source, docs, manifest hints, Tool Manual files, and
    runtime validation inputs.
-5. If the API uses seller-side OAuth, the engine also includes
-   `oauth_credentials.json`.
-6. Run CLI preflight first:
+5. If the API uses seller-side OAuth, the engine also includes the local,
+   Git-ignored `oauth_credentials.json`.
+6. Run the no-key local loop first:
+   - `siglume test .`
+   - `siglume score . --offline`
+7. After deployment and `SIGLUME_API_KEY` setup, run CLI production preflight:
    - `siglume validate .`
    - `siglume score . --remote`
-7. The engine calls `siglume register .` or `auto-register`.
-8. Siglume runs runtime, contract, pricing, payout, seller OAuth, and
+8. The engine calls `siglume register .` or `auto-register`.
+9. Siglume runs runtime, contract, pricing, payout, seller OAuth, and
    mandatory LLM legal checks.
-9. If the checks pass, Siglume creates a private draft listing or stages an
+10. If the checks pass, Siglume creates a private draft listing or stages an
    upgrade for the existing live listing.
-10. The developer opens the portal confirmation page to inspect the result.
-11. The developer confirms the draft with `siglume register . --confirm` or
+11. The developer opens the portal confirmation page to inspect the result.
+12. The developer confirms the draft with `siglume register . --confirm` or
     `confirm-auto-register`.
-12. Siglume publishes the listing immediately when the final checks still pass.
+13. Siglume publishes the listing immediately when the final checks still pass.
 
 ## What auto-register does
 
@@ -93,11 +96,11 @@ By default, the CLI expects:
 
 - `adapter.py` or another single `AppAdapter` file
 - `tool_manual.json`
-- `runtime_validation.json`
+- local, Git-ignored `runtime_validation.json`
 
 It also uses these when present:
 
-- `oauth_credentials.json` for seller-side OAuth app credentials
+- local, Git-ignored `oauth_credentials.json` for seller-side OAuth app credentials
 
 SDK / HTTP automation can pass `source_url`, `source_context`, and
 `input_form_spec` directly to `auto-register`, but the current CLI project
@@ -125,7 +128,7 @@ preflight errors before calling `auto-register`.
   - expected response fields
 - For OAuth-backed APIs that use seller-owned OAuth apps:
   - declare the provider in `required_connected_accounts`
-  - include the seller OAuth app credentials in `oauth_credentials.json`
+  - include the seller OAuth app credentials in the local Git-ignored `oauth_credentials.json`
   - upgrades that add a new provider are blocked until the new seed is included
 - Listing metadata such as:
   - `name`
@@ -202,7 +205,7 @@ source repository.
 
 Recommended prompt for a coding engine:
 
-> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json`, `runtime_validation.json`, and any required `oauth_credentials.json` next to the adapter; then show the exact `siglume validate .`, `siglume score . --remote`, `siglume test .`, and `siglume register . --confirm` steps.
+> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to the adapter; if seller-side OAuth is required, also create the local, Git-ignored `oauth_credentials.json`; then show the exact no-key local loop (`siglume test .`, `siglume score . --offline`) and the API-key production loop (`siglume validate .`, `siglume score . --remote`, `siglume register . --confirm`).
 
 ## Where the schema lives
 

@@ -2,7 +2,7 @@
 
 TypeScript runtime for building, testing, and registering Siglume developer apps.
 
-This package is prepared in the public SDK repo and ships with the current v0.5 release line.
+This package is prepared in the public SDK repo and ships with the current v0.7.6 release line.
 
 It also includes `draft_tool_manual()` and `fill_tool_manual_gaps()` with
 bundled `AnthropicProvider` and `OpenAIProvider` classes. Provide
@@ -58,15 +58,21 @@ For API Store publishing, the recommended CLI flow is:
 
 ```bash
 siglume init --template price-compare
+siglume test .
+siglume score . --offline
+
+# After deployment and SIGLUME_API_KEY setup:
 siglume validate .
 siglume score . --remote
-siglume test .
 siglume register .            # preflight + draft only
 siglume register . --confirm # confirm + publish
 ```
 
-`siglume register` reads `tool_manual.json`, `runtime_validation.json`, and
-optional `oauth_credentials.json`. SDK / HTTP automation can pass
+`siglume register` reads `tool_manual.json`, the local Git-ignored
+`runtime_validation.json`, and optional local Git-ignored
+`oauth_credentials.json`. Generated projects keep runtime validation and OAuth
+credential files Git-ignored because they can contain review keys and client
+secrets. SDK / HTTP automation can pass
 `source_url`, `source_context`, and `input_form_spec` directly to
 `auto-register`. The CLI runs preflight by default, then calls the same
 `auto-register` route used by SDK / automation clients. Re-run the

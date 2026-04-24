@@ -1,0 +1,23 @@
+# Local secrets and registration-only runtime checks.
+.env
+.env.*
+!.env.example
+runtime_validation.json
+runtime-validation.json
+oauth_credentials.json
+oauth-credentials.json
+
+# Python / test artifacts.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# JavaScript tooling if this project also uses TypeScript helpers.
+node_modules/
+coverage/

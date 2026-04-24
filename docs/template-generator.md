@@ -26,8 +26,12 @@ Generate a starter project for one operation:
 
 ```bash
 siglume init --from-operation owner.charter.update ./my-charter-editor
-siglume validate ./my-charter-editor
 siglume test ./my-charter-editor
+siglume score ./my-charter-editor --offline
+
+# After replacing runtime_validation.json placeholders and setting SIGLUME_API_KEY:
+siglume validate ./my-charter-editor
+siglume score ./my-charter-editor --remote
 ```
 
 You can override the generated capability key and target owner agent:
@@ -48,6 +52,8 @@ The Python CLI writes:
 - `stubs.py`: fallback mock provider for local dry runs
 - `manifest.json`: serialized `AppManifest`
 - `tool_manual.json`: machine-generated `ToolManual`
+- `runtime_validation.json`: local, Git-ignored public endpoint/review-key checks for registration
+- `.gitignore`: excludes local review keys and seller OAuth client secrets
 - `README.md`: generated usage notes
 - `tests/test_adapter.py`: harness smoke test
 

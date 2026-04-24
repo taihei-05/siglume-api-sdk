@@ -26,13 +26,12 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> 🚀 **v0.5.0 is out** — the platform-integration release. Python + TypeScript
-> now cover webhook handling, seller-side refund / dispute flows,
-> experimental usage metering, and typed Web3 settlement helpers on top of the
-> v0.4 runtime, grading, diffing, exporter, recorder, buyer-SDK, and example
-> set.
-> Capability bundles are deferred pending a platform-first public bundle API.
-> See [RELEASE_NOTES_v0.5.0.md](./RELEASE_NOTES_v0.5.0.md) for the full release.
+> **Current release: v0.7.6.** Python and TypeScript are version-aligned and
+> cover the current production registration surface: explicit Tool Manual input,
+> runtime validation, seller OAuth seeding, paid payout readiness, webhooks,
+> usage metering, refunds / disputes, and typed Web3 settlement helpers.
+> See [CHANGELOG.md](./CHANGELOG.md) and
+> [RELEASE_NOTES_v0.7.6.md](./RELEASE_NOTES_v0.7.6.md) for the current release.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 > For the current browser-vs-CLI entry points into the same `auto-register`
@@ -76,7 +75,7 @@ If you want to scaffold quickly with an AI coding agent, give it:
 
 Recommended prompt:
 
-> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json`, `runtime_validation.json`, and any required `oauth_credentials.json` next to the adapter; then show the exact `siglume validate .`, `siglume score . --remote`, `siglume test .`, and `siglume register . --confirm` steps.
+> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to the adapter; if seller-side OAuth is required, also create the local, Git-ignored `oauth_credentials.json`; then show the exact no-key local loop (`siglume test .`, `siglume score . --offline`) and the API-key production loop (`siglume validate .`, `siglume score . --remote`, `siglume register . --confirm`).
 
 ---
 
@@ -92,19 +91,20 @@ This is the main use case. You build an API, register it, and earn revenue.
 1. Build your API with AppAdapter (see examples/ for templates)
 2. Test locally with AppTestHarness
 3. Deploy the real API to a public URL
-4. Keep `tool_manual.json` and `runtime_validation.json` next to your adapter
-5. If the API uses seller-side OAuth, also keep `oauth_credentials.json` next to your adapter
-6. Run `siglume register . --confirm`
-7. Review the result in the developer portal when needed
-7. Confirm → immediately published to the API Store when all checks pass
-8. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
+4. Keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to your adapter
+5. If the API uses seller-side OAuth, also keep the local, Git-ignored `oauth_credentials.json` next to your adapter
+6. Run `siglume test .` and `siglume score . --offline`
+7. Set `SIGLUME_API_KEY`, then run `siglume validate .`, `siglume score . --remote`, and `siglume register . --confirm`
+8. Review the result in the developer portal when needed
+9. Confirmed listings publish immediately when all checks pass
+10. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
 
 If the listing already exists and is live, re-run the same `capability_key` to
 stage an upgrade. `siglume register . --confirm` publishes the next release
 immediately when the same self-serve checks pass. If the upgrade adds a new
-seller-side OAuth provider, `oauth_credentials.json` must already include that
-provider or the upgrade is rejected.
+seller-side OAuth provider, the local Git-ignored `oauth_credentials.json` must
+already include that provider or the upgrade is rejected.
 
 **You do not submit a PR to this repo.** You register directly on the platform.
 No permission needed. No issue to claim. Just build and register.
@@ -113,7 +113,7 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, `runtime_validation.json`, and optional `oauth_credentials.json`, runs preflight by default, then calls `auto-register`. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to stage an upgrade. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, local Git-ignored `runtime_validation.json`, and optional local Git-ignored `oauth_credentials.json`, runs preflight by default, then calls `auto-register`. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to stage an upgrade. |
 | Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. The OAuth section is for credential rotation / repair after registration, not the initial registration step. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
@@ -126,7 +126,7 @@ No permission needed. No issue to claim. Just build and register.
 - OAuth-backed APIs now require seller-owned OAuth app credentials during
   registration and upgrade:
   - declare the provider in `required_connected_accounts`
-  - include the seller app credentials in `oauth_credentials.json`
+  - include the seller app credentials in the local Git-ignored `oauth_credentials.json`
   - if a new provider appears in an upgrade and the seed is missing, registration is blocked
 - Siglume blocks draft creation if the public API cannot be reached or the
   functional test does not match the declared response shape.
@@ -154,11 +154,15 @@ No permission needed. No issue to claim. Just build and register.
 siglume init --template price-compare
 # edit adapter.py
 # edit tool_manual.json
-# edit runtime_validation.json with your real deployed API URL and review/test key
-# if the API uses seller-side OAuth, add oauth_credentials.json with the seller OAuth app credentials
+# run the no-key local loop first
+siglume test .
+siglume score . --offline
+
+# deploy the real API, then edit the local runtime_validation.json with your public URL and review/test key
+# if the API uses seller-side OAuth, add the local oauth_credentials.json with the seller OAuth app credentials
+# set SIGLUME_API_KEY or ~/.siglume/credentials.toml before the production checks
 siglume validate .
 siglume score . --remote
-siglume test .
 siglume register .                 # preflight + draft only
 siglume register . --confirm      # confirm + publish
 ```
@@ -235,13 +239,22 @@ Install from PyPI:
 pip install siglume-api-sdk
 ```
 
-Generate a starter project and validate it:
+Generate a starter project and run the no-key local loop:
 
 ```bash
 siglume init --template price-compare
+siglume test .
+siglume score . --offline
+```
+
+After you deploy the real API, replace placeholders in the local
+`runtime_validation.json`, set `SIGLUME_API_KEY`, and run the production
+checks:
+
+```bash
 siglume validate .
 siglume score . --remote
-siglume test .
+siglume register . --confirm
 ```
 
 Or generate a wrapper directly from a first-party owner operation:
@@ -249,6 +262,10 @@ Or generate a wrapper directly from a first-party owner operation:
 ```bash
 siglume init --list-operations
 siglume init --from-operation owner.charter.update ./my-charter-editor
+siglume test ./my-charter-editor
+siglume score ./my-charter-editor --offline
+
+# After replacing runtime_validation.json placeholders and setting SIGLUME_API_KEY:
 siglume validate ./my-charter-editor
 ```
 
@@ -456,7 +473,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is an early-stage project (v0.5.0, alpha) with a growing but still
+This is an early-stage project (v0.7.6, alpha) with a growing but still
 small user base. The SDK and platform are actively evolving. Start with
 a small read-only API to learn the flow.
 

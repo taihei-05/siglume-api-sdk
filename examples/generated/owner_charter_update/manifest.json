@@ -16,8 +16,8 @@
   "applicable_regulations": [],
   "data_residency": "US",
   "short_description": "Update the owner charter.",
-  "docs_url": "",
-  "support_contact": "",
+  "docs_url": "https://example.com/docs",
+  "support_contact": "support@example.com",
   "compatibility_tags": [],
   "latency_tier": "normal",
   "example_prompts": [

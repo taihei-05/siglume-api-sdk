@@ -66,6 +66,8 @@ class OwnerCharterUpdateWrapperApp(AppAdapter):
             price_model=PriceModel.FREE,
             jurisdiction="US",
             short_description="Update the owner charter.",
+            support_contact="support@example.com",
+            docs_url="https://example.com/docs",
             example_prompts=["Run owner.charter.update for my owned agent."],
         )
 

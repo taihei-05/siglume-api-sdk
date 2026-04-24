@@ -45,10 +45,16 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 # Install from PyPI
 pip install siglume-api-sdk
 
-# Generate a starter and validate it
+# Generate a starter and run the no-key local loop
 siglume init --template price-compare
-siglume validate .
 siglume test .
+siglume score . --offline
+
+# After deploying the real API, fill the local runtime_validation.json,
+# set SIGLUME_API_KEY, and run production checks:
+siglume validate .
+siglume score . --remote
+siglume register . --confirm
 ```
 
 Or clone the repo to browse the examples:
@@ -66,11 +72,12 @@ python examples/hello_price_compare.py
 
 ```
 my-awesome-app/
-├── my_app.py          # Your API (subclasses AppAdapter)
-├── stubs.py           # Mock external APIs for testing
-├── tests/
-│   └── test_app.py    # Tests
-└── requirements.txt
+├── adapter.py               # Your API (subclasses AppAdapter)
+├── manifest.json            # Serialized AppManifest snapshot
+├── tool_manual.json         # Editable Tool Manual contract
+├── runtime_validation.json  # Local, Git-ignored public endpoint/review-key checks
+├── .gitignore               # Keeps review keys and OAuth client secrets out of Git
+└── README.md                # Generated local workflow
 ```
 
 ---
@@ -289,12 +296,14 @@ Does your API write to anything external?
 ```
 1. Build and test locally (AppTestHarness)
 2. Deploy the real API to a public URL
-3. Keep `tool_manual.json` and `runtime_validation.json` with the project
-4. If the API uses seller-side OAuth, also keep `oauth_credentials.json` with the project
-5. Run `siglume validate .`, `siglume score . --remote`, and `siglume register`
-6. Review the result in the developer portal when needed
-7. Confirm and publish immediately when all checks pass
-8. Live in the API Store
+3. Keep `tool_manual.json` with the project
+4. Keep the local, Git-ignored `runtime_validation.json` next to the adapter
+5. If the API uses seller-side OAuth, also keep the local, Git-ignored `oauth_credentials.json` with the project
+6. Run `siglume test .` and `siglume score . --offline` before any API key is required
+7. After deployment, run `siglume validate .`, `siglume score . --remote`, and `siglume register`
+8. Review the result in the developer portal when needed
+9. Confirm and publish immediately when all checks pass
+10. Live in the API Store
 ```
 
 ### Step 1: Run local tests
@@ -331,8 +340,8 @@ Use this flow from CLI / SDK / automation:
   `/v1/market/capabilities/auto-register`
 - `siglume register` reads:
   - `tool_manual.json`
-  - `runtime_validation.json`
-  - optional `oauth_credentials.json` for seller-side OAuth app credentials
+  - local, Git-ignored `runtime_validation.json`
+  - optional local, Git-ignored `oauth_credentials.json` for seller-side OAuth app credentials
 - `siglume register` runs manifest validation and remote Tool Manual quality
   preview before draft creation by default
 - This route requires `SIGLUME_API_KEY` or `~/.siglume/credentials.toml`
@@ -347,9 +356,12 @@ Use this flow from CLI / SDK / automation:
 Minimal CLI flow:
 
 ```bash
+siglume test .
+siglume score . --offline
+
+# After deployment and SIGLUME_API_KEY setup:
 siglume validate .
 siglume score . --remote
-siglume test .
 siglume register .                 # preflight + draft only
 siglume register . --confirm      # confirm + publish
 ```
@@ -405,7 +417,7 @@ A quality check runs automatically at confirmation time:
 - Seller OAuth app credentials during `auto-register`
   - if `required_connected_accounts` includes a seller-side OAuth provider
     such as X, Slack, Google, GitHub, Linear, or Notion, include that
-    provider in `oauth_credentials.json`
+    provider in the local, Git-ignored `oauth_credentials.json`
   - if an upgrade adds a new seller-side OAuth provider and the seed is
     missing, registration is rejected
 - Tool Manual quality grade **B** or above
@@ -488,8 +500,8 @@ If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter
 
 If the API itself also needs a seller-owned OAuth app configuration to broker
 that provider flow, include the seller app credentials in
-`oauth_credentials.json` during registration. Do not wait to create that
-configuration in the portal after publish.
+the local, Git-ignored `oauth_credentials.json` during registration. Do not
+wait to create that configuration in the portal after publish.
 
 ---
 
@@ -505,11 +517,11 @@ Submit again with the same `capability_key`.
 
 - If the listing is live, `siglume register` stages an upgrade instead of creating a new product.
 - `siglume register . --confirm` publishes the next release immediately when the self-serve checks pass again.
-- If the upgrade adds a new seller-side OAuth provider, update `oauth_credentials.json` before registering or the upgrade is rejected.
+- If the upgrade adds a new seller-side OAuth provider, update the local, Git-ignored `oauth_credentials.json` before registering or the upgrade is rejected.
 
 ### How do I manage external API credentials?
 
-Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. If the API also needs a seller-owned OAuth app, provide that app's Client ID / Client Secret in `oauth_credentials.json` during registration or upgrade. **Never hardcode secrets in your API code.**
+Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. If the API also needs a seller-owned OAuth app, provide that app's Client ID / Client Secret in the local, Git-ignored `oauth_credentials.json` during registration or upgrade. **Never hardcode secrets in your API code.**
 
 ### What's the difference between free and paid APIs?
 
@@ -764,7 +776,7 @@ cat > auto-register-paid-action.json <<'JSON'
     "repository_url": "https://github.com/example/growpost-publisher",
     "repo_ref": "main",
     "source_paths": ["runtime.py"],
-    "doc_paths": ["README.md", "tool_manual.json", "runtime_validation.json"],
+    "doc_paths": ["README.md", "tool_manual.json"],
     "generated_by": "siglume-cli"
   },
   "capability_key": "growpost-monthly-publisher",
@@ -972,7 +984,7 @@ response = requests.post(
             "repository_url": "https://github.com/example/my-api",
             "repo_ref": "main",
             "source_paths": ["my_api.py"],
-            "doc_paths": ["README.md", "tool_manual.json", "oauth_credentials.json"],
+            "doc_paths": ["README.md", "tool_manual.json"],
             "generated_by": "codex",
         },
         "manifest": {
@@ -1223,7 +1235,7 @@ The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
 - Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
 - Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades).
 
-SDK v0.5.0 (current release) ships the Web3 enum values for
+SDK v0.7.6 ships the Web3 enum values for
 payment-permission tools: `SettlementMode.POLYGON_MANDATE` and
 `SettlementMode.EMBEDDED_WALLET_CHARGE`. See
 [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.

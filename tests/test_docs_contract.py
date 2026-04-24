@@ -1,3 +1,5 @@
+import json
+import tomllib
 from pathlib import Path
 
 
@@ -33,6 +35,48 @@ def test_docs_do_not_advertise_removed_register_flags() -> None:
 
     for removed_flag in ("--no-preflight", "--force-draft", "--allow-generated-manual"):
         assert removed_flag not in docs
+
+
+def test_package_runtime_versions_match_release_metadata() -> None:
+    pyproject = tomllib.loads(_read("pyproject.toml"))
+    package_json = json.loads(_read("siglume-api-sdk-ts/package.json"))
+    python_version = str(pyproject["project"]["version"])
+    ts_version = str(package_json["version"])
+
+    assert python_version == "0.7.6"
+    assert ts_version == python_version
+    assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
+    assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
+
+
+def test_onboarding_docs_match_generated_scaffold_and_no_key_first_loop() -> None:
+    readme = _read("README.md")
+    getting_started = _read("GETTING_STARTED.md")
+    ts_readme = _read("siglume-api-sdk-ts/README.md")
+    security = _read("SECURITY.md")
+    normalized_security = " ".join(security.split())
+
+    assert "v0.5.0 is out" not in readme
+    assert "current v0.5 release line" not in ts_readme
+    assert "This is an early-stage project (v0.7.6, alpha)" in readme
+    assert "Production releases are published by GitHub Actions with PyPI Trusted" in security
+    assert "Do not create a PyPI API token or local `.pypirc` for the normal release path." in normalized_security
+    assert "Rotate after every release" not in security
+
+    assert "siglume score . --offline" in readme
+    assert readme.index("siglume score . --offline") < readme.index("siglume validate .")
+    assert "siglume score . --offline" in getting_started
+    assert getting_started.index("siglume score . --offline") < getting_started.index("siglume validate .")
+    assert "siglume score . --offline" in ts_readme
+    assert ts_readme.index("siglume score . --offline") < ts_readme.index("siglume validate .")
+
+    for stale_file in ("my_app.py", "tests/test_app.py", "requirements.txt"):
+        assert stale_file not in getting_started
+    assert "adapter.py" in getting_started
+    assert "manifest.json" in getting_started
+    assert "tool_manual.json" in getting_started
+    assert "runtime_validation.json" in getting_started
+    assert ".gitignore" in getting_started
 
 
 def test_cli_docs_match_current_sidecar_inputs() -> None:
