@@ -9,6 +9,34 @@
 
 **Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
 
+## Start here if you are new
+
+You do not need to design the whole API by yourself. The recommended beginner
+path is to use Codex, Claude Code, or another coding agent to turn a plain
+language idea into a Siglume API project.
+
+Start with a **free, read-only API**. Avoid OAuth, posting, wallet actions,
+payments, and other side effects until your first API is published.
+
+```
+1. Pick a small API idea.
+2. Give this repo and your idea to a coding agent.
+3. Let the agent create `adapter.py`, `tool_manual.json`, tests, and a local README.
+4. Run the no-key local loop:
+   siglume test .
+   siglume score . --offline
+5. Deploy the real API.
+6. Fill the local, Git-ignored `runtime_validation.json`.
+7. Run the production loop:
+   siglume validate .
+   siglume score . --remote
+   siglume register . --confirm
+```
+
+Use [docs/coding-agent-guide.md](./docs/coding-agent-guide.md) as the file to
+give your coding agent. Use [API_IDEAS.md](./API_IDEAS.md) if you need a safe
+first idea.
+
 > ⚠️ **Payment stack is migrating.** Siglume is moving from Stripe Connect to fully **on-chain settlement** (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for what works today vs. what's changing.
 
 Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
@@ -62,19 +90,39 @@ print(m)
 
 ---
 
-## Using Codex or Claude Code
+## Coding agent prompt
 
-If you want to scaffold quickly with an AI coding agent, give it:
+Give this prompt to Codex, Claude Code, or another coding agent:
 
-- this repository
-- `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`
-- your API idea
-- the external API docs you want to wrap
-- deployed endpoint details and review/test key requirements, if already known
+```text
+You are helping me build a Siglume Agent API Store project.
 
-Recommended prompt:
+Read this repository, especially:
+- README.md
+- GETTING_STARTED.md
+- docs/coding-agent-guide.md
+- docs/publish-flow.md
+- examples/hello_echo.py
 
-> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to the adapter; if seller-side OAuth is required, also create the local, Git-ignored `oauth_credentials.json`; then show the exact no-key local loop (`siglume test .`, `siglume score . --offline`) and the API-key production loop (`siglume validate .`, `siglume score . --remote`, `siglume register . --confirm`).
+My API idea is:
+[describe the API in plain language]
+
+Constraints:
+- Start as a FREE and READ_ONLY API unless I explicitly say otherwise.
+- Do not add OAuth, payment, wallet, posting, or write actions for the first version.
+- Create adapter.py, tool_manual.json, and a local README.
+- Keep runtime_validation.json, oauth_credentials.json, .env, and real secrets Git-ignored.
+- Do not put real secrets in source code or committed docs.
+- Make the project pass:
+  siglume test .
+  siglume score . --offline
+
+After that, tell me exactly what I need to deploy and what values I must put
+into runtime_validation.json before running:
+  siglume validate .
+  siglume score . --remote
+  siglume register . --confirm
+```
 
 ---
 

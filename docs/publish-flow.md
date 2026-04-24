@@ -209,7 +209,30 @@ source repository.
 
 Recommended prompt for a coding engine:
 
-> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to the adapter; if seller-side OAuth is required, also create the local, Git-ignored `oauth_credentials.json`; then show the exact no-key local loop (`siglume test .`, `siglume score . --offline`) and the API-key production loop (`siglume validate .`, `siglume score . --remote`, `siglume register . --confirm`).
+```text
+Read this repository, especially README.md, GETTING_STARTED.md,
+docs/coding-agent-guide.md, and docs/publish-flow.md.
+
+Use the API idea and external API docs I provide. Build a Siglume API that
+follows the documented CLI-first flow.
+
+For the first version, start as FREE and READ_ONLY unless I explicitly say
+otherwise. Do not add OAuth, payment, wallet, posting, or write actions unless I
+explicitly request them.
+
+Create adapter.py, tool_manual.json, a local README, and useful local tests.
+Keep runtime_validation.json and oauth_credentials.json local and Git-ignored.
+
+First make this pass:
+siglume test .
+siglume score . --offline
+
+After deployment, tell me exactly what values to put in runtime_validation.json,
+then show the API-key production loop:
+siglume validate .
+siglume score . --remote
+siglume register . --confirm
+```
 
 ## Where the schema lives
 

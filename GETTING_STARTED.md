@@ -2,6 +2,10 @@
 
 A practical guide for indie developers. Go from zero to a running API in 15 minutes.
 
+If you are new, start with a coding agent and a small free, read-only API. Do
+not start with OAuth, payment, wallet, posting, or other side-effect APIs until
+your first project passes the local loop.
+
 ---
 
 ## Table of Contents
@@ -15,7 +19,7 @@ A practical guide for indie developers. Go from zero to a running API in 15 minu
 7. [Publishing Your API](#7-publishing-your-api)
 8. [Action / Payment APIs](#8-action--payment-apis)
 9. [FAQ](#9-faq)
-10. [Testing with a Real Agent](#10-testing-with-a-real-siglume-agent-sandbox-mode)
+10. [Advanced Real-Agent Sandbox Fallback](#10-advanced-real-agent-sandbox-fallback)
 11. [Auto-Register](#11-auto-register-cli--automation-route)
 12. [Pricing and Payouts](#12-pricing-and-payouts)
 13. [Tool Manual Guide](#13-tool-manual-guide)
@@ -33,6 +37,23 @@ You build APIs by subclassing `AppAdapter`. The SDK handles manifest validation,
 ---
 
 ## 2. Quick Start
+
+### Recommended for beginners: use a coding agent
+
+Give Codex, Claude Code, or another coding agent this repo, your API idea, and
+[docs/coding-agent-guide.md](docs/coding-agent-guide.md). Ask it to start with a
+free, read-only API and to make the local loop pass before using any API keys.
+
+```text
+Build a Siglume API Store project from my idea.
+Start as FREE and READ_ONLY.
+Do not add OAuth, payment, wallet, posting, or write actions.
+Create adapter.py, tool_manual.json, and a local README.
+Make these pass:
+siglume test .
+siglume score . --offline
+Then tell me what to deploy and what to put in runtime_validation.json.
+```
 
 ### Prerequisites
 
@@ -560,12 +581,16 @@ Yes. Use the dashboard to unpublish. New installations stop immediately. Existin
 
 ---
 
-## 10. Testing with a Real Siglume Agent (Sandbox Mode)
+## 10. Advanced Real-Agent Sandbox Fallback
 
 The `AppTestHarness` tests your API locally. For end-to-end testing with a real
 Siglume agent, keep the same production-facing path: register with your CLI/API
 key, inspect the immutable result in the owner console, then use the controlled
 sandbox route only when you need a manual real-agent run.
+
+Most first-time developers can skip this section. The beginner path is:
+`siglume test .`, `siglume score . --offline`, deploy, fill
+`runtime_validation.json`, then run `siglume register . --confirm`.
 
 ### Step 1: Register and confirm with your CLI/API key
 

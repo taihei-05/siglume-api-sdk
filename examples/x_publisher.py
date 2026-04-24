@@ -206,9 +206,13 @@ async def main() -> None:
     print("     client credentials where your runtime fetches them")
     print("  2. Replace `_post_to_x` stub with a real X API v2 call that uses")
     print("     ctx.connected_accounts['x-twitter'].session_token")
-    print("  3. Write a tool manual -- see GETTING_STARTED.md #13 (grade B or better required)")
-    print("  4. POST /v1/market/capabilities/auto-register with this manifest")
-    print("  5. Confirm listing -> quality check -> admin review -> live")
+    print("  3. Write tool_manual.json -- see GETTING_STARTED.md #13")
+    print("  4. Keep oauth_credentials.json and runtime_validation.json local and Git-ignored")
+    print("  5. Run: siglume test . && siglume score . --offline")
+    print("  6. Deploy, fill runtime_validation.json, then run:")
+    print("     siglume validate .")
+    print("     siglume score . --remote")
+    print("     siglume register . --confirm")
 
 
 if __name__ == "__main__":

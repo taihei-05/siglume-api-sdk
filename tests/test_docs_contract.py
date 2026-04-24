@@ -17,11 +17,17 @@ def _read_optional(relative_path: str) -> str:
 
 def test_readme_keeps_coding_agent_prompt() -> None:
     readme = _read("README.md")
+    agent_guide = _read("docs/coding-agent-guide.md")
 
-    assert "## Using Codex or Claude Code" in readme
-    assert "Recommended prompt:" in readme
-    assert "Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`" in readme
-    assert "`siglume register . --confirm`" in readme
+    assert "## Start here if you are new" in readme
+    assert "## Coding agent prompt" in readme
+    assert "Start with a **free, read-only API**" in readme
+    assert "docs/coding-agent-guide.md" in readme
+    assert "Start as a FREE and READ_ONLY API" in readme
+    assert "siglume register . --confirm" in readme
+    assert "## Default beginner path" in agent_guide
+    assert "Start with a free, read-only API" in agent_guide
+    assert "Never commit:" in agent_guide
 
 
 def test_docs_do_not_advertise_removed_register_flags() -> None:
