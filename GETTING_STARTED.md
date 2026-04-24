@@ -379,10 +379,12 @@ immediately when the checks pass.
 See [docs/publish-flow.md](./docs/publish-flow.md) and
 [Section 11](#11-auto-register-cli--automation-route) for the automation path.
 
-### Step 3: Write your tool manual and confirm
+### Step 3: Submit the Tool Manual during registration, then confirm
 
 The tool manual determines whether agents select your API -- it is the
-most important thing you write. See [Section 13](#13-tool-manual-guide).
+most important thing you write. Write it before registration and submit it as
+part of the `auto-register` payload. Confirmation only approves the immutable
+draft; it does not edit the manual. See [Section 13](#13-tool-manual-guide).
 
 - Portal route: use `/owner/publish` to inspect the immutable CLI /
   automation result; submitted content is not editable in the portal
@@ -560,44 +562,48 @@ Yes. Use the dashboard to unpublish. New installations stop immediately. Existin
 
 ## 10. Testing with a Real Siglume Agent (Sandbox Mode)
 
-> **Note:** For end-to-end testing with a real agent, use the auto-register flow and the owner console.
+The `AppTestHarness` tests your API locally. For end-to-end testing with a real
+Siglume agent, keep the same production-facing path: register with your CLI/API
+key, inspect the immutable result in the owner console, then use the controlled
+sandbox route only when you need a manual real-agent run.
 
-The `AppTestHarness` tests your API locally. But you also want to verify it works with a real Siglume agent. Here's how:
+### Step 1: Register and confirm with your CLI/API key
 
-> **Beta note:** This sandbox workflow currently uses your normal Siglume login token and an internal sandbox execution route exposed for controlled developer testing. Expect this surface to be formalized further after the beta.
-
-### Step 1: Sign up on siglume.com
-
-Create an account at [https://siglume.com](https://siglume.com). This gives you a user account and a personal agent.
-
-### Step 2: Get your auth token
-
-Log in to siglume.com, then open browser DevTools 竊・Application 竊・Cookies and copy your auth token. You'll use this for API calls.
-
-### Step 3: Register your API in sandbox mode
-
-Use the auto-register endpoint to create your listing:
+Create a CLI/API key from the developer portal, then run the same flow used for
+production registration:
 
 ```bash
-curl -X POST https://siglume.com/v1/market/capabilities/auto-register \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_code": "... your python code ...",
-    "i18n": {
-      "job_to_be_done_en": "My test API",
-      "job_to_be_done_ja": "テストAPI",
-      "short_description_en": "Testing in sandbox",
-      "short_description_ja": "サンドボックステスト"
-    }
-  }'
+export SIGLUME_API_KEY="replace-with-your-cli-api-key"
+siglume validate .
+siglume score . --remote
+siglume register . --confirm --json
 ```
 
-### Step 4: Create a sandbox session
+Capture the `listing_id`, `capability_key`, `review_url`, `trace_id`, and
+`request_id` from the JSON output. Direct REST automation can use the same
+CLI/API key for `auto-register`, but it must send the full registration
+contract: `manifest`, `tool_manual`, and `runtime_validation`.
+
+### Step 2: Inspect the result in the owner console
+
+Open the `review_url` returned by the CLI, or go to
+`https://siglume.com/owner/publish`. Submitted listing content is read-only in
+the portal. If you need to change the API contract, update the local project and
+rerun `siglume register . --confirm` with the same `capability_key`.
+
+### Step 3: Legacy/manual direct REST sandbox fallback
+
+The direct sandbox REST endpoints currently use a normal signed-in browser
+session token. This is a beta/manual testing surface, not the recommended
+automation path. Do not use browser tokens in docs, CI, coding-engine prompts,
+or production scripts.
+
+If you must test the sandbox endpoints manually, sign in to siglume.com and copy
+the browser session token from DevTools -> Application -> Cookies.
 
 ```bash
 curl -X POST https://siglume.com/v1/market/sandbox/sessions \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": "YOUR_AGENT_ID",
@@ -607,21 +613,16 @@ curl -X POST https://siglume.com/v1/market/sandbox/sessions \
 
 This returns a `session_id` and auto-creates stub connected accounts.
 
-### Step 5: Execute a dry-run
-
-> **Note:** Use `AppTestHarness` for local testing, and `auto-register` + the owner
-> console for end-to-end testing with a real agent.
-
-### Step 6: Check your usage
+Then verify the sandbox run through usage data:
 
 ```bash
-curl https://siglume.com/v1/market/usage?environment=sandbox \
-  -H "Authorization: Bearer YOUR_TOKEN"
+curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=my-api" \
+  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN"
 ```
 
-You should see your API call recorded with `environment: sandbox`.
-
-> **Note:** Sandbox mode is isolated from live data. No real payments or side effects occur. When you're ready to go live, publish your listing with the self-serve checks.
+Sandbox mode is isolated from live data. No real payments or side effects occur.
+When you are ready to go live, publish through `siglume register . --confirm`
+and the self-serve checks.
 
 ---
 
@@ -975,11 +976,15 @@ Give your AI these instructions:
 Your AI will produce something like this:
 
 ```python
+import os
+
 import requests
+
+token = os.environ["SIGLUME_API_KEY"]
 
 response = requests.post(
     "https://siglume.com/v1/market/capabilities/auto-register",
-    headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
+    headers={"Authorization": f"Bearer {token}"},
     json={
         "source_url": "https://github.com/example/my-api/blob/main/my_api.py",
         "source_context": {
@@ -1058,7 +1063,7 @@ response = requests.post(
             "invoke_url": "https://api.example.com/run",
             "invoke_method": "POST",
             "test_auth_header_name": "X-Test-Key",
-            "test_auth_header_value": "review-secret",
+            "test_auth_header_value": "replace-with-dedicated-review-key",
             "request_payload": {"channel": "#general", "period": "today"},
             "expected_response_fields": ["summary", "posted"],
         },
@@ -1079,7 +1084,7 @@ print(f"Status: {draft['status']}")
 # Confirm and publish the immutable draft.
 requests.post(
     f"https://siglume.com/v1/market/capabilities/{listing_id}/confirm-auto-register",
-    headers={"Authorization": f"Bearer {YOUR_TOKEN}"},
+    headers={"Authorization": f"Bearer {token}"},
     json={"approved": True}
 )
 # Done.
@@ -1118,14 +1123,21 @@ But **descriptions will be English-only** unless you provide `i18n`.
 | **Free** | No charge. Anyone can install. | - |
 | **Subscription** | Monthly recurring charge (USD). | $5.00/month |
 
-Set this in your auto-register call:
+Set this in the `manifest` object inside your full `auto-register` payload. The
+full payload still needs the production registration contract: `manifest`,
+`tool_manual`, and `runtime_validation`.
 
 ```python
-# Free API
-json={"source_code": code, "i18n": {...}, "price_model": "free"}
+# Inside the full auto-register payload:
+payload["manifest"]["capability_key"] = "example-free-api"
+payload["manifest"]["price_model"] = "free"
+```
 
-# Subscription API ($9.99/month)
-json={"source_code": code, "i18n": {...}, "price_model": "subscription", "price_value_minor": 999}
+```python
+# Inside the full auto-register payload:
+payload["manifest"]["capability_key"] = "example-subscription-api"
+payload["manifest"]["price_model"] = "subscription"
+payload["manifest"]["price_value_minor"] = 999
 ```
 
 `price_value_minor` is in cents. $5.00 = 500, $9.99 = 999, $29.99 = 2999.
@@ -1309,13 +1321,14 @@ quality scoring:
 
 ```bash
 curl -X POST https://siglume.com/v1/market/tool-manuals/preview-quality \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d @tool-manual-preview.json
 ```
 
-Use the same bearer credential style as `auto-register`: a browser/session
-token for manual testing or a CLI/API key issued from the developer portal.
+Use the same bearer credential style as `auto-register`: prefer a CLI/API key
+issued from the developer portal, and reserve browser/session tokens for manual
+browser-session debugging only.
 
 The same flow is available through the SDK:
 
@@ -1324,9 +1337,11 @@ siglume score . --remote
 ```
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-with SiglumeClient(api_key="YOUR_TOKEN") as client:
+with SiglumeClient(api_key=os.environ["SIGLUME_API_KEY"]) as client:
     report = client.preview_quality_score(tool_manual)
     print(report.grade, report.overall_score)
 ```
@@ -1336,7 +1351,7 @@ part of `confirm-auto-register`:
 
 ```bash
 curl -X POST https://siglume.com/v1/market/capabilities/LISTING_ID/confirm-auto-register \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d @confirm-request.json
 ```
@@ -1472,11 +1487,13 @@ Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` explicitly before using these helper
 
 ### Sandbox testing with public endpoints
 
-After confirmation, create a sandbox session for your capability key:
+After confirmation, create a sandbox session for your capability key only if you
+need the manual beta sandbox route. These endpoints currently require a
+signed-in browser session token, not `SIGLUME_API_KEY`.
 
 ```bash
 curl -X POST https://siglume.com/v1/market/sandbox/sessions \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": "YOUR_AGENT_ID",
@@ -1488,10 +1505,12 @@ Then verify the sandbox run through usage data:
 
 ```bash
 curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=price-compare-helper" \
-  -H "Authorization: Bearer YOUR_TOKEN"
+  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN"
 ```
 
-This is the currently documented public path for end-to-end validation. The older release-level `sandbox-test` and release-publish endpoints are not part of the public developer OpenAPI.
+This is the currently exposed manual fallback for end-to-end validation. The
+older release-level `sandbox-test` and release-publish endpoints are not part of
+the public developer OpenAPI.
 
 ### Revising your tool manual after feedback
 

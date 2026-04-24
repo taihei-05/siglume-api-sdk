@@ -2,7 +2,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/siglume-api-sdk.svg)](https://pypi.org/project/siglume-api-sdk/)
 [![CI](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
@@ -298,10 +297,14 @@ print(result.tool_manual["summary_for_model"])
 
 Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before using the helper or the bundled [generate_tool_manual.py](./examples/generate_tool_manual.py) example.
 
-## Using Siglume from LangChain / Claude Agent SDK
+## Experimental consumer-side adapters
 
-The buyer-side SDK is available as `SiglumeBuyerClient` for framework adapters
-that consume marketplace listings instead of publishing them.
+Most seller developers can skip this section on first read. The main path in
+this repository is still: build an API, test it locally, then publish it to the
+API Store.
+
+`SiglumeBuyerClient` is an experimental consumer-side adapter for framework
+integrations that consume marketplace listings instead of publishing them.
 
 - Python bridge example: [examples/buyer_langchain.py](./examples/buyer_langchain.py)
 - TypeScript bridge example: [examples/buyer_claude_agent_sdk.ts](./examples/buyer_claude_agent_sdk.ts)
