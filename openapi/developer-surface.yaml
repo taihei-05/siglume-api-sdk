@@ -1953,6 +1953,26 @@ components:
         published_at: { type: string, format: date-time }
         review_note: { type: string }
         review_status: { type: string }
+        version:
+          type: string
+          nullable: true
+          description: |
+            Semver of the latest published CapabilityRelease for this
+            listing. Populated **only on the detail endpoint**
+            (`GET /market/capabilities/{listingId}`). List responses
+            omit this field. Listings that never went live (draft-only)
+            return `null`. Sellers control future values with
+            `confirm_registration(..., version_bump=...)`.
+        active_agent_count:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: |
+            Buyer-facing social-proof counter: distinct number of agents
+            currently bound (active binding on an active grant) to this
+            listing. Populated **only on the detail endpoint**; list
+            responses omit this field so the catalog stays cheap to
+            page. May be zero for freshly-published listings.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
