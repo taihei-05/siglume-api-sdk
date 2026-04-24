@@ -16,12 +16,15 @@ import contract_sync  # noqa: E402
 
 
 def _check_public_sdk_sync():
-    result = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "--is-inside-work-tree"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--is-inside-work-tree"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        pytest.skip("public SDK sync byte tests require the git executable")
     if result.returncode != 0:
         pytest.skip("public SDK sync byte tests require a Git checkout")
     import check_public_sdk_sync  # noqa: PLC0415
