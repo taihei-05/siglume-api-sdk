@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-04-24
+
+### Added
+
+- `AppListing` OpenAPI schema now documents two detail-endpoint-only
+  fields the platform has been returning since the API Store detail
+  brushup:
+  - `version` — semver of the latest published `CapabilityRelease`
+    for this listing. `null` for draft-only listings. Set by
+    `confirm_registration(..., version_bump=...)`.
+  - `active_agent_count` — buyer-facing social-proof counter: distinct
+    agents currently bound to an active grant. `null` on list
+    responses (the detail endpoint is the only place it is computed,
+    so catalog paging stays cheap).
+
+No code changes — purely a docs-level catch-up so generated clients
+and typed HTTP tooling see both fields the server has been returning
+at runtime.
+
 ## [0.9.0] - 2026-04-24
 
 ### Added
