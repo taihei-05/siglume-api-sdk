@@ -184,6 +184,7 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
         if request.url.path == "/v1/market/capabilities/auto-register":
             assert body["capability_key"] == manifest.capability_key
             assert "i18n" not in body
+            assert "metadata" not in body
             assert body["manifest"]["docs_url"] == manifest.docs_url
             assert body["tool_manual"]["tool_name"] == tool_manual.tool_name
             assert body["runtime_validation"]["invoke_url"] == runtime_validation["invoke_url"]

@@ -137,8 +137,8 @@ paths:
         **Localization is platform-generated.** Submit the buyer-facing
         listing fields in the language you have. The platform translates and
         stores Japanese and English copies in `metadata.i18n`. Do not submit
-        an `i18n` object; unsupported or extra request fields are rejected
-        with `422 INVALID_PAYLOAD`.
+        an `i18n` or arbitrary `metadata` object; unsupported or extra
+        request fields are rejected with `422 INVALID_PAYLOAD`.
       tags: [Capabilities]
       requestBody:
         required: true
@@ -177,9 +177,6 @@ paths:
                         type: string
                     generated_by:
                       type: string
-                metadata:
-                  type: object
-                  description: Optional metadata persisted with the draft
                 manifest:
                   type: object
                   description: Optional manifest seed. Top-level request fields override this object. Include docs_url, support_contact, jurisdiction, and required_connected_accounts here if you do not repeat them top-level.

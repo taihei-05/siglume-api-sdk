@@ -145,7 +145,7 @@ def test_auto_register_docs_keep_localization_platform_generated() -> None:
 
     assert '"i18n": {' not in docs
     assert "optional bilingual `i18n`" not in docs
-    assert "Do not include an `i18n` object" in docs
+    assert "Do not include an `i18n` object or arbitrary `metadata`" in docs
     assert "Localization is platform-generated" in docs
     assert "additionalProperties: false" in docs
 

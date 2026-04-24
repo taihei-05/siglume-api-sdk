@@ -157,7 +157,6 @@ export interface SiglumeClientShape {
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
       oauth_credentials?: Record<string, unknown> | unknown[];
-      metadata?: Record<string, unknown>;
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
     },
@@ -2175,7 +2174,6 @@ export class SiglumeClient implements SiglumeClientShape {
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
       oauth_credentials?: Record<string, unknown> | unknown[];
-      metadata?: Record<string, unknown>;
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
     } = {},
@@ -2204,9 +2202,6 @@ export class SiglumeClient implements SiglumeClientShape {
             ),
           }
         : coerceMapping(options.oauth_credentials, "oauth_credentials");
-    }
-    if (options.metadata) {
-      payload.metadata = coerceMapping(options.metadata, "metadata");
     }
     if (options.source_context) {
       payload.source_context = coerceMapping(options.source_context, "source_context");

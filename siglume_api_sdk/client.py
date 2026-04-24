@@ -1429,7 +1429,6 @@ def _build_auto_register_request(
     source_url: str | None,
     runtime_validation: Mapping[str, Any] | None,
     oauth_credentials: Mapping[str, Any] | Sequence[Any] | None,
-    metadata: Mapping[str, Any] | None,
     source_context: Mapping[str, Any] | None,
     input_form_spec: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1457,8 +1456,6 @@ def _build_auto_register_request(
             }
         else:
             raise TypeError("oauth_credentials must be a mapping or a sequence of mappings")
-    if metadata is not None:
-        payload["metadata"] = _coerce_mapping(metadata, "metadata")
     if source_context is not None:
         payload["source_context"] = _coerce_mapping(source_context, "source_context")
     if input_form_spec is not None:
@@ -3003,7 +3000,6 @@ class SiglumeClient:
         source_url: str | None = None,
         runtime_validation: Mapping[str, Any] | None = None,
         oauth_credentials: Mapping[str, Any] | Sequence[Any] | None = None,
-        metadata: Mapping[str, Any] | None = None,
         source_context: Mapping[str, Any] | None = None,
         input_form_spec: Mapping[str, Any] | None = None,
     ) -> AutoRegistrationReceipt:
@@ -3021,7 +3017,6 @@ class SiglumeClient:
             source_url=source_url,
             runtime_validation=runtime_validation,
             oauth_credentials=oauth_credentials,
-            metadata=metadata,
             source_context=source_context,
             input_form_spec=input_form_spec_payload,
         )
