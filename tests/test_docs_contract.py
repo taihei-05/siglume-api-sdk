@@ -134,6 +134,22 @@ def test_public_docs_keep_submitted_registration_content_immutable() -> None:
     assert "deprecated: true" in openapi
 
 
+def test_auto_register_docs_keep_localization_platform_generated() -> None:
+    docs = "\n".join(
+        [
+            _read("GETTING_STARTED.md"),
+            _read("docs/publish-flow.md"),
+            _read("openapi/developer-surface.yaml"),
+        ]
+    )
+
+    assert '"i18n": {' not in docs
+    assert "optional bilingual `i18n`" not in docs
+    assert "Do not include an `i18n` object" in docs
+    assert "Localization is platform-generated" in docs
+    assert "additionalProperties: false" in docs
+
+
 def test_docs_do_not_advertise_unsupported_connected_account_families() -> None:
     connected_accounts = _read("docs/connected-accounts.md")
 

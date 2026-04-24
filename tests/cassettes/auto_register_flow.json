@@ -17,12 +17,6 @@
           "capability_key": "price-compare-helper",
           "category": "commerce",
           "dry_run_supported": true,
-          "i18n": {
-            "job_to_be_done_en": "Compare retailer prices for a product and return the best current offer.",
-            "job_to_be_done_ja": "Compare retailer prices for a product and return the best current offer.",
-            "short_description_en": "Search multiple retailers and summarize the best current price.",
-            "short_description_ja": "Search multiple retailers and summarize the best current price."
-          },
           "job_to_be_done": "Compare retailer prices for a product and return the best current offer.",
           "jurisdiction": "US",
           "manifest": {
