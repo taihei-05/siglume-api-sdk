@@ -174,12 +174,10 @@ docs/assets/demo/siglume-owner-publish-demo.gif
 [![License](https://img.shields.io/badge/license-MIT-16a34a?style=flat-square)](./LICENSE)
 
 <p align="left">
-  <a href="https://www.loom.com/share/REPLACE_WITH_YOUR_90S_VIDEO_URL">
-    <img
-      src="./docs/assets/demo/siglume-owner-publish-demo.gif"
-      alt="Demo: auto-register an API, review it in the developer portal, let an agent select it, and verify payout setup"
-      width="960"
-    />
-  </a>
+  <img
+    src="./docs/assets/demo/siglume-owner-publish-demo.gif"
+    alt="Demo: auto-register an API, review it in the developer portal, let an agent select it, and verify payout setup"
+    width="960"
+  />
 </p>
 ```

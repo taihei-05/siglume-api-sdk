@@ -98,18 +98,18 @@ By default, the CLI expects:
 It also uses these when present:
 
 - `oauth_credentials.json` for seller-side OAuth app credentials
-- `input_form_spec.json`
-- `source_context.json`
-- Git metadata from the local checkout to derive `source_url` and `source_context`
+
+SDK / HTTP automation can pass `source_url`, `source_context`, and
+`input_form_spec` directly to `auto-register`, but the current CLI project
+loader does not read those values from sidecar files.
 
 Before draft creation, `siglume register` runs:
 
 - local manifest validation
 - remote Tool Manual quality preview
 
-Use `--no-preflight` to skip that step, `--force-draft` to continue after a
-failed preflight, and `--allow-generated-manual` only if you intentionally want
-to register with the CLI-generated Tool Manual template.
+The CLI intentionally does not expose a bypass flag for these checks. Fix
+preflight errors before calling `auto-register`.
 
 ## What is required today
 
@@ -198,6 +198,10 @@ The intended advanced flow is:
 This is the recommended path for AI-assisted registration because it avoids
 manual browser form entry and keeps the registration contract close to the
 source repository.
+
+Recommended prompt for a coding engine:
+
+> Read this repository, especially `README.md`, `GETTING_STARTED.md`, and `docs/publish-flow.md`; use the API idea and external API docs I provide; build a Siglume API that follows the documented CLI-first flow; keep `tool_manual.json`, `runtime_validation.json`, and any required `oauth_credentials.json` next to the adapter; then show the exact `siglume validate .`, `siglume score . --remote`, `siglume test .`, and `siglume register . --confirm` steps.
 
 ## Where the schema lives
 

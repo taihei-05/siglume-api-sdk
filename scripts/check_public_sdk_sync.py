@@ -13,6 +13,16 @@ IGNORE_FILE = SDK_ROOT / "public-sync-ignore.txt"
 PRIVATE_REPO = "https://github.com/taihei-05/siglume.git"
 PUBLIC_REPO = "https://github.com/taihei-05/siglume-api-sdk.git"
 PRIVATE_MIRROR_PREFIX = "packages/contracts/sdk"
+BINARY_SUFFIXES = {
+    ".gif",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".pdf",
+    ".png",
+    ".webp",
+    ".zip",
+}
 
 
 def _run(*args: str, cwd: Path | None = None) -> str:
@@ -90,6 +100,17 @@ def _mirror_path(repo_root: Path, prefix: str, relative_path: str) -> Path:
     return root / relative_path
 
 
+def _comparable_bytes(path: Path) -> bytes:
+    data = path.read_bytes()
+    if path.suffix.lower() in BINARY_SUFFIXES:
+        return data
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+
+
 def _compare_files(peer_dir: Path, patterns: list[str], *, peer_prefix: str) -> list[str]:
     local_files = {path for path in _tracked_files(REPO_ROOT, LOCAL_MIRROR_PREFIX) if not _is_ignored(path, patterns)}
     peer_files = {path for path in _tracked_files(peer_dir, peer_prefix) if not _is_ignored(path, patterns)}
@@ -106,8 +127,8 @@ def _compare_files(peer_dir: Path, patterns: list[str], *, peer_prefix: str) -> 
         issues.extend(f"  - {path}" for path in only_peer)
 
     for rel_path in sorted(local_files & peer_files):
-        local_bytes = _mirror_path(REPO_ROOT, LOCAL_MIRROR_PREFIX, rel_path).read_bytes()
-        peer_bytes = _mirror_path(peer_dir, peer_prefix, rel_path).read_bytes()
+        local_bytes = _comparable_bytes(_mirror_path(REPO_ROOT, LOCAL_MIRROR_PREFIX, rel_path))
+        peer_bytes = _comparable_bytes(_mirror_path(peer_dir, peer_prefix, rel_path))
         if local_bytes != peer_bytes:
             issues.append(f"  - content differs: {rel_path}")
 

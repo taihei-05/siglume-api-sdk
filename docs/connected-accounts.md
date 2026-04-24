@@ -1,7 +1,7 @@
 # Connected Accounts Guide
 
 Siglume APIs can depend on user-linked external accounts such as
-Slack, X, Google, Notion, OpenAI, or MetaMask.
+Slack, X/Twitter, Google, GitHub, Linear, or Notion.
 
 The SDK exposes two distinct concerns:
 
@@ -76,7 +76,7 @@ client.revoke_connected_account("ca_123")
 List required providers in `required_connected_accounts`:
 
 ```python
-required_connected_accounts=["slack", "openai"]
+required_connected_accounts=["slack", "github"]
 ```
 
 ## What Your Runtime Receives
@@ -85,7 +85,7 @@ At execution time, Siglume provides an opaque `ConnectedAccountRef`:
 
 ```python
 ConnectedAccountRef(
-    provider_key="x-twitter",
+    provider_key="twitter",
     session_token="short-lived-scoped-token",
     scopes=["tweet.write"],
     environment=Environment.LIVE,

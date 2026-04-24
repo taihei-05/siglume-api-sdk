@@ -120,13 +120,13 @@ manual = ToolManual(
     tool_name="charge_subscription",
     # ... required fields ...
     permission_class=ToolManualPermissionClass.PAYMENT,
-    approval_summary_template="Charge ${amount} to {card}?",
+    approval_summary_template="Charge ${amount} through the owner's embedded wallet?",
     preview_schema={...},
     idempotency_support=True,
     side_effect_summary="Debits the owner's connected wallet via the platform's payment adapter.",
     quote_schema={...},
     currency="USD",
-    settlement_mode=SettlementMode.STRIPE_PAYMENT_INTENT,
+    settlement_mode=SettlementMode.EMBEDDED_WALLET_CHARGE,
     refund_or_cancellation_note="Full refund within 7 days per platform policy.",
     jurisdiction="US",  # required for action/payment
     legal_notes="Refunds follow US FTC Rule 16 CFR 429. Not offered to EU users.",
@@ -145,11 +145,9 @@ If `AppManifest.jurisdiction = "US"`, a payment tool cannot set
 - **JSON schemas** (`schemas/app-manifest.schema.json`,
   `schemas/tool-manual.schema.json`) enforce `pattern: ^[A-Z]{2}(-[A-Z0-9]{1,3})?$`.
 - **Platform-side**: the review step checks the declared jurisdiction for
-  consistency with the developer's payout setup (historically the Stripe
-  Connect onboarding country; during the on-chain migration this will move
-  to a wallet/account-level declaration — see
-  [PAYMENT_MIGRATION.md](../PAYMENT_MIGRATION.md)). Mismatches surface as a
-  quality-report warning.
+  consistency with the listing, runtime sample, payout readiness, and legal
+  review result. Mismatches surface as a quality-report warning or a blocking
+  publish error depending on severity.
 
 ## Applicable regulations
 
@@ -175,9 +173,8 @@ dollars. This is enforced:
 - The platform's registration endpoint rejects non-USD payloads with a 422
   (`CURRENCY_NOT_SUPPORTED`).
 
-Why: the payout rail (Stripe Connect today, on-chain embedded wallet after
-cutover), platform-fee accounting, the 93.4% / 6.6% revenue split, and the
-$5.00/month minimum for subscription APIs all
+Why: platform-fee accounting, embedded-wallet settlement, the 93.4% / 6.6%
+revenue split, and the $5.00/month minimum for subscription APIs all
 operate in USD. Mixing currencies would fragment payouts and break the fee
 model.
 

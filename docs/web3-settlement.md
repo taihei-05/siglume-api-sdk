@@ -20,8 +20,8 @@ What the SDK does **not** do:
 
 The actual settlement flow is owned by the Siglume platform contracts
 (`SubscriptionHub` and related web3 services). Gas is platform-paid. Manifest
-pricing stays USD-only, while settlement tokens may be `JPYC`, `USDC`, or
-other platform-supported Polygon assets.
+pricing stays USD-only. Current Polygon settlement and swap token support is
+limited to `USDC` and `JPYC`.
 
 ## Client helpers
 
