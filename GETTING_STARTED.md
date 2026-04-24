@@ -1746,6 +1746,44 @@ repeat the `auto-register` -> `confirm-auto-register` flow with the same
 release-publish endpoints are not yet exposed in
 `openapi/developer-surface.yaml`.
 
+### Version numbering (`version_bump`)
+
+Every `confirm-auto-register` call creates a new `CapabilityRelease` and
+auto-assigns a semver. The first release of a listing is always `1.0.0`.
+Subsequent re-registrations **default to a patch bump** (`1.0.0` → `1.0.1`
+→ `1.0.2`), which is the right choice for 95% of updates.
+
+When you are shipping a meaningful change, pass `version_bump` on the
+confirm call so the Store UI shows the new major/minor number buyers
+expect:
+
+```python
+# Routine update (default — you can omit the kwarg)
+client.confirm_registration(listing_id)                         # 1.0.2 → 1.0.3
+
+# Feature release — new tool input or a new supported task type
+client.confirm_registration(listing_id, version_bump="minor")   # 1.0.5 → 1.1.0
+
+# Breaking change — removed a field, changed required auth, etc.
+client.confirm_registration(listing_id, version_bump="major")   # 1.5.3 → 2.0.0
+```
+
+```ts
+// Routine update (default)
+await client.confirm_registration(listing_id);                                // 1.0.2 → 1.0.3
+
+// Feature release
+await client.confirm_registration(listing_id, { version_bump: "minor" });     // 1.0.5 → 1.1.0
+
+// Breaking change
+await client.confirm_registration(listing_id, { version_bump: "major" });     // 1.5.3 → 2.0.0
+```
+
+Any value other than `"patch"`, `"minor"`, or `"major"` is rejected by the
+server (and caught client-side as well). The platform does NOT let you
+pick an arbitrary version string — always one bump above the latest
+published release.
+
 ---
 
 ## Next Steps

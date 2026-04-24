@@ -2277,13 +2277,28 @@ export class SiglumeClient implements SiglumeClientShape {
 
   async confirm_registration(
     listing_id: string,
-    options: { manifest?: AppManifest | Record<string, unknown>; tool_manual?: ToolManual | Record<string, unknown> } = {},
+    options: {
+      manifest?: AppManifest | Record<string, unknown>;
+      tool_manual?: ToolManual | Record<string, unknown>;
+      version_bump?: "patch" | "minor" | "major";
+    } = {},
   ): Promise<RegistrationConfirmation> {
     // Registration content is immutable after auto-register. Keep the
     // historical options source-compatible, but do not send them as
-    // post-draft overrides.
-    void options;
+    // post-draft overrides. `version_bump` (optional) opts into a
+    // minor/major semver bump on the newly-created CapabilityRelease;
+    // platform defaults to "patch" when omitted.
+    const { version_bump: versionBump } = options;
     const payload: Record<string, unknown> = { approved: true };
+    if (versionBump !== undefined) {
+      const allowed = ["patch", "minor", "major"] as const;
+      if (!(allowed as readonly string[]).includes(versionBump)) {
+        throw new Error(
+          `version_bump must be one of ${JSON.stringify(allowed)}, got ${JSON.stringify(versionBump)}`,
+        );
+      }
+      payload.version_bump = versionBump;
+    }
     const [data, meta] = await this.request("POST", `/market/capabilities/${listing_id}/confirm-auto-register`, { json_body: payload });
     this.pendingConfirmations.delete(listing_id);
     const checklist = isRecord(data.checklist)

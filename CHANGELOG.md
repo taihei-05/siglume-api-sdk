@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-24
+
+### Added
+
+- `confirm_registration()` now accepts an optional `version_bump` argument
+  (`"patch"` / `"minor"` / `"major"`). The platform applies it to the
+  semver of the newly-created `CapabilityRelease`. When omitted, behavior
+  is unchanged — the patch position auto-increments as before. Added in
+  both Python and TypeScript bindings; invalid values are rejected
+  client-side before the network round-trip.
+- OpenAPI (`openapi/developer-surface.yaml`) documents the new
+  `version_bump` field on the confirm endpoint with a strict enum.
+- `GETTING_STARTED.md` has a new "Version numbering" section with
+  before/after semver examples.
+
+### Fixed
+
+- The API Store detail page previously hard-coded `1.0.0` because the
+  public listing response never exposed the release semver. Paired with
+  the main-repo fix landing alongside this SDK release, the detail page
+  now reflects the real `release_semver`; `version_bump` lets sellers
+  step past `1.0.x` when they ship a feature or breaking change.
+
 ## [0.8.0] - 2026-04-24
 
 ### Breaking

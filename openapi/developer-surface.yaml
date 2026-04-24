@@ -451,6 +451,18 @@ paths:
                 approved:
                   type: boolean
                   description: Must be true to confirm
+                version_bump:
+                  type: string
+                  enum: [patch, minor, major]
+                  default: patch
+                  description: |
+                    Semver bump kind applied to the next CapabilityRelease.
+                    Omit or pass `patch` for routine re-registrations (e.g.
+                    `1.0.2` → `1.0.3`). Pass `minor` when shipping a new
+                    feature (`1.0.5` → `1.1.0`). Pass `major` when the
+                    change is not backward-compatible (`1.5.3` → `2.0.0`).
+                    First-ever release of a listing is always `1.0.0` and
+                    ignores this field.
                 overrides:
                   type: object
                   deprecated: true
