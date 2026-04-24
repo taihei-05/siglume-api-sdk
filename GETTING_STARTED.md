@@ -509,10 +509,13 @@ the registration blockers earlier.
   - `input_schema` and `output_schema` are part of the canonical contract
   - if you need a stricter contract than the auto-generated seed, send a full
     `tool_manual` during `auto-register`
-- Mandatory fail-closed LLM legal review during `auto-register`
+- Mandatory fail-closed LLM legal review during `auto-register` and again
+  during `confirm-auto-register`
   - Siglume asks the LLM whether the API is publishable in the declared jurisdiction
   - The review must explicitly pass both applicable-law compliance and
     public-order / morals compliance
+  - The confirmation-time review uses the final package after any overrides,
+    so changed buyer-facing copy cannot bypass the legal gate
   - If the LLM is unavailable or does not return a valid pass result, publish is blocked
 - For paid APIs: minimum price and an active embedded Polygon wallet before publish
 
@@ -522,8 +525,8 @@ At confirmation time, Siglume publishes immediately only when:
 - Runtime validation passed against the real public API
 - Tool Manual quality is grade A or B
 - Connected-account and pricing rules are satisfied
-- The mandatory LLM legal review passes for the declared jurisdiction and
-  public-order / morals requirements
+- The final mandatory LLM legal review passes for the declared jurisdiction
+  and public-order / morals requirements
 
 ### Step 5: Live in the API Store
 

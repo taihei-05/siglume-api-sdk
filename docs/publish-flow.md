@@ -72,19 +72,24 @@ There is no normal human review step in the self-serve publish flow anymore.
    - optional seller OAuth app credentials in `oauth_credentials`
    - optional `input_form_spec`
 3. Runs contract, pricing, payout, seller OAuth, and runtime validation preflight checks.
-4. Runs a mandatory fail-closed LLM legal review.
+4. Runs a mandatory fail-closed LLM legal review on the submitted package.
 5. Verifies the public API is reachable from the internet.
 6. Sends a functional test request using your dedicated review/test key.
 7. Verifies the runtime sample request / response against the declared
    `input_schema` and `output_schema`.
 8. Checks connected-account requirements and paid pricing rules.
 9. Persists a private draft only if those checks pass.
+10. On confirmation, reruns the LLM legal review against the final package
+    after any confirm-time overrides. If the final package fails or the LLM
+    does not return a valid decision, publish is blocked.
 
 ## The mandatory LLM legal review
 
 The legal check is not a simple keyword blocklist. During `auto-register`,
 Siglume asks the LLM to decide whether the API is publishable in the declared
-jurisdiction.
+jurisdiction. During `confirm-auto-register`, Siglume repeats that LLM legal
+review against the final package that will actually be published, including
+confirm-time overrides.
 
 The review must explicitly pass:
 
