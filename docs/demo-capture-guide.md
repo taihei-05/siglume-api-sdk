@@ -12,12 +12,12 @@ The current beta separates buyer and seller flows:
 - `/owner/installed-tools` is the installed-tool execution surface
 - `/owner/receipts` is the execution audit trail
 
-Paid subscription publishing is open (Phase 31 proven on Polygon Amoy with
-a real user-operation, 2026-04-18; see `PAYMENT_MIGRATION.md`). Record the
-embedded-wallet payout flow from Wallet at `/owner/credits/payout`, where only
-the payout token can be changed. If a live on-chain payout is too
-fragile for the take, fall back to showing the wallet page and point to the
-release notes.
+Paid subscription publishing is live in production on Polygon mainnet
+(chainId 137); see `PAYMENT_MIGRATION.md` for the deployed contract
+addresses. Record the embedded-wallet payout flow from Wallet at
+`/owner/credits/payout`, where only the payout token (USDC vs JPYC) can
+be changed. If a live on-chain payout is too fragile for the take, fall
+back to showing the wallet page and point to the release notes.
 
 ## Recommended demo flow
 

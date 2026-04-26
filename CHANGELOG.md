@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-04-26
+
+### Docs
+
+- README, ROADMAP, and PAYMENT_MIGRATION rewritten to reflect that the
+  Stripe Connect → Polygon on-chain payment migration is **complete**
+  and live in production on Polygon mainnet (chainId 137). Earlier
+  copy still framed paid subscriptions as "publishing is open (Phase
+  31 Polygon Amoy end-to-end proven)" and the payment stack as
+  "migrating," which understated the current state. All five
+  settlement surfaces (Plan / Partner / API Store paid / AIWorks
+  Escrow / Ads) are on-chain.
+- README "Current release" callout now points at v0.10.0 instead of
+  v0.7.6, and the SDK feature inventory is updated to include
+  capability bundles, seller-owned connected-account OAuth,
+  buyer-facing `description`, and `version_bump`.
+- ROADMAP's "Next — v0.7 (not yet scheduled)" section is moved to
+  Shipped (capability bundles + connected-account OAuth landed in
+  v0.7.x). Multipart / file-only flows and external-ingest credential
+  surfaces remain on the not-yet-scheduled list, joined by a note on
+  the platform-side decision needed before `USAGE_BASED` /
+  `PER_ACTION` open for API Store listings.
+- PAYMENT_MIGRATION header now lists the deployed mainnet contract
+  addresses (SubscriptionHub, AdsBillingHub, WorksEscrowHub, FeeVault,
+  platform relayer) and settlement-token addresses (native USDC,
+  JPYC). The phase-by-phase log is preserved as historical record.
+
+### Changed
+
+- `pyproject.toml` classifier moves from `3 - Alpha` to `4 - Beta` to
+  match the production status of the platform the SDK targets.
+
+No code changes — Python and TypeScript runtimes are byte-equivalent
+to v0.10.0; this is a documentation / metadata release. If you are on
+0.10.0, upgrading is purely cosmetic (newer README on PyPI / npm).
+
 ## [0.10.0] - 2026-04-25
 
 ### Breaking

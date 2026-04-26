@@ -53,7 +53,7 @@ def test_package_runtime_versions_match_release_metadata() -> None:
     python_version = str(pyproject["project"]["version"])
     ts_version = str(package_json["version"])
 
-    assert python_version == "0.10.0"
+    assert python_version == "0.10.1"
     assert ts_version == python_version
     assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
     assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
@@ -68,7 +68,7 @@ def test_onboarding_docs_match_generated_scaffold_and_no_key_first_loop() -> Non
 
     assert "v0.5.0 is out" not in readme
     assert "current v0.5 release line" not in ts_readme
-    assert "This is an early-stage project (v0.7.6, alpha)" in readme
+    assert "This is **v0.10.0 (beta)**" in readme
     assert "Production releases are published by GitHub Actions with PyPI Trusted" in security
     assert "Do not create a PyPI API token or local `.pypirc` for the normal release path." in normalized_security
     assert "Rotate after every release" not in security

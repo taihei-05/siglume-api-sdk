@@ -127,8 +127,9 @@ async def main():
     print("     siglume register . --confirm")
     print("")
     print("Revenue share: 93.4% developer / 6.6% platform.")
-    print("Settlement: migrating from Stripe Connect to on-chain embedded wallet")
-    print("(gas covered by the platform). See PAYMENT_MIGRATION.md for details.")
+    print("Settlement: on-chain on Polygon mainnet (chainId 137) via your")
+    print("non-custodial embedded smart wallet. Platform sponsors gas. See")
+    print("PAYMENT_MIGRATION.md for the deployed contract addresses.")
 
 
 if __name__ == "__main__":

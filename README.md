@@ -41,7 +41,7 @@ Use [docs/coding-agent-guide.md](./docs/coding-agent-guide.md) as the file to
 give your coding agent. Use [API_IDEAS.md](./API_IDEAS.md) if you need a safe
 first idea.
 
-> ⚠️ **Payment stack is migrating.** Siglume is moving from Stripe Connect to fully **on-chain settlement** (embedded smart wallet, platform-covered gas, auto-debit subscriptions). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for what works today vs. what's changing.
+> ✅ **Payment stack is on-chain and live.** Siglume settles 100% on **Polygon mainnet** (chainId 137) — non-custodial embedded smart wallets, platform-sponsored gas, auto-debit subscription mandates. Stripe Connect was retired in v0.2.0; the migration is complete across all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the migration history and on-chain contract addresses.
 
 Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
 
@@ -57,12 +57,14 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v0.7.6.** Python and TypeScript are version-aligned and
+> **Current release: v0.10.0.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
-> runtime validation, seller OAuth seeding, paid payout readiness, webhooks,
-> usage metering and typed Web3 settlement helpers.
+> runtime validation, seller-owned connected-account OAuth, paid payout readiness,
+> capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
+> long-form buyer-facing `description`, and platform-controlled release semver
+> via `version_bump`.
 > See [CHANGELOG.md](./CHANGELOG.md) and
-> [RELEASE_NOTES_v0.7.6.md](./RELEASE_NOTES_v0.7.6.md) for the current release.
+> [RELEASE_NOTES_v0.10.0.md](./RELEASE_NOTES_v0.10.0.md) for the current release.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 > For the current browser-vs-CLI entry points into the same `auto-register`
@@ -267,12 +269,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 |---|---|
 | **Developer share** | 93.4% of subscription revenue |
 | **Platform fee** | 6.6% |
-| **Settlement** | On-chain to a Polygon embedded wallet (see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
-| **Gas fees** | Covered by the platform — developers and buyers never touch gas tokens |
+| **Settlement** | On-chain on **Polygon mainnet** (chainId 137) via your non-custodial embedded smart wallet (see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
+| **Gas fees** | Covered by the platform — developers and buyers never touch POL/MATIC |
+| **Settlement tokens** | USDC and JPYC (ERC-20 on Polygon mainnet) |
 | **Minimum price** | $5.00/month equivalent for subscription APIs |
 | **Free APIs** | Also supported — no wallet setup required for free listings |
 
-Both free and paid subscription APIs are supported. Free listings are fully live today; paid subscription publishing is open (Phase 31 Polygon Amoy end-to-end proven, 2026-04-18). Paid revenue settles to your Siglume embedded Polygon wallet automatically; only the payout token is configurable, from Wallet at `/owner/credits/payout`.
+Both free and paid subscription APIs are live in production on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid listings settle automatically to your non-custodial embedded smart wallet on each charge cycle. Only the payout token (USDC vs JPYC) is configurable, from Wallet at `/owner/credits/payout`.
 
 > **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
 > and `PER_ACTION`. These are **reserved for future phases** and are not accepted
@@ -545,9 +548,13 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is an early-stage project (v0.7.6, alpha) with a growing but still
-small user base. The SDK and platform are actively evolving. Start with
-a small read-only API to learn the flow.
+This is **v0.10.0 (beta)** — the platform is launched on Polygon mainnet
+(chainId 137) with all five settlement surfaces (Plan / Partner / API
+Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
+reached parity with the production registration and operation surface.
+The user base is still growing, and new SDK surfaces continue to ship
+as the platform exposes them. Start with a small read-only API to learn
+the flow.
 
 ## Questions? Ideas? Feedback?
 

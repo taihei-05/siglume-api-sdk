@@ -640,7 +640,7 @@ Declare the account type in `required_connected_accounts`. The agent owner conne
 Use `price_model="free"` for free APIs. For subscription APIs, use `price_model="subscription"` with `price_value_minor` set to your monthly price in cents (e.g., 999 for $9.99/month). Minimum subscription price is $5.00/month (500 cents). The following pricing models are available:
 
 - **Free** (`price_model="free"`): Anyone can install. You can convert to subscription pricing at any time.
-- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement runs on Polygon on-chain embedded-wallet auto-debit (proven end-to-end on Amoy 2026-04-18 — see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md)). Revenue settles to your Siglume embedded wallet automatically; use `/owner/credits/payout` only if you want to change the payout token. Buyers purchase via Web3 mandate, and access grants are automatic.
+- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement runs on Polygon mainnet (chainId 137) via on-chain embedded-wallet auto-debit (see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the deployed contract addresses). Revenue settles to your Siglume embedded wallet automatically; use `/owner/credits/payout` only if you want to change the payout token (USDC vs JPYC). Buyers purchase via on-chain Web3 mandate, and access grants are automatic.
 
 The SDK enum `PriceModel` also defines `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and `PER_ACTION`. These are **reserved values for future phases** — they are not accepted by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
 
@@ -1387,26 +1387,20 @@ You receive:            ~$9.33/month, settled directly to your wallet
 
 ### Wallet payout flow (subscription APIs only)
 
-> ✅ **Payouts now run on Polygon.** Paid subscription publish is **open** — proven end-to-end on Polygon Amoy (2026-04-18). Revenue settles to the Siglume embedded wallet automatically; use `/owner/credits/payout` only when you want to change the payout token. Buyers purchase via Web3 mandate, and access grants land automatically. The Stripe Connect onboarding flow shown below is retained only for reference during migration — new publishes use the Polygon path. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full migration log and real on-chain metrics.
+> ✅ **Payouts run on Polygon mainnet (chainId 137).** Paid subscription publish is live in production — Stripe Connect is fully retired across the platform and the migration is complete for all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). Revenue settles to your Siglume embedded smart wallet automatically; use `/owner/credits/payout` only when you want to change the payout token (USDC vs JPYC). Buyers purchase via on-chain Web3 mandate and access grants land automatically. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full migration log and the deployed mainnet contract addresses.
 
-Historical Stripe-Connect-based flow (retired, kept here for reference only):
-
-1. The developer portal returned a hosted onboarding URL.
-2. Developer completed Stripe identity + bank-account verification once.
-3. The developer portal later showed the payout rail as ready.
-4. Subsequent `confirm-auto-register` calls for `price_model="subscription"` went through.
-
-The current on-chain flow (live as of Phase 31 on Polygon Amoy, 2026-04-18):
+The on-chain flow:
 
 - Creates a **non-custodial** embedded smart wallet attached to the developer's Siglume account (no external wallet app needed). Turnkey-backed ERC-4337 smart account — signing authority stays with the user; Siglume never holds your keys or your funds.
-- Uses that embedded wallet as the fixed payout destination; developers can change the payout token, not specify an external payout wallet.
-- Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold the gas token.
-- Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades). Buyers pre-authorize an on-chain mandate with a monthly cap; the `SubscriptionHub` contract can only pull within that cap, and the buyer can revoke on-chain at any time.
+- Uses that embedded wallet as the fixed payout destination; developers can change the payout token (USDC vs JPYC), not specify an external payout wallet.
+- Has the platform cover gas fees end-to-end via Pimlico paymaster, so developers never hold POL/MATIC.
+- Uses session-key-scoped auto-debits for subscription renewals (no Stripe-style retry cascades). Buyers pre-authorize an on-chain mandate with a per-charge cap; the `SubscriptionHub` contract can only pull within that cap, and the buyer can revoke on-chain at any time.
 
-SDK v0.7.6 ships the Web3 enum values for
+SDK ships the Web3 enum values for
 payment-permission tools: `SettlementMode.POLYGON_MANDATE` and
-`SettlementMode.EMBEDDED_WALLET_CHARGE`. See
-[PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log.
+`SettlementMode.EMBEDDED_WALLET_CHARGE` (added in v0.2.0). See
+[PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log
+and the live mainnet contract addresses.
 
 ### Free APIs need no wallet setup
 

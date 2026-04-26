@@ -6,6 +6,54 @@ what is explicitly out of scope. For the per-release changelog, see
 
 ## Shipped
 
+### v0.10.0 — buyer-facing copy + platform-controlled release semver
+
+`AppManifest.description` (long-form buyer-facing sales copy) and the
+top-level forwarding of `description` / `permission_scopes` /
+`compatibility_tags` on `auto_register`. Server-rejected
+`AppManifest.version` is stripped from outbound payloads; use
+`confirm_registration(..., version_bump=...)` to control
+`release_semver`. See
+[RELEASE_NOTES_v0.10.0.md](./RELEASE_NOTES_v0.10.0.md).
+
+### v0.9.x — semver control + listing detail polish
+
+`confirm_registration(..., version_bump="patch"|"minor"|"major")` lets
+sellers step the published `release_semver` past the auto-incrementing
+patch. `AppListing` documents the `version` and `active_agent_count`
+fields the detail endpoint already returns. See
+[RELEASE_NOTES_v0.9.0.md](./RELEASE_NOTES_v0.9.0.md) /
+[RELEASE_NOTES_v0.9.1.md](./RELEASE_NOTES_v0.9.1.md).
+
+### v0.8.0 — example_prompts ≥ 2 enforced
+
+`example_prompts` now requires at least 2 distinct entries on
+`auto_register` / `confirm_auto_register`; client-side preflight
+mirrors the server rule so the failure surfaces before the network
+round-trip. See
+[RELEASE_NOTES_v0.8.0.md](./RELEASE_NOTES_v0.8.0.md).
+
+### v0.7.x — capability bundles + seller-owned connected-account OAuth
+
+Both v0.7 platform tracks landed:
+
+- **Capability bundles** — typed `/v1/market/bundles` wrappers in
+  Python and TypeScript. One listing exposes multiple capability
+  listings under one subscription; same-seller, 10-member cap, and
+  grade-B-per-member gates are enforced platform-side.
+- **Connected-account OAuth (seller-owned)** — sellers register their
+  own OAuth app credentials per listing via
+  `set_listing_oauth_credentials()`; buyers initiate OAuth against the
+  seller's app rather than a platform-shared one. The
+  `client_secret` never leaves the SDK on the wire.
+
+Plus production-onboarding hardening across v0.7.2 → v0.7.6:
+auto-register payload alignment, runtime-validation contract checks,
+register CLI preflight, jurisdiction enforcement, and `SIGLUME_API_KEY`
+fallback. See
+[RELEASE_NOTES_v0.7.0.md](./RELEASE_NOTES_v0.7.0.md) through
+[RELEASE_NOTES_v0.7.6.md](./RELEASE_NOTES_v0.7.6.md).
+
 ### v0.6.0 — first-party operation surface parity
 
 Every first-party operation on the Siglume platform is reachable
@@ -27,30 +75,20 @@ drafting, manifest / tool-manual diff, tool-schema exporter
 (experimental), seven starter examples. See
 [RELEASE_NOTES_v0.4.0.md](./RELEASE_NOTES_v0.4.0.md).
 
-## Next — v0.7 (not yet scheduled)
+### v0.2.0 — first SDK-visible step of the on-chain payment migration
 
-v0.7 focuses on surfaces **outside** the first-party operation
-registry that v0.6 already covers. Each of the three tracks below is
-blocked on platform-side contract work before the SDK can wrap it.
+`SettlementMode` expanded with `polygon_mandate` and
+`embedded_wallet_charge`. The full migration (Stripe Connect → Polygon
+mainnet, chainId 137) shipped server-side across phases 1–47 and is
+now live in production for all five settlement surfaces (Plan /
+Partner / API Store paid / AIWorks Escrow / Ads). See
+[PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the detail and
+on-chain contract addresses.
 
-### Capability bundles
+## Next — not yet scheduled
 
-Publish one listing that exposes multiple `ToolManual` entries (one
-per sub-capability) and is sold as a single subscription.
-
-What the SDK will add once the platform ships the bundle contract:
-
-- `AppAdapter.list_tools()` convention for declaring multiple tools
-  on one adapter.
-- Bundle-level registration helpers on `SiglumeClient`.
-- Bundle-aware quality grading in `AppTestHarness`.
-
-Platform prerequisites:
-
-- A public `/v1/market/bundles` (or equivalent) registration and
-  read API.
-- Stable bundle-level identity that maps cleanly onto listing keys,
-  release ids, and per-tool quality validation.
+Each track below is blocked on platform-side contract work before the
+SDK can wrap it.
 
 ### Multipart / file-only flows
 
@@ -107,6 +145,15 @@ Platform prerequisites:
 - A stable provider-family contract in `operation_registry` for
   external credential issuance.
 - Decision on per-provider redaction and audit requirements.
+
+### Usage-based / per-action billing on `PriceModel`
+
+The SDK enum reserves `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and
+`PER_ACTION`, and the `MeterClient` surface ships today as
+experimental ingest-only. Platform-side, `AdsBillingHub` already
+implements metered settlement on Polygon for ad spend; opening the
+same axis for API Store listings is a platform decision, not an
+SDK gap.
 
 ## Not planned
 

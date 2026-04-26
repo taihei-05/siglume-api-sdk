@@ -1,9 +1,26 @@
 # Payment Migration: Stripe Connect → Polygon On-Chain Smart Wallet
 
-**Status:** Phases 1–47 shipped. **Phase 47 closes preflight / env alignment and marks the Codex implementation role as handed off.** `web3_preflight_rpc_max_age_seconds` default is now 60 s and `.env.prod.example` matches. Reconciliation cadence is now documented as seconds-based-daily, with external orchestration called out as the way to pin a fixed wall-clock time (e.g., 03:00). `payout_*` primary / `stripe_*` alias stance is further sharpened in OpenAPI + frontend types. **Codex declared its implementation role complete after Phase 47** — branch is handed off in "merge-ready pending operator + release cut" state. Residual code task is `stripe_*` alias tail cleanup (release-cadence decision, not implementation). `recovery-2026-04-18` is **code-complete for mainnet launch prerequisites**; main still untouched. Remaining work is operator-side + release-side: (1) create 2-of-3 operator Safe on Polygon mainnet, (2) populate `.env.prod` from the operator-ready `.env.prod.example`, (3) run `/v1/admin/market/web3/preflight --require-ready` and verify all green, (4) merge `recovery-2026-04-18` → `main` and deploy, (5) re-sync public SDK repo `openapi/developer-surface.yaml` + cut patch release (v0.2.1, additive-only) so SDK consumers see `payout_*` primary.
-**Last updated:** 2026-04-18
+**Status: ✅ COMPLETE — live on Polygon mainnet (chainId 137).**
 
-The Siglume Agent API Store is retiring its Stripe Connect payout stack and moving to **Polygon-based on-chain settlement**. This document tracks the migration so SDK users know what works today vs. what is changing.
+The migration is done. All five Siglume settlement surfaces — Plan / Partner / API Store paid / AIWorks Escrow / Ads — settle on-chain through the Polygon mainnet contracts below. Stripe Connect is retired across the platform; there is no Stripe code path remaining for new purchases.
+
+**Mainnet contracts (chainId 137):**
+
+| Contract | Address |
+|---|---|
+| `SubscriptionHub` | [`0xBe901CcCCF94709105cbCdc4A9799dC05d24Eb16`](https://polygonscan.com/address/0xBe901CcCCF94709105cbCdc4A9799dC05d24Eb16) |
+| `AdsBillingHub` | [`0xFc89FB66CeF46b6A3802E8e4aeDce1B115335744`](https://polygonscan.com/address/0xFc89FB66CeF46b6A3802E8e4aeDce1B115335744) |
+| `WorksEscrowHub` | [`0x6FC58be065F99354932Db2C8ac4030CEf4fa5889`](https://polygonscan.com/address/0x6FC58be065F99354932Db2C8ac4030CEf4fa5889) |
+| `FeeVault` | [`0x1c631A94851cD9cbd4CB631A821EDd6Aa22523b0`](https://polygonscan.com/address/0x1c631A94851cD9cbd4CB631A821EDd6Aa22523b0) |
+| Platform relayer (Safe-4337 smart wallet, gas-sponsored) | `0x2216864a3f9cf8039d49748abc5ee79a006f4fea` |
+
+Settlement tokens: native USDC (`0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`) and JPYC (`0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29`). Buyers and sellers each get a non-custodial embedded smart wallet (Turnkey-backed sub-org per user); platform-sponsored gas via Pimlico means neither side ever holds POL/MATIC. Subscription mandates auto-debit on cadence; the buyer can revoke on-chain at any time.
+
+The phase-by-phase log below is preserved as historical record. The "Phase 47 / mainnet-launch-prerequisites code-complete" status that closes that log was followed shortly after by the actual mainnet deploy and cutover, and the platform has been operating on the on-chain rail since.
+
+**Last updated:** 2026-04-26
+
+The Siglume Agent API Store has retired its Stripe Connect payout stack and moved to **Polygon-based on-chain settlement**. This document records the migration history so SDK users can see how the on-chain contracts and the SDK enums got to their current shape.
 
 ## The new model
 
