@@ -80,13 +80,6 @@ export interface ConnectedAccountRef {
 
 export interface AppManifest {
   capability_key: string;
-  /**
-   * LOCAL-ONLY identification. The Siglume platform never reads this on
-   * auto_register / confirm_auto_register and rejects submissions that
-   * declare a version — the authoritative `release_semver` is controlled
-   * by the platform per the bump rules on the confirm endpoint
-   * (see `confirm_registration({ version_bump: ... })`).
-   */
   version?: string;
   name: string;
   job_to_be_done: string;
@@ -103,13 +96,6 @@ export interface AppManifest {
   applicable_regulations?: string[];
   data_residency?: string;
   short_description?: string;
-  /**
-   * Long-form sales description shown on the buyer-facing API detail
-   * page. Complements `short_description` (one-liner) with a fuller
-   * pitch: who this is for, what it can / cannot do, limits, required
-   * connected accounts. The Tool Manual is agent-facing and not shown
-   * to buyers; put buyer-facing story here.
-   */
   description?: string;
   docs_url?: string;
   support_contact?: string;
@@ -290,6 +276,7 @@ export interface AppListingRecord {
   price_value_minor: number;
   currency: string;
   short_description?: string | null;
+  description?: string | null;
   docs_url?: string | null;
   support_contact?: string | null;
   seller_display_name?: string | null;
@@ -1302,75 +1289,5 @@ export interface AgentTopicSubscription {
 export interface AgentThreadRecord {
   thread_id: string;
   items: NetworkContentDetail[];
-  raw: Record<string, unknown>;
-}
-
-export const RefundReason = {
-  CUSTOMER_REQUEST: "customer-request",
-  DUPLICATE: "duplicate",
-  FRAUDULENT: "fraudulent",
-  SERVICE_FAILURE: "service-failure",
-  GOODWILL: "goodwill",
-} as const;
-export type RefundReason = (typeof RefundReason)[keyof typeof RefundReason];
-
-export const DisputeResponse = {
-  ACCEPT: "accept",
-  CONTEST: "contest",
-} as const;
-export type DisputeResponse = (typeof DisputeResponse)[keyof typeof DisputeResponse];
-
-export const RefundStatus = {
-  ISSUED: "issued",
-  FAILED: "failed",
-} as const;
-export type RefundStatus = (typeof RefundStatus)[keyof typeof RefundStatus];
-
-export const DisputeStatus = {
-  OPEN: "open",
-  ACCEPTED: "accepted",
-  CONTESTED: "contested",
-} as const;
-export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus];
-
-export interface RefundRecord {
-  refund_id: string;
-  receipt_id: string;
-  owner_user_id?: string | null;
-  payment_mandate_id?: string | null;
-  usage_event_id?: string | null;
-  chain_receipt_id?: string | null;
-  amount_minor: number;
-  currency: string;
-  status: string;
-  reason_code: string;
-  note?: string | null;
-  idempotency_key?: string | null;
-  on_chain_tx_hash?: string | null;
-  metadata: Record<string, unknown>;
-  idempotent_replay: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface DisputeRecord {
-  dispute_id: string;
-  receipt_id: string;
-  owner_user_id?: string | null;
-  payment_mandate_id?: string | null;
-  usage_event_id?: string | null;
-  external_dispute_id?: string | null;
-  status: string;
-  reason_code: string;
-  description?: string | null;
-  evidence: Record<string, unknown>;
-  response_decision?: string | null;
-  response_note?: string | null;
-  responded_at?: string | null;
-  metadata: Record<string, unknown>;
-  idempotent_replay: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
   raw: Record<string, unknown>;
 }

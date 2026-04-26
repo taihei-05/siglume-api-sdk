@@ -232,6 +232,15 @@ paths:
                 name:
                   type: string
                   description: Override auto-detected name
+                job_to_be_done:
+                  type: string
+                  description: Buyer-facing task this API lets an agent complete.
+                short_description:
+                  type: string
+                  description: Concise buyer-facing catalog summary.
+                description:
+                  type: string
+                  description: Optional long buyer-facing detail shown on the API Store detail page.
                 category:
                   type: string
                   enum: [commerce, booking, crm, finance, document, communication, monitoring, creative, productivity, summarization, other]
@@ -491,6 +500,8 @@ paths:
                     job_to_be_done:
                       type: string
                     short_description:
+                      type: string
+                    description:
                       type: string
                     category:
                       type: string
@@ -1650,171 +1661,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/SupportCaseEnvelope'
 
-  /market/refunds:
-    get:
-      operationId: listRefunds
-      summary: List your marketplace refunds
-      tags: [Refunds]
-      parameters:
-        - name: receipt_id
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Refund records
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefundListEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    post:
-      operationId: issueRefund
-      summary: Issue a partial or full refund
-      tags: [Refunds]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRefundRequest'
-      responses:
-        '201':
-          description: Refund issued
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefundEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-
-  /market/refunds/{refund_id}:
-    get:
-      operationId: getRefund
-      summary: Get a refund by id
-      tags: [Refunds]
-      parameters:
-        - name: refund_id
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: Refund record
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefundEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-
-  /market/disputes:
-    get:
-      operationId: listDisputes
-      summary: List your marketplace disputes
-      tags: [Refunds]
-      parameters:
-        - name: receipt_id
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Dispute records
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DisputeListEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-
-  /market/disputes/{dispute_id}:
-    get:
-      operationId: getDispute
-      summary: Get a dispute by id
-      tags: [Refunds]
-      parameters:
-        - name: dispute_id
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: Dispute record
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DisputeEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-
-  /market/disputes/{dispute_id}/respond:
-    post:
-      operationId: respondToDispute
-      summary: Accept or contest a dispute
-      tags: [Refunds]
-      parameters:
-        - name: dispute_id
-          in: path
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RespondToDisputeRequest'
-      responses:
-        '200':
-          description: Updated dispute record
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DisputeEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-
 components:
   schemas:
     EnvelopeMeta:
@@ -2567,156 +2413,6 @@ components:
         idempotency_key: { type: string }
         environment: { type: string, enum: [sandbox, live], default: live }
         metadata: { type: object }
-
-    RefundReason:
-      type: string
-      enum: [customer-request, duplicate, fraudulent, service-failure, goodwill]
-
-    DisputeResponse:
-      type: string
-      enum: [accept, contest]
-
-    RefundStatus:
-      type: string
-      enum: [issued, failed]
-
-    DisputeStatus:
-      type: string
-      enum: [open, accepted, contested]
-
-    CreateRefundRequest:
-      type: object
-      required: [receipt_id, idempotency_key]
-      properties:
-        receipt_id: { type: string }
-        amount_minor: { type: integer, minimum: 1, nullable: true }
-        reason_code:
-          $ref: '#/components/schemas/RefundReason'
-        note: { type: string, nullable: true }
-        idempotency_key: { type: string }
-
-    Refund:
-      type: object
-      required: [id, receipt_id, amount_minor, currency, status, reason_code]
-      properties:
-        id: { type: string }
-        receipt_id: { type: string }
-        owner_user_id: { type: string, nullable: true }
-        payment_mandate_id: { type: string, nullable: true }
-        usage_event_id: { type: string, nullable: true }
-        chain_receipt_id: { type: string, nullable: true }
-        amount_minor: { type: integer }
-        currency: { type: string }
-        status:
-          $ref: '#/components/schemas/RefundStatus'
-        reason_code:
-          $ref: '#/components/schemas/RefundReason'
-        note: { type: string, nullable: true }
-        idempotency_key: { type: string, nullable: true }
-        on_chain_tx_hash: { type: string, nullable: true }
-        metadata:
-          type: object
-          additionalProperties: true
-        idempotent_replay: { type: boolean }
-        created_at: { type: string, nullable: true }
-        updated_at: { type: string, nullable: true }
-
-    RefundEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/Refund'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    RefundListEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Refund'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    RespondToDisputeRequest:
-      type: object
-      required: [response]
-      properties:
-        response:
-          $ref: '#/components/schemas/DisputeResponse'
-        evidence:
-          type: object
-          additionalProperties: true
-        note: { type: string, nullable: true }
-
-    Dispute:
-      type: object
-      required: [id, receipt_id, status, reason_code, evidence]
-      properties:
-        id: { type: string }
-        receipt_id: { type: string }
-        owner_user_id: { type: string, nullable: true }
-        payment_mandate_id: { type: string, nullable: true }
-        usage_event_id: { type: string, nullable: true }
-        external_dispute_id: { type: string, nullable: true }
-        status:
-          $ref: '#/components/schemas/DisputeStatus'
-        reason_code: { type: string }
-        description: { type: string, nullable: true }
-        evidence:
-          type: object
-          additionalProperties: true
-        response_decision:
-          anyOf:
-            - $ref: '#/components/schemas/DisputeResponse'
-            - type: 'null'
-        response_note: { type: string, nullable: true }
-        responded_at: { type: string, nullable: true }
-        metadata:
-          type: object
-          additionalProperties: true
-        idempotent_replay: { type: boolean }
-        created_at: { type: string, nullable: true }
-        updated_at: { type: string, nullable: true }
-
-    DisputeEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/Dispute'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    DisputeListEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Dispute'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
 
     Web3TransactionRequest:
       type: object
@@ -3757,10 +3453,8 @@ components:
         - subscription.cancelled
         - subscription.paused
         - subscription.reinstated
-        - refund.issued
         - payment.succeeded
         - payment.failed
-        - payment.disputed
         - capability.published
         - capability.delisted
         - execution.completed

@@ -119,6 +119,7 @@ class AppListingRecord:
     price_value_minor: int = 0
     currency: str = "USD"
     short_description: str | None = None
+    description: str | None = None
     docs_url: str | None = None
     support_contact: str | None = None
     seller_display_name: str | None = None
@@ -1249,74 +1250,6 @@ class OperationExecution:
     safety: dict[str, Any] = field(default_factory=dict, kw_only=True)
 
 
-class RefundReason(str, Enum):
-    CUSTOMER_REQUEST = "customer-request"
-    DUPLICATE = "duplicate"
-    FRAUDULENT = "fraudulent"
-    SERVICE_FAILURE = "service-failure"
-    GOODWILL = "goodwill"
-
-
-class DisputeResponse(str, Enum):
-    ACCEPT = "accept"
-    CONTEST = "contest"
-
-
-class RefundStatus(str, Enum):
-    ISSUED = "issued"
-    FAILED = "failed"
-
-
-class DisputeStatus(str, Enum):
-    OPEN = "open"
-    ACCEPTED = "accepted"
-    CONTESTED = "contested"
-
-
-@dataclass
-class Refund:
-    refund_id: str
-    receipt_id: str
-    owner_user_id: str | None = None
-    payment_mandate_id: str | None = None
-    usage_event_id: str | None = None
-    chain_receipt_id: str | None = None
-    amount_minor: int = 0
-    currency: str = "USD"
-    status: str = RefundStatus.ISSUED.value
-    reason_code: str = RefundReason.CUSTOMER_REQUEST.value
-    note: str | None = None
-    idempotency_key: str | None = None
-    on_chain_tx_hash: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-    idempotent_replay: bool = False
-    created_at: str | None = None
-    updated_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class Dispute:
-    dispute_id: str
-    receipt_id: str
-    owner_user_id: str | None = None
-    payment_mandate_id: str | None = None
-    usage_event_id: str | None = None
-    external_dispute_id: str | None = None
-    status: str = DisputeStatus.OPEN.value
-    reason_code: str = "manual-review"
-    description: str | None = None
-    evidence: dict[str, Any] = field(default_factory=dict)
-    response_decision: str | None = None
-    response_note: str | None = None
-    responded_at: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-    idempotent_replay: bool = False
-    created_at: str | None = None
-    updated_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
 def _string_or_none(value: Any) -> str | None:
     text = str(value).strip() if value is not None else ""
     return text or None
@@ -1544,6 +1477,7 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         price_value_minor=int(data.get("price_value_minor") or 0),
         currency=str(data.get("currency") or "USD"),
         short_description=_string_or_none(data.get("short_description")),
+        description=_string_or_none(data.get("description")),
         docs_url=_string_or_none(data.get("docs_url")),
         support_contact=_string_or_none(data.get("support_contact")),
         seller_display_name=_string_or_none(data.get("seller_display_name")),
@@ -2823,52 +2757,6 @@ def _parse_market_proposal_action_result(execution: OperationExecution) -> Marke
         trace_id=execution.trace_id,
         request_id=execution.request_id,
         raw=dict(execution.raw),
-    )
-
-
-def _parse_refund(data: Mapping[str, Any]) -> Refund:
-    return Refund(
-        refund_id=str(data.get("refund_id") or data.get("id") or ""),
-        receipt_id=str(data.get("receipt_id") or ""),
-        owner_user_id=_string_or_none(data.get("owner_user_id")),
-        payment_mandate_id=_string_or_none(data.get("payment_mandate_id")),
-        usage_event_id=_string_or_none(data.get("usage_event_id")),
-        chain_receipt_id=_string_or_none(data.get("chain_receipt_id")),
-        amount_minor=int(data.get("amount_minor") or 0),
-        currency=str(data.get("currency") or "USD"),
-        status=str(data.get("status") or RefundStatus.ISSUED.value),
-        reason_code=str(data.get("reason_code") or RefundReason.CUSTOMER_REQUEST.value),
-        note=_string_or_none(data.get("note")),
-        idempotency_key=_string_or_none(data.get("idempotency_key")),
-        on_chain_tx_hash=_string_or_none(data.get("on_chain_tx_hash")),
-        metadata=_to_dict(data.get("metadata")),
-        idempotent_replay=bool(data.get("idempotent_replay") or False),
-        created_at=_string_or_none(data.get("created_at")),
-        updated_at=_string_or_none(data.get("updated_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_dispute(data: Mapping[str, Any]) -> Dispute:
-    return Dispute(
-        dispute_id=str(data.get("dispute_id") or data.get("id") or ""),
-        receipt_id=str(data.get("receipt_id") or ""),
-        owner_user_id=_string_or_none(data.get("owner_user_id")),
-        payment_mandate_id=_string_or_none(data.get("payment_mandate_id")),
-        usage_event_id=_string_or_none(data.get("usage_event_id")),
-        external_dispute_id=_string_or_none(data.get("external_dispute_id")),
-        status=str(data.get("status") or DisputeStatus.OPEN.value),
-        reason_code=str(data.get("reason_code") or "manual-review"),
-        description=_string_or_none(data.get("description")),
-        evidence=_to_dict(data.get("evidence")),
-        response_decision=_string_or_none(data.get("response_decision")),
-        response_note=_string_or_none(data.get("response_note")),
-        responded_at=_string_or_none(data.get("responded_at")),
-        metadata=_to_dict(data.get("metadata")),
-        idempotent_replay=bool(data.get("idempotent_replay") or False),
-        created_at=_string_or_none(data.get("created_at")),
-        updated_at=_string_or_none(data.get("updated_at")),
-        raw=dict(data),
     )
 
 
@@ -5170,137 +5058,6 @@ class SiglumeClient:
                 )
             ) if next_cursor else None,
         )
-
-    def issue_partial_refund(
-        self,
-        receipt_id: str,
-        *,
-        amount_minor: int,
-        reason: RefundReason | str = RefundReason.CUSTOMER_REQUEST,
-        note: str | None = None,
-        idempotency_key: str,
-        original_amount_minor: int | None = None,
-    ) -> Refund:
-        normalized_receipt_id = str(receipt_id or "").strip()
-        normalized_idempotency_key = str(idempotency_key or "").strip()
-        if not normalized_receipt_id:
-            raise SiglumeClientError("receipt_id is required.")
-        if not normalized_idempotency_key:
-            raise SiglumeClientError("idempotency_key is required.")
-        try:
-            requested_amount_minor = int(amount_minor)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise SiglumeClientError("amount_minor must be a finite integer.") from exc
-        if requested_amount_minor <= 0:
-            raise SiglumeClientError("amount_minor must be positive.")
-        if original_amount_minor is not None and requested_amount_minor > int(original_amount_minor):
-            raise SiglumeClientError("amount_minor cannot exceed the original receipt amount.")
-        payload: dict[str, Any] = {
-            "receipt_id": normalized_receipt_id,
-            "amount_minor": requested_amount_minor,
-            "reason_code": _enum_value(reason),
-            "idempotency_key": normalized_idempotency_key,
-        }
-        if note:
-            payload["note"] = note
-        data, _meta = self._request("POST", "/market/refunds", json_body=payload)
-        return _parse_refund(data)
-
-    def issue_full_refund(
-        self,
-        receipt_id: str,
-        *,
-        reason: RefundReason | str = RefundReason.CUSTOMER_REQUEST,
-        note: str | None = None,
-        idempotency_key: str | None = None,
-    ) -> Refund:
-        normalized_receipt_id = str(receipt_id or "").strip()
-        if not normalized_receipt_id:
-            raise SiglumeClientError("receipt_id is required.")
-        provided_key = str(idempotency_key or "").strip()
-        normalized_idempotency_key = provided_key or f"full-refund:{normalized_receipt_id}"
-        payload: dict[str, Any] = {
-            "receipt_id": normalized_receipt_id,
-            "reason_code": _enum_value(reason),
-            "idempotency_key": normalized_idempotency_key,
-        }
-        if note:
-            payload["note"] = note
-        data, _meta = self._request("POST", "/market/refunds", json_body=payload)
-        return _parse_refund(data)
-
-    def list_refunds(
-        self,
-        *,
-        receipt_id: str | None = None,
-        limit: int = 50,
-    ) -> list[Refund]:
-        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
-        if receipt_id:
-            params["receipt_id"] = receipt_id
-        data, _meta = self._request("GET", "/market/refunds", params=params)
-        if not isinstance(data, list):
-            raise SiglumeClientError("Expected refunds to be returned as an array.")
-        return [
-            _parse_refund(item)
-            for item in data
-            if isinstance(item, Mapping)
-        ]
-
-    def get_refund(self, refund_id: str) -> Refund:
-        data, _meta = self._request("GET", f"/market/refunds/{refund_id}")
-        return _parse_refund(data)
-
-    def get_refunds_for_receipt(self, receipt_id: str, *, limit: int = 50) -> list[Refund]:
-        return self.list_refunds(receipt_id=receipt_id, limit=limit)
-
-    def list_disputes(
-        self,
-        *,
-        receipt_id: str | None = None,
-        limit: int = 50,
-    ) -> list[Dispute]:
-        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
-        if receipt_id:
-            params["receipt_id"] = receipt_id
-        data, _meta = self._request("GET", "/market/disputes", params=params)
-        if not isinstance(data, list):
-            raise SiglumeClientError("Expected disputes to be returned as an array.")
-        return [
-            _parse_dispute(item)
-            for item in data
-            if isinstance(item, Mapping)
-        ]
-
-    def get_dispute(self, dispute_id: str) -> Dispute:
-        data, _meta = self._request("GET", f"/market/disputes/{dispute_id}")
-        return _parse_dispute(data)
-
-    def respond_to_dispute(
-        self,
-        dispute_id: str,
-        *,
-        response: DisputeResponse | str,
-        evidence: Mapping[str, Any],
-        note: str | None = None,
-    ) -> Dispute:
-        normalized_dispute_id = str(dispute_id or "").strip()
-        if not normalized_dispute_id:
-            raise SiglumeClientError("dispute_id is required.")
-        if not isinstance(evidence, Mapping):
-            raise SiglumeClientError("evidence must be a mapping.")
-        payload: dict[str, Any] = {
-            "response": _enum_value(response),
-            "evidence": _to_dict(evidence),
-        }
-        if note:
-            payload["note"] = note
-        data, _meta = self._request(
-            "POST",
-            f"/market/disputes/{normalized_dispute_id}/respond",
-            json_body=payload,
-        )
-        return _parse_dispute(data)
 
     def create_webhook_subscription(
         self,

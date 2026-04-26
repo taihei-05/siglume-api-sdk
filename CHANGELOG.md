@@ -445,30 +445,27 @@ methods, with paging, approval-required handling, and secret-hiding baked in.
 
 v0.5.0 is the platform-integration release for the public SDK. It layers
 seller-facing operations and settlement helpers on top of the v0.4 multi-runtime
-foundation: webhook verification, refund/dispute flows, experimental metering,
-and typed Web3 read/simulate helpers now ship in both Python and TypeScript.
+foundation: webhook verification, experimental metering, and typed Web3
+read/simulate helpers now ship in both Python and TypeScript.
 
 ### Added
 
 - Webhook handler surface for Python and TypeScript:
   `WebhookHandler`, typed webhook-event unions, HMAC-SHA256 signature
   verification, timestamp tolerance checks, and idempotency/dedupe helpers.
-- Seller-side refund/dispute client:
-  `RefundClient`, typed `Refund` / `Dispute` models, partial/full refund
-  helpers, and dispute response helpers.
 - Experimental metering support:
   `MeterClient`, `UsageRecord`, client-side batch chunking, and
   `AppTestHarness.simulate_metering()` invoice previews.
 - Web3 settlement helpers:
   typed Polygon mandate, settlement receipt, embedded-wallet charge, and
   cross-currency quote models plus deterministic local simulation helpers.
-- New docs/examples for webhooks, refunds/disputes, metering, and Web3
-  settlement flows across Python and TypeScript.
+- New docs/examples for webhooks, metering, and Web3 settlement flows across
+  Python and TypeScript.
 
 ### Changed
 
-- The public OpenAPI surface now includes the API Store webhook, refund,
-  dispute, metering, and Web3 settlement endpoints the SDK wraps.
+- The public OpenAPI surface now includes the API Store webhook, metering, and
+  Web3 settlement endpoints the SDK wraps.
 - README and Getting Started now point to the current v0.5.0 release line and
   its new platform-integration surfaces.
 

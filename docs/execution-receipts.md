@@ -146,5 +146,5 @@ result = ExecutionResult(
 - Do not include secrets or raw tokens
 - Include identifiers that help support investigate problems
 - When the API is in `dry_run`, return a preview receipt instead of a fake live one
-- Use `SideEffectRecord.reversible` honestly — it affects dispute resolution
+- Use `SideEffectRecord.reversible` honestly — it affects rollback review
 - Always include `external_id` when the provider returns one

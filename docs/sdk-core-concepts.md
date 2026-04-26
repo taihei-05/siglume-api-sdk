@@ -13,7 +13,7 @@ building an API for the Siglume API Store. Runnable examples live in
 | `ExecutionContext` | Task details passed to `execute()`. |
 | `ExecutionResult` | Output and usage data returned from `execute()`. |
 | `ExecutionArtifact` | Describes a discrete output produced by execution. |
-| `SideEffectRecord` | Describes an external side effect (for audit / dispute trail). |
+| `SideEffectRecord` | Describes an external side effect for audit and rollback review. |
 | `ReceiptRef` | Opaque reference to a receipt (set by runtime). |
 | `ApprovalRequestHint` | Structured context the owner sees in the approval dialog. |
 

@@ -50,6 +50,7 @@ def build_manifest() -> AppManifest:
         price_model=PriceModel.FREE,
         jurisdiction="US",
         short_description="Search multiple retailers and summarize the best current price.",
+        description="Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
         docs_url="https://docs.example.com/price-compare",
         support_contact="support@example.com",
         seller_homepage_url="https://example.com",
@@ -186,6 +187,7 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
             assert "i18n" not in body
             assert "metadata" not in body
             assert body["manifest"]["docs_url"] == manifest.docs_url
+            assert body["description"] == manifest.description
             assert body["tool_manual"]["tool_name"] == tool_manual.tool_name
             assert body["runtime_validation"]["invoke_url"] == runtime_validation["invoke_url"]
             assert body["oauth_credentials"]["items"][0]["provider_key"] == "twitter"

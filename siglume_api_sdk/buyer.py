@@ -93,7 +93,7 @@ class CapabilityListing:
             capability_key=listing.capability_key,
             name=listing.name,
             status=listing.status,
-            description=_string_or_none(raw.get("description")),
+            description=listing.description or _string_or_none(raw.get("description")),
             category=listing.category,
             job_to_be_done=listing.job_to_be_done,
             permission_class=listing.permission_class,
@@ -444,7 +444,7 @@ def _build_listing_tool_manual(listing: AppListingRecord) -> dict[str, Any]:
     existing = raw.get("tool_manual")
     if isinstance(existing, Mapping):
         return dict(existing)
-    description = _string_or_none(raw.get("description")) or listing.short_description or listing.job_to_be_done or listing.name
+    description = listing.description or _string_or_none(raw.get("description")) or listing.short_description or listing.job_to_be_done or listing.name
     permission_class = _tool_manual_permission(listing.permission_class)
     input_schema = _to_dict(raw.get("input_schema")) or {
         "type": "object",

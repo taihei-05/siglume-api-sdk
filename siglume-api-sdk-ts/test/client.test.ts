@@ -60,6 +60,7 @@ function buildManifest() {
     price_model: PriceModel.FREE,
     jurisdiction: "US",
     short_description: "Search multiple retailers and summarize the best current price.",
+    description: "Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
     docs_url: "https://docs.example.com/price-compare",
     support_contact: "support@example.com",
     seller_homepage_url: "https://example.com",
@@ -145,6 +146,7 @@ describe("SiglumeClient", () => {
         requests.push({ method: String(init?.method ?? "GET"), path: url.pathname, body });
         if (url.pathname === "/v1/market/capabilities/auto-register") {
           expect(body.manifest).toMatchObject({ docs_url: manifest.docs_url });
+          expect(body.description).toBe(manifest.description);
           expect(body.tool_manual).toMatchObject({ tool_name: toolManual.tool_name });
           expect(body.runtime_validation).toMatchObject({ invoke_url: runtimeValidation.invoke_url });
           expect((body.oauth_credentials as { items?: Array<{ provider_key?: string }> }).items?.[0]?.provider_key).toBe("twitter");

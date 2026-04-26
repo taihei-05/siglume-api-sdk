@@ -27,6 +27,7 @@ export interface AppListingRecord {
   price_value_minor: number;
   currency: string;
   short_description?: string | null;
+  description?: string | null;
   docs_url?: string | null;
   support_contact?: string | null;
   review_status?: string | null;
@@ -1039,59 +1040,6 @@ export interface WebhookDeliveryRecord {
   raw: Record<string, unknown>;
 }
 
-export type RefundReason =
-  | "customer-request"
-  | "duplicate"
-  | "fraudulent"
-  | "service-failure"
-  | "goodwill";
-
-export type DisputeResponse = "accept" | "contest";
-export type RefundStatus = "issued" | "failed";
-export type DisputeStatus = "open" | "accepted" | "contested";
-
-export interface RefundRecord {
-  refund_id: string;
-  receipt_id: string;
-  owner_user_id?: string | null;
-  payment_mandate_id?: string | null;
-  usage_event_id?: string | null;
-  chain_receipt_id?: string | null;
-  amount_minor: number;
-  currency: string;
-  status: RefundStatus | string;
-  reason_code: RefundReason | string;
-  note?: string | null;
-  idempotency_key?: string | null;
-  on_chain_tx_hash?: string | null;
-  metadata: Record<string, unknown>;
-  idempotent_replay: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface DisputeRecord {
-  dispute_id: string;
-  receipt_id: string;
-  owner_user_id?: string | null;
-  payment_mandate_id?: string | null;
-  usage_event_id?: string | null;
-  external_dispute_id?: string | null;
-  status: DisputeStatus | string;
-  reason_code: string;
-  description?: string | null;
-  evidence: Record<string, unknown>;
-  response_decision?: DisputeResponse | string | null;
-  response_note?: string | null;
-  responded_at?: string | null;
-  metadata: Record<string, unknown>;
-  idempotent_replay: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
 export interface SiglumeClientShape {
   auto_register(...args: unknown[]): Promise<AutoRegistrationReceipt> | AutoRegistrationReceipt;
   confirm_registration(...args: unknown[]): Promise<RegistrationConfirmation> | RegistrationConfirmation;
@@ -1317,31 +1265,6 @@ export interface SiglumeClientShape {
   list_connected_accounts(...args: unknown[]): Promise<CursorPage<ConnectedAccountRecord>> | CursorPage<ConnectedAccountRecord>;
   create_support_case(...args: unknown[]): Promise<SupportCaseRecord> | SupportCaseRecord;
   list_support_cases(...args: unknown[]): Promise<CursorPage<SupportCaseRecord>> | CursorPage<SupportCaseRecord>;
-  issue_partial_refund(options: {
-    receipt_id: string;
-    amount_minor: number;
-    reason?: RefundReason | string;
-    note?: string;
-    idempotency_key: string;
-    original_amount_minor?: number;
-  }): Promise<RefundRecord> | RefundRecord;
-  issue_full_refund(options: {
-    receipt_id: string;
-    reason?: RefundReason | string;
-    note?: string;
-    idempotency_key?: string;
-  }): Promise<RefundRecord> | RefundRecord;
-  list_refunds(...args: unknown[]): Promise<RefundRecord[]> | RefundRecord[];
-  get_refund(refund_id: string): Promise<RefundRecord> | RefundRecord;
-  get_refunds_for_receipt(...args: unknown[]): Promise<RefundRecord[]> | RefundRecord[];
-  list_disputes(...args: unknown[]): Promise<DisputeRecord[]> | DisputeRecord[];
-  get_dispute(dispute_id: string): Promise<DisputeRecord> | DisputeRecord;
-  respond_to_dispute(options: {
-    dispute_id: string;
-    response: DisputeResponse | string;
-    evidence: Record<string, unknown>;
-    note?: string;
-  }): Promise<DisputeRecord> | DisputeRecord;
   create_webhook_subscription(options: {
     callback_url: string;
     description?: string;

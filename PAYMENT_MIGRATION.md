@@ -857,7 +857,7 @@ Reviewer re-run verdict: **CRITICAL count = 0, merge unblocked** for the scope o
 Codex expanded the scope beyond the review findings after auditing the recovery branch holistically. The 15 items, summarized:
 
 - **Items 1-4 (CRITICAL in the broader audit, not blocking the Phase 39 CRITICAL count above)**: remove Works Stripe refund fallback, disable Stripe API Store webhook (410 Gone), remove API Store Stripe Connect `get_connect_account_status` reference, disable wallet-broker mock mode in prod with FATAL-on-fallback guard.
-- **Items 5-10 (WARNING)**: indexer daemon containerization + health endpoint, dual-rail reconciliation batch job with Slack alerting, preflight resilience additions (known-revoked Turnkey keys, Pimlico paymaster balance threshold, Polygon RPC chain-head freshness, 0x live quote), Stripe `cancel_at_period_end` admin API for day-45 force-migration, CSS/variable `stripe*`→`payout*` rename (preserving Stripe Payments Japan K.K. legal-doc references), WorksEscrowHub `initialOwner` pinned to multisig + v2 90-day dispute timeout.
+- **Items 5-10 (WARNING)**: indexer daemon containerization + health endpoint, dual-rail reconciliation batch job with Slack alerting, preflight resilience additions (known-revoked Turnkey keys, Pimlico paymaster balance threshold, Polygon RPC chain-head freshness, 0x live quote), Stripe `cancel_at_period_end` admin API for day-45 force-migration, CSS/variable `stripe*`→`payout*` rename (preserving Stripe Payments Japan K.K. legal-doc references), WorksEscrowHub `initialOwner` pinned to multisig.
 - **Items 11-15 (INFO)**: SDK v0.3.0 with `SettlementMode.stripe_*` marked `@Deprecated`, `.env.prod.example` Web3 variables, Privacy Policy additions (AI Works escrow custody disclosure + Anthropic Zero Data Retention), indexer SLO doc with Datadog/Grafana queries, DMARC/SPF/DKIM + DPO contact.
 
 Codex plans Critical → Warning → Info in three separate PRs. Rename strategy (item 9) to be proposed first (field aliasing for migration safety).
@@ -887,7 +887,7 @@ Codex is driving through the 15-item workstream opened at Phase 39. All still on
 - **Warning #5 (indexer daemon health)** — `GET /v1/admin/market/web3/indexer/health` returns `lag / stale / severity`; Admin Settlement Ops GUI now renders it. (`web3_indexer_daemon.py`, `marketplace_api.py`, `schemas.py`, `AdminSettlementOpsPage.tsx`). **Still pending**: wiring the daemon as a resident process in prod (Docker compose / systemd).
 - **Warning #8 (Stripe cancel-at-period-end)** — `POST /v1/me/plan/stripe-cancel-at-period-end` (user-initiated) and `POST /v1/admin/plans/stripe-cancel-at-period-end` (bulk, with dry-run) now live. `User.plan_cancel_scheduled_at` column added (migration `0045_plan_cancel_scheduled_at.py`). PlanSection UI shows "Stripe cancellation scheduled" state. Admin Settlement Ops gets a dry-run + bulk-execute panel. Integration test: `test_plan_billing_cutover.py`.
 - **Warning #9 (stripe_* → payout_* rename)** — strategy confirmed as **alias-phase-out** rather than hard swap: backend temporarily emits **both** `stripe_*` and `payout_*` field names; frontend migrates to `payout_*`; one release later, `stripe_*` aliases removed. Developer portal monetization is the first surface; `payout_*` canonical names added, `stripe_*` kept as alias. Safer than a one-shot rename against a dual-rail contract.
-- **Warning #10 (WorksEscrowHub owner renounce + dispute timeout)** — deploy script now **requires** `AGENT_SNS_WEB3_OPERATOR_SAFE_ADDRESS`; EOA owner fallback is explicitly rejected so the contract cannot be deployed with an operator-owned key. Preflight `operator_safe` check is fail-severity (not warning). Still pending: v2 `WorksEscrowHub` with 90-day dispute-timeout refund.
+- **Warning #10 (WorksEscrowHub owner renounce)** — deploy script now **requires** `AGENT_SNS_WEB3_OPERATOR_SAFE_ADDRESS`; EOA owner fallback is explicitly rejected so the contract cannot be deployed with an operator-owned key. Preflight `operator_safe` check is fail-severity (not warning).
 
 **Tests stacked during the phase (focused):**
 
@@ -903,7 +903,6 @@ Codex is driving through the 15-item workstream opened at Phase 39. All still on
 - Warning #6 dual-rail reconciliation batch job (schema for `settlement_rail` label, nightly Stripe ↔ on-chain ↔ ledger diff, Slack alert)
 - Warning #7 preflight resilience additions (known-revoked Turnkey keys, Pimlico paymaster balance threshold, Polygon RPC chain-head freshness, 0x live quote)
 - Warning #9 rename migration body (backend keeps shipping both names, frontend field-by-field move — ongoing)
-- Warning #10 v2 WorksEscrowHub with dispute timeout (new deploy + migration, not upgradable contract)
 - INFO #11-15 (SDK v0.3.0 deprecation notes, `.env.prod.example` additions, Privacy Policy micro-updates, indexer SLO doc, DMARC/SPF/DKIM + DPO contact)
 
 **Branch state**: `recovery-2026-04-18` continues to accumulate. Main is still at iter 48 (doc mirror only). **Merge decision remains operator call** — the CRITICAL is 0 since Phase 39 but WARNING items #5, #6, #7 still have live work, and item #4 mock-signer protection is what prevents Pimlico-over-nothing decay if a config hiccup slips past.
@@ -936,7 +935,6 @@ Two of the three remaining mainnet-prerequisite warnings advance.
 - WARNING #6 nightly batch + Slack alert (manual trigger exists, auto-schedule and alerting are next)
 - WARNING #7 remaining resilience checks (known-revoked Turnkey keys, Polygon RPC chain-head freshness, 0x live quote — the balance gate is one piece)
 - WARNING #9 rename migration body (alias strategy confirmed in Phase 40, frontend-by-frontend migration ongoing)
-- WARNING #10 v2 WorksEscrowHub + dispute timeout (deploy script hardening shipped in Phase 40; v2 contract design is next)
 - Phase 39 reviewer's `erc20_approve` scale regression (1-line fix; becomes critical only before live 0x swap use, which is not a launch-day surface)
 - INFO #11-15
 
@@ -1012,7 +1010,6 @@ Codex's ETA: 1-2 hours from step 1 to merge-ready smoke.
 **Remaining on the 15-item list after Phase 42:**
 
 - WARNING #9 rename body (frontend-by-frontend `stripe_*` → `payout_*` migration; alias contract preserved in backend) — **next Codex focus**
-- WARNING #10 v2 WorksEscrowHub with 90-day dispute timeout (new deploy + migration, not upgradable — design pass needed)
 - INFO #11-15 (SDK v0.3.0 deprecation deferred; `.env.prod.example` likely already touched; Privacy Policy micro-updates; indexer SLO doc; DMARC/SPF/DKIM + DPO contact)
 
 **Branch state:** `recovery-2026-04-18` is now **"mainnet-launch-prerequisites code-complete"**. Main still untouched. The gating items to flip from code-complete → merge-ready are operator-side (Safe creation, `.env.prod`, preflight run).
@@ -1265,7 +1262,6 @@ After Phase 47, Codex formally closed out its implementation-agent role on this 
 
 **Not on the handoff (deferred by design):**
 
-- **WARNING #10** — v2 WorksEscrowHub with 90-day dispute timeout. New contract deploy + migration, not upgradable. Design pass still owed.
 - **SDK v0.3.0** — alias-removal breaking release. Release-cadence decision, not blocking mainnet cutover.
 
 **Branch state at handoff:** `recovery-2026-04-18` is now the canonical reference of "Codex considers this merge-ready pending operator preflight". Main still untouched. This phase is the final Codex-authored entry in this document.

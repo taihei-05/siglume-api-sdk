@@ -137,17 +137,6 @@ def test_webhook_handler_flask_example_runs_with_mock_payload() -> None:
     assert output[-1] == "duplicate_on_replay: True"
 
 
-def test_refund_partial_example_runs_with_mock_client() -> None:
-    module = _load_module("refund_partial.py")
-
-    output = module.run_refund_partial_example()
-
-    assert output[0].startswith("refund_note: Refunds are issued against the original receipt.")
-    assert output[1] == "refund_status: issued replay=False"
-    assert output[3] == "refunds_for_receipt: 1"
-    assert output[4] == "dispute_status: contested response=contest"
-
-
 def test_metering_record_example_runs_with_mock_client() -> None:
     module = _load_module("metering_record.py")
 

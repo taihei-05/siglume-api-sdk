@@ -236,7 +236,7 @@ def build_tool_manual() -> ToolManual:
         },
         currency="USD",
         settlement_mode=SettlementMode.POLYGON_MANDATE,
-        refund_or_cancellation_note="Refunds and cancellations are handled by the platform contract and seller support flow; on-chain settlement itself is not reversed by the SDK helper.",
+        refund_or_cancellation_note="Cancellations before final settlement follow the seller policy; on-chain settlement itself is not reversed by the SDK helper.",
         jurisdiction="US",
     )
 

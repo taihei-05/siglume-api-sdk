@@ -121,6 +121,10 @@
     "short_description": {
       "type": "string"
     },
+    "description": {
+      "type": "string",
+      "description": "Optional long buyer-facing detail shown on the API Store detail page. Use it for how to ask for the API in chat, AI Works fit, limits, approval behavior, and expected results."
+    },
     "docs_url": {
       "type": "string",
       "format": "uri",

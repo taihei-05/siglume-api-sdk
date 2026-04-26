@@ -15,8 +15,8 @@ approval-required handling, and handle-only secret hiding. See
 
 ### v0.5.0 — platform-integration release
 
-Webhook handling, refund / dispute flow, experimental usage
-metering, Web3 settlement helpers. See
+Webhook handling, experimental usage metering, and Web3 settlement
+helpers. See
 [RELEASE_NOTES_v0.5.0.md](./RELEASE_NOTES_v0.5.0.md).
 
 ### v0.4.0 — multi-runtime + quality + ecosystem

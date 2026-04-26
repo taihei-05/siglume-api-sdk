@@ -34,8 +34,6 @@ import type {
   ConnectedAccountRecord,
   CursorPage,
   DeveloperPortalSummary,
-  DisputeRecord,
-  DisputeResponse,
   EnvelopeMeta,
   FavoriteAgent,
   FavoriteAgentMutation,
@@ -61,8 +59,6 @@ import type {
   NetworkRepliesPage,
   RegistrationConfirmation,
   RegistrationQuality,
-  RefundReason,
-  RefundRecord,
   SandboxSession,
   PlanCheckoutSession,
   PlanWeb3Mandate,
@@ -593,37 +589,6 @@ export interface SiglumeClientShape {
     limit?: number;
     cursor?: string;
   }): Promise<CursorPage<SupportCaseRecord>>;
-  issue_partial_refund(options: {
-    receipt_id: string;
-    amount_minor: number;
-    reason?: RefundReason | string;
-    note?: string;
-    idempotency_key: string;
-    original_amount_minor?: number;
-  }): Promise<RefundRecord>;
-  issue_full_refund(options: {
-    receipt_id: string;
-    reason?: RefundReason | string;
-    note?: string;
-    idempotency_key?: string;
-  }): Promise<RefundRecord>;
-  list_refunds(options?: {
-    receipt_id?: string;
-    limit?: number;
-  }): Promise<RefundRecord[]>;
-  get_refund(refund_id: string): Promise<RefundRecord>;
-  get_refunds_for_receipt(receipt_id: string, options?: { limit?: number }): Promise<RefundRecord[]>;
-  list_disputes(options?: {
-    receipt_id?: string;
-    limit?: number;
-  }): Promise<DisputeRecord[]>;
-  get_dispute(dispute_id: string): Promise<DisputeRecord>;
-  respond_to_dispute(options: {
-    dispute_id: string;
-    response: DisputeResponse | string;
-    evidence: Record<string, unknown>;
-    note?: string;
-  }): Promise<DisputeRecord>;
   create_webhook_subscription(options: {
     callback_url: string;
     description?: string;
@@ -828,6 +793,7 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     price_value_minor: Number(data.price_value_minor ?? 0),
     currency: String(data.currency ?? "USD"),
     short_description: stringOrNull(data.short_description),
+    description: stringOrNull(data.description),
     docs_url: stringOrNull(data.docs_url),
     support_contact: stringOrNull(data.support_contact),
     seller_display_name: stringOrNull(data.seller_display_name),
@@ -2090,52 +2056,6 @@ function parseMarketProposalActionResult(execution: OperationExecution): MarketP
     trace_id: execution.trace_id ?? null,
     request_id: execution.request_id ?? null,
     raw: { ...execution.raw },
-  };
-}
-
-function parseRefund(data: Record<string, unknown>): RefundRecord {
-  return {
-    refund_id: String(data.refund_id ?? data.id ?? ""),
-    receipt_id: String(data.receipt_id ?? ""),
-    owner_user_id: stringOrNull(data.owner_user_id) ?? undefined,
-    payment_mandate_id: stringOrNull(data.payment_mandate_id) ?? undefined,
-    usage_event_id: stringOrNull(data.usage_event_id) ?? undefined,
-    chain_receipt_id: stringOrNull(data.chain_receipt_id) ?? undefined,
-    amount_minor: Number(data.amount_minor ?? 0),
-    currency: String(data.currency ?? "USD"),
-    status: String(data.status ?? "issued"),
-    reason_code: String(data.reason_code ?? "customer-request"),
-    note: stringOrNull(data.note) ?? undefined,
-    idempotency_key: stringOrNull(data.idempotency_key) ?? undefined,
-    on_chain_tx_hash: stringOrNull(data.on_chain_tx_hash) ?? undefined,
-    metadata: toRecord(data.metadata),
-    idempotent_replay: Boolean(data.idempotent_replay ?? false),
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    updated_at: stringOrNull(data.updated_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseDispute(data: Record<string, unknown>): DisputeRecord {
-  return {
-    dispute_id: String(data.dispute_id ?? data.id ?? ""),
-    receipt_id: String(data.receipt_id ?? ""),
-    owner_user_id: stringOrNull(data.owner_user_id) ?? undefined,
-    payment_mandate_id: stringOrNull(data.payment_mandate_id) ?? undefined,
-    usage_event_id: stringOrNull(data.usage_event_id) ?? undefined,
-    external_dispute_id: stringOrNull(data.external_dispute_id) ?? undefined,
-    status: String(data.status ?? "open"),
-    reason_code: String(data.reason_code ?? "manual-review"),
-    description: stringOrNull(data.description) ?? undefined,
-    evidence: toRecord(data.evidence),
-    response_decision: stringOrNull(data.response_decision) ?? undefined,
-    response_note: stringOrNull(data.response_note) ?? undefined,
-    responded_at: stringOrNull(data.responded_at) ?? undefined,
-    metadata: toRecord(data.metadata),
-    idempotent_replay: Boolean(data.idempotent_replay ?? false),
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    updated_at: stringOrNull(data.updated_at) ?? undefined,
-    raw: { ...data },
   };
 }
 
@@ -4453,133 +4373,6 @@ export class SiglumeClient implements SiglumeClientShape {
         ? (cursor) => this.list_support_cases({ ...options, cursor })
         : undefined,
     });
-  }
-
-  async issue_partial_refund(options: {
-    receipt_id: string;
-    amount_minor: number;
-    reason?: RefundReason | string;
-    note?: string;
-    idempotency_key: string;
-    original_amount_minor?: number;
-  }): Promise<RefundRecord> {
-    const receipt_id = String(options.receipt_id ?? "").trim();
-    const idempotency_key = String(options.idempotency_key ?? "").trim();
-    if (!receipt_id) {
-      throw new SiglumeClientError("receipt_id is required.");
-    }
-    if (!idempotency_key) {
-      throw new SiglumeClientError("idempotency_key is required.");
-    }
-    if (!Number.isFinite(options.amount_minor)) {
-      throw new SiglumeClientError("amount_minor must be a finite number.");
-    }
-    const amount_minor = Math.trunc(options.amount_minor);
-    if (amount_minor <= 0) {
-      throw new SiglumeClientError("amount_minor must be positive.");
-    }
-    if (
-      typeof options.original_amount_minor === "number"
-      && amount_minor > Math.trunc(options.original_amount_minor)
-    ) {
-      throw new SiglumeClientError("amount_minor cannot exceed the original receipt amount.");
-    }
-    const [data] = await this.request("POST", "/market/refunds", {
-      json_body: {
-        receipt_id,
-        amount_minor,
-        reason_code: options.reason ?? "customer-request",
-        note: options.note,
-        idempotency_key,
-      },
-    });
-    return parseRefund(data);
-  }
-
-  async issue_full_refund(options: {
-    receipt_id: string;
-    reason?: RefundReason | string;
-    note?: string;
-    idempotency_key?: string;
-  }): Promise<RefundRecord> {
-    const receipt_id = String(options.receipt_id ?? "").trim();
-    if (!receipt_id) {
-      throw new SiglumeClientError("receipt_id is required.");
-    }
-    const provided_key = String(options.idempotency_key ?? "").trim();
-    const idempotency_key = provided_key || `full-refund:${receipt_id}`;
-    const [data] = await this.request("POST", "/market/refunds", {
-      json_body: {
-        receipt_id,
-        reason_code: options.reason ?? "customer-request",
-        note: options.note,
-        idempotency_key,
-      },
-    });
-    return parseRefund(data);
-  }
-
-  async list_refunds(options: { receipt_id?: string; limit?: number } = {}): Promise<RefundRecord[]> {
-    const [data] = await this.requestAny("GET", "/market/refunds", {
-      params: {
-        receipt_id: options.receipt_id,
-        limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 50), 100)),
-      },
-    });
-    if (!Array.isArray(data)) {
-      throw new SiglumeClientError("Expected refunds to be returned as an array.");
-    }
-    return data.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseRefund);
-  }
-
-  async get_refund(refund_id: string): Promise<RefundRecord> {
-    const [data] = await this.request("GET", `/market/refunds/${refund_id}`);
-    return parseRefund(data);
-  }
-
-  async get_refunds_for_receipt(receipt_id: string, options: { limit?: number } = {}): Promise<RefundRecord[]> {
-    return this.list_refunds({ receipt_id, limit: options.limit });
-  }
-
-  async list_disputes(options: { receipt_id?: string; limit?: number } = {}): Promise<DisputeRecord[]> {
-    const [data] = await this.requestAny("GET", "/market/disputes", {
-      params: {
-        receipt_id: options.receipt_id,
-        limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 50), 100)),
-      },
-    });
-    if (!Array.isArray(data)) {
-      throw new SiglumeClientError("Expected disputes to be returned as an array.");
-    }
-    return data.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseDispute);
-  }
-
-  async get_dispute(dispute_id: string): Promise<DisputeRecord> {
-    const [data] = await this.request("GET", `/market/disputes/${dispute_id}`);
-    return parseDispute(data);
-  }
-
-  async respond_to_dispute(options: {
-    dispute_id: string;
-    response: DisputeResponse | string;
-    evidence: Record<string, unknown>;
-    note?: string;
-  }): Promise<DisputeRecord> {
-    const dispute_id = String(options.dispute_id ?? "").trim();
-    if (!dispute_id) {
-      throw new SiglumeClientError("dispute_id is required.");
-    }
-    if (!isRecord(options.evidence)) {
-      throw new SiglumeClientError("evidence must be an object.");
-    }
-    const [data] = await this.request("POST", `/market/disputes/${dispute_id}/respond`, {
-      json_body: {
-        response: options.response,
-        evidence: toRecord(options.evidence),
-        note: options.note,
-      },
-    });
-    return parseDispute(data);
   }
 
   async create_webhook_subscription(options: {

@@ -20,10 +20,8 @@ WEBHOOK_EVENT_TYPES: tuple[str, ...] = (
     "subscription.cancelled",
     "subscription.paused",
     "subscription.reinstated",
-    "refund.issued",
     "payment.succeeded",
     "payment.failed",
-    "payment.disputed",
     "capability.published",
     "capability.delisted",
     "execution.completed",
@@ -37,10 +35,8 @@ WebhookEventType: TypeAlias = Literal[
     "subscription.cancelled",
     "subscription.paused",
     "subscription.reinstated",
-    "refund.issued",
     "payment.succeeded",
     "payment.failed",
-    "payment.disputed",
     "capability.published",
     "capability.delisted",
     "execution.completed",
@@ -156,11 +152,6 @@ class SubscriptionReinstatedEvent(BaseWebhookEvent):
 
 
 @dataclass(kw_only=True)
-class RefundIssuedEvent(BaseWebhookEvent):
-    type: Literal["refund.issued"] = "refund.issued"
-
-
-@dataclass(kw_only=True)
 class PaymentSucceededEvent(BaseWebhookEvent):
     type: Literal["payment.succeeded"] = "payment.succeeded"
 
@@ -168,11 +159,6 @@ class PaymentSucceededEvent(BaseWebhookEvent):
 @dataclass(kw_only=True)
 class PaymentFailedEvent(BaseWebhookEvent):
     type: Literal["payment.failed"] = "payment.failed"
-
-
-@dataclass(kw_only=True)
-class PaymentDisputedEvent(BaseWebhookEvent):
-    type: Literal["payment.disputed"] = "payment.disputed"
 
 
 @dataclass(kw_only=True)
@@ -201,10 +187,8 @@ SiglumeWebhookEvent: TypeAlias = (
     | SubscriptionCancelledEvent
     | SubscriptionPausedEvent
     | SubscriptionReinstatedEvent
-    | RefundIssuedEvent
     | PaymentSucceededEvent
     | PaymentFailedEvent
-    | PaymentDisputedEvent
     | CapabilityPublishedEvent
     | CapabilityDelistedEvent
     | ExecutionCompletedEvent
@@ -217,10 +201,8 @@ _EVENT_CLASS_BY_TYPE: dict[str, type[BaseWebhookEvent]] = {
     "subscription.cancelled": SubscriptionCancelledEvent,
     "subscription.paused": SubscriptionPausedEvent,
     "subscription.reinstated": SubscriptionReinstatedEvent,
-    "refund.issued": RefundIssuedEvent,
     "payment.succeeded": PaymentSucceededEvent,
     "payment.failed": PaymentFailedEvent,
-    "payment.disputed": PaymentDisputedEvent,
     "capability.published": CapabilityPublishedEvent,
     "capability.delisted": CapabilityDelistedEvent,
     "execution.completed": ExecutionCompletedEvent,
@@ -600,7 +582,6 @@ __all__ = [
     "ExecutionCompletedEvent",
     "ExecutionFailedEvent",
     "InMemoryWebhookDedupe",
-    "PaymentDisputedEvent",
     "PaymentFailedEvent",
     "PaymentSucceededEvent",
     "QueuedWebhookEvent",

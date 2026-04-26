@@ -177,28 +177,6 @@ describe("webhooks", () => {
     expect(() => new WebhookHandler({ signing_secret: "" })).toThrow(SiglumeWebhookSignatureError);
   });
 
-  it("parses refund.issued with typed narrowing", () => {
-    const parsed = parse_webhook_event({
-      id: "evt_refund_123",
-      type: "refund.issued",
-      api_version: "2026-04-20",
-      occurred_at: "2026-04-20T12:00:00Z",
-      idempotency_key: "evt_refund_123",
-      data: {
-        refund_id: "rfnd_demo_123",
-        receipt_id: "rcp_demo_123",
-        amount_minor: 500,
-        currency: "USD",
-        status: "issued",
-      },
-    });
-
-    expect(parsed.type).toBe("refund.issued");
-    if (parsed.type === "refund.issued") {
-      expect(parsed.data.refund_id).toBe("rfnd_demo_123");
-    }
-  });
-
   it("maps express verification failures to 401 and payload failures to 400", async () => {
     const event = buildEvent();
     const rawBody = JSON.stringify(event);

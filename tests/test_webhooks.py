@@ -190,7 +190,6 @@ def test_webhook_handler_rejects_header_mismatch() -> None:
             now=1713571200,
         )
 
-
 def test_webhook_handler_rejects_unknown_registration() -> None:
     handler = WebhookHandler(signing_secret="whsec_test_secret")
 
@@ -411,25 +410,3 @@ def test_parse_webhook_event_rejects_unknown_type() -> None:
                 "data": {},
             }
         )
-
-
-def test_parse_webhook_event_supports_refund_issued() -> None:
-    parsed = parse_webhook_event(
-        {
-            "id": "evt_refund_123",
-            "type": "refund.issued",
-            "api_version": "2026-04-20",
-            "occurred_at": "2026-04-20T12:00:00Z",
-            "idempotency_key": "evt_refund_123",
-            "data": {
-                "refund_id": "rfnd_demo_123",
-                "receipt_id": "rcp_demo_123",
-                "amount_minor": 500,
-                "currency": "USD",
-                "status": "issued",
-            },
-        }
-    )
-
-    assert parsed.type == "refund.issued"
-    assert parsed.data["refund_id"] == "rfnd_demo_123"

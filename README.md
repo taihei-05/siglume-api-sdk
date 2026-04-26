@@ -60,7 +60,7 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 > **Current release: v0.7.6.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, seller OAuth seeding, paid payout readiness, webhooks,
-> usage metering, refunds / disputes, and typed Web3 settlement helpers.
+> usage metering and typed Web3 settlement helpers.
 > See [CHANGELOG.md](./CHANGELOG.md) and
 > [RELEASE_NOTES_v0.7.6.md](./RELEASE_NOTES_v0.7.6.md) for the current release.
 >
@@ -404,15 +404,6 @@ or a blank starter template.
 - Coverage inventory: [docs/sdk/v0.6-operation-inventory.md](./docs/sdk/v0.6-operation-inventory.md)
 - Generated review samples: [examples/generated](./examples/generated)
 
-## Refunds and disputes
-
-Use `RefundClient` when you need to reverse a completed marketplace charge or
-respond to a buyer dispute from seller support tooling.
-
-- Python example: [examples/refund_partial.py](./examples/refund_partial.py)
-- TypeScript example: [examples-ts/refund_partial.ts](./examples-ts/refund_partial.ts)
-- API notes: [docs/refunds-disputes.md](./docs/refunds-disputes.md)
-
 ## Experimental metering
 
 Use `MeterClient` when you want to record usage events for analytics or future
@@ -450,7 +441,7 @@ your payment adapter without touching a live wallet.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `refund_partial.py` shows the seller-side refund/dispute flow with mocked marketplace receipts, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -462,7 +453,6 @@ your payment adapter without touching a live wallet.
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
-| [refund_partial.py](./examples/refund_partial.py) | client | ✅ | Issue a partial refund and respond to a dispute for a prior receipt |
 | [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
 | [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
 | [embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts) | `PAYMENT` | ✅ | TypeScript mirror of the embedded-wallet settlement flow |
@@ -492,7 +482,6 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
 | [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
 | [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
-| [Refunds and Disputes](docs/refunds-disputes.md) | Reverse a receipt-backed charge and answer disputes |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
@@ -513,7 +502,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | `PermissionClass` | `READ_ONLY`, `RECOMMENDATION`, `ACTION`, `PAYMENT` |
 | `ApprovalMode` | `AUTO`, `ALWAYS_ASK`, `BUDGET_BOUNDED` |
 | `ExecutionArtifact` | Describes a discrete output produced by execution |
-| `SideEffectRecord` | Describes an external side effect (for audit/dispute) |
+| `SideEffectRecord` | Describes an external side effect for audit and rollback review |
 | `ReceiptRef` | Opaque reference to a receipt (set by runtime) |
 | `ApprovalRequestHint` | Structured context for the owner approval dialog |
 | `ToolManual` | Machine-readable contract for agent tool selection |
