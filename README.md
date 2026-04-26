@@ -57,14 +57,17 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v0.10.0.** Python and TypeScript are version-aligned and
+> **Current release: v0.10.1.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, seller-owned connected-account OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
 > long-form buyer-facing `description`, and platform-controlled release semver
-> via `version_bump`.
-> See [CHANGELOG.md](./CHANGELOG.md) and
-> [RELEASE_NOTES_v0.10.0.md](./RELEASE_NOTES_v0.10.0.md) for the current release.
+> via `version_bump`. v0.10.1 is a documentation / metadata catch-up over
+> v0.10.0 — runtime behavior is byte-equivalent.
+> See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v0.10.1.md](./RELEASE_NOTES_v0.10.1.md), and
+> [RELEASE_NOTES_v0.10.0.md](./RELEASE_NOTES_v0.10.0.md) for the current
+> release line.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 > For the current browser-vs-CLI entry points into the same `auto-register`
