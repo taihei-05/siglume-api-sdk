@@ -224,8 +224,7 @@ paths:
                 tool_manual:
                   $ref: '#/components/schemas/ToolManual'
                 input_form_spec:
-                  type: object
-                  description: Optional structured UI input form spec to seed the release contract
+                  $ref: '#/components/schemas/InputFormSpec'
                 capability_key:
                   type: string
                   description: Override auto-detected capability key
@@ -2965,6 +2964,121 @@ components:
         currency: { type: string, enum: [USD], description: "Must be USD" }
         settlement_mode: { type: string, enum: [stripe_checkout, stripe_payment_intent, polygon_mandate, embedded_wallet_charge] }
         refund_or_cancellation_note: { type: string, minLength: 1 }
+
+    BilingualText:
+      type: object
+      description: Bilingual ja/en text used by input_form_spec for titles, labels, descriptions, placeholders, and option labels.
+      required: [ja, en]
+      additionalProperties: false
+      properties:
+        ja: { type: string, minLength: 1 }
+        en: { type: string, minLength: 1 }
+
+    InputFormSpecField:
+      type: object
+      description: |
+        A single form field. Validator-enforced rules (cannot be expressed
+        purely in OpenAPI):
+        - At least one field in `fields[]` must have `required: true`.
+        - Field `key` must be unique within `fields[]`.
+        - For `text` / `textarea` / `url` fields, `placeholder` is required
+          under multi-capability composition.
+        - For `select` / `multiselect`, `options` is required.
+        See docs/input-form-spec.md for the full rule set.
+      required: [key, type, label]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-z][a-z0-9_]*$"
+          description: Lowercase + underscores only. Unique within fields[].
+        type:
+          type: string
+          enum: [text, textarea, number, select, multiselect, file, url, date, boolean]
+        label: { $ref: '#/components/schemas/BilingualText' }
+        description: { $ref: '#/components/schemas/BilingualText' }
+        placeholder: { $ref: '#/components/schemas/BilingualText' }
+        required: { type: boolean, default: false }
+        default:
+          description: Optional default value. Type must match the field's input type.
+        # text / textarea
+        max_length: { type: integer, minimum: 1 }
+        rows: { type: integer, minimum: 1, description: "textarea only — UI hint" }
+        # number
+        min: { type: number }
+        max: { type: number }
+        step: { type: number, exclusiveMinimum: 0 }
+        unit: { type: string, description: "number only — informational, not validated" }
+        # select / multiselect
+        options:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [value, label]
+            additionalProperties: false
+            properties:
+              value: { type: string, minLength: 1 }
+              label: { $ref: '#/components/schemas/BilingualText' }
+        max_selections: { type: integer, minimum: 1, description: "multiselect only" }
+        # file
+        accept:
+          type: array
+          description: "file only — array of dot-prefixed extensions (e.g. '.pdf')"
+          items: { type: string, pattern: "^\\." }
+        max_size_mb: { type: number, exclusiveMinimum: 0, maximum: 200 }
+        max_files: { type: integer, minimum: 1, default: 1 }
+        # date
+        min_date: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        max_date: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        # multi-capability composition
+        tool_bindings:
+          type: array
+          description: Multi-capability composition only. Maps this form field to one or more (capability_release_id, param) pairs.
+          items:
+            type: object
+            required: [capability_release_id, param]
+            additionalProperties: false
+            properties:
+              capability_release_id: { type: string }
+              param: { type: string }
+
+    InputFormSpec:
+      type: object
+      description: |
+        Optional bilingual (ja/en) client-facing form spec. The agent or
+        buyer fills in this form to invoke the listing. Distinct from
+        `input_schema`, which the runtime uses to validate the actual
+        tool-call parameters. Canonical machine-checkable schema:
+        schemas/input-form-spec.schema.json. Authoring guide:
+        docs/input-form-spec.md.
+      required: [version, title, fields]
+      additionalProperties: false
+      properties:
+        version:
+          type: string
+          enum: ["1.0"]
+          description: Spec version. Currently only '1.0' is accepted.
+        title: { $ref: '#/components/schemas/BilingualText' }
+        description: { $ref: '#/components/schemas/BilingualText' }
+        fields:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/InputFormSpecField' }
+        sections:
+          type: array
+          description: Optional grouping of field keys into ordered, titled UI sections.
+          items:
+            type: object
+            required: [key, title, field_keys]
+            additionalProperties: false
+            properties:
+              key: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
+              title: { $ref: '#/components/schemas/BilingualText' }
+              field_keys:
+                type: array
+                items: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
 
     ToolManualValidationMessage:
       type: object

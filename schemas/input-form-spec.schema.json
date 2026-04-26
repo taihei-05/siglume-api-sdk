@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/taihei-05/siglume-api-sdk/schemas/input-form-spec.schema.json",
+  "title": "input_form_spec",
+  "description": "Schema for the optional input_form_spec object passed to /v1/market/capabilities/auto-register and reused at confirm time. Defines the bilingual (ja/en) client-facing form an agent or buyer fills in to invoke a listing. See docs/input-form-spec.md.",
+  "type": "object",
+  "required": ["version", "title", "fields"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Spec version. Currently the only accepted value is '1.0'."
+    },
+    "title": { "$ref": "#/$defs/bilingualText" },
+    "description": { "$ref": "#/$defs/bilingualText" },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "description": "Form fields. At least one field must have required=true (validator-enforced; not expressible at the schema level).",
+      "items": { "$ref": "#/$defs/field" }
+    },
+    "sections": {
+      "type": "array",
+      "description": "Optional grouping of field keys into ordered, titled sections. Used by multi-capability composition flows.",
+      "items": {
+        "type": "object",
+        "required": ["key", "title", "field_keys"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "title": { "$ref": "#/$defs/bilingualText" },
+          "field_keys": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "bilingualText": {
+      "type": "object",
+      "required": ["ja", "en"],
+      "additionalProperties": false,
+      "properties": {
+        "ja": { "type": "string", "minLength": 1 },
+        "en": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fieldKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Lowercase + underscores only. Must start with a letter. Must be unique within fields[]."
+    },
+    "fieldBase": {
+      "type": "object",
+      "required": ["key", "type", "label"],
+      "properties": {
+        "key": { "$ref": "#/$defs/fieldKey" },
+        "type": {
+          "type": "string",
+          "enum": ["text", "textarea", "number", "select", "multiselect", "file", "url", "date", "boolean"]
+        },
+        "label": { "$ref": "#/$defs/bilingualText" },
+        "description": { "$ref": "#/$defs/bilingualText" },
+        "placeholder": {
+          "$ref": "#/$defs/bilingualText",
+          "description": "Required for text/textarea/url under multi-capability composition (18.6.2)."
+        },
+        "required": { "type": "boolean", "default": false },
+        "default": {
+          "description": "Optional default value. Type must match the field's effective input type."
+        },
+        "tool_bindings": {
+          "type": "array",
+          "description": "Multi-capability composition only. Maps this form field to one or more (capability_release_id, param) pairs.",
+          "items": {
+            "type": "object",
+            "required": ["capability_release_id", "param"],
+            "additionalProperties": false,
+            "properties": {
+              "capability_release_id": { "type": "string" },
+              "param": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "field": {
+      "oneOf": [
+        { "$ref": "#/$defs/textField" },
+        { "$ref": "#/$defs/textareaField" },
+        { "$ref": "#/$defs/numberField" },
+        { "$ref": "#/$defs/selectField" },
+        { "$ref": "#/$defs/multiselectField" },
+        { "$ref": "#/$defs/fileField" },
+        { "$ref": "#/$defs/urlField" },
+        { "$ref": "#/$defs/dateField" },
+        { "$ref": "#/$defs/booleanField" }
+      ]
+    },
+    "textField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "text" },
+            "max_length": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "textareaField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "textarea" },
+            "max_length": { "type": "integer", "minimum": 1 },
+            "rows": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "numberField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "number" },
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "step": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "type": "string", "description": "Informational unit string (e.g. 'm2'). Not validated." }
+          }
+        }
+      ]
+    },
+    "selectOption": {
+      "type": "object",
+      "required": ["value", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "label": { "$ref": "#/$defs/bilingualText" }
+      }
+    },
+    "selectField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "required": ["options"],
+          "properties": {
+            "type": { "const": "select" },
+            "options": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": { "$ref": "#/$defs/selectOption" }
+            }
+          }
+        }
+      ]
+    },
+    "multiselectField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "required": ["options"],
+          "properties": {
+            "type": { "const": "multiselect" },
+            "options": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": { "$ref": "#/$defs/selectOption" }
+            },
+            "max_selections": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "fileField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "file" },
+            "accept": {
+              "type": "array",
+              "description": "Accepted file extensions. Each entry must be dot-prefixed (e.g. '.pdf').",
+              "items": { "type": "string", "pattern": "^\\." }
+            },
+            "max_size_mb": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 200
+            },
+            "max_files": { "type": "integer", "minimum": 1, "default": 1 }
+          }
+        }
+      ]
+    },
+    "urlField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "url" }
+          }
+        }
+      ]
+    },
+    "dateField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "date" },
+            "min_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+            "max_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+          }
+        }
+      ]
+    },
+    "booleanField": {
+      "allOf": [
+        { "$ref": "#/$defs/fieldBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "boolean" }
+          }
+        }
+      ]
+    }
+  }
+}

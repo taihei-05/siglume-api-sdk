@@ -466,7 +466,10 @@ draft; it does not edit the manual. See [Section 13](#13-tool-manual-guide).
 - SDK / HTTP automation can include `source_url` plus optional
   `source_context` to register directly from GitHub provenance
 - `input_form_spec` can be seeded during `auto-register` and is reused at
-  confirm time; confirmation does not edit it
+  confirm time; confirmation does not edit it. See
+  [`docs/input-form-spec.md`](docs/input-form-spec.md) for the authoring
+  guide and [`schemas/input-form-spec.schema.json`](schemas/input-form-spec.schema.json)
+  for the machine-checkable schema.
 
 A quality check runs automatically at confirmation time:
 - Grade B or above (A/B): your API can be published immediately if the
