@@ -69,7 +69,7 @@ There is no normal human review step in the self-serve publish flow anymore.
    - manifest fields
    - Tool Manual
    - optional seller OAuth app credentials in `oauth_credentials`
-   - optional `input_form_spec`
+   - optional `input_form_spec` ([authoring guide](input-form-spec.md))
 3. Runs contract, pricing, payout, seller OAuth, and runtime validation preflight checks.
 4. Runs a mandatory fail-closed LLM legal review on the submitted package.
 5. Verifies the public API is reachable from the internet.
