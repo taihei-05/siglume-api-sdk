@@ -2967,12 +2967,19 @@ components:
 
     BilingualText:
       type: object
-      description: Bilingual ja/en text used by input_form_spec for titles, labels, descriptions, placeholders, and option labels.
+      description: Stored bilingual ja/en text for input_form_spec titles, labels, descriptions, placeholders, and option labels.
       required: [ja, en]
       additionalProperties: false
       properties:
         ja: { type: string, minLength: 1 }
         en: { type: string, minLength: 1 }
+
+    LocalizedText:
+      oneOf:
+        - type: string
+          minLength: 1
+        - $ref: '#/components/schemas/BilingualText'
+      description: Plain seller-authored strings are accepted during auto-register and normalized by the platform into stored ja/en text.
 
     InputFormSpecField:
       type: object
@@ -2994,9 +3001,9 @@ components:
         type:
           type: string
           enum: [text, textarea, number, select, multiselect, file, url, date, boolean]
-        label: { $ref: '#/components/schemas/BilingualText' }
-        description: { $ref: '#/components/schemas/BilingualText' }
-        placeholder: { $ref: '#/components/schemas/BilingualText' }
+        label: { $ref: '#/components/schemas/LocalizedText' }
+        description: { $ref: '#/components/schemas/LocalizedText' }
+        placeholder: { $ref: '#/components/schemas/LocalizedText' }
         required: { type: boolean, default: false }
         default:
           description: Optional default value. Type must match the field's input type.
@@ -3019,7 +3026,7 @@ components:
             additionalProperties: false
             properties:
               value: { type: string, minLength: 1 }
-              label: { $ref: '#/components/schemas/BilingualText' }
+              label: { $ref: '#/components/schemas/LocalizedText' }
         max_selections: { type: integer, minimum: 1, description: "multiselect only" }
         # file
         accept:
@@ -3046,8 +3053,9 @@ components:
     InputFormSpec:
       type: object
       description: |
-        Optional bilingual (ja/en) client-facing form spec. The agent or
-        buyer fills in this form to invoke the listing. Distinct from
+        Optional client-facing form spec. Sellers may send plain one-language
+        strings; auto-register normalizes them into stored ja/en text. The
+        agent or buyer fills in this form to invoke the listing. Distinct from
         `input_schema`, which the runtime uses to validate the actual
         tool-call parameters. Canonical machine-checkable schema:
         schemas/input-form-spec.schema.json. Authoring guide:
@@ -3059,8 +3067,8 @@ components:
           type: string
           enum: ["1.0"]
           description: Spec version. Currently only '1.0' is accepted.
-        title: { $ref: '#/components/schemas/BilingualText' }
-        description: { $ref: '#/components/schemas/BilingualText' }
+        title: { $ref: '#/components/schemas/LocalizedText' }
+        description: { $ref: '#/components/schemas/LocalizedText' }
         fields:
           type: array
           minItems: 1
@@ -3075,7 +3083,7 @@ components:
             additionalProperties: false
             properties:
               key: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
-              title: { $ref: '#/components/schemas/BilingualText' }
+              title: { $ref: '#/components/schemas/LocalizedText' }
               field_keys:
                 type: array
                 items: { type: string, pattern: "^[a-z][a-z0-9_]*$" }

@@ -139,6 +139,7 @@ export interface SiglumeClientOptions {
 type PendingConfirmation = {
   manifest: Record<string, unknown>;
   tool_manual: Record<string, unknown>;
+  input_form_spec: Record<string, unknown>;
 };
 
 type RequestMetaTuple = [Record<string, unknown>, EnvelopeMeta];
@@ -2100,9 +2101,13 @@ export class SiglumeClient implements SiglumeClientShape {
   ): Promise<AutoRegistrationReceipt> {
     const manifestPayload = coerceMapping(manifest, "manifest");
     const toolManualPayload = coerceMapping(tool_manual, "tool_manual");
+    const toolManualForRequest = { ...toolManualPayload };
+    const embeddedInputFormSpec = toolManualForRequest.input_form_spec;
+    delete toolManualForRequest.input_form_spec;
+    const inputFormSpec = options.input_form_spec ?? embeddedInputFormSpec;
     const payload: Record<string, unknown> = {
       manifest: { ...manifestPayload },
-      tool_manual: { ...toolManualPayload },
+      tool_manual: toolManualForRequest,
     };
     if (options.source_url) {
       payload.source_url = options.source_url;
@@ -2126,8 +2131,8 @@ export class SiglumeClient implements SiglumeClientShape {
     if (options.source_context) {
       payload.source_context = coerceMapping(options.source_context, "source_context");
     }
-    if (options.input_form_spec) {
-      payload.input_form_spec = coerceMapping(options.input_form_spec, "input_form_spec");
+    if (inputFormSpec !== undefined && inputFormSpec !== null) {
+      payload.input_form_spec = coerceMapping(inputFormSpec, "input_form_spec");
     }
     // Manifest fields forwarded to the top-level auto-register payload.
     // `version` is intentionally NOT forwarded — the platform auto-assigns
@@ -2189,7 +2194,11 @@ export class SiglumeClient implements SiglumeClientShape {
     if (!listing_id) {
       throw new SiglumeClientError("Siglume auto-register response did not include listing_id.");
     }
-    this.pendingConfirmations.set(listing_id, { manifest: manifestPayload, tool_manual: toolManualPayload });
+    this.pendingConfirmations.set(listing_id, {
+      manifest: manifestPayload,
+      tool_manual: toRecord(payload.tool_manual),
+      input_form_spec: toRecord(payload.input_form_spec),
+    });
     return {
       listing_id,
       status: String(data.status ?? "draft"),

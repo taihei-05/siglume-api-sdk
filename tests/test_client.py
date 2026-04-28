@@ -331,6 +331,51 @@ def test_auto_register_accepts_oauth_credentials_sequence() -> None:
     assert receipt.listing_id == "lst_seq"
 
 
+def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
+    manifest = build_manifest()
+    tool_manual = build_tool_manual().to_dict()
+    input_form_spec = {
+        "version": "1.0",
+        "title": "Wallet lookup",
+        "fields": [
+            {
+                "key": "wallet_address",
+                "type": "text",
+                "label": "Wallet address",
+                "required": True,
+            }
+        ],
+    }
+    tool_manual["input_form_spec"] = input_form_spec
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/market/capabilities/auto-register"
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload["input_form_spec"] == input_form_spec
+        assert "input_form_spec" not in payload["tool_manual"]
+        return httpx.Response(
+            201,
+            json=envelope(
+                {
+                    "listing_id": "lst_form",
+                    "status": "draft",
+                    "auto_manifest": {"capability_key": manifest.capability_key},
+                    "confidence": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        receipt = client.auto_register(
+            manifest,
+            tool_manual,
+            source_url="https://github.com/example/wallet",
+            runtime_validation=build_runtime_validation(),
+        )
+
+    assert receipt.listing_id == "lst_form"
+
+
 def test_cursor_pages_follow_next_cursor_for_listings_and_usage() -> None:
     call_counter = {"listings": 0, "usage": 0}
 

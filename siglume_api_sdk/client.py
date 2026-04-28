@@ -1365,9 +1365,16 @@ def _build_auto_register_request(
     source_context: Mapping[str, Any] | None,
     input_form_spec: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    tool_manual_for_request = dict(tool_manual_payload)
+    embedded_input_form_spec = tool_manual_for_request.pop("input_form_spec", None)
+    input_form_spec_for_request = (
+        input_form_spec
+        if input_form_spec is not None
+        else embedded_input_form_spec
+    )
     payload: dict[str, Any] = {
         "manifest": dict(manifest_payload),
-        "tool_manual": dict(tool_manual_payload),
+        "tool_manual": tool_manual_for_request,
     }
     if source_url:
         payload["source_url"] = source_url
@@ -1391,8 +1398,8 @@ def _build_auto_register_request(
             raise TypeError("oauth_credentials must be a mapping or a sequence of mappings")
     if source_context is not None:
         payload["source_context"] = _coerce_mapping(source_context, "source_context")
-    if input_form_spec is not None:
-        payload["input_form_spec"] = _coerce_mapping(input_form_spec, "input_form_spec")
+    if input_form_spec_for_request is not None:
+        payload["input_form_spec"] = _coerce_mapping(input_form_spec_for_request, "input_form_spec")
 
     # Manifest fields forwarded to the top-level auto-register payload.
     # ``version`` is intentionally NOT forwarded — the platform auto-assigns
@@ -2914,8 +2921,8 @@ class SiglumeClient:
             raise SiglumeClientError("Siglume auto-register response did not include listing_id.")
         self._pending_confirmations[listing_id] = {
             "manifest": manifest_payload,
-            "tool_manual": tool_manual_payload,
-            "input_form_spec": input_form_spec_payload or {},
+            "tool_manual": _to_dict(payload.get("tool_manual")),
+            "input_form_spec": _to_dict(payload.get("input_form_spec")),
         }
         return AutoRegistrationReceipt(
             listing_id=listing_id,

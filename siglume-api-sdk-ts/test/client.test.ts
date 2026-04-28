@@ -262,6 +262,56 @@ describe("SiglumeClient", () => {
     expect(receipt.listing_id).toBe("lst_seq");
   });
 
+  it("hoists input_form_spec from tool_manual before auto_register", async () => {
+    const inputFormSpec = {
+      version: "1.0",
+      title: "Wallet lookup",
+      fields: [
+        {
+          key: "wallet_address",
+          type: "text",
+          label: "Wallet address",
+          required: true,
+        },
+      ],
+    };
+    const toolManual = {
+      ...buildToolManual(),
+      input_form_spec: inputFormSpec,
+    };
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.input_form_spec).toEqual(inputFormSpec);
+          expect((body.tool_manual as Record<string, unknown>).input_form_spec).toBeUndefined();
+          return new Response(
+            JSON.stringify(
+              envelope({
+                listing_id: "lst_form",
+                status: "draft",
+                auto_manifest: {},
+                confidence: {},
+              }),
+            ),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const receipt = await client.auto_register(buildManifest(), toolManual, {
+      source_url: "https://github.com/example/wallet",
+      runtime_validation: buildRuntimeValidation(),
+    });
+
+    expect(receipt.listing_id).toBe("lst_form");
+  });
+
   it("rejects non-object oauth_credentials sequence entries before sending the request", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",

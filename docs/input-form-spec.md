@@ -1,8 +1,13 @@
 # `input_form_spec` — Client-Facing Form Specification
 
-`input_form_spec` is the optional bilingual (Japanese / English) form
-specification you can attach to a listing during `auto-register`. It defines
-the form an agent or buyer fills in when invoking your API.
+`input_form_spec` is the optional client-facing form specification you can
+attach to a listing during `auto-register`. It defines the form an agent or
+buyer fills in when invoking your API.
+
+You may write buyer-facing text as plain one-language strings. The platform
+normalizes those strings into stored Japanese / English text during
+`auto-register`. If you already have both languages, you may also send the
+stored `{ "ja": "...", "en": "..." }` shape directly.
 
 It is distinct from `input_schema` (the JSON Schema the runtime uses to
 validate the actual tool-call parameters at runtime). Both can coexist; they
@@ -18,14 +23,14 @@ The machine-checkable schema lives at
 ```json
 {
   "version": "1.0",
-  "title": { "ja": "Wallet lookup", "en": "Wallet lookup" },
+  "title": "Wallet lookup",
   "fields": [
     {
       "key": "address",
       "type": "text",
-      "label": { "ja": "Wallet address", "en": "Wallet address" },
-      "description": { "ja": "0x-prefixed EVM address", "en": "0x-prefixed EVM address" },
-      "placeholder": { "ja": "0x...", "en": "0x..." },
+      "label": "Wallet address",
+      "description": "0x-prefixed EVM address",
+      "placeholder": "0x...",
       "required": true
     }
   ]
@@ -39,13 +44,15 @@ The machine-checkable schema lives at
 | Field | Required | Type | Notes |
 |---|---|---|---|
 | `version` | yes | string | Must be exactly `"1.0"` |
-| `title` | yes | bilingual text | Both `ja` and `en` keys required |
-| `description` | no | bilingual text | Both keys required when present |
+| `title` | yes | localized text | Plain string accepted; platform stores `ja` / `en` |
+| `description` | no | localized text | Plain string accepted; platform stores `ja` / `en` |
 | `fields` | yes | array | 1–20 items; **at least one** must have `required: true` |
 | `sections` | no | array | Optional grouping of fields into ordered titled sections (multi-capability composition only) |
 
-A *bilingual text* object is `{ "ja": "...", "en": "..." }` with both keys
-present and non-empty.
+A *localized text* value may be either a plain string or a bilingual object
+`{ "ja": "...", "en": "..." }`. Plain strings are the recommended seller input
+for `auto-register`; bilingual objects are the stored shape and are accepted
+for automation that already owns both translations.
 
 ---
 
@@ -57,9 +64,9 @@ All fields share these base properties:
 |---|---|---|
 | `key` | yes | Lowercase + underscores. Must match `^[a-z][a-z0-9_]*$`. Unique within `fields[]`. |
 | `type` | yes | One of the 9 types listed below |
-| `label` | yes | Bilingual text |
-| `description` | no | Bilingual text |
-| `placeholder` | no (per type) | Bilingual text. Required for `text` / `textarea` / `url` under multi-capability composition |
+| `label` | yes | Localized text |
+| `description` | no | Localized text |
+| `placeholder` | no (per type) | Localized text. Required for `text` / `textarea` / `url` under multi-capability composition |
 | `required` | no | Boolean. At least one field in the form must be `true`. |
 | `default` | no | Optional default value. Type must match the field's input type. |
 | `tool_bindings` | no | Multi-capability composition only. See [Multi-capability composition](#multi-capability-composition). |
@@ -145,9 +152,11 @@ Single-choice dropdown.
 
 | Extra | Notes |
 |---|---|
-| `options` | Required, 1–100 items. Each `{ value, label }`. `label` is bilingual. |
+| `options` | Required, 1–100 items. Each `{ value, label }`. `label` is localized text. |
 
-Submitted value must equal one of the option `value`s.
+Submitted value must equal one of the option `value`s. Option labels follow the
+same localized text rule as field labels: a plain string is accepted during
+`auto-register` and normalized by the platform.
 
 ### `multiselect`
 
@@ -262,13 +271,13 @@ field cannot bind to a `string` schema property.
 | Message | Cause | Fix |
 |---|---|---|
 | `version must be '1.0'` | Wrong or missing `version` | Set `"version": "1.0"` |
-| `title must have both 'ja' and 'en' keys` | Missing one language | Provide both keys, both non-empty |
+| `title must have both 'ja' and 'en' keys` | Stored form spec was not normalized | Send a plain string through `auto-register`, or provide both stored keys |
 | `fields must be a non-empty array` | `fields: []` or missing | Provide at least one field |
 | `fields must have at most 20 items` | More than 20 fields | Split or simplify the form |
 | `key '...' must match [a-z][a-z0-9_]*` | Uppercase or special chars in key | Use lowercase + underscore only |
 | `duplicate key '...'` | Two fields share a key | Each field's `key` must be unique |
 | `unsupported type '...'` | Unknown field type | Use one of the 9 types above |
-| `label must have both 'ja' and 'en'` | Single-language label | Bilingual labels are mandatory |
+| `label must have both 'ja' and 'en'` | Stored form spec was not normalized | Send a plain string through `auto-register`, or provide both stored keys |
 | `at least one field must be required` | All fields are optional | Mark at least one field as `required: true` |
 | `accept entries must be dot-prefixed extensions like '.pdf' (got '...')` | Missing leading dot | Prefix all extensions with `.` |
 | `max_size_mb cannot exceed 200` | File limit too high | Cap at 200 |
