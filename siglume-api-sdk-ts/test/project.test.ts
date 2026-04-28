@@ -388,6 +388,34 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(false);
   });
 
+  it("rejects platform-managed OAuth requirements without a provider key", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: [{ platform_managed: true, required_scopes: ["chat:write"] }],
+      },
+    });
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport();
+              },
+              async auto_register() {
+                throw new Error("auto_register should not run");
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("platform-managed entries must include a supported provider_key");
+  });
+
   it("canonicalizes OAuth seed payloads before auto-register", async () => {
     const projectDir = await createObjectProject({
       manifest: {

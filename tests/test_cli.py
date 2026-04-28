@@ -364,6 +364,22 @@ def test_register_requires_oauth_seed_for_platform_managed_oauth_api(monkeypatch
     assert "twitter" in result.output
 
 
+def test_register_rejects_platform_managed_oauth_without_provider_key(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "oauth-missing-provider"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=[{"platform_managed": True, "required_scopes": ["chat:write"]}],
+    )
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "platform-managed entries must include a supported provider_key" in result.output
+
+
 def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "oauth-canonical"

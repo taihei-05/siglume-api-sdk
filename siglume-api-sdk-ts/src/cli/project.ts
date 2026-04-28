@@ -349,6 +349,11 @@ function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
   for (const item of requirements ?? []) {
     if (!isPlatformManagedRequirement(item)) continue;
     const providerKey = oauthProviderKeyFromRequirement(item);
+    if (!providerKey) {
+      throw new SiglumeProjectError(
+        "required_connected_accounts platform-managed entries must include a supported provider_key",
+      );
+    }
     if (providerKey && !providers.includes(providerKey)) {
       providers.push(providerKey);
     }

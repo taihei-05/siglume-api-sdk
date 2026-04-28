@@ -345,6 +345,10 @@ def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) 
         if not _is_platform_managed_requirement(item):
             continue
         provider_key = _oauth_provider_key_from_requirement(item)
+        if not provider_key:
+            raise click.ClickException(
+                "required_connected_accounts platform-managed entries must include a supported provider_key"
+            )
         if provider_key and provider_key not in providers:
             providers.append(provider_key)
     return providers
