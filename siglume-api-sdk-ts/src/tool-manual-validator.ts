@@ -41,16 +41,24 @@ function checkSchemaForbiddenRecursive(
   path = "",
 ): void {
   for (const keyword of COMPOSITION_KEYWORDS) {
-    if (keyword in schema) {
-      const location = path ? `${rootField}.${path}.${keyword}` : `${rootField}.${keyword}`;
-      pushIssue(
-        issue(
-          "INPUT_SCHEMA",
-          `Composition keyword '${keyword}' is not allowed in beta${path ? ` at ${path}` : ""}`,
-          location,
-        ),
-      );
+    if (!(keyword in schema)) {
+      continue;
     }
+    const branches = schema[keyword];
+    const location = path ? `${rootField}.${path}.${keyword}` : `${rootField}.${keyword}`;
+    if (!Array.isArray(branches) || branches.length === 0) {
+      pushIssue(issue("INPUT_SCHEMA", `${keyword} must be a non-empty array`, location));
+      continue;
+    }
+    branches.forEach((branch, index) => {
+      const branchPath = path ? `${path}.${keyword}[${index}]` : `${keyword}[${index}]`;
+      const branchLocation = `${rootField}.${branchPath}`;
+      if (!isRecord(branch)) {
+        pushIssue(issue("INPUT_SCHEMA", `${keyword}[${index}] must be an object`, branchLocation));
+        return;
+      }
+      checkSchemaForbiddenRecursive(branch, rootField, pushIssue, branchPath);
+    });
   }
 
   for (const forbidden of INPUT_SCHEMA_FORBIDDEN_KEYS) {

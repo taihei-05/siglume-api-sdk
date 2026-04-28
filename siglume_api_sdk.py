@@ -108,7 +108,7 @@ class AppManifest:
     permission_class: PermissionClass = PermissionClass.READ_ONLY
     approval_mode: ApprovalMode = ApprovalMode.AUTO
     dry_run_supported: bool = False
-    required_connected_accounts: list[str] = field(default_factory=list)  # e.g. ["amazon", "stripe"]
+    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. ["amazon"] or {"provider_key": "slack", "platform_managed": True}
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # in minor currency units (e.g. cents/yen)
@@ -395,7 +395,7 @@ class ToolManual:
     do_not_use_when: list[str]                          # 1-5 items
     permission_class: ToolManualPermissionClass = ToolManualPermissionClass.READ_ONLY
     dry_run_supported: bool = False
-    requires_connected_accounts: list[str] = field(default_factory=list)
+    requires_connected_accounts: list[Any] = field(default_factory=list)
     input_schema: dict[str, Any] = field(default_factory=dict)   # JSON Schema (type=object)
     output_schema: dict[str, Any] = field(default_factory=dict)  # must include "summary"
     usage_hints: list[str] = field(default_factory=list)
@@ -524,8 +524,9 @@ def _check_schema_forbidden_recursive(
     *,
     path: str = "",
 ) -> None:
-    """Recurse into a JSON Schema rejecting composition keywords and
-    forbidden keys (patternProperties) at any nesting level.
+    """Recurse into a JSON Schema rejecting forbidden keys
+    (patternProperties) at any nesting level while validating composition
+    branch structure.
 
     Server parity: matches `_check_composition_keywords` and
     `_check_forbidden_key` in
@@ -535,11 +536,20 @@ def _check_schema_forbidden_recursive(
         return
 
     for kw in _COMPOSITION_KEYWORDS:
-        if kw in schema:
+        if kw not in schema:
+            continue
+        branches = schema.get(kw)
+        if not isinstance(branches, list) or not branches:
             loc = f"{root_field}.{path}.{kw}" if path else f"{root_field}.{kw}"
-            err_fn("INPUT_SCHEMA",
-                   f"Composition keyword '{kw}' is not allowed in beta{' at ' + path if path else ''}",
-                   loc)
+            err_fn("INPUT_SCHEMA", f"{kw} must be a non-empty array", loc)
+            continue
+        for index, branch in enumerate(branches):
+            branch_path = f"{path}.{kw}[{index}]" if path else f"{kw}[{index}]"
+            loc = f"{root_field}.{branch_path}"
+            if not isinstance(branch, dict):
+                err_fn("INPUT_SCHEMA", f"{kw}[{index}] must be an object", loc)
+                continue
+            _check_schema_forbidden_recursive(branch, root_field, err_fn, path=branch_path)
 
     for forbidden in _INPUT_SCHEMA_FORBIDDEN_KEYS:
         if forbidden in schema:

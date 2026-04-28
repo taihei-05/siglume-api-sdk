@@ -27,7 +27,7 @@ export interface AppManifest {
   permission_class: PermissionClass;
   approval_mode: ApprovalMode;
   dry_run_supported: boolean;
-  required_connected_accounts: string[];
+  required_connected_accounts: unknown[];
   permission_scopes: string[];
   price_model: PriceModel;
   price_value_minor: number;

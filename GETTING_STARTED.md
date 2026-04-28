@@ -18,7 +18,7 @@ Before a listing can publish, make sure you have all of these artifacts:
 | `docs_url` | Yes | Dedicated API usage guide. Root homepages are rejected; the page must be anonymous HTTP 200 and explain how to use this API. |
 | `support_contact` | Yes | Real support email address or public support URL. |
 | `seller_homepage_url` | No | Official seller/company URL. Helpful for buyers, but not a publish blocker. |
-| `oauth_credentials.json` | Only OAuth-backed APIs | Seller-owned OAuth app Client ID / Client Secret. This is separate from the buyer's connected account. |
+| `oauth_credentials.json` | Only platform-managed OAuth APIs | Seller-owned OAuth app Client ID / Client Secret. This is separate from the buyer's connected account. |
 | Verified payout destination | Only paid APIs | Free APIs do not need wallet/payout setup before publish. |
 
 After the no-key local loop and deployment, use the production validation,
@@ -503,10 +503,12 @@ the registration blockers earlier.
   - `output_schema` must declare and match the live response fields
   - `requires_connected_accounts` must match the listing / Tool Manual contract
 - Seller OAuth app credentials during `auto-register`
-  - if `required_connected_accounts` includes a seller-side OAuth provider
-    such as X, Slack, Google, GitHub, Linear, or Notion, include that
+  - if `required_connected_accounts` declares a platform-managed OAuth provider
+    such as `{"provider_key": "slack", "platform_managed": true}`, include that
     provider in the local, Git-ignored `oauth_credentials.json`
-  - if an upgrade adds a new seller-side OAuth provider and the seed is
+  - simple provider strings such as `"slack"` are API-managed requirements and
+    do not require `oauth_credentials.json`
+  - if an upgrade adds a new platform-managed OAuth provider and the seed is
     missing, registration is rejected
 - Tool Manual quality grade **B** or above
   - `input_schema` and `output_schema` are part of the canonical contract
@@ -593,10 +595,12 @@ Setting `AUTO` on an `ACTION` or `PAYMENT` API will fail manifest validation.
 
 If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, a third-party provider API key), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
 
-If the API itself also needs a seller-owned OAuth app configuration to broker
-that provider flow, include the seller app credentials in
-the local, Git-ignored `oauth_credentials.json` during registration. Do not
-wait to create that configuration in the portal after publish.
+If Siglume should broker that provider flow with a seller-owned OAuth app,
+declare the requirement with `platform_managed: true` and include the seller
+app credentials in the local, Git-ignored `oauth_credentials.json` during
+registration. Plain strings such as `"slack"` mean your API manages that auth
+path itself and do not require `oauth_credentials.json`. Do not wait to create
+platform-managed OAuth configuration in the portal after publish.
 
 Responsibility split:
 
@@ -630,11 +634,11 @@ Submit again with the same `capability_key`.
 
 - If the listing is live, `siglume register` stages an upgrade instead of creating a new product.
 - `siglume register . --confirm` publishes the next release immediately after you approve the staged result and the self-serve checks pass again.
-- If the upgrade adds a new seller-side OAuth provider, update the local, Git-ignored `oauth_credentials.json` before registering or the upgrade is rejected.
+- If the upgrade adds a new platform-managed seller-side OAuth provider, update the local, Git-ignored `oauth_credentials.json` before registering or the upgrade is rejected.
 
 ### How do I manage external API credentials?
 
-Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. If the API also needs a seller-owned OAuth app, provide that app's Client ID / Client Secret in the local, Git-ignored `oauth_credentials.json` during registration or upgrade. **Never hardcode secrets in your API code.**
+Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. If Siglume should broker that connection with your seller-owned OAuth app, use `{"provider_key": "...", "platform_managed": true}` and provide that app's Client ID / Client Secret in the local, Git-ignored `oauth_credentials.json` during registration or upgrade. **Never hardcode secrets in your API code.**
 
 ### What's the difference between free and paid APIs?
 
@@ -657,7 +661,7 @@ Common causes:
 - `docs_url` points to a homepage instead of a dedicated anonymous API usage guide
 - `support_contact` is a placeholder or malformed email / support URL
 - `runtime_validation.json` still has placeholder URLs, missing expected fields, or a review key that is not dedicated to Siglume
-- OAuth-backed APIs are missing seller app credentials in local `oauth_credentials.json`
+- Platform-managed OAuth APIs are missing seller app credentials in local `oauth_credentials.json`
 - `ACTION` / `PAYMENT` API has `approval_mode=AUTO`
 - `ACTION` / `PAYMENT` API has `dry_run_supported=False`
 

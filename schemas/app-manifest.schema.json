@@ -71,7 +71,29 @@
     "required_connected_accounts": {
       "type": "array",
       "items": {
-        "type": "string"
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "provider_key": {
+                "type": "string"
+              },
+              "platform_managed": {
+                "type": "boolean"
+              },
+              "required_scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "permission_scopes": {

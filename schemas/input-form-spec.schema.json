@@ -18,7 +18,7 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 20,
-      "description": "Form fields. At least one field must have required=true (validator-enforced; not expressible at the schema level).",
+      "description": "Form fields. Single-API auto-register accepts all-optional forms; multi-capability / Works composition requires at least one required=true field (validator-enforced; not expressible at the schema level).",
       "items": { "$ref": "#/$defs/field" }
     },
     "sections": {

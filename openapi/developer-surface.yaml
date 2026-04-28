@@ -282,18 +282,22 @@ paths:
                   description: Whether the API supports dry-run execution
                 required_connected_accounts:
                   type: array
-                  description: Manifest/listing connected-account provider keys. Must match ToolManual.requires_connected_accounts.
+                  description: Manifest/listing connected-account requirements. Plain strings are API-managed; objects with platform_managed=true require seller OAuth credentials and must match ToolManual.requires_connected_accounts.
                   items:
-                    type: string
+                    oneOf:
+                      - type: string
+                      - type: object
                 oauth_credentials:
                   type: object
                   description: |
                     Optional seller-owned OAuth app credentials. Required when
-                    the API uses seller-side OAuth providers declared in
-                    `required_connected_accounts`. Include these during the
-                    initial registration and during upgrades that add a new
-                    provider. The portal OAuth panel is for rotation / repair
-                    after registration, not the initial setup step.
+                    `required_connected_accounts` declares platform-managed
+                    OAuth provider objects. Plain provider strings are
+                    API-managed and do not require this seed. Include these
+                    during the initial registration and during upgrades that add
+                    a new platform-managed provider. The portal OAuth panel is
+                    for rotation / repair after registration, not the initial
+                    setup step.
                   properties:
                     items:
                       type: array
@@ -1707,7 +1711,12 @@ components:
         permission_class: { type: string, enum: [read-only, action, payment, recommendation], description: "Supported tiers: read-only / action / payment. `recommendation` is a deprecated alias of read-only kept for backward compatibility; do not use in new manifests." }
         approval_mode: { type: string, enum: [auto, budget-bounded, always-ask, deny] }
         dry_run_supported: { type: boolean, default: false }
-        required_connected_accounts: { type: array, items: { type: string } }
+        required_connected_accounts:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
         permission_scopes: { type: array, items: { type: string } }
         price_model:
           type: string
@@ -1804,7 +1813,12 @@ components:
         seller_display_name: { type: string, nullable: true }
         seller_homepage_url: { type: string, nullable: true }
         seller_social_url: { type: string, nullable: true }
-        required_connected_accounts: { type: array, items: { type: string } }
+        required_connected_accounts:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
         permission_scopes: { type: array, items: { type: string } }
         compatibility_tags: { type: array, items: { type: string } }
         latency_tier: { type: string }

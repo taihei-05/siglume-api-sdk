@@ -306,7 +306,27 @@ _OAUTH_PROVIDER_ALIASES = {
 }
 
 
+def _is_platform_managed_requirement(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if value.get("platform_managed") is True:
+        return True
+    owner = str(
+        value.get("managed_by")
+        or value.get("auth_managed_by")
+        or value.get("connection_owner")
+        or ""
+    ).strip().lower().replace("_", "-")
+    return owner in {"platform", "siglume", "siglume-platform"}
+
+
 def _oauth_provider_key_from_requirement(value: Any) -> str | None:
+    if isinstance(value, dict):
+        for key in ("provider_key", "provider", "account_type", "name"):
+            provider_key = _oauth_provider_key_from_requirement(value.get(key))
+            if provider_key:
+                return provider_key
+        return None
     raw = str(value or "").strip().lower().replace("_", "-")
     if not raw:
         return None
@@ -322,10 +342,22 @@ def _oauth_provider_key_from_requirement(value: Any) -> str | None:
 def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) -> list[str]:
     providers: list[str] = []
     for item in requirements or []:
+        if not _is_platform_managed_requirement(item):
+            continue
         provider_key = _oauth_provider_key_from_requirement(item)
         if provider_key and provider_key not in providers:
             providers.append(provider_key)
     return providers
+
+
+def _connected_account_requirement_label(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("provider_key", "provider", "account_type", "name"):
+            label = str(value.get(key) or "").strip()
+            if label:
+                return label
+        return ""
+    return str(value or "").strip()
 
 
 def _oauth_provider_records_map(payload: dict[str, Any] | list[Any] | None) -> dict[str, dict[str, Any]]:
@@ -390,7 +422,7 @@ def _ensure_required_oauth_credentials(project: LoadedProject) -> None:
         return
     path = project.oauth_credentials_path or (project.root_dir / "oauth_credentials.json")
     raise click.ClickException(
-        f"{path} is required for OAuth-backed APIs. Missing provider seeds: {', '.join(missing)}"
+        f"{path} is required for platform-managed OAuth APIs. Missing provider seeds: {', '.join(missing)}"
     )
 
 
@@ -995,7 +1027,17 @@ def _api_usage_docs_template(manifest: AppManifest) -> str:
     job_to_be_done = str(payload.get("job_to_be_done") or "Describe what this API lets an agent do.")
     permission_class = str(payload.get("permission_class") or "read-only")
     price_model = str(payload.get("price_model") or "free")
-    required_accounts = ", ".join(str(item) for item in (payload.get("required_connected_accounts") or [])) or "none"
+    required_accounts = (
+        ", ".join(
+            label
+            for label in (
+                _connected_account_requirement_label(item)
+                for item in (payload.get("required_connected_accounts") or [])
+            )
+            if label
+        )
+        or "none"
+    )
     support_contact = str(payload.get("support_contact") or "replace-with-support-contact")
     return textwrap.dedent(
         f"""
@@ -1453,7 +1495,7 @@ def _registration_preflight(project: LoadedProject, client: SiglumeClient) -> di
         errors.append(f"remote Tool Manual quality is not publishable: {grade} ({score}/100)")
     if missing_oauth_providers:
         errors.append(
-            "oauth_credentials.json is required for OAuth-backed APIs: "
+            "oauth_credentials.json is required for platform-managed OAuth APIs: "
             + ", ".join(missing_oauth_providers)
         )
     preflight = {

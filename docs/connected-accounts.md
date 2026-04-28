@@ -3,10 +3,11 @@
 Siglume APIs can depend on user-linked external accounts such as
 Slack, X/Twitter, Google, GitHub, Linear, or Notion.
 
-The SDK exposes two distinct concerns:
+The SDK exposes three distinct concerns:
 
-1. Seller-side OAuth setup on the listing
-2. Buyer-side OAuth authorization for that listing
+1. API-managed connected-account requirements
+2. Platform-managed seller-side OAuth setup on the listing
+3. Buyer-side OAuth authorization for that listing
 
 Your API runtime never receives raw long-lived credentials.
 
@@ -89,10 +90,21 @@ client.revoke_connected_account("ca_123")
 
 ## What To Declare In Your App
 
-List required providers in `required_connected_accounts`:
+If your API manages the provider-specific auth path itself, list required
+providers as plain strings:
 
 ```python
 required_connected_accounts=["slack", "github"]
+```
+
+If Siglume should run the OAuth flow with the seller-owned OAuth app, mark the
+provider as platform-managed and include `oauth_credentials.json` during
+registration:
+
+```python
+required_connected_accounts=[
+    {"provider_key": "slack", "platform_managed": True, "required_scopes": ["chat:write"]}
+]
 ```
 
 ## What Your Runtime Receives

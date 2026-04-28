@@ -46,7 +46,7 @@ The machine-checkable schema lives at
 | `version` | yes | string | Must be exactly `"1.0"` |
 | `title` | yes | localized text | Plain string accepted; platform stores `ja` / `en` |
 | `description` | no | localized text | Plain string accepted; platform stores `ja` / `en` |
-| `fields` | yes | array | 1–20 items; **at least one** must have `required: true` |
+| `fields` | yes | array | 1–20 items. Single-API `auto-register` accepts all-optional forms; multi-capability / Works composition requires at least one `required: true` field. |
 | `sections` | no | array | Optional grouping of fields into ordered titled sections (multi-capability composition only) |
 
 A *localized text* value may be either a plain string or a bilingual object
@@ -67,7 +67,7 @@ All fields share these base properties:
 | `label` | yes | Localized text |
 | `description` | no | Localized text |
 | `placeholder` | no (per type) | Localized text. Required for `text` / `textarea` / `url` under multi-capability composition |
-| `required` | no | Boolean. At least one field in the form must be `true`. |
+| `required` | no | Boolean. Single-API `auto-register` may use all-optional filters; multi-capability / Works composition requires at least one required field. |
 | `default` | no | Optional default value. Type must match the field's input type. |
 | `tool_bindings` | no | Multi-capability composition only. See [Multi-capability composition](#multi-capability-composition). |
 
@@ -181,7 +181,10 @@ option `value`s; length capped by `max_selections` if set.
 
 ### `file`
 
-File upload.
+File upload. This field type is for AI Works / client-upload flows. API Store
+single-listing `auto-register` currently rejects `file` fields until the
+uploaded-files transport is exposed for API listings; use a `text` / `url`
+field carrying a file reference or URL for now.
 
 ```json
 {
@@ -278,7 +281,8 @@ field cannot bind to a `string` schema property.
 | `duplicate key '...'` | Two fields share a key | Each field's `key` must be unique |
 | `unsupported type '...'` | Unknown field type | Use one of the 9 types above |
 | `label must have both 'ja' and 'en'` | Stored form spec was not normalized | Send a plain string through `auto-register`, or provide both stored keys |
-| `at least one field must be required` | All fields are optional | Mark at least one field as `required: true` |
+| `at least one field must be required` | All fields are optional in a multi-capability / Works composition form | Mark at least one field as `required: true`, or use single-API `auto-register` where optional-only filter forms are allowed |
+| `uploaded_files transport` | `file` field used in API Store `auto-register` | Use a `text` / `url` field for a file reference until API listings expose uploaded-files transport |
 | `accept entries must be dot-prefixed extensions like '.pdf' (got '...')` | Missing leading dot | Prefix all extensions with `.` |
 | `max_size_mb cannot exceed 200` | File limit too high | Cap at 200 |
 | `<type> must have at least 1 option` | Empty `options` on a `select` / `multiselect` | Provide at least 1 option |

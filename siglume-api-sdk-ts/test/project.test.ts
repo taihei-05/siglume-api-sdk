@@ -328,11 +328,40 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(false);
   });
 
-  it("blocks registration when an OAuth-backed API does not provide oauth_credentials.json", async () => {
+  it("allows API-managed connected accounts without oauth_credentials.json", async () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
         required_connected_accounts: ["twitter"],
+      },
+    });
+
+    const report = await runRegistration(
+      projectDir,
+      {},
+      {
+        env: { SIGLUME_API_KEY: "sig_test_key" },
+        client_factory: () =>
+          ({
+            async preview_quality_score() {
+              return publishableQualityReport();
+            },
+            async auto_register(_manifest: unknown, _toolManual: unknown, options?: { oauth_credentials?: unknown }) {
+              expect(options?.oauth_credentials).toBeUndefined();
+              return { listing_id: "lst_api_managed", status: "draft", auto_manifest: {}, confidence: {} };
+            },
+          }) as unknown as SiglumeClientShape,
+      },
+    );
+
+    expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_api_managed");
+  });
+
+  it("blocks registration when a platform-managed OAuth API does not provide oauth_credentials.json", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: [{ provider_key: "twitter", platform_managed: true }],
       },
     });
     let autoRegisterCalled = false;
@@ -355,7 +384,7 @@ describe("cli project helpers", () => {
             }) as unknown as SiglumeClientShape,
         },
       ),
-    ).rejects.toThrow("oauth_credentials.json is required for OAuth-backed APIs");
+    ).rejects.toThrow("oauth_credentials.json is required for platform-managed OAuth APIs");
     expect(autoRegisterCalled).toBe(false);
   });
 
@@ -363,7 +392,7 @@ describe("cli project helpers", () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
-        required_connected_accounts: ["google-drive"],
+        required_connected_accounts: [{ provider_key: "google-drive", platform_managed: true }],
       },
       oauthCredentials: [
         {

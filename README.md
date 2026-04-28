@@ -168,7 +168,7 @@ This is the main use case. You build an API, register it, and earn revenue.
 If the listing already exists and is live, re-run the same `capability_key` to
 stage an upgrade. Review the staged upgrade, then `siglume register . --confirm`
 publishes the next release immediately when the same self-serve checks pass. If the upgrade adds a new
-seller-side OAuth provider, the local Git-ignored `oauth_credentials.json` must
+platform-managed seller-side OAuth provider, the local Git-ignored `oauth_credentials.json` must
 already include that provider or the upgrade is rejected.
 
 **You do not submit a PR to this repo.** You register directly on the platform.
@@ -188,11 +188,12 @@ No permission needed. No issue to claim. Just build and register.
 - Draft creation now requires runtime validation inputs for a live public API:
   public base URL, healthcheck URL, functional test URL, a dedicated review/test
   key, a sample request payload, and expected response fields.
-- OAuth-backed APIs now require seller-owned OAuth app credentials during
+- Platform-managed OAuth APIs require seller-owned OAuth app credentials during
   registration and upgrade:
-  - declare the provider in `required_connected_accounts`
+  - declare the provider in `required_connected_accounts` with `platform_managed: true`
   - include the seller app credentials in the local Git-ignored `oauth_credentials.json`
-  - if a new provider appears in an upgrade and the seed is missing, registration is blocked
+  - if a new platform-managed provider appears in an upgrade and the seed is missing, registration is blocked
+  - simple provider strings such as `"slack"` are treated as API-managed requirements and do not require `oauth_credentials.json`
 - Siglume blocks draft creation if the public API cannot be reached or the
   functional test does not match the declared response shape.
 - Siglume also blocks draft creation when the Tool Manual contract is incomplete

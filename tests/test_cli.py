@@ -30,7 +30,7 @@ def _write_register_project(
     *,
     include_tool_manual: bool = True,
     runtime_validation: dict | None = None,
-    required_connected_accounts: list[str] | None = None,
+    required_connected_accounts: list | None = None,
     oauth_credentials: dict | list | None = None,
     docs_url: str = "https://docs.siglume.test/register-project",
     support_contact: str = "https://support.siglume.test/register-project",
@@ -278,12 +278,56 @@ def test_register_blocks_non_publishable_remote_quality(monkeypatch, tmp_path) -
     assert FakeClient.auto_register_called is False
 
 
-def test_register_requires_oauth_seed_for_oauth_backed_api(monkeypatch, tmp_path) -> None:
+def test_register_allows_api_managed_connected_account_without_oauth_seed(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "api-managed-oauth"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=["twitter"],
+    )
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=90,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=70,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            assert kwargs.get("oauth_credentials") is None
+            return SimpleNamespace(listing_id="lst_api_managed", status="draft")
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert '"listing_id": "lst_api_managed"' in result.output
+
+
+def test_register_requires_oauth_seed_for_platform_managed_oauth_api(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "oauth-required"
     _write_register_project(
         project_dir,
-        required_connected_accounts=["twitter"],
+        required_connected_accounts=[{"provider_key": "twitter", "platform_managed": True}],
     )
 
     monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
@@ -325,7 +369,7 @@ def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> Non
     project_dir = tmp_path / "oauth-canonical"
     _write_register_project(
         project_dir,
-        required_connected_accounts=["google-drive"],
+        required_connected_accounts=[{"provider_key": "google-drive", "platform_managed": True}],
         oauth_credentials=[
             {
                 "provider": "gmail",
@@ -784,6 +828,39 @@ def test_build_tool_manual_template_tolerates_missing_job_to_be_done() -> None:
 
     assert manual["job_to_be_done"] == "Price Compare Helper"
     assert manual["trigger_conditions"][0].startswith("The owner asks for help with")
+
+
+def test_tool_manual_validator_allows_json_schema_composition_keywords() -> None:
+    manifest = AppManifest(
+        capability_key="price-compare-helper",
+        name="Price Compare Helper",
+        job_to_be_done="Compare retailer prices for a product and return the best current offer.",
+        category=AppCategory.COMMERCE,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        jurisdiction="US",
+    )
+    manual = project_module.build_tool_manual_template(manifest)
+    manual["input_schema"] = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "anyOf": [
+                    {"type": "string", "description": "Product query."},
+                    {"type": "null"},
+                ]
+            }
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    }
+
+    valid, issues = validate_tool_manual(manual)
+
+    assert valid, issues
 
 
 def test_validate_and_score_commands_use_remote_preview(monkeypatch) -> None:

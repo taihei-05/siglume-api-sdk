@@ -144,9 +144,11 @@ preflight errors before calling `auto-register`.
   - sample request payload in `request_payload`
   - expected response fields
 - For OAuth-backed APIs that use seller-owned OAuth apps:
-  - declare the provider in `required_connected_accounts`
+  - declare the provider in `required_connected_accounts` with `platform_managed: true`
   - include the seller OAuth app credentials in the local Git-ignored `oauth_credentials.json`
   - upgrades that add a new provider are blocked until the new seed is included
+- Plain provider strings such as `"slack"` mean the API manages that auth path
+  itself; the CLI does not require `oauth_credentials.json` for those entries.
 - Listing metadata such as:
   - `name`
   - `job_to_be_done`

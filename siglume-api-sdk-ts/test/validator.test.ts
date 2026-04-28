@@ -16,15 +16,19 @@ describe("validate_tool_manual", () => {
     expect(issues.some((issue) => issue.code === "INVALID_PERMISSION_CLASS")).toBe(true);
   });
 
-  it("rejects nested composition keywords and patternProperties", () => {
+  it("allows composition keywords but rejects nested patternProperties", () => {
     const manual = cloneBase();
     manual.input_schema = {
       type: "object",
       properties: {
         query: {
-          type: "object",
-          oneOf: [{ type: "string" }, { type: "number" }],
-          patternProperties: { "^x-": { type: "string" } },
+          oneOf: [
+            { type: "string" },
+            {
+              type: "object",
+              patternProperties: { "^x-": { type: "string" } },
+            },
+          ],
         },
       },
       required: ["query"],
@@ -34,8 +38,8 @@ describe("validate_tool_manual", () => {
     const [ok, issues] = validate_tool_manual(manual);
 
     expect(ok).toBe(false);
-    expect(issues.some((issue) => issue.field === "input_schema.query.oneOf")).toBe(true);
-    expect(issues.some((issue) => issue.field === "input_schema.query.patternProperties")).toBe(true);
+    expect(issues.some((issue) => issue.field === "input_schema.query.oneOf")).toBe(false);
+    expect(issues.some((issue) => issue.field === "input_schema.query.oneOf[1].patternProperties")).toBe(true);
   });
 
   it("warns about platform-injected input fields", () => {

@@ -310,7 +310,26 @@ const OAUTH_PROVIDER_ALIASES: Record<string, string> = {
   notion: "notion",
 };
 
+function isPlatformManagedRequirement(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.platform_managed === true) return true;
+  const owner = String(
+    value.managed_by ?? value.auth_managed_by ?? value.connection_owner ?? "",
+  )
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "-");
+  return owner === "platform" || owner === "siglume" || owner === "siglume-platform";
+}
+
 function oauthProviderKeyFromRequirement(value: unknown): string | null {
+  if (isRecord(value)) {
+    for (const key of ["provider_key", "provider", "account_type", "name"]) {
+      const providerKey = oauthProviderKeyFromRequirement(value[key]);
+      if (providerKey) return providerKey;
+    }
+    return null;
+  }
   const raw = String(value ?? "").trim().toLowerCase().replaceAll("_", "-");
   if (!raw) return null;
   if (OAUTH_PROVIDER_ALIASES[raw]) {
@@ -328,12 +347,24 @@ function oauthProviderKeyFromRequirement(value: unknown): string | null {
 function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
   const providers: string[] = [];
   for (const item of requirements ?? []) {
+    if (!isPlatformManagedRequirement(item)) continue;
     const providerKey = oauthProviderKeyFromRequirement(item);
     if (providerKey && !providers.includes(providerKey)) {
       providers.push(providerKey);
     }
   }
   return providers;
+}
+
+function connectedAccountRequirementLabel(value: unknown): string {
+  if (isRecord(value)) {
+    for (const key of ["provider_key", "provider", "account_type", "name"]) {
+      const label = String(value[key] ?? "").trim();
+      if (label) return label;
+    }
+    return "";
+  }
+  return String(value ?? "").trim();
 }
 
 function oauthProviderRecordsMap(payload: Record<string, unknown> | unknown[] | undefined): Record<string, Record<string, unknown>> {
@@ -403,7 +434,7 @@ function ensureRequiredOauthCredentials(project: LoadedProject): void {
   }
   const path = project.oauth_credentials_path ?? join(project.root_dir, "oauth_credentials.json");
   throw new SiglumeProjectError(
-    `${path} is required for OAuth-backed APIs. Missing provider seeds: ${missing.join(", ")}`,
+    `${path} is required for platform-managed OAuth APIs. Missing provider seeds: ${missing.join(", ")}`,
   );
 }
 
@@ -609,7 +640,7 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
     errors.push(`remote Tool Manual quality is not publishable: ${remoteQuality.grade} (${remoteQuality.overall_score}/100)`);
   }
   if (missingOauthProviders.length > 0) {
-    errors.push(`oauth_credentials.json is required for OAuth-backed APIs: ${missingOauthProviders.join(", ")}`);
+    errors.push(`oauth_credentials.json is required for platform-managed OAuth APIs: ${missingOauthProviders.join(", ")}`);
   }
   const preflight = {
     manifest_issues: manifestIssues,
@@ -639,6 +670,7 @@ export async function runRegistration(
   ensureManifestPublisherIdentity(project);
   ensureRuntimeValidationReady(project);
   ensureRequiredOauthCredentials(project);
+  const canonicalOauthCredentials = canonicalOauthCredentialsPayload(project.oauth_credentials);
   const client = await createClient(deps);
   const preflight = await registrationPreflight(project, client);
   let developerPortalPreflight: unknown = null;
@@ -654,7 +686,7 @@ export async function runRegistration(
   }
   const receipt = await client.auto_register(project.manifest, project.tool_manual, {
     runtime_validation: project.runtime_validation,
-    oauth_credentials: canonicalOauthCredentialsPayload(project.oauth_credentials),
+    oauth_credentials: canonicalOauthCredentials,
   });
   const result: Record<string, unknown> = {
     receipt: toJsonable(receipt),
@@ -1298,7 +1330,11 @@ function apiUsageDocsTemplate(manifest: AppManifest): string {
   const jobToBeDone = String(manifest.job_to_be_done ?? "Describe what this API lets an agent do.");
   const permissionClass = String(manifest.permission_class ?? "read-only");
   const priceModel = String(manifest.price_model ?? "free");
-  const requiredAccounts = (manifest.required_connected_accounts ?? []).join(", ") || "none";
+  const requiredAccounts =
+    (manifest.required_connected_accounts ?? [])
+      .map((item) => connectedAccountRequirementLabel(item))
+      .filter(Boolean)
+      .join(", ") || "none";
   const supportContact = String(manifest.support_contact ?? "replace-with-support-contact");
   return [
     `# ${name} API Usage Guide`,
