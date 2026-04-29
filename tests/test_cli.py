@@ -377,7 +377,7 @@ def test_register_rejects_platform_managed_oauth_without_provider_key(monkeypatc
     result = runner.invoke(main, ["register", str(project_dir), "--json"])
 
     assert result.exit_code == 1
-    assert "platform-managed entries must include a supported provider_key" in result.output
+    assert "platform-managed entries must include a provider_key" in result.output
 
 
 def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> None:
@@ -385,13 +385,15 @@ def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> Non
     project_dir = tmp_path / "oauth-canonical"
     _write_register_project(
         project_dir,
-        required_connected_accounts=[{"provider_key": "google-drive", "platform_managed": True}],
+        required_connected_accounts=[{"provider_key": "google", "platform_managed": True}],
         oauth_credentials=[
             {
-                "provider": "gmail",
+                "provider": "google",
                 "client_id": "google-client",
                 "client_secret": "google-secret",
                 "scopes": ["gmail.readonly"],
+                "authorize_url": "https://accounts.example.com/oauth/authorize",
+                "token_url": "https://accounts.example.com/oauth/token",
             }
         ],
     )
@@ -427,6 +429,8 @@ def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> Non
                         "client_id": "google-client",
                         "client_secret": "google-secret",
                         "required_scopes": ["gmail.readonly"],
+                        "authorize_url": "https://accounts.example.com/oauth/authorize",
+                        "token_url": "https://accounts.example.com/oauth/token",
                     }
                 ]
             }
@@ -441,6 +445,73 @@ def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> Non
     assert '"listing_id": "lst_oauth"' in result.output
 
 
+def test_register_canonicalizes_contract_defined_unknown_oauth_provider(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "oauth-custom"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=[{"provider_key": "custom-crm", "platform_managed": True}],
+        oauth_credentials=[
+            {
+                "provider_key": "custom-crm",
+                "client_id": "custom-client",
+                "client_secret": "custom-secret",
+                "scopes": ["record.write"],
+                "authorize_url": "https://crm.example.com/oauth/authorize",
+                "token_url": "https://crm.example.com/oauth/token",
+                "scope_separator": ",",
+                "token_endpoint_auth": "client_secret_post",
+                "pkce_required": True,
+            }
+        ],
+    )
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=90,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=70,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            assert kwargs["oauth_credentials"]["items"][0] == {
+                "provider_key": "custom-crm",
+                "client_id": "custom-client",
+                "client_secret": "custom-secret",
+                "required_scopes": ["record.write"],
+                "authorize_url": "https://crm.example.com/oauth/authorize",
+                "token_url": "https://crm.example.com/oauth/token",
+                "scope_separator": ",",
+                "token_endpoint_auth": "client_secret_post",
+                "pkce_required": True,
+            }
+            return SimpleNamespace(listing_id="lst_custom_oauth", status="draft")
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert '"listing_id": "lst_custom_oauth"' in result.output
+
+
 def test_register_rejects_string_oauth_scopes(tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "oauth-bad-scopes"
@@ -449,9 +520,11 @@ def test_register_rejects_string_oauth_scopes(tmp_path) -> None:
         required_connected_accounts=["google"],
         oauth_credentials=[
             {
-                "provider": "gmail",
+                "provider": "google",
                 "client_id": "google-client",
                 "client_secret": "google-secret",
+                "authorize_url": "https://accounts.example.com/oauth/authorize",
+                "token_url": "https://accounts.example.com/oauth/token",
                 "scopes": "gmail.readonly",
             }
         ],

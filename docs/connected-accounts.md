@@ -120,7 +120,7 @@ ConnectedAccountRef(
 )
 ```
 
-- `provider_key` identifies the provider family
+- `provider_key` is an opaque key from the API's registered OAuth contract
 - `session_token` is short-lived and Siglume-managed
 - `scopes` describe what the owner granted
 - `environment` tells you whether the execution is sandbox or live

@@ -40,13 +40,11 @@ def test_docs_and_contracts_are_in_sync() -> None:
 def test_openapi_keeps_connected_account_oauth_routes_public() -> None:
     text = (ROOT / "openapi" / "developer-surface.yaml").read_text(encoding="utf-8")
     required_fragments = [
-        "/me/connected-accounts/providers:",
         "/me/connected-accounts/oauth/authorize:",
         "/me/connected-accounts/oauth/callback:",
         "/me/connected-accounts/{accountId}/refresh:",
         "/me/connected-accounts/{accountId}/revoke:",
         "/market/capabilities/{listingId}/oauth-credentials:",
-        "ConnectedAccountProviderListEnvelope:",
         "ConnectedAccountOAuthAuthorizeRequest:",
         "ConnectedAccountOAuthStartEnvelope:",
         "ConnectedAccountOAuthCallbackRequest:",
