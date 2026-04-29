@@ -14,7 +14,6 @@ if str(ROOT) not in sys.path:
 from siglume_api_sdk import (  # noqa: E402
     ConnectedAccountLifecycleResult,
     ConnectedAccountOAuthStart,
-    ConnectedAccountProvider,
     SiglumeClient,
 )
 
@@ -29,37 +28,6 @@ def _build(handler) -> SiglumeClient:
         base_url="https://api.example.test/v1",
         transport=httpx.MockTransport(handler),
     )
-
-
-def test_list_providers_parses_registry() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.method == "GET"
-        assert request.url.path == "/v1/me/connected-accounts/providers"
-        return httpx.Response(200, json=envelope({
-            "items": [
-                {
-                    "provider_key": "slack", "display_name": "Slack",
-                    "auth_type": "oauth2", "refresh_supported": True,
-                    "pkce_required": False,
-                    "default_scopes": ["chat:write"],
-                    "available_scopes": ["chat:write", "channels:read"],
-                    "scope_separator": ",",
-                },
-                {
-                    "provider_key": "google", "display_name": "Google",
-                    "auth_type": "oauth2", "refresh_supported": True,
-                    "pkce_required": True,
-                    "default_scopes": ["openid"], "available_scopes": ["openid"],
-                    "scope_separator": " ",
-                },
-            ],
-        }))
-
-    providers = _build(handler).list_connected_account_providers()
-    assert len(providers) == 2
-    assert isinstance(providers[0], ConnectedAccountProvider)
-    assert providers[0].provider_key == "slack"
-    assert providers[1].pkce_required is True
 
 
 def test_start_oauth_posts_listing_id_and_returns_authorize_url() -> None:
@@ -163,12 +131,24 @@ def test_seller_can_set_and_read_listing_oauth_credentials() -> None:
         provider_key="slack",
         client_id="sato-cid",
         client_secret="sato-secret",
+        authorize_url="https://slack.example/oauth/authorize",
+        token_url="https://slack.example/oauth/token",
+        revoke_url="https://slack.example/oauth/revoke",
+        display_name="Team Slack",
+        scope_separator=",",
+        token_endpoint_auth="client_secret_basic",
+        pkce_required=True,
+        refresh_supported=True,
+        available_scopes=["chat:write", "channels:read"],
         required_scopes=["chat:write"],
     )
     assert result["configured"] is True
     assert calls[0][0] == "PUT"
     assert calls[0][1] == "/v1/market/capabilities/lst_abc/oauth-credentials"
     assert calls[0][2]["client_secret"] == "sato-secret"
+    assert calls[0][2]["authorize_url"] == "https://slack.example/oauth/authorize"
+    assert calls[0][2]["token_url"] == "https://slack.example/oauth/token"
+    assert calls[0][2]["available_scopes"] == ["chat:write", "channels:read"]
 
     status = client.get_listing_oauth_credentials_status("lst_abc")
     assert status["configured"] is True

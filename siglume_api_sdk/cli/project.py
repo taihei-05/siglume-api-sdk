@@ -6,6 +6,7 @@ import importlib.util
 import inspect
 import json
 import os
+import re
 import sys
 import textwrap
 import tomllib
@@ -291,21 +292,6 @@ def render_json(data: Any) -> str:
     return json.dumps(to_jsonable(data), ensure_ascii=False, indent=2)
 
 
-_OAUTH_PROVIDER_ALIASES = {
-    "x": "twitter",
-    "x-twitter": "twitter",
-    "twitter": "twitter",
-    "slack": "slack",
-    "google": "google",
-    "gmail": "google",
-    "google-drive": "google",
-    "google-calendar": "google",
-    "github": "github",
-    "linear": "linear",
-    "notion": "notion",
-}
-
-
 def _is_platform_managed_requirement(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
@@ -330,13 +316,7 @@ def _oauth_provider_key_from_requirement(value: Any) -> str | None:
     raw = str(value or "").strip().lower().replace("_", "-")
     if not raw:
         return None
-    if raw in _OAUTH_PROVIDER_ALIASES:
-        return _OAUTH_PROVIDER_ALIASES[raw]
-    for token in raw.replace("/", "-").replace(":", "-").split("-"):
-        token = token.strip()
-        if token in _OAUTH_PROVIDER_ALIASES:
-            return _OAUTH_PROVIDER_ALIASES[token]
-    return None
+    return re.sub(r"[^a-z0-9]+", "-", raw).strip("-") or None
 
 
 def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) -> list[str]:
@@ -347,7 +327,7 @@ def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) 
         provider_key = _oauth_provider_key_from_requirement(item)
         if not provider_key:
             raise click.ClickException(
-                "required_connected_accounts platform-managed entries must include a supported provider_key"
+                "required_connected_accounts platform-managed entries must include a provider_key"
             )
         if provider_key and provider_key not in providers:
             providers.append(provider_key)
@@ -380,7 +360,25 @@ def _oauth_provider_records_map(payload: dict[str, Any] | list[Any] | None) -> d
             item.get("provider_key") or item.get("provider")
         )
         if not provider_key:
-            raise click.ClickException(f"oauth_credentials[{index}].provider_key is unsupported.")
+            raise click.ClickException(f"oauth_credentials[{index}].provider_key is required.")
+        authorize_url = str(
+            item.get("authorize_url")
+            or item.get("authorization_url")
+            or item.get("auth_url")
+            or ""
+        ).strip()
+        token_url = str(item.get("token_url") or "").strip()
+        if not authorize_url or not token_url:
+            raise click.ClickException(
+                f"oauth_credentials[{index}] must include authorize_url and token_url."
+            )
+        for url_key, url_value in {
+            "authorize_url": authorize_url,
+            "token_url": token_url,
+            "revoke_url": str(item.get("revoke_url") or "").strip(),
+        }.items():
+            if url_value and not url_value.startswith("https://"):
+                raise click.ClickException(f"oauth_credentials[{index}].{url_key} must be an https URL.")
         client_id = str(item.get("client_id") or "").strip()
         client_secret = str(item.get("client_secret") or "").strip()
         if not client_id or not client_secret:
@@ -398,12 +396,34 @@ def _oauth_provider_records_map(payload: dict[str, Any] | list[Any] | None) -> d
             )
         else:
             scopes = [str(scope).strip() for scope in raw_scopes if str(scope).strip()]
-        resolved[provider_key] = {
+        record: dict[str, Any] = {
             "provider_key": provider_key,
             "client_id": client_id,
             "client_secret": client_secret,
             "required_scopes": scopes,
         }
+        for key, value in {
+            "authorize_url": authorize_url,
+            "token_url": token_url,
+            "revoke_url": str(item.get("revoke_url") or "").strip(),
+            "display_name": str(item.get("display_name") or "").strip(),
+            "scope_separator": str(item.get("scope_separator") or "").strip(),
+            "token_endpoint_auth": str(item.get("token_endpoint_auth") or "").strip(),
+        }.items():
+            if value:
+                record[key] = value
+        for key in ("pkce_required", "refresh_supported"):
+            if isinstance(item.get(key), bool):
+                record[key] = item[key]
+        if isinstance(item.get("available_scopes"), list):
+            available_scopes = [
+                str(scope).strip()
+                for scope in item["available_scopes"]
+                if str(scope).strip()
+            ]
+            if available_scopes:
+                record["available_scopes"] = available_scopes
+        resolved[provider_key] = record
     return resolved
 
 

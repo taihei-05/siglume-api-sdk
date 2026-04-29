@@ -26,7 +26,6 @@ import type {
   BundleMember,
   ConnectedAccountLifecycleResult,
   ConnectedAccountOAuthStart,
-  ConnectedAccountProvider,
   AutoRegistrationReceipt,
   BillingPortalLink,
   BudgetPolicy,
@@ -206,7 +205,6 @@ export interface SiglumeClientShape {
   submit_bundle_for_review(bundle_id: string): Promise<BundleListingRecord>;
 
   // Connected accounts (v0.7 track 3)
-  list_connected_account_providers(): Promise<ConnectedAccountProvider[]>;
   start_connected_account_oauth(input: {
     listing_id: string;
     redirect_uri: string;
@@ -219,6 +217,15 @@ export interface SiglumeClientShape {
       provider_key: string;
       client_id: string;
       client_secret: string;
+      authorize_url: string;
+      token_url: string;
+      revoke_url?: string;
+      display_name?: string;
+      scope_separator?: string;
+      token_endpoint_auth?: string;
+      pkce_required?: boolean;
+      refresh_supported?: boolean;
+      available_scopes?: string[];
       required_scopes?: string[];
     },
   ): Promise<Record<string, unknown>>;
@@ -820,24 +827,6 @@ function parseBundleMember(data: Record<string, unknown>): BundleMember {
     status: stringOrNull(data.status),
     added_at: stringOrNull(data.added_at),
     link_id: stringOrNull(data.link_id),
-  };
-}
-
-function parseConnectedAccountProvider(data: Record<string, unknown>): ConnectedAccountProvider {
-  return {
-    provider_key: String(data.provider_key ?? ""),
-    display_name: String(data.display_name ?? ""),
-    auth_type: String(data.auth_type ?? "oauth2"),
-    refresh_supported: Boolean(data.refresh_supported ?? false),
-    pkce_required: Boolean(data.pkce_required ?? false),
-    default_scopes: Array.isArray(data.default_scopes)
-      ? data.default_scopes.filter((s): s is string => typeof s === "string")
-      : [],
-    available_scopes: Array.isArray(data.available_scopes)
-      ? data.available_scopes.filter((s): s is string => typeof s === "string")
-      : [],
-    scope_separator: String(data.scope_separator ?? " "),
-    notes: stringOrNull(data.notes),
   };
 }
 
@@ -2412,14 +2401,6 @@ export class SiglumeClient implements SiglumeClientShape {
   // ----- Connected accounts (v0.7 track 3) ---------------------------------
   // `resolve()` is intentionally NOT wrapped: runtime-only, never over the wire.
 
-  async list_connected_account_providers(): Promise<ConnectedAccountProvider[]> {
-    const [data] = await this.request("GET", "/me/connected-accounts/providers");
-    const items = Array.isArray(data.items) ? data.items : [];
-    return items
-      .filter((item: unknown): item is Record<string, unknown> => isRecord(item))
-      .map(parseConnectedAccountProvider);
-  }
-
   async start_connected_account_oauth(input: {
     listing_id: string;
     redirect_uri: string;
@@ -2469,6 +2450,15 @@ export class SiglumeClient implements SiglumeClientShape {
       provider_key: string;
       client_id: string;
       client_secret: string;
+      authorize_url: string;
+      token_url: string;
+      revoke_url?: string;
+      display_name?: string;
+      scope_separator?: string;
+      token_endpoint_auth?: string;
+      pkce_required?: boolean;
+      refresh_supported?: boolean;
+      available_scopes?: string[];
       required_scopes?: string[];
     },
   ): Promise<Record<string, unknown>> {
@@ -2476,7 +2466,16 @@ export class SiglumeClient implements SiglumeClientShape {
       provider_key: input.provider_key,
       client_id: input.client_id,
       client_secret: input.client_secret,
+      authorize_url: input.authorize_url,
+      token_url: input.token_url,
     };
+    if (input.revoke_url !== undefined) body.revoke_url = input.revoke_url;
+    if (input.display_name !== undefined) body.display_name = input.display_name;
+    if (input.scope_separator !== undefined) body.scope_separator = input.scope_separator;
+    if (input.token_endpoint_auth !== undefined) body.token_endpoint_auth = input.token_endpoint_auth;
+    if (input.pkce_required !== undefined) body.pkce_required = input.pkce_required;
+    if (input.refresh_supported !== undefined) body.refresh_supported = input.refresh_supported;
+    if (input.available_scopes !== undefined) body.available_scopes = input.available_scopes;
     if (input.required_scopes !== undefined) body.required_scopes = input.required_scopes;
     const [data] = await this.request("PUT", `/market/capabilities/${listing_id}/oauth-credentials`, {
       json_body: body,

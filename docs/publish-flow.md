@@ -1,7 +1,7 @@
 # Publish Flow
 
 This document explains the current Siglume Agent API Store publish flow as of
-2026-04-23.
+2026-04-29.
 
 ## The short answer
 
@@ -26,7 +26,8 @@ The browser portal does **not** run registration directly. The portal is for:
 
 Submitted listing content is read-only in the portal. To change a submitted
 API, edit the source-side registration inputs and rerun `siglume register` /
-`auto-register` with the same `capability_key`.
+`auto-register`. Use the same `capability_key` only for non-material updates.
+Material contract changes require a new API with a new `capability_key`.
 
 There is no normal human review step in the self-serve publish flow anymore.
 
@@ -51,8 +52,9 @@ There is no normal human review step in the self-serve publish flow anymore.
    refresh the immutable draft.
 9. Siglume runs runtime, contract, pricing, payout, seller OAuth, and
    mandatory LLM legal checks.
-10. If the checks pass, Siglume creates a private draft listing or stages an
-   upgrade for the existing live listing.
+10. If the checks pass, Siglume creates a private draft listing or stages a
+   non-material update for the existing live listing. Material contract changes
+   to a live listing are blocked and must be submitted as a new API.
 11. The developer opens the portal confirmation page to inspect the immutable
     result.
 12. The developer confirms the draft with `siglume register . --confirm` or
@@ -82,6 +84,32 @@ There is no normal human review step in the self-serve publish flow anymore.
     draft package. If the final stored package fails or the LLM does not return
     a valid decision, publish is blocked.
 
+## Same-key updates and material changes
+
+After an API is live, the same `capability_key` can only be used for
+non-material updates such as buyer-facing copy, docs/support links, example
+prompts, compatibility tags, translation refreshes, or runtime endpoint repair
+that does not change the contract.
+
+The following live-listing changes are material and are rejected with
+`MATERIAL_CONTRACT_CHANGE_REQUIRES_NEW_API`:
+
+- `price_model`
+- `price_value_minor`
+- `currency`
+- `price_value_minor_jpy`
+- `dual_currency`
+- `permission_class`
+- `approval_mode`
+- `dry_run_supported`
+- `required_connected_accounts`
+- `permission_scopes`
+- `jurisdiction`
+
+When a material term changes, create a new API listing with a new
+`capability_key`. Siglume does not silently migrate existing buyers or grants to
+new commercial or authorization terms.
+
 ## The mandatory LLM legal review
 
 The legal check is not a simple keyword blocklist. During `auto-register`,
@@ -89,8 +117,10 @@ Siglume asks the LLM to decide whether the API is publishable in the declared
 jurisdiction. During `confirm-auto-register`, Siglume repeats that LLM legal
 review against the stored package that will actually be published. Confirmation
 does not accept content overrides; to change buyer-facing copy, Tool Manual,
-tags, scopes, pricing, or connected-account requirements, rerun
-`auto-register` and confirm the new reviewed draft.
+or tags, rerun `auto-register` and confirm the new reviewed draft. To change
+pricing, permission class, permission scopes, jurisdiction, connected-account
+requirements, or another material contract term on a live listing, register a
+new API with a new `capability_key`.
 
 The review must explicitly pass:
 
@@ -146,7 +176,8 @@ preflight errors before calling `auto-register`.
 - For OAuth-backed APIs that use seller-owned OAuth apps:
   - declare the provider in `required_connected_accounts` with `platform_managed: true`
   - include the seller OAuth app credentials in the local Git-ignored `oauth_credentials.json`
-  - upgrades that add a new provider are blocked until the new seed is included
+  - a live API cannot add provider requirements through a same-key update; use
+    a new `capability_key` for that material contract change
 - Plain provider strings such as `"slack"` mean the API manages that auth path
   itself; the CLI does not require `oauth_credentials.json` for those entries.
 - Listing metadata such as:

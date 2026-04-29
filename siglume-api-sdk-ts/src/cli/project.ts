@@ -296,20 +296,6 @@ export async function loadProject(path = "."): Promise<LoadedProject> {
   };
 }
 
-const OAUTH_PROVIDER_ALIASES: Record<string, string> = {
-  x: "twitter",
-  "x-twitter": "twitter",
-  twitter: "twitter",
-  slack: "slack",
-  google: "google",
-  gmail: "google",
-  "google-drive": "google",
-  "google-calendar": "google",
-  github: "github",
-  linear: "linear",
-  notion: "notion",
-};
-
 function isPlatformManagedRequirement(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (value.platform_managed === true) return true;
@@ -332,16 +318,7 @@ function oauthProviderKeyFromRequirement(value: unknown): string | null {
   }
   const raw = String(value ?? "").trim().toLowerCase().replaceAll("_", "-");
   if (!raw) return null;
-  if (OAUTH_PROVIDER_ALIASES[raw]) {
-    return OAUTH_PROVIDER_ALIASES[raw];
-  }
-  for (const token of raw.replaceAll("/", "-").replaceAll(":", "-").split("-")) {
-    const next = token.trim();
-    if (OAUTH_PROVIDER_ALIASES[next]) {
-      return OAUTH_PROVIDER_ALIASES[next];
-    }
-  }
-  return null;
+  return raw.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || null;
 }
 
 function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
@@ -351,7 +328,7 @@ function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
     const providerKey = oauthProviderKeyFromRequirement(item);
     if (!providerKey) {
       throw new SiglumeProjectError(
-        "required_connected_accounts platform-managed entries must include a supported provider_key",
+        "required_connected_accounts platform-managed entries must include a provider_key",
       );
     }
     if (providerKey && !providers.includes(providerKey)) {
@@ -388,7 +365,23 @@ function oauthProviderRecordsMap(payload: Record<string, unknown> | unknown[] | 
     }
     const providerKey = oauthProviderKeyFromRequirement(item.provider_key ?? item.provider);
     if (!providerKey) {
-      throw new SiglumeProjectError(`oauth_credentials[${index}].provider_key is unsupported.`);
+      throw new SiglumeProjectError(`oauth_credentials[${index}].provider_key is required.`);
+    }
+    const authorizeUrl = String(item.authorize_url ?? item.authorization_url ?? item.auth_url ?? "").trim();
+    const tokenUrl = String(item.token_url ?? "").trim();
+    if (!authorizeUrl || !tokenUrl) {
+      throw new SiglumeProjectError(
+        `oauth_credentials[${index}] must include authorize_url and token_url.`,
+      );
+    }
+    for (const [urlKey, urlValue] of Object.entries({
+      authorize_url: authorizeUrl,
+      token_url: tokenUrl,
+      revoke_url: String(item.revoke_url ?? "").trim(),
+    })) {
+      if (urlValue && !urlValue.startsWith("https://")) {
+        throw new SiglumeProjectError(`oauth_credentials[${index}].${urlKey} must be an https URL.`);
+      }
     }
     const clientId = String(item.client_id ?? "").trim();
     const clientSecret = String(item.client_secret ?? "").trim();
@@ -404,12 +397,30 @@ function oauthProviderRecordsMap(payload: Record<string, unknown> | unknown[] | 
     } else {
       scopes = rawScopes.map((scope) => String(scope ?? "").trim()).filter(Boolean);
     }
-    resolved[providerKey] = {
+    const record: Record<string, unknown> = {
       provider_key: providerKey,
       client_id: clientId,
       client_secret: clientSecret,
       required_scopes: scopes,
     };
+    for (const [key, value] of Object.entries({
+      authorize_url: authorizeUrl,
+      token_url: tokenUrl,
+      revoke_url: String(item.revoke_url ?? "").trim(),
+      display_name: String(item.display_name ?? "").trim(),
+      scope_separator: String(item.scope_separator ?? "").trim(),
+      token_endpoint_auth: String(item.token_endpoint_auth ?? "").trim(),
+    })) {
+      if (value) record[key] = value;
+    }
+    for (const key of ["pkce_required", "refresh_supported"]) {
+      if (typeof item[key] === "boolean") record[key] = item[key];
+    }
+    if (Array.isArray(item.available_scopes)) {
+      const availableScopes = item.available_scopes.map((scope) => String(scope ?? "").trim()).filter(Boolean);
+      if (availableScopes.length > 0) record.available_scopes = availableScopes;
+    }
+    resolved[providerKey] = record;
   }
   return resolved;
 }

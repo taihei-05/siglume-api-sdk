@@ -134,7 +134,7 @@ operational telemetry for partner-run data feeds.
 
 What the SDK will add once the platform ships the contract:
 
-- Typed wrappers for each supported provider family.
+- Typed helpers for listing-declared OAuth contracts.
 - Structured refresh / rotate / revoke flows that preserve the
   handle-only contract (the bus never emits the raw secret,
   even at creation — sellers see it once on the user-facing HTTP
@@ -142,9 +142,8 @@ What the SDK will add once the platform ships the contract:
 
 Platform prerequisites:
 
-- A stable provider-family contract in `operation_registry` for
-  external credential issuance.
-- Decision on per-provider redaction and audit requirements.
+- Listing-declared OAuth contracts for external credential issuance.
+- Decision on contract-scoped redaction and audit requirements.
 
 ### Usage-based / per-action billing on `PriceModel`
 

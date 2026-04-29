@@ -1297,18 +1297,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConnectedAccountEnvelope'
 
-  /me/connected-accounts/providers:
-    get:
-      operationId: listConnectedAccountProviders
-      summary: List the connected-account provider registry
-      responses:
-        '200':
-          description: Provider registry
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountProviderListEnvelope'
-
   /me/connected-accounts/oauth/authorize:
     post:
       operationId: startConnectedAccountOAuth
@@ -1929,44 +1917,6 @@ components:
         scopes: { type: array, items: { type: string } }
         metadata: { type: object }
 
-    ConnectedAccountProvider:
-      type: object
-      properties:
-        provider_key: { type: string }
-        display_name: { type: string }
-        auth_type: { type: string, default: oauth2 }
-        refresh_supported: { type: boolean, default: false }
-        pkce_required: { type: boolean, default: false }
-        default_scopes:
-          type: array
-          items: { type: string }
-        available_scopes:
-          type: array
-          items: { type: string }
-        scope_separator: { type: string, default: ' ' }
-        notes: { type: string, nullable: true }
-
-    ConnectedAccountProviderList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConnectedAccountProvider'
-
-    ConnectedAccountProviderListEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountProviderList'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
     ConnectedAccountOAuthAuthorizeRequest:
       type: object
       required: [listing_id, redirect_uri]
@@ -2038,11 +1988,22 @@ components:
 
     ListingOAuthCredentialsRequest:
       type: object
-      required: [provider_key, client_id, client_secret]
+      required: [provider_key, client_id, client_secret, authorize_url, token_url]
       properties:
         provider_key: { type: string }
         client_id: { type: string }
         client_secret: { type: string }
+        authorize_url: { type: string, format: uri }
+        token_url: { type: string, format: uri }
+        revoke_url: { type: string, format: uri, nullable: true }
+        display_name: { type: string, nullable: true }
+        scope_separator: { type: string, nullable: true, default: ' ' }
+        token_endpoint_auth: { type: string, nullable: true }
+        pkce_required: { type: boolean, nullable: true }
+        refresh_supported: { type: boolean, nullable: true }
+        available_scopes:
+          type: array
+          items: { type: string }
         required_scopes:
           type: array
           items: { type: string }
@@ -2063,6 +2024,17 @@ components:
             properties:
               provider_key: { type: string }
               configured: { type: boolean }
+              authorize_url: { type: string, nullable: true }
+              token_url: { type: string, nullable: true }
+              revoke_url: { type: string, nullable: true }
+              display_name: { type: string, nullable: true }
+              scope_separator: { type: string, nullable: true }
+              token_endpoint_auth: { type: string, nullable: true }
+              pkce_required: { type: boolean, nullable: true }
+              refresh_supported: { type: boolean, nullable: true }
+              available_scopes:
+                type: array
+                items: { type: string }
               required_scopes:
                 type: array
                 items: { type: string }

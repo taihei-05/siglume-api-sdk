@@ -413,21 +413,23 @@ describe("cli project helpers", () => {
             }) as unknown as SiglumeClientShape,
         },
       ),
-    ).rejects.toThrow("platform-managed entries must include a supported provider_key");
+    ).rejects.toThrow("platform-managed entries must include a provider_key");
   });
 
   it("canonicalizes OAuth seed payloads before auto-register", async () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
-        required_connected_accounts: [{ provider_key: "google-drive", platform_managed: true }],
+        required_connected_accounts: [{ provider_key: "google", platform_managed: true }],
       },
       oauthCredentials: [
         {
-          provider: "gmail",
+          provider: "google",
           client_id: "google-client",
           client_secret: "google-secret",
           scopes: ["gmail.readonly"],
+          authorize_url: "https://accounts.example.com/oauth/authorize",
+          token_url: "https://accounts.example.com/oauth/token",
         },
       ],
     });
@@ -454,6 +456,8 @@ describe("cli project helpers", () => {
                     client_id: "google-client",
                     client_secret: "google-secret",
                     required_scopes: ["gmail.readonly"],
+                    authorize_url: "https://accounts.example.com/oauth/authorize",
+                    token_url: "https://accounts.example.com/oauth/token",
                   },
                 ],
               });
@@ -466,6 +470,66 @@ describe("cli project helpers", () => {
     expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_oauth");
   });
 
+  it("canonicalizes contract-defined unknown OAuth providers before auto-register", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: [{ provider_key: "custom-crm", platform_managed: true }],
+      },
+      oauthCredentials: [
+        {
+          provider_key: "custom-crm",
+          client_id: "custom-client",
+          client_secret: "custom-secret",
+          scopes: ["record.write"],
+          authorize_url: "https://crm.example.com/oauth/authorize",
+          token_url: "https://crm.example.com/oauth/token",
+          scope_separator: ",",
+          token_endpoint_auth: "client_secret_post",
+          pkce_required: true,
+        },
+      ],
+    });
+
+    const report = await runRegistration(
+      projectDir,
+      {},
+      {
+        env: { SIGLUME_API_KEY: "sig_test_key" },
+        client_factory: () =>
+          ({
+            async preview_quality_score() {
+              return publishableQualityReport();
+            },
+            async auto_register(
+              _manifest: unknown,
+              _tool_manual: unknown,
+              options?: { oauth_credentials?: Record<string, unknown> | unknown[] },
+            ) {
+              expect(options?.oauth_credentials).toEqual({
+                items: [
+                  {
+                    provider_key: "custom-crm",
+                    client_id: "custom-client",
+                    client_secret: "custom-secret",
+                    required_scopes: ["record.write"],
+                    authorize_url: "https://crm.example.com/oauth/authorize",
+                    token_url: "https://crm.example.com/oauth/token",
+                    scope_separator: ",",
+                    token_endpoint_auth: "client_secret_post",
+                    pkce_required: true,
+                  },
+                ],
+              });
+              return { listing_id: "lst_custom_oauth", status: "draft", auto_manifest: {}, confidence: {} };
+            },
+          }) as unknown as SiglumeClientShape,
+      },
+    );
+
+    expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_custom_oauth");
+  });
+
   it("rejects string OAuth scopes", async () => {
     const projectDir = await createObjectProject({
       manifest: {
@@ -474,9 +538,11 @@ describe("cli project helpers", () => {
       },
       oauthCredentials: [
         {
-          provider: "gmail",
+          provider: "google",
           client_id: "google-client",
           client_secret: "google-secret",
+          authorize_url: "https://accounts.example.com/oauth/authorize",
+          token_url: "https://accounts.example.com/oauth/token",
           scopes: "gmail.readonly",
         },
       ],

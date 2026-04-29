@@ -134,20 +134,6 @@ class AppListingRecord:
 
 
 @dataclass
-class ConnectedAccountProvider:
-    """One entry from the provider-family registry (v0.7 track 3)."""
-    provider_key: str
-    display_name: str
-    auth_type: str
-    refresh_supported: bool
-    pkce_required: bool
-    default_scopes: list[str] = field(default_factory=list)
-    available_scopes: list[str] = field(default_factory=list)
-    scope_separator: str = " "
-    notes: str | None = None
-
-
-@dataclass
 class ConnectedAccountOAuthStart:
     """Result of ``start_connected_account_oauth`` — carries the URL
     the owner's browser should be pointed at plus the state token
@@ -1498,20 +1484,6 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
         raw=dict(data),
-    )
-
-
-def _parse_connected_account_provider(data: Mapping[str, Any]) -> ConnectedAccountProvider:
-    return ConnectedAccountProvider(
-        provider_key=str(data.get("provider_key") or ""),
-        display_name=str(data.get("display_name") or ""),
-        auth_type=str(data.get("auth_type") or "oauth2"),
-        refresh_supported=bool(data.get("refresh_supported") or False),
-        pkce_required=bool(data.get("pkce_required") or False),
-        default_scopes=[str(s) for s in (data.get("default_scopes") or []) if isinstance(s, str)],
-        available_scopes=[str(s) for s in (data.get("available_scopes") or []) if isinstance(s, str)],
-        scope_separator=str(data.get("scope_separator") or " "),
-        notes=_string_or_none(data.get("notes")),
     )
 
 
@@ -3182,16 +3154,6 @@ class SiglumeClient:
     # routes. ``resolve`` is NOT exposed: capabilities access the
     # runtime handle in-process, not over the wire.
 
-    def list_connected_account_providers(self) -> list[ConnectedAccountProvider]:
-        """List supported OAuth provider families (Slack / Google / etc)."""
-        data, _meta = self._request("GET", "/me/connected-accounts/providers")
-        items = data.get("items") if isinstance(data.get("items"), list) else []
-        return [
-            _parse_connected_account_provider(item)
-            for item in items
-            if isinstance(item, Mapping)
-        ]
-
     def start_connected_account_oauth(
         self,
         *,
@@ -3261,6 +3223,15 @@ class SiglumeClient:
         provider_key: str,
         client_id: str,
         client_secret: str,
+        authorize_url: str,
+        token_url: str,
+        revoke_url: str | None = None,
+        display_name: str | None = None,
+        scope_separator: str | None = None,
+        token_endpoint_auth: str | None = None,
+        pkce_required: bool | None = None,
+        refresh_supported: bool | None = None,
+        available_scopes: list[str] | None = None,
         required_scopes: list[str] | None = None,
     ) -> dict[str, Any]:
         """Seller-side: register the OAuth client credentials for
@@ -3272,7 +3243,23 @@ class SiglumeClient:
             "provider_key": provider_key,
             "client_id": client_id,
             "client_secret": client_secret,
+            "authorize_url": authorize_url,
+            "token_url": token_url,
         }
+        if revoke_url is not None:
+            body["revoke_url"] = revoke_url
+        if display_name is not None:
+            body["display_name"] = display_name
+        if scope_separator is not None:
+            body["scope_separator"] = scope_separator
+        if token_endpoint_auth is not None:
+            body["token_endpoint_auth"] = token_endpoint_auth
+        if pkce_required is not None:
+            body["pkce_required"] = bool(pkce_required)
+        if refresh_supported is not None:
+            body["refresh_supported"] = bool(refresh_supported)
+        if available_scopes is not None:
+            body["available_scopes"] = list(available_scopes)
         if required_scopes is not None:
             body["required_scopes"] = list(required_scopes)
         data, _meta = self._request(
