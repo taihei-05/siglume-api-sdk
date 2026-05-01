@@ -308,6 +308,24 @@ function isPlatformManagedRequirement(value: unknown): boolean {
   return owner === "platform" || owner === "siglume" || owner === "siglume-platform";
 }
 
+/**
+ * Extract the opaque `provider_key` from a requirement entry.
+ *
+ * Returns the value VERBATIM — no lowercasing, no rewriting of
+ * non-alphanumeric characters. `provider_key` is a contract-defined
+ * opaque identifier used for OAuth flow routing; keys such as
+ * `AzureAD_v2`, `microsoft/graph`, `foo.bar` must be transmitted
+ * unchanged so the API contract recognizes them. The earlier
+ * implementation normalized to `[a-z0-9-]+` and silently rewrote any
+ * of those into `azuread-v2` / `microsoft-graph` / `foo-bar`, breaking
+ * the contract-driven OAuth flow.
+ *
+ * Codex review on PR #194 surfaced the regression; mirrors the
+ * Python-side fix in `siglume_api_sdk/cli/project.py`. Owner-field
+ * normalization for the platform-managed-vs-third-party check happens
+ * in `isPlatformManagedRequirement` and is unrelated to this opaque
+ * provider_key value.
+ */
 function oauthProviderKeyFromRequirement(value: unknown): string | null {
   if (isRecord(value)) {
     for (const key of ["provider_key", "provider", "account_type", "name"]) {
@@ -316,9 +334,8 @@ function oauthProviderKeyFromRequirement(value: unknown): string | null {
     }
     return null;
   }
-  const raw = String(value ?? "").trim().toLowerCase().replaceAll("_", "-");
-  if (!raw) return null;
-  return raw.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || null;
+  const raw = String(value ?? "").trim();
+  return raw || null;
 }
 
 function requiredOauthProviders(requirements: unknown[] | undefined): string[] {

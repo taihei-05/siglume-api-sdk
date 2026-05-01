@@ -555,7 +555,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v0.10.0 (beta)** — the platform is launched on Polygon mainnet
+This is **v0.10.1 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.

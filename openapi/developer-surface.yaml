@@ -280,6 +280,29 @@ paths:
                 dry_run_supported:
                   type: boolean
                   description: Whether the API supports dry-run execution
+                permission_scopes:
+                  type: array
+                  description: |
+                    OAuth-style permission scopes this API requires (e.g.
+                    `["calendar.read", "drive.write"]`). Surfaced on the
+                    buyer-facing detail page so installs can compare scope
+                    asks across competing tools. Optional; mirrors the
+                    listing response shape so a publisher can repeat the
+                    same value at re-register without it being silently
+                    dropped (regression in v0.10.0 / fixed by codex review
+                    on PR #184).
+                  items:
+                    type: string
+                compatibility_tags:
+                  type: array
+                  description: |
+                    Discovery / compatibility tags (e.g. `["en", "ja"]` for
+                    locale, framework names, vertical labels). Used by the
+                    catalog filter and search UI on the buyer side.
+                    Optional; same regression-fix rationale as
+                    `permission_scopes`.
+                  items:
+                    type: string
                 required_connected_accounts:
                   type: array
                   description: Manifest/listing connected-account requirements. Plain strings are API-managed; objects with platform_managed=true require seller OAuth credentials and must match ToolManual.requires_connected_accounts.
