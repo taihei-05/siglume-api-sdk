@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `siglume dev` subcommand group exposing publisher-side observability:
+  - `siglume dev gap-report [--days N] [--min-occurrences M] [--limit L]` —
+    cross-publisher anonymized aggregate of "what capability shapes the
+    planner asked for but no installed tool matched" (server enforces
+    `min_occurrences >= 3` floor as singleton-fingerprinting privacy
+    guardrail). High-occurrence shapes are unmet demand a publisher can
+    target.
+  - `siglume dev stats <listing-id> [--days N]` — installs / revenue /
+    executions / success and selection rates for one of your listings.
+  - `siglume dev miss-analysis <listing-id> [--days N]` — why your listing
+    was a candidate but not selected, with actionable improvement reasons
+    and suggested trigger keywords.
+  - `siglume dev keywords <listing-id>` — keyword suggestions to add to
+    your tool manual to improve discoverability (manual coverage vs.
+    high-frequency request words).
+  - `siglume dev tail [--agent-id …] [--status …] [--follow] [--interval S]`
+    — recent execution receipts in the caller's owner scope; `--follow`
+    polls live with dedup across polls. `Ctrl-C` exits gracefully.
+- `SiglumeClient` gains five matching methods (`get_gap_report`,
+  `get_seller_listing_stats`, `get_seller_selection_analysis`,
+  `get_seller_keyword_suggestions`, `list_execution_receipts`). All are
+  thin GET wrappers; buyer prompts, agent IDs, and owner IDs are never
+  in any response payload.
+
+Triggered by [`siglume-api-sdk#186`](https://github.com/taihei-05/siglume-api-sdk/issues/186)
+(publisher observability gap raised by @sanrishi); tracking
+[`siglume-api-sdk#195`](https://github.com/taihei-05/siglume-api-sdk/issues/195).
+
 ### Changed
 
 - `siglume register .` now confirms publication by default after

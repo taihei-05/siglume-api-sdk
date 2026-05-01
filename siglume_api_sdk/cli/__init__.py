@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import click
 
+from siglume_api_sdk.cli.commands.dev_cmd import dev_command
 from siglume_api_sdk.cli.commands.diff_cmd import diff_command
 from siglume_api_sdk.cli.commands.init_cmd import init_command
 from siglume_api_sdk.cli.commands.preflight_cmd import preflight_command
@@ -27,3 +28,4 @@ main.add_command(preflight_command)
 main.add_command(register_command)
 main.add_command(support_command)
 main.add_command(usage_command)
+main.add_command(dev_command)

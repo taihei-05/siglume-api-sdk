@@ -3293,6 +3293,90 @@ class SiglumeClient:
         )
         return _parse_sandbox_session(data, meta)
 
+    # ------------------------------------------------------------------
+    # Publisher dev tools (Phase 1) — observability into marketplace performance
+    # ------------------------------------------------------------------
+
+    def get_gap_report(
+        self,
+        *,
+        days: int = 30,
+        min_occurrences: int = 3,
+        limit: int = 50,
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+        """Cross-publisher gap report: capability shapes the planner asked for but no tool matched.
+
+        Anonymized aggregate. Server enforces ``min_occurrences >= 3`` floor as
+        privacy guardrail against singleton fingerprinting. Never includes
+        buyer prompts, agent IDs, or owner IDs.
+        """
+        params: dict[str, Any] = {
+            "days": int(days),
+            "min_occurrences": int(min_occurrences),
+            "limit": int(limit),
+        }
+        return self._request("GET", "/seller/analytics/gap-report", params=params)
+
+    def get_seller_listing_stats(
+        self,
+        listing_id: str,
+        *,
+        days: int = 30,
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+        """Per-listing stats — installs, revenue, executions, success and selection rates."""
+        return self._request(
+            "GET",
+            f"/seller/analytics/listings/{listing_id}/stats",
+            params={"days": int(days)},
+        )
+
+    def get_seller_selection_analysis(
+        self,
+        listing_id: str,
+        *,
+        days: int = 30,
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+        """Why your listing was a candidate but NOT selected — actionable improvement signal."""
+        return self._request(
+            "GET",
+            f"/seller/analytics/listings/{listing_id}/selection-analysis",
+            params={"days": int(days)},
+        )
+
+    def get_seller_keyword_suggestions(
+        self,
+        listing_id: str,
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+        """Keyword suggestions to add to the tool manual to improve discoverability."""
+        return self._request(
+            "GET",
+            f"/seller/analytics/listings/{listing_id}/keyword-suggestions",
+        )
+
+    def list_execution_receipts(
+        self,
+        *,
+        agent_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], EnvelopeMeta]:
+        """List recent execution receipts in the caller's owner scope.
+
+        Returns a list of receipt dicts (most recent first). Used by
+        ``siglume dev tail`` to surface live execution activity to publishers
+        debugging their own listing's behavior.
+        """
+        params: dict[str, Any] = {
+            "limit": int(limit),
+            "offset": int(offset),
+        }
+        if agent_id:
+            params["agent_id"] = str(agent_id)
+        if status:
+            params["status"] = str(status)
+        return self._request("GET", "/capability-execution-receipts", params=params)
+
     def get_usage(
         self,
         *,
