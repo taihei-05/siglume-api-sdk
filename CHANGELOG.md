@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `siglume dev simulate "<offer text>"` (Phase 2) — predict the orchestrator's
+  tool chain for an offer text without executing any dispatches. Calls
+  Anthropic Haiku against the public catalog (top 50 listings, keyword
+  pre-filtered to top 10 candidates). Server-side rate-limited to **10 calls
+  per publisher per UTC day**; the response includes ``quota_used_today`` so
+  you can pace yourself. Use this to test "would my next API be picked for
+  offers like this?" before publishing. `429` quota responses surface a
+  friendly message via `SiglumeAPIError.details` (no stack trace).
+- `siglume dev tail --listing-id <id>` (Phase 2) — tail receipts that touched
+  a listing you own (publisher-scoped Q3 boundary). Returns structural
+  metadata only (status, counts, timing) — agent IDs, owner IDs, summary, and
+  failure_reason are intentionally NOT in the response, so you can monitor
+  inbound traffic on your published listings without seeing identifying buyer
+  detail or other publishers' tool outputs in multi-step chains.
+- `SiglumeClient.simulate_planner` and `SiglumeClient.list_listing_recent_receipts`
+  — matching client methods.
 - New `siglume dev` subcommand group exposing publisher-side observability:
   - `siglume dev gap-report [--days N] [--min-occurrences M] [--limit L]` —
     cross-publisher anonymized aggregate of "what capability shapes the

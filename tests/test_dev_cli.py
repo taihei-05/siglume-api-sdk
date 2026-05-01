@@ -13,14 +13,12 @@ from typing import Any
 
 from click.testing import CliRunner
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from siglume_api_sdk.cli import main  # noqa: E402
 from siglume_api_sdk.cli.commands import dev_cmd as dev_cmd_module  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # FakeClient — captures call args, returns configurable payloads
@@ -177,6 +175,70 @@ class FakeClient:
             None,
         )
 
+    def list_listing_recent_receipts(
+        self,
+        listing_id: str,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], Any]:
+        FakeClient.last_call = (
+            "list_listing_recent_receipts",
+            {"listing_id": listing_id, "limit": limit, "offset": offset},
+        )
+        return (
+            [
+                {
+                    "receipt_id": "rcpt_listing_0001",
+                    "status": "completed",
+                    "step_count": 2,
+                    "total_latency_ms": 240,
+                    "created_at": "2026-05-01T06:00:00+00:00",
+                    "completed_at": "2026-05-01T06:00:01+00:00",
+                },
+            ],
+            None,
+        )
+
+    def simulate_planner(
+        self,
+        *,
+        offer_text: str,
+        max_candidates: int = 10,
+    ) -> tuple[dict[str, Any], Any]:
+        FakeClient.last_call = (
+            "simulate_planner",
+            {"offer_text": offer_text, "max_candidates": max_candidates},
+        )
+        return (
+            {
+                "offer_text": offer_text,
+                "catalog_size": 50,
+                "candidates_considered": 4,
+                "predicted_chain": [
+                    {
+                        "tool_name": "translate_text",
+                        "capability_key": "translate_text",
+                        "listing_id": "lst_translate",
+                        "listing_title": "DeepL Translator",
+                        "args": {"target_lang": "ja", "text": "<offer text>"},
+                    },
+                    {
+                        "tool_name": "notion_append_page",
+                        "capability_key": "notion_append_page",
+                        "listing_id": "lst_notion",
+                        "listing_title": "Notion Page Appender",
+                        "args": {"page_id": "p_x", "content": "<translated>"},
+                    },
+                ],
+                "model": "claude-haiku-4-5-20251001",
+                "quota_used_today": 3,
+                "quota_limit": 10,
+                "note": None,
+            },
+            None,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -199,8 +261,8 @@ def test_dev_command_is_registered_on_main():
     runner = CliRunner()
     result = runner.invoke(main, ["dev", "--help"])
     assert result.exit_code == 0
-    # All 5 subcommands listed
-    for sub in ("gap-report", "stats", "miss-analysis", "keywords", "tail"):
+    # All 6 subcommands listed (Phase 1: 5 + Phase 2: simulate)
+    for sub in ("gap-report", "stats", "miss-analysis", "keywords", "tail", "simulate"):
         assert sub in result.output, f"subcommand {sub!r} missing from `siglume dev --help`"
 
 
@@ -479,7 +541,148 @@ def test_dev_tail_unexpected_response_shape_emits_warning(monkeypatch):
 
 def test_dev_subcommand_help_renders():
     runner = CliRunner()
-    for sub in ("gap-report", "stats", "miss-analysis", "keywords", "tail"):
+    for sub in ("gap-report", "stats", "miss-analysis", "keywords", "tail", "simulate"):
         result = runner.invoke(main, ["dev", sub, "--help"])
         assert result.exit_code == 0, f"`siglume dev {sub} --help` exited {result.exit_code}"
         assert sub.replace("-", "") in result.output.lower() or "Usage:" in result.output
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 2 — simulate command
+
+
+def test_dev_simulate_renders_predicted_chain(monkeypatch):
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "simulate", "translate english to japanese"])
+    assert result.exit_code == 0
+    assert FakeClient.last_call == (
+        "simulate_planner",
+        {"offer_text": "translate english to japanese", "max_candidates": 10},
+    )
+    assert "Simulated against 50 catalog listings" in result.output
+    assert "translate_text" in result.output
+    assert "notion_append_page" in result.output
+    assert "Quota: 3/10 used today" in result.output
+
+
+def test_dev_simulate_json(monkeypatch):
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["dev", "simulate", "do something", "--max-candidates", "5", "--json"],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["catalog_size"] == 50
+    assert len(payload["predicted_chain"]) == 2
+    assert FakeClient.last_call == (
+        "simulate_planner",
+        {"offer_text": "do something", "max_candidates": 5},
+    )
+
+
+def test_dev_simulate_max_candidates_above_20_rejected(monkeypatch):
+    """Click IntRange(1, 20) on --max-candidates."""
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(
+        main, ["dev", "simulate", "x", "--max-candidates", "999"],
+    )
+    assert result.exit_code != 0
+    assert "Invalid value for '--max-candidates'" in result.output or "is not in" in result.output
+
+
+def test_dev_simulate_429_quota_exceeded_friendly_message(monkeypatch):
+    """429 with details emits a tidy quota message, not a stack trace."""
+    _patch_client(monkeypatch)
+    from siglume_api_sdk.client import SiglumeAPIError
+
+    def _raise_429(self, **_kwargs):
+        raise SiglumeAPIError(
+            "Daily simulate quota of 10 reached. Resets at 00:00 UTC.",
+            status_code=429,
+            error_code="SIMULATE_QUOTA_EXCEEDED",
+            details={
+                "quota_used_today": 10,
+                "quota_limit": 10,
+                "reset_at": "2026-05-02T00:00:00+00:00",
+            },
+        )
+
+    monkeypatch.setattr(FakeClient, "simulate_planner", _raise_429)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "simulate", "anything"])
+    assert result.exit_code != 0
+    assert "Daily simulate quota exceeded" in result.output
+    assert "Resets at 2026-05-02" in result.output
+
+
+def test_dev_simulate_empty_chain_shows_note(monkeypatch):
+    _patch_client(monkeypatch)
+
+    def _empty(self, **_kwargs):
+        return (
+            {
+                "offer_text": "weird offer",
+                "catalog_size": 50,
+                "candidates_considered": 4,
+                "predicted_chain": [],
+                "model": "claude-haiku-4-5-20251001",
+                "quota_used_today": 4,
+                "quota_limit": 10,
+                "note": "LLM picked no tools (offer may not match any catalog entry)",
+            },
+            None,
+        )
+
+    monkeypatch.setattr(FakeClient, "simulate_planner", _empty)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "simulate", "weird offer"])
+    assert result.exit_code == 0
+    assert "Predicted chain: (empty)" in result.output
+    assert "LLM picked no tools" in result.output
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 2 — tail --listing-id (publisher-scoped feed)
+
+
+def test_dev_tail_listing_id_routes_to_listing_endpoint(monkeypatch):
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "tail", "--listing-id", "lst_xyz"])
+    assert result.exit_code == 0
+    # Routes to list_listing_recent_receipts, not list_execution_receipts
+    assert FakeClient.last_call == (
+        "list_listing_recent_receipts",
+        {"listing_id": "lst_xyz", "limit": 20, "offset": 0},
+    )
+    assert "rcpt_lis" in result.output  # truncated id from _format_receipt_line
+
+
+def test_dev_tail_listing_id_warns_when_irrelevant_filters_passed(monkeypatch):
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "dev", "tail",
+            "--listing-id", "lst_xyz",
+            "--agent-id", "agent_x",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Note: --agent-id and --status are ignored" in result.output
+
+
+def test_dev_tail_listing_id_response_has_no_agent_field(monkeypatch):
+    """Listing-scoped responses omit agent_id by design — output line lacks 'agent='."""
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "tail", "--listing-id", "lst_xyz"])
+    assert result.exit_code == 0
+    assert "agent=" not in result.output

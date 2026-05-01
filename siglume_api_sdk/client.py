@@ -3377,6 +3377,47 @@ class SiglumeClient:
             params["status"] = str(status)
         return self._request("GET", "/capability-execution-receipts", params=params)
 
+    def list_listing_recent_receipts(
+        self,
+        listing_id: str,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], EnvelopeMeta]:
+        """Receipts where any step touched this publisher's listing.
+
+        Publisher-scoped (Q3): caller must own the listing. Returns receipts
+        that surface execution metadata only — buyer agent IDs, owner IDs,
+        summary, and failure_reason are intentionally NOT in the response.
+        Used by ``siglume dev tail --listing-id`` to answer "who is calling
+        my listing" without exposing identifying buyer detail.
+        """
+        params: dict[str, Any] = {"limit": int(limit), "offset": int(offset)}
+        return self._request(
+            "GET",
+            f"/seller/analytics/listings/{listing_id}/recent-receipts",
+            params=params,
+        )
+
+    def simulate_planner(
+        self,
+        *,
+        offer_text: str,
+        max_candidates: int = 10,
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+        """Predict the orchestrator's tool chain for an offer text without dispatching.
+
+        Rate-limited server-side (10 calls / publisher / UTC day). Beyond the
+        cap the server returns ``429`` with a ``SIMULATE_QUOTA_EXCEEDED``
+        error code and a ``reset_at`` timestamp. Privacy: never includes
+        buyer prompts or other publishers' tool outputs.
+        """
+        body: dict[str, Any] = {
+            "offer_text": str(offer_text),
+            "max_candidates": int(max_candidates),
+        }
+        return self._request("POST", "/seller/dev/simulate", json_body=body)
+
     def get_usage(
         self,
         *,

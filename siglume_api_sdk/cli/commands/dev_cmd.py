@@ -16,7 +16,6 @@ import time
 from typing import Any
 
 import click
-
 from siglume_api_sdk.cli.project import render_json, resolve_api_key
 from siglume_api_sdk.client import SiglumeAPIError, SiglumeClient
 
@@ -74,7 +73,10 @@ def gap_report_command(
     click.echo(f"min_occurrences floor: {floor}")
     if shape_count == 0:
         click.echo("")
-        click.echo("(No shapes met the threshold yet — instrumentation may need more traffic to accumulate.)")
+        click.echo(
+            "(No shapes met the threshold yet — "
+            "instrumentation may need more traffic to accumulate.)"
+        )
         return
     click.echo("")
     for shape in (data.get("shapes", []) if isinstance(data, dict) else []):
@@ -228,22 +230,38 @@ def keywords_command(listing_id: str, json_output: bool) -> None:
 
 
 def _format_receipt_line(r: dict[str, Any]) -> str:
+    """Render one receipt line. Handles both shapes:
+    - own-agent (has ``id`` + ``agent_id``)
+    - listing-scoped (has ``receipt_id``, NO agent_id by design)
+    """
+    rid = str(r.get("receipt_id") or r.get("id") or "?")
+    agent = r.get("agent_id")
+    agent_part = f"agent={(str(agent))[:8]} " if agent is not None else ""
     return (
         f"{r.get('created_at', '?')} "
-        f"agent={(str(r.get('agent_id') or '?'))[:8]} "
+        f"{agent_part}"
         f"status={str(r.get('status', '?')):<10} "
         f"steps={r.get('step_count', 0)} "
         f"latency={r.get('total_latency_ms', '?')}ms "
-        f"id={(str(r.get('id') or '?'))[:8]}"
+        f"id={rid[:8]}"
     )
 
 
 @dev_command.command("tail")
-@click.option("--agent-id", default=None, help="Filter by agent_id.")
+@click.option(
+    "--listing-id",
+    default=None,
+    help=(
+        "Tail receipts that touched this publisher-owned listing "
+        "(Q3-scoped to listings you own). Without this flag, tails YOUR "
+        "OWN agent's recent receipts (debugging-your-own-agent view)."
+    ),
+)
+@click.option("--agent-id", default=None, help="Filter by agent_id (own-agent mode only).")
 @click.option(
     "--status",
     default=None,
-    help="Filter by status (pending / running / completed / failed).",
+    help="Filter by status (pending / running / completed / failed). Own-agent mode only.",
 )
 @click.option(
     "--limit",
@@ -267,6 +285,7 @@ def _format_receipt_line(r: dict[str, Any]) -> str:
 )
 @click.option("--json", "json_output", is_flag=True)
 def tail_command(
+    listing_id: str | None,
     agent_id: str | None,
     status: str | None,
     limit: int,
@@ -274,12 +293,26 @@ def tail_command(
     interval: int,
     json_output: bool,
 ) -> None:
-    """Tail recent execution receipts (your owner scope only).
+    """Tail recent execution receipts.
 
-    With --follow, polls every --interval seconds and prints new receipts as
-    they appear. Without --follow, prints the most recent --limit receipts and
+    Two modes:
+      - default (no --listing-id): tails YOUR OWN agent's recent receipts
+        (Q3-scoped to current_user.id). Useful for debugging your own
+        agent's tool usage. Filters: --agent-id, --status.
+      - --listing-id <id>: tails receipts that touched a publisher-owned
+        listing you own. Returns structural metadata only (no agent IDs,
+        no summaries, no failure reasons) — privacy-safe across the
+        publisher boundary.
+
+    With --follow, polls every --interval seconds and prints new receipts
+    as they appear. Without --follow, prints the most recent --limit and
     exits.
     """
+    if listing_id and (agent_id or status):
+        click.secho(
+            "Note: --agent-id and --status are ignored in listing-scoped mode.",
+            fg="yellow", err=True,
+        )
     api_key = resolve_api_key()
     seen_ids: set[str] = set()
 
@@ -299,7 +332,8 @@ def tail_command(
         for r in reversed(receipts):
             if not isinstance(r, dict):
                 continue
-            rid = str(r.get("id") or "")
+            # Listing-scoped responses use 'receipt_id'; owner-scoped use 'id'
+            rid = str(r.get("receipt_id") or r.get("id") or "")
             if not rid or rid in seen_ids:
                 continue
             seen_ids.add(rid)
@@ -308,12 +342,19 @@ def tail_command(
             else:
                 click.echo(_format_receipt_line(r))
 
+    def _fetch(client: SiglumeClient) -> Any:
+        if listing_id:
+            data, _ = client.list_listing_recent_receipts(listing_id, limit=limit)
+        else:
+            data, _ = client.list_execution_receipts(
+                agent_id=agent_id, status=status, limit=limit,
+            )
+        return data
+
     try:
         with SiglumeClient(api_key=api_key) as client:
             try:
-                data, _ = client.list_execution_receipts(
-                    agent_id=agent_id, status=status, limit=limit,
-                )
+                data = _fetch(client)
             except SiglumeAPIError as exc:
                 click.secho(f"API error: {exc}", fg="red", err=True)
                 raise click.Abort() from exc
@@ -329,9 +370,7 @@ def tail_command(
             while True:
                 time.sleep(interval)
                 try:
-                    data, _ = client.list_execution_receipts(
-                        agent_id=agent_id, status=status, limit=limit,
-                    )
+                    data = _fetch(client)
                 except SiglumeAPIError as exc:
                     click.secho(f"poll error: {exc}", fg="yellow", err=True)
                     continue
@@ -340,3 +379,106 @@ def tail_command(
         # Catches Ctrl-C during initial fetch AND during follow-loop sleep/poll.
         click.echo("", err=True)
         click.secho("[interrupted]", fg="cyan", err=True)
+
+
+# ---------------------------------------------------------------------------
+# simulate
+# ---------------------------------------------------------------------------
+
+
+@dev_command.command("simulate")
+@click.argument("offer_text")
+@click.option(
+    "--max-candidates",
+    default=10,
+    show_default=True,
+    type=click.IntRange(1, 20),
+    help="Cap on how many catalog tools to send to the LLM as candidates.",
+)
+@click.option("--json", "json_output", is_flag=True)
+def simulate_command(
+    offer_text: str, max_candidates: int, json_output: bool,
+) -> None:
+    """Predict the orchestrator's tool chain for an offer text WITHOUT executing it.
+
+    Useful for testing "would my next API be picked for offers like this?"
+    before publishing. Rate-limited server-side at 10 calls / publisher /
+    UTC day; the response includes ``quota_used_today`` so you can pace
+    yourself.
+
+    Example:
+
+        siglume dev simulate "translate english doc to japanese, post to notion"
+    """
+    api_key = resolve_api_key()
+    with SiglumeClient(api_key=api_key) as client:
+        try:
+            data, _ = client.simulate_planner(
+                offer_text=offer_text, max_candidates=max_candidates,
+            )
+        except SiglumeAPIError as exc:
+            # 429 quota → friendly message
+            if getattr(exc, "status_code", None) == 429:
+                details = getattr(exc, "details", None) or {}
+                quota_used = details.get("quota_used_today", "?")
+                quota_limit = details.get("quota_limit", "?")
+                reset_at = details.get("reset_at", "?")
+                click.secho(
+                    f"Daily simulate quota exceeded ({quota_used}/{quota_limit}). "
+                    f"Resets at {reset_at}.",
+                    fg="yellow", err=True,
+                )
+                raise click.Abort() from exc
+            click.secho(f"API error: {exc}", fg="red", err=True)
+            raise click.Abort() from exc
+
+    if json_output:
+        click.echo(render_json(data))
+        return
+
+    if not isinstance(data, dict):
+        click.secho("Unexpected response shape.", fg="red", err=True)
+        return
+
+    catalog_size = data.get("catalog_size", 0)
+    candidates = data.get("candidates_considered", 0)
+    chain = data.get("predicted_chain") or []
+    quota_used = data.get("quota_used_today", 0)
+    quota_limit = data.get("quota_limit", 0)
+    note = data.get("note")
+    model = data.get("model", "?")
+
+    click.secho(
+        f"Simulated against {catalog_size} catalog listings "
+        f"({candidates} considered) — model={model}",
+        fg="green",
+    )
+    if not chain:
+        click.echo("")
+        click.secho(
+            "Predicted chain: (empty)",
+            fg="yellow",
+        )
+        if note:
+            click.echo(f"  reason: {note}")
+    else:
+        click.echo("")
+        click.echo("Predicted chain:")
+        for i, call in enumerate(chain, 1):
+            if not isinstance(call, dict):
+                continue
+            click.echo(
+                f"  {i}. {call.get('tool_name', '?')} "
+                f"(listing={call.get('listing_id', '?')[:8]}…, "
+                f"title='{call.get('listing_title', '?')}')"
+            )
+            args = call.get("args") or {}
+            if args:
+                arg_summary = ", ".join(f"{k}={v!r}" for k, v in list(args.items())[:3])
+                click.echo(f"     args: {arg_summary}")
+        if note:
+            click.echo("")
+            click.echo(f"note: {note}")
+
+    click.echo("")
+    click.echo(f"Quota: {quota_used}/{quota_limit} used today")
