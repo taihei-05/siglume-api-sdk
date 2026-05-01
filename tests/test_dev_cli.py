@@ -363,9 +363,8 @@ def test_dev_tail_json_emits_per_receipt(monkeypatch):
     runner = CliRunner()
     result = runner.invoke(main, ["dev", "tail", "--json"])
     assert result.exit_code == 0
-    # Each receipt is a separate JSON object, one per line block
-    lines = [line for line in result.output.split("\n}") if line.strip()]
-    # We don't fully reparse — just assert the shape signal IDs are present
+    # Each receipt renders as its own JSON object (one per --json invocation per id);
+    # we assert presence by ID rather than reparsing the full stream.
     assert "receipt_a_0001" in result.output
     assert "receipt_b_0002" in result.output
 
