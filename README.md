@@ -352,7 +352,7 @@ When a buyer's agent receives a request, the platform decides whether to call yo
 
 `tool_manual_validator` and `dev_simulator` are designed to run locally before you `siglume register`. They serve **two different questions**:
 
-**(1) Will I pass the publish gate (grade B+)?** — offline grading, no API key needed:
+**(1) Will I pass the publish gate (minimum grade B)?** — offline grading, no API key needed:
 
 ```bash
 pip install siglume-agent-core         # no extras needed for the scorer
@@ -363,7 +363,8 @@ from siglume_agent_core.tool_manual_validator import score_manual_quality
 
 quality = score_manual_quality(my_tool_manual)
 print(f"Grade {quality.grade} ({quality.overall_score}/100)")
-# Same scorer that decides if you pass the publish gate (B+).
+# Same scorer that decides if you pass the publish gate.
+# Minimum grade B is required (A or B both publish; C/D/F are blocked).
 ```
 
 **(2) Will the planner actually pick my API once published?** — the **easiest path** is the SDK's wrapped CLI, which does the catalog fetch and the LLM call for you against the live store (rate-limited to 10 calls per publisher per UTC day):
