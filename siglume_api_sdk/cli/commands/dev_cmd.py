@@ -5,6 +5,7 @@ so publishers can inspect their API's marketplace performance from the CLI.
 
 Subcommands:
 - ``siglume dev gap-report``      : cross-publisher unmet-demand shapes
+- ``siglume dev market-vitals``   : publisher market vitals overview
 - ``siglume dev stats``           : per-listing install / revenue / execution stats
 - ``siglume dev miss-analysis``   : why your listing was candidate-but-not-selected
 - ``siglume dev keywords``        : keyword suggestions for the tool manual
@@ -90,6 +91,60 @@ def gap_report_command(
             f"hash={shape_hash[:12]}…  "
             f"words=[{words}]"
         )
+
+
+# ---------------------------------------------------------------------------
+# market-vitals
+# ---------------------------------------------------------------------------
+
+
+@dev_command.command("market-vitals")
+@click.option("--days", default=7, show_default=True, type=click.IntRange(1, 90))
+@click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
+def market_vitals_command(days: int, json_output: bool) -> None:
+    """Publisher market vitals overview."""
+    api_key = resolve_api_key()
+    with SiglumeClient(api_key=api_key) as client:
+        try:
+            data, _ = client.get_market_vitals(days=days)
+        except SiglumeAPIError as exc:
+            click.secho(f"API error: {exc}", fg="red", err=True)
+            raise click.Abort() from exc
+
+    if json_output:
+        click.echo(render_json(data))
+        return
+
+    if not isinstance(data, dict):
+        click.secho("Unexpected response shape.", fg="red", err=True)
+        return
+
+    period_days = data.get("period_days", days)
+    intents_total = data.get("intents_total", 0)
+    intents_per_day_avg = data.get("intents_per_day_avg", 0)
+    receipts_total = data.get("receipts_total", 0)
+    receipts_succeeded = data.get("receipts_succeeded", 0)
+    approval_gated_count = data.get("approval_gated_count", 0)
+    top_capabilities = data.get("top_capabilities") or []
+
+    click.secho(f"Market Vitals  (last {period_days} days)", fg="green")
+    click.echo("-" * 29)
+    click.echo("")
+    click.echo(f"Intents        {intents_total}  ({float(intents_per_day_avg):.2f}/day avg)")
+    click.echo(
+        f"Receipts       {receipts_total}  dispatched, {receipts_succeeded} succeeded"
+    )
+    click.echo(f"Approval-gated {approval_gated_count}")
+
+    if top_capabilities:
+        click.echo("")
+        click.echo("Top capabilities")
+        for i, capability in enumerate(top_capabilities[:3], 1):
+            if not isinstance(capability, dict):
+                continue
+            key = str(capability.get("capability_key", "?"))
+            selections = capability.get("selection_count", 0)
+            click.echo(f"  #{i}  {key:<34} {selections} selections")
 
 
 # ---------------------------------------------------------------------------

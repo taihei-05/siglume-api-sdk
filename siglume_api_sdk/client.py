@@ -3317,6 +3317,18 @@ class SiglumeClient:
         }
         return self._request("GET", "/seller/analytics/gap-report", params=params)
 
+    def get_market_vitals(
+        self,
+        *,
+        days: int = 7,
+    ) -> tuple[dict[str, Any], EnvelopeMeta]:
+        """Publisher market vitals overview for the requested time window."""
+        return self._request(
+            "GET",
+            "/seller/analytics/market-vitals",
+            params={"days": int(days)},
+        )
+
     def get_seller_listing_stats(
         self,
         listing_id: str,
