@@ -6,7 +6,6 @@ import importlib.util
 import inspect
 import json
 import os
-import re
 import sys
 import textwrap
 import tomllib
@@ -307,16 +306,30 @@ def _is_platform_managed_requirement(value: Any) -> bool:
 
 
 def _oauth_provider_key_from_requirement(value: Any) -> str | None:
+    """Extract the opaque ``provider_key`` from a requirement entry.
+
+    Returns the value VERBATIM — no lowercasing, no re-mapping of
+    non-alphanumeric characters. ``provider_key`` is a contract-defined
+    opaque identifier used for OAuth flow routing; keys such as
+    ``AzureAD_v2``, ``microsoft/graph``, ``foo.bar`` must be
+    transmitted unchanged so the API contract recognizes them. The
+    earlier implementation normalized to ``[a-z0-9-]+`` which silently
+    rewrote any of those into ``azuread-v2`` / ``microsoft-graph`` /
+    ``foo-bar`` and broke the new contract-driven OAuth flow.
+
+    Codex review on PR #194 surfaced the regression. Owner-field
+    normalization for the platform-managed-vs-third-party check
+    happens in ``_is_platform_managed_requirement`` and is unrelated
+    to the opaque provider_key value.
+    """
     if isinstance(value, dict):
         for key in ("provider_key", "provider", "account_type", "name"):
             provider_key = _oauth_provider_key_from_requirement(value.get(key))
             if provider_key:
                 return provider_key
         return None
-    raw = str(value or "").strip().lower().replace("_", "-")
-    if not raw:
-        return None
-    return re.sub(r"[^a-z0-9]+", "-", raw).strip("-") or None
+    raw = str(value or "").strip()
+    return raw or None
 
 
 def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) -> list[str]:

@@ -72,6 +72,8 @@ There is no normal human review step in the self-serve publish flow anymore.
    - optional seller OAuth app credentials in `oauth_credentials`
    - optional `input_form_spec` ([authoring guide](input-form-spec.md))
 3. Runs contract, pricing, payout, seller OAuth, and runtime validation preflight checks.
+
+   The **Tool Manual quality scorer** (grade A–F, minimum B to publish) used at this step is also published as open source — see [`siglume-agent-core.tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01). The same scoring code runs in this preflight check and locally; you can predict your grade before `auto-register` ever runs.
 4. Runs a mandatory fail-closed LLM legal review on the submitted package.
 5. Verifies the public API is reachable from the internet.
 6. Sends a functional test request using your dedicated review/test key.

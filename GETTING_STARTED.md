@@ -1562,6 +1562,10 @@ Your tool manual is automatically scored 0-100 with a letter grade:
 
 **Grade C, D, or F manuals cannot be published — minimum grade B is required.** Fix the issues and resubmit.
 
+> **Score locally before you submit.** The same A–F scorer is published as open source: [`siglume-agent-core.tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01). Install with `pip install siglume-agent-core` and call `score_manual_quality(my_manual)` to get the same grade you'll see at registration time, without burning a CLI/API key or hitting the platform.
+
+> **Want to know whether the planner would even pick your API once published?** [`siglume-agent-core.dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) runs the same selection pipeline (top-N catalog → keyword pre-filter → single `tool_choice="auto"` turn) against the live catalog and returns the predicted tool chain — without executing any of it. Pair it with `score_manual_quality` to validate **both** "will I pass the publish gate?" and "will I get picked once published?" before submission.
+
 ### What gets penalized
 
 - Vague trigger conditions: `"use when helpful"`, `"for many tasks"`, `"general purpose"`

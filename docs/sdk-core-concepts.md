@@ -53,7 +53,7 @@ time): `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, `PER_ACTION`.
 |---|---|
 | `ToolManual` | Machine-readable contract that agents read to decide whether to call your API. |
 | `ToolManualIssue` | Single validation or quality issue (raised by the grader). |
-| `ToolManualQualityReport` | Aggregated quality score (0–100 / grade A–F). Grade B is the minimum to publish. |
+| `ToolManualQualityReport` | Aggregated quality score (0–100 / grade A–F). Grade B is the minimum to publish. The same scorer is also published as the open-source [`siglume-agent-core.tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01) — install it locally to predict your grade before submission. |
 | `validate_tool_manual()` | Client-side validation that mirrors the server rules. |
 | `draft_tool_manual()` | Generate a ToolManual skeleton from a job description using an LLM provider. |
 | `fill_tool_manual_gaps()` | Repair / fill missing fields on an existing ToolManual. |
@@ -84,3 +84,4 @@ into your `execute()`; skip it otherwise.
 - [Permission Scopes](./permission-scopes.md) — how to choose the minimum safe tier
 - [Dry Run and Approval](./dry-run-and-approval.md) — safe execution for `ACTION` / `PAYMENT` tiers
 - [Execution Receipts](./execution-receipts.md) — what to return after execution
+- **[`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core)** — the open-source decision logic that runs *after* you publish: the same Tool Manual scorer, the tool-selection function (`tool_selector`), the LLM tool-use orchestrate loop, the per-tool failure-learning rules, and the publisher dev simulator (`dev_simulator`) for pre-publish dry runs. AGPL-3.0; same code path as production.

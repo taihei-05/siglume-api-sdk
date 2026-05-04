@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Documentation cross-links to `siglume-agent-core`** — README,
+  GETTING_STARTED, `docs/publish-flow.md`, and `docs/sdk-core-concepts.md`
+  now cross-link to the open-source decision logic at
+  [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core)
+  (AGPL-3.0 PyPI package). The README gains a new top-level section
+  **"How your API actually gets selected — the algorithm is public"**
+  with a 5-stage pipeline diagram (`installed_tool_prefilter` → `tool_selector`
+  → `orchestrate_helpers` + `orchestrate` → `provider_adapters` →
+  `capability_failure_learning`) and a question-driven reading list
+  ("why was my tool picked / not picked?" → `tool_selector`, etc.).
+  GETTING_STARTED's quality-scoring section now points publishers at
+  `score_manual_quality()` from agent-core for offline grade prediction
+  before submission, and at `dev_simulator.simulate_planner()` (or the
+  easier `siglume dev simulate "<offer>"` CLI) for a pre-publish dry run
+  that asks "would the planner have picked my API for this offer?".
+  No SDK behaviour change.
+
 ### Added
 
 - `siglume dev simulate "<offer text>"` (Phase 2) — predict the orchestrator's
