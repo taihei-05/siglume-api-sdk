@@ -72,6 +72,42 @@ class FakeClient:
             None,
         )
 
+    def get_market_vitals(
+        self, *, days: int,
+    ) -> tuple[dict[str, Any], Any]:
+        FakeClient.last_call = (
+            "get_market_vitals",
+            {"days": days},
+        )
+        return (
+            {
+                "since": "2026-04-24T00:00:00+00:00",
+                "until": "2026-05-01T00:00:00+00:00",
+                "period_days": days,
+                "intents_total": 32,
+                "intents_per_day_avg": 4.57 if days == 7 else 1.07,
+                "receipts_total": 27,
+                "receipts_succeeded": 0,
+                "approval_gated_count": 18,
+                "top_capabilities_min_count": 3,
+                "top_capabilities": [
+                    {
+                        "capability_key": "growpost-daily-theme-x-poster",
+                        "selection_count": 14,
+                    },
+                    {
+                        "capability_key": "ecb-fx-converter",
+                        "selection_count": 5,
+                    },
+                    {
+                        "capability_key": "cisa-kev-checker",
+                        "selection_count": 3,
+                    },
+                ],
+            },
+            None,
+        )
+
     def get_seller_listing_stats(
         self, listing_id: str, *, days: int,
     ) -> tuple[dict[str, Any], Any]:
@@ -261,8 +297,16 @@ def test_dev_command_is_registered_on_main():
     runner = CliRunner()
     result = runner.invoke(main, ["dev", "--help"])
     assert result.exit_code == 0
-    # All 6 subcommands listed (Phase 1: 5 + Phase 2: simulate)
-    for sub in ("gap-report", "stats", "miss-analysis", "keywords", "tail", "simulate"):
+    # All 7 subcommands listed (Phase 1: 5 + Phase 2: simulate + market-vitals)
+    for sub in (
+        "gap-report",
+        "market-vitals",
+        "stats",
+        "miss-analysis",
+        "keywords",
+        "tail",
+        "simulate",
+    ):
         assert sub in result.output, f"subcommand {sub!r} missing from `siglume dev --help`"
 
 
@@ -309,6 +353,42 @@ def test_dev_gap_report_min_occurrences_below_3_rejected(monkeypatch):
     result = runner.invoke(main, ["dev", "gap-report", "--min-occurrences", "1"])
     assert result.exit_code != 0
     assert "Invalid value for '--min-occurrences'" in result.output or "is not in" in result.output
+
+
+# ---------------------------------------------------------------------------
+# market-vitals
+# ---------------------------------------------------------------------------
+
+
+def test_dev_market_vitals_renders_summary(monkeypatch):
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "market-vitals"])
+    assert result.exit_code == 0
+    assert FakeClient.last_call == (
+        "get_market_vitals",
+        {"days": 7},
+    )
+    assert "Market Vitals  (last 7 days)" in result.output
+    assert "-----------------------------" in result.output
+    assert "Intents        32  (4.57/day avg)" in result.output
+    assert "Receipts       27  dispatched, 0 succeeded" in result.output
+    assert "Approval-gated 18" in result.output
+    assert "#1  growpost-daily-theme-x-poster" in result.output
+
+
+def test_dev_market_vitals_json(monkeypatch):
+    _patch_client(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(main, ["dev", "market-vitals", "--days", "30", "--json"])
+    assert result.exit_code == 0
+    assert FakeClient.last_call == (
+        "get_market_vitals",
+        {"days": 30},
+    )
+    payload = json.loads(result.output)
+    assert payload["period_days"] == 30
+    assert payload["top_capabilities"][0]["capability_key"] == "growpost-daily-theme-x-poster"
 
 
 # ---------------------------------------------------------------------------
@@ -541,7 +621,7 @@ def test_dev_tail_unexpected_response_shape_emits_warning(monkeypatch):
 
 def test_dev_subcommand_help_renders():
     runner = CliRunner()
-    for sub in ("gap-report", "stats", "miss-analysis", "keywords", "tail", "simulate"):
+    for sub in ("gap-report", "market-vitals", "stats", "miss-analysis", "keywords", "tail", "simulate"):
         result = runner.invoke(main, ["dev", sub, "--help"])
         assert result.exit_code == 0, f"`siglume dev {sub} --help` exited {result.exit_code}"
         assert sub.replace("-", "") in result.output.lower() or "Usage:" in result.output
