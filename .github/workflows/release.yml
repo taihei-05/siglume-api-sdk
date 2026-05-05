@@ -39,9 +39,6 @@ on:
 permissions:
   contents: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # Job 1: validate the tag ref and build artifacts. No id-token perm.
   # A compromised build dep here CANNOT mint an OIDC token.
@@ -80,7 +77,7 @@ jobs:
           echo "resolved-tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Checkout at resolved tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ steps.resolve.outputs.resolved-ref }}
           fetch-depth: 0
@@ -104,7 +101,7 @@ jobs:
           fi
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -155,7 +152,7 @@ jobs:
           python -m twine check dist/*
 
       - name: Upload artifacts for publish job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -177,7 +174,7 @@ jobs:
       id-token: write
     steps:
       - name: Download dist artifacts from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -220,13 +217,13 @@ jobs:
       id-token: write
     steps:
       - name: Check out the tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 1
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
