@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-05-05
+
+### Changed
+
+- **Docs align with `siglume-agent-core` v0.9.0.** README now distinguishes
+  the API Store tool-selection pipeline used by `siglume dev simulate` and
+  `siglume dev market-vitals` from the AI Works pre-route. It links to the
+  newly public `job_feasibility` and `works_candidate_selector` modules so the
+  Works automated route and re-check suppression policy are no longer implied
+  to be private or absent from agent-core.
+
+### Compatibility
+
+- No CLI or client behavior change. `siglume dev market-vitals` remains a thin
+  authenticated wrapper around `/v1/seller/analytics/market-vitals`; it reports
+  aggregate API Store orchestrator traffic and does not depend on the Works
+  auto-pitch cache implementation.
+
 ## [0.10.2] - 2026-05-05
 
 ### Changed

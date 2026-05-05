@@ -102,7 +102,7 @@ def gap_report_command(
 @click.option("--days", default=7, show_default=True, type=click.IntRange(1, 90))
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 def market_vitals_command(days: int, json_output: bool) -> None:
-    """Publisher market vitals overview."""
+    """Publisher market vitals overview for API Store orchestrator traffic."""
     api_key = resolve_api_key()
     with SiglumeClient(api_key=api_key) as client:
         try:
