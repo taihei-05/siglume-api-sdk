@@ -39,6 +39,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # Job 1: validate the tag ref and build artifacts. No id-token perm.
   # A compromised build dep here CANNOT mint an OIDC token.

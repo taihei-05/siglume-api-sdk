@@ -8,6 +8,9 @@ on:
   schedule:
     - cron: "17 18 * * *"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   contract-sync:
     runs-on: ubuntu-latest
