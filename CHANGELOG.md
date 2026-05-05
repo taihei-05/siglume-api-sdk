@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-05-05
+
 ### Changed
 
 - **Documentation cross-links to `siglume-agent-core`** — README,
@@ -51,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `min_occurrences >= 3` floor as singleton-fingerprinting privacy
     guardrail). High-occurrence shapes are unmet demand a publisher can
     target.
+  - `siglume dev market-vitals [--days N] [--json]` — aggregate daily
+    orchestrator traffic, dispatch receipt, approval-gated, and top selected
+    capability counts so publishers can distinguish "not selected" from "no
+    matching market traffic yet."
   - `siglume dev stats <listing-id> [--days N]` — installs / revenue /
     executions / success and selection rates for one of your listings.
   - `siglume dev miss-analysis <listing-id> [--days N]` — why your listing
@@ -62,15 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `siglume dev tail [--agent-id …] [--status …] [--follow] [--interval S]`
     — recent execution receipts in the caller's owner scope; `--follow`
     polls live with dedup across polls. `Ctrl-C` exits gracefully.
-- `SiglumeClient` gains five matching methods (`get_gap_report`,
-  `get_seller_listing_stats`, `get_seller_selection_analysis`,
-  `get_seller_keyword_suggestions`, `list_execution_receipts`). All are
-  thin GET wrappers; buyer prompts, agent IDs, and owner IDs are never
-  in any response payload.
+- `SiglumeClient` gains six matching methods (`get_gap_report`,
+  `get_market_vitals`, `get_seller_listing_stats`,
+  `get_seller_selection_analysis`, `get_seller_keyword_suggestions`,
+  `list_execution_receipts`). All are thin GET wrappers; buyer prompts, agent
+  IDs, and owner IDs are never in any response payload.
 
 Triggered by [`siglume-api-sdk#186`](https://github.com/taihei-05/siglume-api-sdk/issues/186)
 (publisher observability gap raised by @sanrishi); tracking
-[`siglume-api-sdk#195`](https://github.com/taihei-05/siglume-api-sdk/issues/195).
+[`siglume-api-sdk#195`](https://github.com/taihei-05/siglume-api-sdk/issues/195)
+and [`siglume-api-sdk#199`](https://github.com/taihei-05/siglume-api-sdk/issues/199).
 
 ### Changed
 
