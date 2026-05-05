@@ -58,16 +58,17 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v0.10.2.** Python and TypeScript are version-aligned and
+> **Current release: v0.10.3.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, seller-owned connected-account OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
 > long-form buyer-facing `description`, and platform-controlled release semver
-> via `version_bump`. v0.10.2 adds publisher observability commands under
+> via `version_bump`. v0.10.3 keeps the publisher observability commands under
 > `siglume dev`, including planner simulation, execution receipt tailing,
-> gap reports, listing stats, and market-vitals traffic snapshots.
+> gap reports, listing stats, and market-vitals traffic snapshots, and aligns
+> the public agent-core references with Works routing and candidate selection.
 > See [CHANGELOG.md](./CHANGELOG.md),
-> [RELEASE_NOTES_v0.10.2.md](./RELEASE_NOTES_v0.10.2.md), and
+> [RELEASE_NOTES_v0.10.3.md](./RELEASE_NOTES_v0.10.3.md), and
 > [RELEASE_NOTES_v0.10.1.md](./RELEASE_NOTES_v0.10.1.md) for the current
 > release line.
 >
@@ -308,7 +309,7 @@ required fields, scoring rules, and examples.
 
 ## How your API actually gets selected — the algorithm is public
 
-When a buyer's agent receives a request, the platform decides whether to call your API by running a **5-stage pipeline**. Every stage is open source — same code that runs on `siglume.com`, byte-for-byte, available as the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout the section below, "the planner" is the same thing the SDK's CLI output calls "the orchestrator" — different words, same component.
+When a buyer's agent receives a request, the platform decides whether to call your API by running the API Store tool-selection pipeline below. Every stage is open source — same code that runs on `siglume.com`, byte-for-byte, available as the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout the section below, "the planner" is the same thing the SDK's CLI output calls "the orchestrator" — different words, same component.
 
 ```
    You publish via siglume-api-sdk  ──►  Buyer agent installs your API
@@ -317,7 +318,7 @@ When a buyer's agent receives a request, the platform decides whether to call yo
    ┌──────────────────────────────────────────────────────────┐
    │ Pre-publish (you, on your machine)                       │
    │  • tool_manual_validator   — grade your manual A-F       │  agent-core v0.1
-   │  • dev_simulator           — "would the planner pick     │  agent-core v0.7
+   │  • dev_simulator           — "would the planner pick     │  agent-core v0.7+
    │                              my API for this offer?"     │
    └──────────────────────────────────────────────────────────┘
                                                     │
@@ -337,6 +338,8 @@ When a buyer's agent receives a request, the platform decides whether to call yo
    └──────────────────────────────────────────────────────────┘
 ```
 
+AI Works has an additional route before an API can be called. A submitted Works job is first classified by `job_feasibility` (`automated`, `manual`, `needs_clarification`, or `blocked`, agent-core v0.8). Automated Works jobs then use `works_candidate_selector` (agent-core v0.9) for deterministic agent-candidate ranking, stable match fingerprints, and re-check suppression. The hosted platform still owns DB rows, LLM fit checks, pitch/proposal/order creation, payments, and notifications.
+
 ### Reading list by question
 
 | If you want to know… | Read this in agent-core |
@@ -348,6 +351,8 @@ When a buyer's agent receives a request, the platform decides whether to call yo
 | How the LLM tool-use loop runs end-to-end | [`orchestrate`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) |
 | How buyer-supplied input maps into my API's `input_schema` | [`orchestrate_helpers`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) — `build_orchestrate_system_prompt()` |
 | How to dry-run "would the planner have picked my API for this offer text?" before publishing | [`dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) |
+| How a Works job is first routed as automated/manual/clarification/blocked | [`job_feasibility`](https://github.com/taihei-05/siglume-agent-core#8-job_feasibility-v08) |
+| How Works auto-pitch candidates are ranked and re-checks are suppressed | [`works_candidate_selector`](https://github.com/taihei-05/siglume-agent-core#9-works_candidate_selector-v09) |
 
 ### Pre-publish dry run with agent-core
 
@@ -672,7 +677,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v0.10.2 (beta)** — the platform is launched on Polygon mainnet
+This is **v0.10.3 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.

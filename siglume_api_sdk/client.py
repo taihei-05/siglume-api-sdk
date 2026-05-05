@@ -3322,7 +3322,7 @@ class SiglumeClient:
         *,
         days: int = 7,
     ) -> tuple[dict[str, Any], EnvelopeMeta]:
-        """Publisher market vitals overview for the requested time window."""
+        """Publisher market vitals overview for API Store orchestrator traffic."""
         return self._request(
             "GET",
             "/seller/analytics/market-vitals",
