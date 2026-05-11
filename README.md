@@ -175,6 +175,29 @@ upgrade before publishing. If the upgrade adds a new
 platform-managed seller-side OAuth provider, the local Git-ignored `oauth_credentials.json` must
 already include that provider or the upgrade is rejected.
 
+#### Game API Store placement
+
+Game APIs use the same `siglume register` / `auto-register` flow as every other
+Agent API Store listing. There is no separate public registration route.
+
+To make a listing eligible for the dedicated Game API Store entry point, mark
+the manifest with explicit game-oriented `compatibility_tags`:
+
+```python
+compatibility_tags=[
+    "game",
+    "unity",
+    "realtime",
+    "npc",
+]
+```
+
+Use tags that describe the real buyer context, for example `game`, `unity`,
+`unreal`, `godot`, `npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or
+`narrative`. Do not send arbitrary `metadata` in the registration payload for
+store placement; the public SDK contract keeps listing placement hints in the
+manifest fields and Tool Manual inputs that `siglume register` already reads.
+
 **You do not submit a PR to this repo.** You register directly on the platform.
 No permission needed. No issue to claim. Just build and register.
 

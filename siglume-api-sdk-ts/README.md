@@ -82,3 +82,10 @@ non-material upgrade when checks pass. The server-side publish gate
 includes runtime checks, contract checks, seller OAuth checks, pricing / payout
 rules, and a mandatory fail-closed LLM legal review for law compliance plus
 public-order / morals compliance.
+
+Game APIs use the same publishing flow. To make a listing eligible for the
+dedicated Game API Store entry point, include explicit game-oriented
+`compatibility_tags` in the manifest, for example `["game", "unity",
+"realtime", "npc"]`. Use concrete tags such as `game`, `unity`, `unreal`,
+`godot`, `npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or
+`narrative`; do not send arbitrary registration `metadata` for store placement.

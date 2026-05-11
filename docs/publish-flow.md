@@ -196,6 +196,11 @@ preflight errors before calling `auto-register`.
   - `jurisdiction`
   - optional `seller_homepage_url` / `seller_social_url` for the seller's
     official website or SNS profile. These are separate from `docs_url`.
+  - optional `compatibility_tags`. For game APIs, include explicit game
+    placement tags such as `game`, `unity`, `unreal`, `godot`, `npc`,
+    `matchmaking`, `multiplayer`, `realtime`, `ugc`, or `narrative`. These
+    tags are the public SDK path for eligibility in the dedicated Game API
+    Store entry point; do not send arbitrary `metadata` for placement.
 - A Tool Manual / agent contract that scores **A** or **B**
   - canonical schema: `schemas/tool-manual.schema.json`
   - required core fields include `input_schema`, `output_schema`,
