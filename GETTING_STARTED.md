@@ -216,6 +216,27 @@ The manifest is your API's identity card. It controls how your API appears in th
 | `seller_homepage_url` | Optional official seller/company homepage, separate from `docs_url`. | `"https://your-domain.com"` |
 | `seller_social_url` | Optional official seller social/profile URL, separate from `docs_url`. | `"https://x.com/your_account"` |
 
+### Game API Store placement
+
+If your API is built for game developers or game runtime use cases, use the
+normal publishing flow and add explicit game-oriented `compatibility_tags` to
+the manifest. This is what makes the listing eligible for the dedicated Game
+API Store entry point.
+
+```python
+compatibility_tags=[
+    "game",
+    "unity",
+    "realtime",
+    "npc",
+]
+```
+
+Good tags are concrete buyer signals such as `game`, `unity`, `unreal`,
+`godot`, `npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or
+`narrative`. Do not rely on arbitrary registration `metadata` for placement;
+use manifest fields that are validated and carried through by the SDK.
+
 ### How buyer inquiries reach you
 
 Buyers do **not** click through to your `support_contact` value directly. The
