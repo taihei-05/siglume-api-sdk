@@ -123,6 +123,18 @@ pip install -e .
 python examples/hello_price_compare.py
 ```
 
+### Report onboarding friction
+
+If installation, setup, or first run does not match this guide, please open a
+GitHub issue with:
+
+- your OS, shell, Python version, and install command
+- the exact command that failed and the full error output, with secrets redacted
+- whether you installed from PyPI, editable source, or a Dev Container
+- the first `siglume` command you tried and what you expected to happen
+
+These reports help keep the beginner path accurate for early developers.
+
 ### Project structure
 
 ```
