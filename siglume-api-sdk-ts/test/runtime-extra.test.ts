@@ -26,6 +26,7 @@ class RecordingApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Returns a structured offer comparison.",
       example_prompts: ["Compare prices for Sony headphones."],
@@ -54,6 +55,7 @@ class BrokenManifestApp extends AppAdapter {
       dry_run_supported: false,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       example_prompts: [],
     };

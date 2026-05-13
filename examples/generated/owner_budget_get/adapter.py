@@ -65,6 +65,7 @@ class OwnerBudgetGetWrapperApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Read the current delegated budget.",
             support_contact="support@example.com",

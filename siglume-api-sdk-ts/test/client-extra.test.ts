@@ -33,6 +33,7 @@ function buildManifest() {
     dry_run_supported: true,
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
+    currency: "USD" as const,
     jurisdiction: "US",
     docs_url: "https://docs.example.com/price-compare",
     support_contact: "support@example.com",

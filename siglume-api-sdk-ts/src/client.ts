@@ -2146,6 +2146,7 @@ export class SiglumeClient implements SiglumeClientShape {
       "jurisdiction",
       "price_model",
       "price_value_minor",
+      "currency",
       "permission_class",
       "approval_mode",
       "dry_run_supported",
@@ -2163,6 +2164,16 @@ export class SiglumeClient implements SiglumeClientShape {
         "AppManifest.store_vertical is required. Choose 'api' for normal API Store listings or 'game' for API games.",
       );
     }
+    const currency = String(payload.currency ?? "").trim().toUpperCase();
+    if (!currency) {
+      throw new SiglumeClientError(
+        "AppManifest.currency is required. Choose 'USD' for USDC settlement or 'JPY' for JPYC settlement.",
+      );
+    }
+    if (currency !== "USD" && currency !== "JPY") {
+      throw new SiglumeClientError(`AppManifest.currency must be 'USD' or 'JPY'. Got ${String(payload.currency)}.`);
+    }
+    payload.currency = currency;
     // Strip `version` from the embedded manifest sub-dict too so the
     // platform's reject-on-manifest-version check cannot trip on the SDK's
     // local-tracking default. The SDK's AppManifest.version is local-only

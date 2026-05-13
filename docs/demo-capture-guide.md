@@ -1,4 +1,4 @@
-# Demo Capture Guide
+﻿# Demo Capture Guide
 
 Use this guide to record the SDK story in a way that matches the current beta
 surfaces and the actual route split in the web app.
@@ -14,10 +14,10 @@ The current beta separates buyer and seller flows:
 
 Paid subscription publishing is live in production on Polygon mainnet
 (chainId 137); see `PAYMENT_MIGRATION.md` for the deployed contract
-addresses. Record the embedded-wallet payout flow from Wallet at
-`/owner/credits/payout`, where only the payout token (USDC vs JPYC) can
-be changed. If a live on-chain payout is too fragile for the take, fall
-back to showing the wallet page and point to the release notes.
+addresses. Show that the manifest explicitly declares `currency="USD"` or
+`currency="JPY"`; USD listings settle in USDC, and JPY listings settle in
+JPYC. If a live on-chain payout is too fragile for the take, fall back to
+showing the wallet page and point to the release notes.
 
 ## Recommended demo flow
 
@@ -169,7 +169,7 @@ docs/assets/demo/siglume-owner-publish-demo.gif
 ## README embed snippet
 
 ```md
-[![🚀 Quick Start](https://img.shields.io/badge/%F0%9F%9A%80-Quick%20Start-111827?style=flat-square)](./GETTING_STARTED.md)
+[![噫 Quick Start](https://img.shields.io/badge/%F0%9F%9A%80-Quick%20Start-111827?style=flat-square)](./GETTING_STARTED.md)
 [![Examples](https://img.shields.io/badge/examples-starter%20apps-0ea5e9?style=flat-square)](#examples)
 [![License](https://img.shields.io/badge/license-MIT-16a34a?style=flat-square)](./LICENSE)
 

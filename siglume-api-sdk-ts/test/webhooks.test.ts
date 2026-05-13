@@ -45,7 +45,7 @@ function buildEvent(type = "subscription.created") {
       access_grant_id: "grant_demo_123",
       listing_id: "lst_demo_123",
       capability_key: "currency-converter-v2",
-      currency: "USD",
+      currency: "USD" as const,
       amount_minor: 1200,
       payment_status: "succeeded",
     },

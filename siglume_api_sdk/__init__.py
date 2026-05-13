@@ -23,6 +23,7 @@ _LEGACY_PUBLIC_EXPORTS = [
     "ExecutionKind",
     "ExecutionResult",
     "HealthCheckResult",
+    "ListingCurrency",
     "PermissionClass",
     "PriceModel",
     "ReceiptRef",

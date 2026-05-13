@@ -45,6 +45,7 @@ class AgentBehaviorApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Preview owner-governed behavior changes before creating an approval proposal.",
             example_prompts=[

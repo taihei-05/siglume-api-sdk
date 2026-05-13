@@ -60,7 +60,7 @@ function createMockClient() {
         status: "active",
         dry_run_supported: true,
         price_value_minor: 0,
-        currency: "USD",
+        currency: "USD" as const,
         submission_blockers: [],
         raw: {},
       };
@@ -253,7 +253,7 @@ async function createTestProject(
       required: ["amount_usd", "currency"],
       additionalProperties: false,
     },
-    currency: "USD",
+    currency: "USD" as const,
     settlement_mode: "embedded_wallet_charge",
     refund_or_cancellation_note: "Refunds are handled according to the merchant's cancellation policy.",
     jurisdiction: "US",
@@ -510,7 +510,7 @@ describe("siglume CLI", () => {
           status: "active",
           dry_run_supported: true,
           price_value_minor: 0,
-          currency: "USD",
+          currency: "USD" as const,
           submission_blockers: [],
           raw: {},
         };

@@ -1,4 +1,4 @@
-"""Siglume API Store SDK — interface definitions for external developers.
+"""Siglume API Store SDK 窶・interface definitions for external developers.
 
 This module defines the contracts that developers implement to publish
 APIs on the Siglume API Store.
@@ -23,7 +23,7 @@ from typing import Any, Mapping
 _JURISDICTION_PATTERN = re.compile(r"^[A-Z]{2}(-[A-Z0-9]{1,3})?$")
 
 
-# ── Permission & Execution Models ──
+# 笏笏 Permission & Execution Models 笏笏
 
 class PermissionClass(str, Enum):
     """Permission tiers for AppManifest.
@@ -32,13 +32,13 @@ class PermissionClass(str, Enum):
     ``RECOMMENDATION`` is a deprecated alias of ``READ_ONLY`` retained for
     backward compatibility; ``ToolManualPermissionClass`` has never accepted
     it and the platform normalizes it to ``read-only`` at registration.
-    Do not use ``RECOMMENDATION`` in new manifests — it will be removed in a
+    Do not use ``RECOMMENDATION`` in new manifests 窶・it will be removed in a
     future major version.
     """
     READ_ONLY = "read-only"          # Search, retrieve, review, suggest
     ACTION = "action"                 # Cart, reserve, draft
     PAYMENT = "payment"              # Pay, purchase, settle
-    RECOMMENDATION = "recommendation"  # Deprecated — behaves as READ_ONLY
+    RECOMMENDATION = "recommendation"  # Deprecated 窶・behaves as READ_ONLY
 
 
 class ApprovalMode(str, Enum):
@@ -91,7 +91,12 @@ class StoreVertical(str, Enum):
     GAME = "game"
 
 
-# ── Data Transfer Objects ──
+# 笏笏 Data Transfer Objects 笏笏
+
+class ListingCurrency(str, Enum):
+    USD = "USD"
+    JPY = "JPY"
+
 
 @dataclass
 class AppManifest:
@@ -101,7 +106,7 @@ class AppManifest:
         `jurisdiction` is an ISO 3166-1 alpha-2 country code (optionally with
         a sub-region, e.g. "US", "US-CA", "JP") declaring the governing law
         this API is designed to comply with. Consumer-protection, tax,
-        payment, and data-residency regulations differ by country — the
+        payment, and data-residency regulations differ by country 窶・the
         platform surfaces this to agent owners so they can make an informed
         subscription decision. Default market is "US".
     """
@@ -116,13 +121,13 @@ class AppManifest:
     required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. ["amazon"] or {"provider_key": "slack", "platform_managed": True}
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
-    price_value_minor: int = 0             # in minor currency units (e.g. cents/yen)
-    currency: str = "USD"
-    # REQUIRED. No default — every AppManifest must explicitly declare the
+    price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
+    currency: ListingCurrency | str | None = None  # REQUIRED: "USD" -> USDC, "JPY" -> JPYC
+    # REQUIRED. No default 窶・every AppManifest must explicitly declare the
     # country whose law governs the offering. Ambiguous / missing values are
     # rejected at construction time and at platform registration.
     jurisdiction: str = ""                 # must be explicitly set; ISO 3166-1 alpha-2 (e.g. "US", "JP", "US-CA")
-    applicable_regulations: list[str] = field(default_factory=list)  # e.g. ["GDPR", "CCPA", "資金決済法"]
+    applicable_regulations: list[str] = field(default_factory=list)  # e.g. ["GDPR", "CCPA", "雉・≡豎ｺ貂域ｳ・]
     data_residency: str | None = None      # ISO code; defaults to jurisdiction if None
     # NOTE: The SDK intentionally does NOT model served_markets / excluded_markets.
     # Whether this API is valid for a buyer's country/use-case (e.g. seismic
@@ -141,15 +146,18 @@ class AppManifest:
     example_prompts: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        # Currency: the API Store is USD-unified. Non-USD submissions
-        # are rejected at registration. Enforce here so developers get a clear
-        # error at adapter-construction time rather than a 422 at register.
-        if self.currency and self.currency.upper() != "USD":
+        if self.currency is None or str(self.currency).strip() == "":
             raise ValueError(
-                f"AppManifest.currency must be 'USD' — the API Store is "
-                f"USD-unified regardless of jurisdiction. Got: {self.currency!r}"
+                "AppManifest.currency is REQUIRED. Choose 'USD' for USDC "
+                "settlement or 'JPY' for JPYC settlement."
             )
-        self.currency = "USD"
+        currency = self.currency.value if isinstance(self.currency, ListingCurrency) else str(self.currency).strip().upper()
+        if currency not in {ListingCurrency.USD.value, ListingCurrency.JPY.value}:
+            raise ValueError(
+                "AppManifest.currency must be 'USD' or 'JPY'. "
+                f"Got: {self.currency!r}"
+            )
+        self.currency = ListingCurrency(currency)
 
         if self.store_vertical is None or str(self.store_vertical).strip() == "":
             raise ValueError(
@@ -170,7 +178,7 @@ class AppManifest:
                 "the API Store must explicitly declare its country of "
                 "origin (the country whose law governs the offering) as an "
                 "ISO 3166-1 alpha-2 code, e.g. 'US', 'JP', 'GB', 'DE', 'SG'. "
-                "No default is applied — you must make an informed choice."
+                "No default is applied 窶・you must make an informed choice."
             )
         if not _JURISDICTION_PATTERN.match(self.jurisdiction):
             raise ValueError(
@@ -218,7 +226,7 @@ class ExecutionContext:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-# ── Execution Contract Types ──
+# 笏笏 Execution Contract Types 笏笏
 # Structured types for describing what happened during execution.
 # These replace (or complement) the free-form receipt_summary dict
 # so that receipts are machine-readable and can link to AIWorks
@@ -290,7 +298,7 @@ class SideEffectRecord:
 class ReceiptRef:
     """Opaque reference to a CapabilityExecutionReceipt on the platform.
 
-    Returned by the runtime after execution completes — not set by the app
+    Returned by the runtime after execution completes 窶・not set by the app
     developer. Use this to link AIWorks JobDeliverables to execution receipts
     via ``execution_receipt_id``.
 
@@ -366,14 +374,14 @@ class ExecutionResult:
     approval_prompt: str | None = None     # human-readable approval request (legacy)
     receipt_summary: dict[str, Any] = field(default_factory=dict)  # free-form (legacy)
 
-    # ── P1: structured execution contract ──
+    # 笏笏 P1: structured execution contract 笏笏
     artifacts: list[ExecutionArtifact] = field(default_factory=list)
     side_effects: list[SideEffectRecord] = field(default_factory=list)
     receipt_ref: ReceiptRef | None = None   # set by runtime, not by app developer
     approval_hint: ApprovalRequestHint | None = None  # structured approval context
 
 
-# ── Tool Manual Types ──
+# 笏笏 Tool Manual Types 笏笏
 # A ToolManual is the machine-readable contract that tells an LLM when and
 # how to invoke an agent API.  The Siglume runtime validates these on
 # release publish; the SDK mirrors the canonical types so developers get
@@ -406,7 +414,7 @@ class ToolManual:
     Developers build this locally and submit it during release publish or
     via the confirm-auto-register endpoint.
     """
-    # ── Required (all permission classes) ──
+    # 笏笏 Required (all permission classes) 笏笏
     tool_name: str                                      # 3-64 chars, [A-Za-z0-9_]
     job_to_be_done: str                                 # 10-500 chars
     summary_for_model: str                              # 10-300 chars, factual
@@ -421,19 +429,19 @@ class ToolManual:
     result_hints: list[str] = field(default_factory=list)
     error_hints: list[str] = field(default_factory=list)
 
-    # ── Required for action / payment ──
+    # 笏笏 Required for action / payment 笏笏
     approval_summary_template: str | None = None
     preview_schema: dict[str, Any] | None = None        # JSON Schema
     idempotency_support: bool | None = None              # must be True for action/payment
     side_effect_summary: str | None = None
 
-    # ── Required for payment only ──
+    # 笏笏 Required for payment only 笏笏
     quote_schema: dict[str, Any] | None = None           # JSON Schema
     currency: str | None = None                          # must be "USD"
     settlement_mode: SettlementMode | None = None
     refund_or_cancellation_note: str | None = None
 
-    # ── Required for action / payment ──
+    # 笏笏 Required for action / payment 笏笏
     # Governing law declaration for this tool's execution. Must not contradict
     # AppManifest.jurisdiction. ISO 3166-1 alpha-2 (optionally -subregion).
     jurisdiction: str | None = None
@@ -515,11 +523,11 @@ class ToolManualQualityReport:
     validation_warnings: list[ToolManualIssue] = field(default_factory=list)
 
 
-# ── Tool Manual Validation (server-mirror) ──
+# 笏笏 Tool Manual Validation (server-mirror) 笏笏
 # Client-side mirror of the authoritative server validator at
 # agent_sns.application.capability_runtime.tool_manual_validator.
 # Catches common structural mistakes before a network round-trip.
-# The server is always authoritative — keep rule sets in sync.
+# The server is always authoritative 窶・keep rule sets in sync.
 
 _TOOL_NAME_RE = re.compile(r'^[A-Za-z0-9_]{3,64}$')
 
@@ -594,12 +602,12 @@ def validate_tool_manual(
 
     Returns ``(ok, issues)`` where *ok* is True when no errors were found.
 
-    **Server mirror** — this function mirrors the validation rules in the
+    **Server mirror** 窶・this function mirrors the validation rules in the
     Siglume runtime (``tool_manual_validator.validate_tool_manual``).  The
     server is always authoritative; this SDK copy catches the most common
     structural mistakes before a network round-trip.
 
-    **Keeping in sync** — if the server validator adds or changes rules,
+    **Keeping in sync** 窶・if the server validator adds or changes rules,
     this function must be updated to match.  A CI job that compares the
     rule sets (field names, regex, length bounds) is recommended to prevent
     silent drift.  See ``schemas/tool-manual.schema.json`` for the
@@ -620,7 +628,7 @@ def validate_tool_manual(
         _err("INVALID_ROOT", "tool manual must be a dict")
         return False, issues
 
-    # ── required fields ──
+    # 笏笏 required fields 笏笏
     required = [
         "tool_name", "job_to_be_done", "summary_for_model",
         "trigger_conditions", "do_not_use_when", "permission_class",
@@ -632,14 +640,14 @@ def validate_tool_manual(
         if f not in manual:
             _err("MISSING_FIELD", f"required field '{f}' is missing", f)
 
-    # ── tool_name ──
+    # 笏笏 tool_name 笏笏
     tn = manual.get("tool_name", "")
     if isinstance(tn, str) and tn:
         if not _TOOL_NAME_RE.match(tn):
             _err("INVALID_TOOL_NAME",
                  "tool_name must be alphanumeric + underscore, 3-64 chars", "tool_name")
 
-    # ── string length checks ──
+    # 笏笏 string length checks 笏笏
     for fld, mn, mx in [
         ("job_to_be_done", 10, 500),
         ("summary_for_model", 10, 300),
@@ -648,7 +656,7 @@ def validate_tool_manual(
         if isinstance(v, str) and (len(v) < mn or len(v) > mx):
             _err("INVALID_TYPE", f"{fld} must be {mn}-{mx} characters", fld)
 
-    # ── list checks ──
+    # 笏笏 list checks 笏笏
     tc = manual.get("trigger_conditions")
     if isinstance(tc, list):
         if len(tc) < 3:
@@ -672,7 +680,7 @@ def validate_tool_manual(
             _err("TOO_MANY_ITEMS", "do_not_use_when allows at most 5 items",
                  "do_not_use_when")
 
-    # ── permission_class ──
+    # 笏笏 permission_class 笏笏
     pc = manual.get("permission_class")
     valid_pcs = {"read_only", "action", "payment"}
     if isinstance(pc, str) and pc not in valid_pcs:
@@ -687,13 +695,13 @@ def validate_tool_manual(
                  f"permission_class must be one of {sorted(valid_pcs)}",
                  "permission_class")
 
-    # ── action/payment extra fields ──
+    # 笏笏 action/payment extra fields 笏笏
     # Mirror the server validator in agent_sns.application.capability_runtime
     # .tool_manual_validator: schema fields accept {} as "present", string
     # fields are validated as non-empty strings, and bools are validated
     # separately. Using truthiness across all of them over-rejects valid
     # manuals (e.g. preview_schema = {}) and diverges from publish-time
-    # gating — see Codex review finding.
+    # gating 窶・see Codex review finding.
     def _require_str(fld: str, ctx: str) -> None:
         val = manual.get(fld)
         if val is None:
@@ -757,7 +765,7 @@ def validate_tool_manual(
                  f"settlement_mode must be one of {sorted(valid_sm)}",
                  "settlement_mode")
 
-    # ── input_schema ──
+    # 笏笏 input_schema 笏笏
     inp = manual.get("input_schema")
     if isinstance(inp, dict):
         if inp.get("type") != "object":
@@ -778,7 +786,7 @@ def validate_tool_manual(
                       f"'{pf}' is platform-injected; remove from input_schema",
                       f"input_schema.properties.{pf}")
 
-    # ── output_schema ──
+    # 笏笏 output_schema 笏笏
     out = manual.get("output_schema")
     if isinstance(out, dict):
         # must have at least one required key
@@ -792,7 +800,7 @@ def validate_tool_manual(
             _err("OUTPUT_SCHEMA",
                  "output_schema must include a 'summary' property",
                  "output_schema.properties")
-        # payment-specific output checks — match server validate_output_schema
+        # payment-specific output checks 窶・match server validate_output_schema
         # which requires BOTH amount_usd AND currency in properties (not just
         # amount_usd). Previous SDK check only enforced amount_usd in properties
         # while the server rejected missing currency, leading to a pass-local
@@ -828,7 +836,7 @@ class HealthCheckResult:
     provider_status: dict[str, str] = field(default_factory=dict)
 
 
-# ── App Adapter Protocol ──
+# 笏笏 App Adapter Protocol 笏笏
 
 class AppAdapter(abc.ABC):
     """Base class for Siglume API Store capability adapters.
@@ -876,7 +884,7 @@ class AppAdapter(abc.ABC):
         return ["default"]
 
 
-# ── Stub Provider for Sandbox Testing ──
+# 笏笏 Stub Provider for Sandbox Testing 笏笏
 
 class StubProvider:
     """Base class for stub providers used in sandbox testing.
@@ -893,7 +901,7 @@ class StubProvider:
         return {"status": "stub_ok", "provider": self.provider_key, "method": method}
 
 
-# ── Test Harness ──
+# 笏笏 Test Harness 笏笏
 
 def _normalize_usage_record_flat(record: Any) -> dict[str, Any]:
     """Flat-module fallback mirroring siglume_api_sdk.metering._normalize_usage_record.
@@ -978,7 +986,7 @@ class AppTestHarness:
         connected_accounts: dict[str, ConnectedAccountRef] | None = None,
         **kwargs,
     ) -> ExecutionResult:
-        """Internal helper — build context and run execute().
+        """Internal helper 窶・build context and run execute().
 
         All public execute_* methods delegate here so that changes to
         context construction are made in one place.
@@ -1010,7 +1018,7 @@ class AppTestHarness:
         return await self._execute(ExecutionKind.QUOTE, task_type, **kwargs)
 
     async def execute_payment(self, task_type: str = "default", **kwargs) -> ExecutionResult:
-        """Execute a PAYMENT request (in sandbox — no real charges)."""
+        """Execute a PAYMENT request (in sandbox 窶・no real charges)."""
         return await self._execute(ExecutionKind.PAYMENT, task_type, **kwargs)
 
     async def health(self) -> HealthCheckResult:

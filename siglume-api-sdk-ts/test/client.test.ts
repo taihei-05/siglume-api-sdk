@@ -59,6 +59,7 @@ function buildManifest() {
     dry_run_supported: true,
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
+    currency: "USD" as const,
     jurisdiction: "US",
     short_description: "Search multiple retailers and summarize the best current price.",
     description: "Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
@@ -160,6 +161,7 @@ describe("SiglumeClient", () => {
             },
           });
           expect(body.jurisdiction).toBe(manifest.jurisdiction);
+          expect(body.currency).toBe("USD");
           return new Response(
             JSON.stringify(
               envelope({
@@ -223,6 +225,49 @@ describe("SiglumeClient", () => {
     expect(requests[1]?.path).toBe("/v1/market/capabilities/lst_123/confirm-auto-register");
   });
 
+  it("requires an explicit listing currency before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+    const manifest = { ...buildManifest() };
+    delete (manifest as Record<string, unknown>).currency;
+
+    await expect(
+      client.auto_register(manifest, buildToolManual(), {
+        runtime_validation: buildRuntimeValidation(),
+      }),
+    ).rejects.toThrow("AppManifest.currency is required");
+  });
+
+  it("forwards JPY as the listing currency for auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.currency).toBe("JPY");
+          expect(body.price_value_minor).toBe(1200);
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_jpy", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      { ...buildManifest(), currency: "JPY" as const, price_value_minor: 1200 },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
   it("wraps oauth_credentials arrays in the canonical items envelope", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",
@@ -433,7 +478,7 @@ describe("SiglumeClient", () => {
             dry_run_supported: true,
             price_model: "free",
             price_value_minor: 0,
-            currency: "USD",
+            currency: "USD" as const,
           })), { status: 200 });
         }
         if (url.pathname === "/v1/market/developer/portal") {
@@ -669,7 +714,7 @@ describe("SiglumeClient", () => {
             purpose: "subscription",
             cadence: "monthly",
             token_symbol: "JPYC",
-            display_currency: "JPY",
+            display_currency: "JPY" as const,
             max_amount_minor: 4980,
             status: "active",
             retry_count: 0,
@@ -695,7 +740,7 @@ describe("SiglumeClient", () => {
             purpose: "subscription",
             cadence: "monthly",
             token_symbol: "JPYC",
-            display_currency: "JPY",
+            display_currency: "JPY" as const,
             max_amount_minor: 4980,
             status: "cancelled",
             retry_count: 1,
@@ -1735,7 +1780,7 @@ describe("SiglumeClient", () => {
             budget_id: "bdg_demo_2",
             agent_id: "agt_owner_demo",
             principal_user_id: "usr_owner_demo",
-            currency: "JPY",
+            currency: "JPY" as const,
             period_start: "2026-04-01T00:00:00Z",
             period_end: "2026-05-01T00:00:00Z",
             period_limit_minor: 50000,
@@ -1771,7 +1816,7 @@ describe("SiglumeClient", () => {
       "agt_owner_demo",
       {
         budget_id: "bdg_ignore_me",
-        currency: "JPY",
+        currency: "JPY" as const,
         period_limit_minor: 50000,
         per_order_limit_minor: 12000,
         auto_approve_below_minor: 3000,
@@ -1792,7 +1837,7 @@ describe("SiglumeClient", () => {
     expect(requests[1]).toEqual({
       path: "/v1/owner/agents/agt_owner_demo/budget",
       body: {
-        currency: "JPY",
+        currency: "JPY" as const,
         period_limit_minor: 50000,
         per_order_limit_minor: 12000,
         auto_approve_below_minor: 3000,
@@ -1814,7 +1859,7 @@ describe("SiglumeClient", () => {
         expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/budget");
         const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
         expect(body).toEqual({
-          currency: "JPY",
+          currency: "JPY" as const,
           period_start: null,
           period_end: null,
           period_limit_minor: 9000,
@@ -1822,7 +1867,7 @@ describe("SiglumeClient", () => {
         return new Response(JSON.stringify(envelope({
           budget_id: "bdg_nullable",
           agent_id: "agt_owner_demo",
-          currency: "JPY",
+          currency: "JPY" as const,
           period_start: null,
           period_end: null,
           period_limit_minor: 9000,
@@ -1837,7 +1882,7 @@ describe("SiglumeClient", () => {
     });
 
     const budget = await client.update_budget_policy("agt_owner_demo", {
-      currency: "JPY",
+      currency: "JPY" as const,
       period_start: null,
       period_end: null,
       period_limit_minor: 9000,
@@ -1884,7 +1929,7 @@ describe("SiglumeClient", () => {
           return new Response(JSON.stringify(envelope({
             id: "bdg_sparse",
             agent_id: "agt_owner_demo",
-            currency: "USD",
+            currency: "USD" as const,
             period_limit_minor: 9000,
             per_order_limit_minor: 1500,
             auto_approve_below_minor: 500,
@@ -1899,7 +1944,7 @@ describe("SiglumeClient", () => {
       auto_approve_below: { JPY: 2500 },
     });
     const budget = await client.update_budget_policy("agt_owner_demo", {
-      currency: "USD",
+      currency: "USD" as const,
       period_limit_minor: 9000,
       per_order_limit_minor: 1500,
       auto_approve_below_minor: 500,
@@ -1927,7 +1972,7 @@ describe("SiglumeClient", () => {
         return new Response(JSON.stringify(envelope({
           id: "bdg_clear_dates",
           agent_id: "agt_owner_demo",
-          currency: "JPY",
+          currency: "JPY" as const,
           period_start: null,
           period_end: null,
           period_limit_minor: 50000,
@@ -1955,7 +2000,7 @@ describe("SiglumeClient", () => {
         return new Response(JSON.stringify(envelope({
           id: "bdg_strip",
           agent_id: "agt_owner_demo",
-          currency: "USD",
+          currency: "USD" as const,
           period_limit_minor: 1000,
         })), { status: 200 });
       },
@@ -2407,9 +2452,9 @@ describe("SiglumeClient", () => {
     const categories = [
       {
         key: "design",
-        name_ja: "デザイン",
+        name_ja: "Design",
         name_en: "Design",
-        description_ja: "UI とブランドの制作。",
+        description_ja: "UI and brand design work.",
         description_en: "UI and brand design work.",
         icon_url: "https://cdn.example.test/works/design.png",
         open_job_count: 5,
@@ -2417,9 +2462,9 @@ describe("SiglumeClient", () => {
       },
       {
         key: "frontend",
-        name_ja: "フロントエンド",
+        name_ja: "Frontend",
         name_en: "Frontend",
-        description_ja: "Web アプリ実装。",
+        description_ja: "Web app implementation.",
         description_en: "Web app implementation.",
         icon_url: "https://cdn.example.test/works/frontend.png",
         open_job_count: 3,
@@ -2732,7 +2777,7 @@ describe("SiglumeClient", () => {
       binding_status: "active",
       account_readiness: "ready",
       settlement_mode: "embedded_wallet_charge",
-      settlement_currency: "USD",
+      settlement_currency: "USD" as const,
       settlement_network: "polygon",
       accepted_payment_tokens: ["USDC"],
       last_used_at: "2026-04-20T08:30:00Z",
@@ -3285,7 +3330,7 @@ describe("SiglumeClient", () => {
         agent_id: "agt_owner_demo",
         opportunity_id: "opp_demo_1",
         proposal_kind: "proposal",
-        currency: "USD",
+        currency: "USD" as const,
         amount_minor: 25000,
         proposed_terms_jsonb: { delivery_days: 7 },
       });
@@ -3335,7 +3380,7 @@ describe("SiglumeClient", () => {
         agent_id: "agt_owner_demo",
         opportunity_id: "opp_demo_1",
         proposal_kind: "proposal",
-        currency: "USD",
+        currency: "USD" as const,
         amount_minor: 25000,
         proposed_terms_jsonb: { delivery_days: 7 },
       });
@@ -3564,7 +3609,7 @@ describe("SiglumeClient", () => {
               message: "Ads billing loaded.",
               action: "ads_billing_get",
               result: {
-                currency: "usd",
+                currency: "USD" as const,
                 billing_mode: "web3",
                 month_spend_jpy: 0,
                 month_spend_usd: 12000,
@@ -3581,7 +3626,7 @@ describe("SiglumeClient", () => {
                 mandate: {
                   mandate_id: "mdt_ads_1",
                   purpose: "ad_spend",
-                  display_currency: "USD",
+                  display_currency: "USD" as const,
                   token_symbol: "USDC",
                   max_amount_minor: 30000,
                   status: "active",
@@ -3612,7 +3657,7 @@ describe("SiglumeClient", () => {
               result: {
                 has_profile: true,
                 company_name: "Demo Ads",
-                ad_currency: "usd",
+                ad_currency: "USD" as const,
                 has_billing: true,
               },
             }, { trace_id: "trc_ads_profile", request_id: "req_ads_profile" })), { status: 200 });
@@ -3632,7 +3677,7 @@ describe("SiglumeClient", () => {
                   target_topics: ["ai", "launch"],
                   posting_interval_minutes: 720,
                   max_posts_per_day: 2,
-                  currency: "usd",
+                  currency: "USD" as const,
                   monthly_budget_jpy: 30000,
                   cpm_jpy: 250,
                   cpr_jpy: 30,

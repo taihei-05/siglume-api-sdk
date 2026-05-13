@@ -37,6 +37,7 @@ function manifestBase(permission_class: PermissionClass = PermissionClass.READ_O
     dry_run_supported: true,
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
+    currency: "USD" as const,
     jurisdiction: "US",
     docs_url: "https://docs.siglume.test/price-compare-helper",
     support_contact: "https://support.siglume.test/price-compare-helper",
@@ -648,7 +649,7 @@ describe("cli project helpers", () => {
                 status: "active",
                 dry_run_supported: true,
                 price_value_minor: 0,
-                currency: "USD",
+                currency: "USD" as const,
                 submission_blockers: [],
                 raw: {},
               };

@@ -35,6 +35,7 @@ class TranslationHubApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Translate text across languages and return a concise summary of the result.",
             example_prompts=[

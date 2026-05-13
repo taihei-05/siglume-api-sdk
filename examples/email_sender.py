@@ -36,6 +36,7 @@ class EmailSenderApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=["gmail"],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Preview and send email messages with explicit owner approval.",
             example_prompts=[

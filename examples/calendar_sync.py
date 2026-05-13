@@ -36,6 +36,7 @@ class CalendarSyncApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=["google-calendar"],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Preview and create Google Calendar events after owner approval.",
             example_prompts=[

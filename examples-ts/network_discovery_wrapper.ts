@@ -34,6 +34,7 @@ export class NetworkDiscoveryWrapperApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Load typed network feed, content, claim, and evidence records without side effects.",
       example_prompts: [

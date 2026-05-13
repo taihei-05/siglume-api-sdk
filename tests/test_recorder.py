@@ -50,6 +50,7 @@ def build_manifest() -> dict[str, object]:
         "required_connected_accounts": [],
         "price_model": "free",
         "price_value_minor": 0,
+        "currency": "USD",
         "jurisdiction": "US",
         "short_description": "Search multiple retailers and summarize the best current price.",
         "example_prompts": ["Compare prices for Sony WH-1000XM5."],
@@ -330,6 +331,7 @@ class HttpxQuoteApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Calls an upstream quote API.",
             example_prompts=["Quote this item."],
@@ -526,7 +528,7 @@ def test_recorder_does_not_double_capture_module_level_httpx_request(tmp_path: P
 
 def test_recorder_fully_redacts_scheme_less_authorization(tmp_path: Path) -> None:
     # Codex bot P1 on PR #109: a bare-token Authorization header (no whitespace,
-    # no scheme prefix — e.g. a raw GitHub PAT or hex API key) was being
+    # no scheme prefix  Ee.g. a raw GitHub PAT or hex API key) was being
     # written back as "<secret> <REDACTED>" because the code took the
     # partition head as the "scheme" and kept it. The whole value IS the
     # credential in that case and must be redacted.
@@ -543,7 +545,7 @@ def test_recorder_fully_redacts_scheme_less_authorization(tmp_path: Path) -> Non
 
     data = json.loads(cassette_path.read_text(encoding="utf-8"))
     headers = [i["request"]["headers"] for i in data["interactions"]]
-    # Must be the fully-masked form — not `ghp_... <REDACTED>` which would leak.
+    # Must be the fully-masked form  Enot `ghp_... <REDACTED>` which would leak.
     assert headers[0]["authorization"] == "<REDACTED>"
     assert headers[1]["authorization"] == "<REDACTED>"
     cassette_text = cassette_path.read_text(encoding="utf-8")
