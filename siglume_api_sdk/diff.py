@@ -417,6 +417,12 @@ def _normalize_manifest(value: Any) -> dict[str, Any]:
     normalized = dict(payload)
     normalized["price_model"] = normalized.get("price_model") or "free"
     normalized["currency"] = normalized.get("currency") or "USD"
+    normalized["allow_free_trial"] = bool(normalized.get("allow_free_trial") or False)
+    raw_duration = normalized.get("free_trial_duration_days")
+    try:
+        normalized["free_trial_duration_days"] = int(raw_duration) if raw_duration is not None else 30
+    except (TypeError, ValueError):
+        normalized["free_trial_duration_days"] = 30
     # AppManifest defaults permission_class to "read-only" (hyphen form,
     # PermissionClass.READ_ONLY). Without this default, a legacy/minimal
     # manifest without permission_class compared against an upgraded

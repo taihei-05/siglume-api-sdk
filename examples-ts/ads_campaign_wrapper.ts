@@ -38,6 +38,7 @@ export class AdsCampaignWrapperApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
       currency: "USD" as const,
+      allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Reads ads billing, profile, campaigns, and recent posts from the owner-operation surface.",
       example_prompts: [

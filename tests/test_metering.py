@@ -55,6 +55,7 @@ class MeteredApp(AppAdapter):
             price_model=self._price_model,
             price_value_minor=5,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Translate text while previewing future metering line items.",
             example_prompts=["Translate this release note into Japanese."],

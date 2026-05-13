@@ -40,6 +40,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.SUBSCRIPTION,
     currency: "USD" as const,
+    allow_free_trial: false,
       price_value_minor: 1480,
       jurisdiction: "US",
       short_description: "Simulate an ERC-4337 charge with platform-covered gas.",

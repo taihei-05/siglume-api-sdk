@@ -36,7 +36,8 @@
             "required_connected_accounts": [],
             "short_description": "Search multiple retailers and summarize the best current price.",
             "store_vertical": "api",
-            "currency": "USD"
+            "currency": "USD",
+            "allow_free_trial": false
           },
           "name": "Price Compare Helper",
           "permission_class": "read-only",
@@ -120,7 +121,8 @@
             ]
           },
           "store_vertical": "api",
-          "currency": "USD"
+          "currency": "USD",
+          "allow_free_trial": false
         }
       },
       "response": {

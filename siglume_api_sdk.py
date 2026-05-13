@@ -123,6 +123,8 @@ class AppManifest:
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
     currency: ListingCurrency | str | None = None  # REQUIRED: "USD" -> USDC, "JPY" -> JPYC
+    allow_free_trial: bool | None = None   # REQUIRED: True/False must be an explicit publisher choice
+    free_trial_duration_days: int = 30     # 1-90 when allow_free_trial=True
     # REQUIRED. No default 窶・every AppManifest must explicitly declare the
     # country whose law governs the offering. Ambiguous / missing values are
     # rejected at construction time and at platform registration.
@@ -158,6 +160,25 @@ class AppManifest:
                 f"Got: {self.currency!r}"
             )
         self.currency = ListingCurrency(currency)
+
+        if self.allow_free_trial is None:
+            raise ValueError(
+                "AppManifest.allow_free_trial is REQUIRED. Pass True to let Plus/Pro buyers "
+                "start a free trial of your paid API (counts against their monthly quota, "
+                "Plus 3 / Pro 10, lifetime once per buyer per listing). Pass False to disable. "
+                "Publishers can flip this later in the Developer Portal - no default is "
+                "applied because monetization strategy is a conscious choice."
+            )
+        if self.allow_free_trial:
+            if not isinstance(self.free_trial_duration_days, int) or isinstance(self.free_trial_duration_days, bool):
+                raise ValueError(
+                    "AppManifest.free_trial_duration_days must be an int when allow_free_trial=True"
+                )
+            if not (1 <= self.free_trial_duration_days <= 90):
+                raise ValueError(
+                    "AppManifest.free_trial_duration_days must be between 1 and 90 when "
+                    f"allow_free_trial=True, got: {self.free_trial_duration_days}"
+                )
 
         if self.store_vertical is None or str(self.store_vertical).strip() == "":
             raise ValueError(

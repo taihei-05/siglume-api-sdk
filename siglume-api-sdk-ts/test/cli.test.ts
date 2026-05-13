@@ -226,6 +226,7 @@ async function createTestProject(
         summary: { type: "string", description: "One-line summary of the quote or payment result." },
         amount_usd: { type: "number", description: "USD amount that was quoted or charged." },
         currency: { type: "string", description: "Currency code for the quote or charge." },
+        allow_free_trial: false,
       },
       required: ["summary", "amount_usd", "currency"],
       additionalProperties: false,

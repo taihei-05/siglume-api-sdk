@@ -66,6 +66,7 @@ class OwnerCharterUpdateWrapperApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Update the owner charter.",
             support_contact="support@example.com",

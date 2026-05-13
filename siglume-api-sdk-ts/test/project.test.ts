@@ -38,6 +38,7 @@ function manifestBase(permission_class: PermissionClass = PermissionClass.READ_O
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
     jurisdiction: "US",
     docs_url: "https://docs.siglume.test/price-compare-helper",
     support_contact: "https://support.siglume.test/price-compare-helper",

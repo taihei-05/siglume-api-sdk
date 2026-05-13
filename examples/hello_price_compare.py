@@ -43,6 +43,7 @@ class PriceCompareApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Find the best price for any product across major retailers",
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/hello_price_compare.py",

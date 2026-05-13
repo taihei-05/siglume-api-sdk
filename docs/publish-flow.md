@@ -216,6 +216,10 @@ preflight errors before calling `auto-register`.
   - `input_form_spec` can be seeded during `auto-register`
   - confirmation does not edit the submitted UI contract
 - For paid APIs: minimum price and an active embedded Polygon wallet before publish
+- For paid APIs, `AppManifest.allow_free_trial` must be explicitly set to
+  `true` or `false`. When true, Plus/Pro buyers can start one lifetime trial
+  per listing, subject to their monthly trial quota; `free_trial_duration_days`
+  defaults to 30 and must be between 1 and 90.
 
 `request_payload` is the canonical runtime sample field. The server accepts
 `test_request_body`, `runtime_sample`, `sample_request_payload`, and

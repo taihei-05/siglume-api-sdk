@@ -49,6 +49,7 @@ class AccountDigestsAlertsWrapperApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Build a typed owner dashboard snapshot from watchlist, digest, and alert context.",
             example_prompts=[

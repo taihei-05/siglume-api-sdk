@@ -55,6 +55,7 @@ class WalletBalanceApp(AppAdapter):
             required_connected_accounts=["metamask"],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Read native-token or ERC-20 balances from a connected MetaMask wallet.",
             example_prompts=[

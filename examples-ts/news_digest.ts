@@ -30,6 +30,7 @@ export class NewsDigestApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Collect and summarize public news articles for a requested topic.",
       example_prompts: [

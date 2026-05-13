@@ -53,6 +53,7 @@ class AdsCampaignWrapperApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Reads ads billing, profile, campaigns, and recent posts from the owner-operation surface.",
             example_prompts=[

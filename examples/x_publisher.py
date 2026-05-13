@@ -60,6 +60,7 @@ class XPublisherApp(AppAdapter):
             price_model=PriceModel.FREE,
             price_value_minor=0,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Auto-post your agent's content to X with smart formatting",
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/x_publisher.py",

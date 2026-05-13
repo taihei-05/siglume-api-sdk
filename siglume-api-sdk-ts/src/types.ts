@@ -104,6 +104,8 @@ export interface AppManifest {
   price_model?: PriceModel;
   price_value_minor?: number;
   currency: ListingCurrency;
+  allow_free_trial: boolean;
+  free_trial_duration_days?: number;
   jurisdiction: string;
   applicable_regulations?: string[];
   data_residency?: string;
@@ -288,6 +290,8 @@ export interface AppListingRecord {
   price_model?: string | null;
   price_value_minor: number;
   currency: string;
+  allow_free_trial: boolean;
+  free_trial_duration_days: number;
   short_description?: string | null;
   description?: string | null;
   docs_url?: string | null;

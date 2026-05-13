@@ -44,6 +44,7 @@ export class TranslationHubMeteredApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.USAGE_BASED,
     currency: "USD" as const,
+    allow_free_trial: false,
       price_value_minor: 5,
       jurisdiction: "US",
       short_description: "Translate text and preview token-based usage line items.",

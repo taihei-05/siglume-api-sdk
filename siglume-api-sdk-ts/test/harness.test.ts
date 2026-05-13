@@ -24,6 +24,7 @@ class PaymentQuoteApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Preview, quote, and complete a USD payment flow with explicit approval.",
       example_prompts: ["Quote the charge for this premium report purchase."],

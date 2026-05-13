@@ -44,6 +44,7 @@ export class MarketProposalsWrapperApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Loads existing proposals, then prepares create / counter / accept approval intents without inventing an unpublished REST contract.",
       example_prompts: [

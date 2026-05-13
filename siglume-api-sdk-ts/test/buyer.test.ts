@@ -190,6 +190,53 @@ describe("SiglumeBuyerClient", () => {
     expect(subscription.trace_id).toBe("trc_purchase");
   });
 
+  it("starts a trial without binding when bind_agent is false", async () => {
+    const client = buildClient(async (input) => {
+      const url = requestUrl(input);
+      if (url.pathname === "/v1/market/capabilities") {
+        return new Response(JSON.stringify(envelope({ items: loadFixtureListings(), next_cursor: null, limit: 20, offset: 0 })), {
+          status: 200,
+        });
+      }
+      if (url.pathname === "/v1/market/capabilities/lst_currency/start-trial") {
+        return new Response(JSON.stringify(envelope({
+          purchase_status: "trial_started",
+          access_grant: {
+            id: "grant_trial",
+            capability_listing_id: "lst_currency",
+            grant_status: "active",
+          },
+        }, { request_id: "req_trial", trace_id: "trc_trial" })), {
+          status: 200,
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const subscription = await client.start_trial({ capability_key: "currency-converter-v2", bind_agent: false });
+
+    expect(subscription.access_grant_id).toBe("grant_trial");
+    expect(subscription.purchase_status).toBe("trial_started");
+    expect(subscription.binding_id).toBeNull();
+    expect(subscription.trace_id).toBe("trc_trial");
+  });
+
+  it("fetches the buyer trial quota", async () => {
+    const client = buildClient(async (input) => {
+      const url = requestUrl(input);
+      if (url.pathname === "/v1/market/me/trial-quota") {
+        return new Response(JSON.stringify(envelope({ plan: "plus", monthly_limit: 3, used_this_month: 1, remaining: 2 })), {
+          status: 200,
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const quota = await client.get_trial_quota();
+
+    expect(quota.remaining).toBe(2);
+  });
+
   it("binds a purchased grant when a default agent id is configured", async () => {
     const client = buildClient(async (input, init) => {
       const url = requestUrl(input);

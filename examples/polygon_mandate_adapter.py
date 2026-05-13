@@ -53,6 +53,7 @@ class PolygonMandateAdapterApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.SUBSCRIPTION,
             currency="USD",
+            allow_free_trial=False,
             price_value_minor=1480,
             jurisdiction="US",
             short_description="Simulate mandate creation, quote the recurring cap, and emit a mock embedded-wallet receipt.",

@@ -39,6 +39,7 @@ export class PartnerDashboardWrapperApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Loads partner dashboard usage plus existing keys, then creates only the credential handle via the owner-operation bus.",
       example_prompts: [

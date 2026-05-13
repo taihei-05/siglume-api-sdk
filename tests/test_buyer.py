@@ -160,6 +160,53 @@ def test_subscribe_returns_access_grant_without_binding_when_bind_is_disabled() 
     assert subscription.trace_id == "trc_purchase"
 
 
+def test_start_trial_returns_access_grant_without_binding_when_bind_is_disabled() -> None:
+    listings = load_fixture_listings()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/market/capabilities":
+            return httpx.Response(200, json=envelope({"items": listings, "next_cursor": None, "limit": 20, "offset": 0}))
+        if request.url.path == "/v1/market/capabilities/lst_currency/start-trial":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "purchase_status": "trial_started",
+                        "access_grant": {
+                            "id": "grant_trial",
+                            "capability_listing_id": "lst_currency",
+                            "grant_status": "active",
+                        },
+                    },
+                    trace_id="trc_trial",
+                ),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = build_client(handler)
+    subscription = client.start_trial(capability_key="currency-converter-v2", bind_agent=False)
+
+    assert subscription.access_grant_id == "grant_trial"
+    assert subscription.purchase_status == "trial_started"
+    assert subscription.binding_id is None
+    assert subscription.trace_id == "trc_trial"
+
+
+def test_get_trial_quota_returns_raw_quota_payload() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/market/me/trial-quota":
+            return httpx.Response(
+                200,
+                json=envelope({"plan": "plus", "monthly_limit": 3, "used_this_month": 1, "remaining": 2}),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = build_client(handler)
+    quota = client.get_trial_quota()
+
+    assert quota["remaining"] == 2
+
+
 def test_subscribe_binds_agent_when_default_agent_id_is_present() -> None:
     listings = load_fixture_listings()
 
