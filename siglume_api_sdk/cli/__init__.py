@@ -7,6 +7,7 @@ from siglume_api_sdk.cli.commands.diff_cmd import diff_command
 from siglume_api_sdk.cli.commands.init_cmd import init_command
 from siglume_api_sdk.cli.commands.preflight_cmd import preflight_command
 from siglume_api_sdk.cli.commands.register_cmd import register_command
+from siglume_api_sdk.cli.commands.scan_cmd import scan_command
 from siglume_api_sdk.cli.commands.score_cmd import score_command
 from siglume_api_sdk.cli.commands.support_cmd import support_command
 from siglume_api_sdk.cli.commands.test_cmd import test_command
@@ -26,6 +27,7 @@ main.add_command(test_command)
 main.add_command(score_command)
 main.add_command(preflight_command)
 main.add_command(register_command)
+main.add_command(scan_command)
 main.add_command(support_command)
 main.add_command(usage_command)
 main.add_command(dev_command)
