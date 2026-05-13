@@ -86,6 +86,11 @@ class AppCategory(str, Enum):
     OTHER = "other"
 
 
+class StoreVertical(str, Enum):
+    API = "api"
+    GAME = "game"
+
+
 # ── Data Transfer Objects ──
 
 @dataclass
@@ -130,6 +135,7 @@ class AppManifest:
     support_contact: str = ""              # real support email address or public support URL
     seller_homepage_url: str = ""          # optional official seller homepage, separate from docs_url
     seller_social_url: str = ""            # optional official seller social/profile URL
+    store_vertical: StoreVertical | None = None  # REQUIRED: "api" for normal API Store, "game" for API games
     compatibility_tags: list[str] = field(default_factory=list)
     latency_tier: str = "normal"           # fast, normal, slow
     example_prompts: list[str] = field(default_factory=list)
@@ -144,6 +150,19 @@ class AppManifest:
                 f"USD-unified regardless of jurisdiction. Got: {self.currency!r}"
             )
         self.currency = "USD"
+
+        if self.store_vertical is None or str(self.store_vertical).strip() == "":
+            raise ValueError(
+                "AppManifest.store_vertical is REQUIRED. Choose 'api' for "
+                "normal API Store listings or 'game' for API games."
+            )
+        vertical = self.store_vertical.value if isinstance(self.store_vertical, StoreVertical) else str(self.store_vertical).strip().lower()
+        if vertical not in {StoreVertical.API.value, StoreVertical.GAME.value}:
+            raise ValueError(
+                "AppManifest.store_vertical must be 'api' or 'game'. "
+                f"Got: {self.store_vertical!r}"
+            )
+        self.store_vertical = StoreVertical(vertical)
 
         if not self.jurisdiction:
             raise ValueError(

@@ -34,7 +34,8 @@
             "price_model": "free",
             "price_value_minor": 0,
             "required_connected_accounts": [],
-            "short_description": "Search multiple retailers and summarize the best current price."
+            "short_description": "Search multiple retailers and summarize the best current price.",
+            "store_vertical": "api"
           },
           "name": "Price Compare Helper",
           "permission_class": "read-only",
@@ -116,7 +117,8 @@
             "usage_hints": [
               "Use this tool after the owner has named a product and wants evidence-backed price comparison."
             ]
-          }
+          },
+          "store_vertical": "api"
         }
       },
       "response": {

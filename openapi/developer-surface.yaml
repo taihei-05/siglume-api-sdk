@@ -259,6 +259,10 @@ paths:
                 seller_social_url:
                   type: string
                   description: Optional official seller social/profile URL, separate from docs_url
+                store_vertical:
+                  type: string
+                  enum: [api, game]
+                  description: Required explicit store surface. Use `api` for normal API Store listings and `game` for Game API Store listings.
                 jurisdiction:
                   type: string
                   description: Governing ISO 3166-1 alpha-2 country code for this API

@@ -33,6 +33,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
       name: "Embedded Wallet Payment",
       job_to_be_done: "Preview and charge a recurring subscription through embedded-wallet settlement on Polygon.",
       category: AppCategory.FINANCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.PAYMENT,
       approval_mode: ApprovalMode.ALWAYS_ASK,
       dry_run_supported: true,

@@ -63,6 +63,7 @@ class MetaMaskConnectorApp(AppAdapter):
             name="MetaMask Connector",
             job_to_be_done="Send ETH/tokens, check balances, and interact with smart contracts via MetaMask",
             category=AppCategory.FINANCE,
+            store_vertical="api",
             permission_class=PermissionClass.PAYMENT,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

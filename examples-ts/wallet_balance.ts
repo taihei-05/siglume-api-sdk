@@ -36,6 +36,7 @@ export class WalletBalanceApp extends AppAdapter {
       name: "Wallet Balance",
       job_to_be_done: "Read the owner's connected wallet balance on Ethereum or Polygon without moving funds.",
       category: AppCategory.FINANCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,

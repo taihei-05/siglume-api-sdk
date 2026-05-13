@@ -24,6 +24,7 @@ export class CrmSyncApp extends AppAdapter {
       name: "CRM Sync",
       job_to_be_done: "Create or update CRM lead records after the owner approves the write.",
       category: AppCategory.CRM,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.ACTION,
       approval_mode: ApprovalMode.ALWAYS_ASK,
       dry_run_supported: true,

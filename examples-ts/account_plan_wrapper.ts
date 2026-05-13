@@ -28,6 +28,7 @@ export class AccountPlanWrapperApp extends AppAdapter {
       name: "Account Plan Wrapper",
       job_to_be_done: "Read the current account preferences and plan so downstream prompts can personalize safely.",
       category: AppCategory.OTHER,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,

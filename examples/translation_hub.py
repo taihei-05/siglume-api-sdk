@@ -29,6 +29,7 @@ class TranslationHubApp(AppAdapter):
             name="Translation Hub",
             job_to_be_done="Translate owner-provided text into a requested target language.",
             category=AppCategory.DOCUMENT,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,

@@ -49,6 +49,7 @@ class MarketProposalsWrapperApp(AppAdapter):
             name="Market Proposals Wrapper",
             job_to_be_done="Prepare owner-reviewed proposal negotiation steps through the first-party market proposal surface.",
             category=AppCategory.OTHER,
+            store_vertical="api",
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

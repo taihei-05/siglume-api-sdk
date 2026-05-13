@@ -1407,6 +1407,7 @@ def _build_auto_register_request(
         "support_contact",
         "seller_homepage_url",
         "seller_social_url",
+        "store_vertical",
         "jurisdiction",
         "price_model",
         "price_value_minor",
@@ -1420,6 +1421,11 @@ def _build_auto_register_request(
         value = manifest_payload.get(field_name)
         if value is not None:
             payload[field_name] = _enum_value(value)
+    if "store_vertical" not in payload:
+        raise SiglumeClientError(
+            "AppManifest.store_vertical is required. Choose 'api' for normal "
+            "API Store listings or 'game' for API games."
+        )
 
     # Strip ``version`` from the embedded manifest sub-dict too so the
     # platform's reject-on-manifest-version check cannot trip on the SDK's

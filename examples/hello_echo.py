@@ -31,6 +31,7 @@ class HelloEchoApp(AppAdapter):
             name="Hello Echo",
             job_to_be_done="Return the input parameters in the output",
             category=AppCategory.OTHER,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,

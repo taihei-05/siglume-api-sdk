@@ -31,6 +31,7 @@ function manifestBase(permission_class: PermissionClass = PermissionClass.READ_O
         ? "Quote and complete a USD payment after explicit owner approval."
         : "Compare retailer prices for a product and return the best current offer.",
     category: permission_class === PermissionClass.PAYMENT ? AppCategory.FINANCE : AppCategory.COMMERCE,
+    store_vertical: "api" as const,
     permission_class,
     approval_mode: permission_class === PermissionClass.READ_ONLY ? ApprovalMode.AUTO : ApprovalMode.ALWAYS_ASK,
     dry_run_supported: true,
