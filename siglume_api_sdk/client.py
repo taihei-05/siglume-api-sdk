@@ -1411,6 +1411,7 @@ def _build_auto_register_request(
         "jurisdiction",
         "price_model",
         "price_value_minor",
+        "currency",
         "permission_class",
         "approval_mode",
         "dry_run_supported",
@@ -1426,6 +1427,17 @@ def _build_auto_register_request(
             "AppManifest.store_vertical is required. Choose 'api' for normal "
             "API Store listings or 'game' for API games."
         )
+    currency = str(payload.get("currency") or "").strip().upper()
+    if not currency:
+        raise SiglumeClientError(
+            "AppManifest.currency is required. Choose 'USD' for USDC settlement "
+            "or 'JPY' for JPYC settlement."
+        )
+    if currency not in {"USD", "JPY"}:
+        raise SiglumeClientError(
+            f"AppManifest.currency must be 'USD' or 'JPY'. Got {payload.get('currency')!r}."
+        )
+    payload["currency"] = currency
 
     # Strip ``version`` from the embedded manifest sub-dict too so the
     # platform's reject-on-manifest-version check cannot trip on the SDK's

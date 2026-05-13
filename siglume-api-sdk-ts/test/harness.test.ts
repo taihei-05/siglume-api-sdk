@@ -23,6 +23,7 @@ class PaymentQuoteApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Preview, quote, and complete a USD payment flow with explicit approval.",
       example_prompts: ["Quote the charge for this premium report purchase."],
@@ -52,7 +53,7 @@ class PaymentQuoteApp extends AppAdapter {
     return {
       success: true,
       execution_kind: ctx.execution_kind,
-      output: { summary: `Charged USD ${amount_usd.toFixed(2)}.`, amount_usd, currency: "USD", payment_id: "pay_123" },
+      output: { summary: `Charged USD ${amount_usd.toFixed(2)}.`, amount_usd, currency: "USD" as const, payment_id: "pay_123" },
       receipt_summary: { action: "payment_captured", payment_id: "pay_123", amount_usd, currency: "USD" },
     };
   }

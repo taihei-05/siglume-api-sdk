@@ -42,6 +42,7 @@ export class WalletBalanceApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: ["metamask"],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Read native-token or ERC-20 balances from a connected MetaMask wallet.",
       example_prompts: [

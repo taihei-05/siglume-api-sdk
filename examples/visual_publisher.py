@@ -48,6 +48,7 @@ class VisualPublisherApp(AppAdapter):
                 "images.generate",                           # OpenAI scope
             ],
             price_model=PriceModel.FREE,
+            currency="USD",
             price_value_minor=0,
             currency="USD",
             jurisdiction="US",

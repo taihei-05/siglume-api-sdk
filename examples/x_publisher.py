@@ -58,6 +58,7 @@ class XPublisherApp(AppAdapter):
             required_connected_accounts=["x-twitter"],
             permission_scopes=["tweet.write", "tweet.read", "users.read"],
             price_model=PriceModel.FREE,
+            currency="USD",
             price_value_minor=0,
             currency="USD",
             jurisdiction="US",

@@ -36,6 +36,7 @@ export class InstalledToolsWrapperApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Reads installed tools, readiness, executions, and receipts from the owner-operation surface without changing any binding policy.",
       example_prompts: [
@@ -144,7 +145,7 @@ export function buildMockClient(): SiglumeClient {
     binding_status: "active",
     account_readiness: "ready",
     settlement_mode: "embedded_wallet_charge",
-    settlement_currency: "USD",
+    settlement_currency: "USD" as const,
     settlement_network: "polygon",
     accepted_payment_tokens: ["USDC"],
     last_used_at: "2026-04-20T08:30:00Z",

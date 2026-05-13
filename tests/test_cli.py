@@ -48,6 +48,7 @@ def _write_register_project(
                 "            name='Register Project',",
                 "            job_to_be_done='Echo a registration test request.',",
                 "            store_vertical='api',",
+                "            currency='USD',",
                 "            jurisdiction='US',",
                 "            dry_run_supported=True,",
                 f"            required_connected_accounts={required_connected_accounts or []!r},",
@@ -981,6 +982,7 @@ def test_build_tool_manual_template_tolerates_missing_job_to_be_done() -> None:
         dry_run_supported=True,
         required_connected_accounts=[],
         price_model=PriceModel.FREE,
+        currency="USD",
         jurisdiction="US",
     )
     manifest.job_to_be_done = None  # type: ignore[assignment]
@@ -1004,6 +1006,7 @@ def test_tool_manual_validator_allows_json_schema_composition_keywords() -> None
         dry_run_supported=True,
         required_connected_accounts=[],
         price_model=PriceModel.FREE,
+        currency="USD",
         jurisdiction="US",
     )
     manual = project_module.build_tool_manual_template(manifest)
@@ -1145,6 +1148,7 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
                 "            name='Register Project',",
                 "            job_to_be_done='Echo a registration test request.',",
                 "            store_vertical='api',",
+                "            currency='USD',",
                 "            jurisdiction='US',",
                 "            dry_run_supported=True,",
                 "            docs_url='https://docs.siglume.test/register-project',",

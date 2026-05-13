@@ -23,7 +23,7 @@ export function buildExampleEvent() {
       buyer_user_id: "usr_buyer_demo",
       seller_user_id: "usr_seller_demo",
       billing_model: "subscription",
-      currency: "USD",
+      currency: "USD" as const,
       amount_minor: 1200,
       payment_status: "succeeded",
     },

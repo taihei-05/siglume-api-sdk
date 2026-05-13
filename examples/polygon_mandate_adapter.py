@@ -1,7 +1,7 @@
 """API: recurring subscription payment via Polygon mandate + embedded wallet charge.
 
 Intended user: seller-side payment adapter author shipping a PAYMENT tool.
-Connected account: none — settlement runs on the platform's on-chain contracts
+Connected account: none  Esettlement runs on the platform's on-chain contracts
 (SubscriptionHub) and the platform paymaster sponsors gas. Wallets stay
 non-custodial: Siglume never holds the buyer's or seller's funds or keys, and
 the SubscriptionHub contract can only pull up to the mandate cap the buyer
@@ -52,6 +52,7 @@ class PolygonMandateAdapterApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.SUBSCRIPTION,
+            currency="USD",
             price_value_minor=1480,
             jurisdiction="US",
             short_description="Simulate mandate creation, quote the recurring cap, and emit a mock embedded-wallet receipt.",

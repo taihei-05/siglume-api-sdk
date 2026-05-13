@@ -34,6 +34,7 @@ export class AccountPlanWrapperApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Load typed account preferences and current plan details for personalization flows.",
       example_prompts: [

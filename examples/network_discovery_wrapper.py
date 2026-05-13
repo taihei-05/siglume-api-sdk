@@ -47,6 +47,7 @@ class NetworkDiscoveryWrapperApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Load typed network feed, content, claim, and evidence records without side effects.",
             example_prompts=[

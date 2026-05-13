@@ -29,7 +29,7 @@ describe("siglume diff CLI", () => {
         dry_run_supported: true,
         required_connected_accounts: [],
         price_model: "free",
-        currency: "USD",
+        currency: "USD" as const,
         jurisdiction: "US",
       },
       {
@@ -42,7 +42,7 @@ describe("siglume diff CLI", () => {
         dry_run_supported: true,
         required_connected_accounts: [],
         price_model: "subscription",
-        currency: "USD",
+        currency: "USD" as const,
         jurisdiction: "US",
       },
     );
@@ -140,7 +140,7 @@ describe("siglume diff CLI", () => {
         dry_run_supported: true,
         required_connected_accounts: [],
         price_model: "free",
-        currency: "USD",
+        currency: "USD" as const,
         jurisdiction: "US",
       },
       {
@@ -153,7 +153,7 @@ describe("siglume diff CLI", () => {
         dry_run_supported: true,
         required_connected_accounts: [],
         price_model: "free",
-        currency: "USD",
+        currency: "USD" as const,
         jurisdiction: "US",
       },
     );

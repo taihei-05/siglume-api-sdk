@@ -32,6 +32,7 @@ def build_manifest() -> AppManifest:
         dry_run_supported=True,
         required_connected_accounts=[],
         price_model=PriceModel.FREE,
+            currency="USD",
         jurisdiction="US",
         short_description="Search multiple retailers and summarize the best current price.",
         docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/register_via_client.py",
