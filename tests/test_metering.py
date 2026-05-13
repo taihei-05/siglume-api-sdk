@@ -54,6 +54,7 @@ class MeteredApp(AppAdapter):
             required_connected_accounts=[],
             price_model=self._price_model,
             price_value_minor=5,
+            currency="USD",
             jurisdiction="US",
             short_description="Translate text while previewing future metering line items.",
             example_prompts=["Translate this release note into Japanese."],

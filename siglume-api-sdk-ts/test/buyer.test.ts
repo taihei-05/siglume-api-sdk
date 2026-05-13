@@ -256,9 +256,9 @@ describe("SiglumeBuyerClient", () => {
         result: {
           summary: "Converted USD 100.00 to JPY 15000.00.",
           amount: 15000,
-          currency: "JPY",
+          currency: "JPY" as const,
         },
-        receipt: { execution_kind: "action", currency: "JPY", amount_minor: 0 },
+        receipt: { execution_kind: "action", currency: "JPY" as const, amount_minor: 0 },
       }, { request_id: "req_exec", trace_id: "trc_exec" })), {
         status: 200,
       });
@@ -287,7 +287,7 @@ describe("SiglumeBuyerClient", () => {
         side_effects: ["email delivery to finance@example.com"],
       },
       usage_event: { units_consumed: 1, execution_kind: "action" },
-      receipt: { execution_kind: "action", currency: "USD", amount_minor: 0 },
+      receipt: { execution_kind: "action", currency: "USD" as const, amount_minor: 0 },
     })), {
       status: 200,
     }), { default_agent_id: "agent_demo", allow_internal_execute: true });

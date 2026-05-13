@@ -55,6 +55,7 @@ class MarketProposalsWrapperApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Loads existing proposals, then prepares create / counter / accept approval intents without inventing an unpublished REST contract.",
             example_prompts=[

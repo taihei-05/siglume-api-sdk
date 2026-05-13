@@ -34,6 +34,7 @@ export class AccountDigestsAlertsWrapperApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Build a typed owner dashboard snapshot from watchlist, digest, and alert context.",
       example_prompts: [

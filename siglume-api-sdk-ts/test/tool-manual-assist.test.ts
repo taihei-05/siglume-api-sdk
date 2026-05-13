@@ -86,7 +86,7 @@ function goodPaymentManual() {
       required: ["amount_usd", "currency"],
       additionalProperties: false,
     },
-    currency: "USD",
+    currency: "USD" as const,
     settlement_mode: "embedded_wallet_charge" as const,
     refund_or_cancellation_note: "Refunds follow the merchant cancellation policy.",
     jurisdiction: "US",

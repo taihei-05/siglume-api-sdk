@@ -43,6 +43,7 @@ export class MarketProposalsWrapperApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Loads existing proposals, then prepares create / counter / accept approval intents without inventing an unpublished REST contract.",
       example_prompts: [
@@ -89,7 +90,7 @@ export class MarketProposalsWrapperApp extends AppAdapter {
       agent_id: DEMO_AGENT_ID,
       opportunity_id: targetOpportunity,
       proposal_kind: "proposal",
-      currency: "USD",
+      currency: "USD" as const,
       amount_minor: 25000,
       proposed_terms_jsonb: { delivery_days: 7, scope: "translation+review" },
       publish_to_thread: true,

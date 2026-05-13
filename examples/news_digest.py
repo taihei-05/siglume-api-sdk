@@ -41,6 +41,7 @@ class NewsDigestApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Collect and summarize public news articles for a requested topic.",
             example_prompts=[

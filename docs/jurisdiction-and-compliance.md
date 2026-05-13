@@ -1,50 +1,50 @@
-# Jurisdiction & Compliance Declaration
+﻿# Jurisdiction & Compliance Declaration
 
 APIs listed in the Siglume API Store **must** declare which country's
-law they are designed to comply with — there is no default. Consumer-
+law they are designed to comply with 窶・there is no default. Consumer-
 protection rules, tax obligations, payment regulations, and data-residency
 requirements differ by country, so this up-front declaration lets agent
 owners (and the platform) make informed decisions.
 
 The `jurisdiction` field is also the basis for the country-flag icon the
-API Store renders next to each listing — an instant visual cue of
+API Store renders next to each listing 窶・an instant visual cue of
 where the API is "from".
 
-> 🔄 **Payment-stack migration notice.** This document still references
+> 売 **Payment-stack migration notice.** This document still references
 > Stripe Connect in several places. The platform is transitioning to
 > on-chain embedded-wallet settlement; the compliance surface there
 > differs (e.g. country-scoped payout rails are replaced by wallet-based
 > settlement). See [PAYMENT_MIGRATION.md](../PAYMENT_MIGRATION.md) for
 > the current cutover state. The **jurisdiction declaration requirement
-> itself is unchanged** — consumer-protection, tax, and data-residency
+> itself is unchanged** 窶・consumer-protection, tax, and data-residency
 > obligations continue to apply regardless of the settlement mechanism.
 
 ## Why this is required
 
 - **Payments**: the legacy Stripe Connect payout rails had per-country
   destination-charge and refund rules (a US-jurisdiction API settled
-  under US Card-Act-style rules, a JP-jurisdiction API under 資金決済法).
+  under US Card-Act-style rules, a JP-jurisdiction API under 雉・≡豎ｺ貂域ｳ・.
   On-chain settlement shifts the mechanics, but cross-border consumer
   protection, chargeback equivalents, and refund-note obligations still
   track the declared jurisdiction.
 - **Consumer protection**: CA residents get CCPA, EU residents get GDPR,
-  JP residents get 特定商取引法. The platform surfaces this so owners can
+  JP residents get 迚ｹ螳壼膚蜿門ｼ墓ｳ・ The platform surfaces this so owners can
   evaluate risk before subscribing.
 - **Tax / invoicing**: VAT, consumption tax, and sales-tax obligations
   depend on the seller's declared jurisdiction.
 - **Data residency**: HIPAA-equivalent regimes, GDPR adequacy decisions,
-  and Japan's 個人情報保護法 each have residency implications.
+  and Japan's 蛟倶ｺｺ諠・ｱ菫晁ｭｷ豕・each have residency implications.
 
 ## Why only origin, not buyer-country enforcement
 
 The platform deliberately does **not** model a "served countries" allowlist
 or "excluded countries" blocklist on the API itself. Whether an API is
-**fit for a buyer's country and use case** is the buyer's judgment — the
+**fit for a buyer's country and use case** is the buyer's judgment 窶・the
 platform cannot adjudicate this in general.
 
 Example: a seismic-calculation API built to US building codes (IBC) is
 probably not valid for a Japanese structural engineer filing under
-建築基準法, but it may still be useful as a reference or for a comparative
+蟒ｺ遽牙渕貅匁ｳ・ but it may still be useful as a reference or for a comparative
 study. Whether it's appropriate is context-dependent and the buyer is
 the only party with enough information to decide.
 
@@ -59,7 +59,7 @@ What the platform does NOT do:
 
 - Block subscriptions based on the buyer's country.
 - Claim the API is valid for any particular regulatory regime.
-- Validate `applicable_regulations` claims — those are advisory.
+- Validate `applicable_regulations` claims 窶・those are advisory.
 
 The buyer, not the platform, is responsible for determining regulatory
 fitness in their jurisdiction of use.
@@ -69,12 +69,12 @@ fitness in their jurisdiction of use.
 The platform converts `jurisdiction` to a flag emoji using the Regional
 Indicator Symbols for the first two letters of the code:
 
-- `"US"` → 🇺🇸
-- `"JP"` → 🇯🇵
-- `"US-CA"` → 🇺🇸 (sub-regions collapse to the parent country flag;
+- `"US"` 竊・・・
+- `"JP"` 竊・・・
+- `"US-CA"` 竊・・・ (sub-regions collapse to the parent country flag;
   the text label still shows the full `"US-CA"`)
 
-If `jurisdiction` is missing or malformed, no flag is shown — which is
+If `jurisdiction` is missing or malformed, no flag is shown 窶・which is
 why the SDK and the platform both require a valid value at registration.
 
 ## Where to declare it
@@ -94,7 +94,7 @@ manifest = AppManifest(
     price_model=PriceModel.SUBSCRIPTION,
     price_value_minor=500,          # $5.00
     currency="USD",
-    jurisdiction="US",              # required — ISO 3166-1 alpha-2
+    jurisdiction="US",              # required 窶・ISO 3166-1 alpha-2
     applicable_regulations=["CCPA"],
     data_residency="US",            # optional; defaults to jurisdiction
 )
@@ -136,7 +136,7 @@ manual = ToolManual(
 
 The tool-level `jurisdiction` must not contradict the app-level declaration.
 If `AppManifest.jurisdiction = "US"`, a payment tool cannot set
-`jurisdiction = "JP"` — the app is still the legal seller.
+`jurisdiction = "JP"` 窶・the app is still the legal seller.
 
 ## Validation
 
@@ -152,7 +152,7 @@ If `AppManifest.jurisdiction = "US"`, a payment tool cannot set
 
 ## Applicable regulations
 
-`applicable_regulations` is advisory only — the platform does **not** audit
+`applicable_regulations` is advisory only 窶・the platform does **not** audit
 compliance claims. Use it to signal intent. Common values:
 
 | Region | Tag |
@@ -160,27 +160,28 @@ compliance claims. Use it to signal intent. Common values:
 | US federal | `CCPA`, `COPPA`, `HIPAA`, `GLBA` |
 | EU / EEA | `GDPR`, `DSA`, `DMA` |
 | UK | `UK-GDPR`, `DPA-2018` |
-| Japan | `資金決済法`, `特定商取引法`, `個人情報保護法` |
+| Japan | `雉・≡豎ｺ貂域ｳ描, `迚ｹ螳壼膚蜿門ｼ墓ｳ描, `蛟倶ｺｺ諠・ｱ菫晁ｭｷ豕描 |
 | Global / industry | `PCI-DSS`, `SOC2`, `ISO27001`, `ISO27701` |
 
-## Currency is USD regardless of jurisdiction
+## Currency is explicit and separate from jurisdiction
 
-The API Store is **USD-unified**. Even if your `jurisdiction` is
-`"JP"`, `"GB"`, `"DE"`, or anything else, your listing price is in US
-dollars. This is enforced:
+The API Store requires every SDK listing to declare AppManifest.currency
+explicitly. Use "USD" when the listing price is in USD cents and should
+settle in USDC. Use "JPY" when the listing price is in yen and should
+settle in JPYC.
 
-- `AppManifest.currency` is typed as `"USD"` (literal in TS, validated in Python `__post_init__`, `const` in JSON Schema).
-- `ToolManual.currency` (payment tier) is `const "USD"`.
-- The platform's registration endpoint rejects non-USD payloads with a 422
-  (`CURRENCY_NOT_SUPPORTED`).
+This is independent from jurisdiction. For example, a "JP" listing may
+choose currency="USD" or currency="JPY" depending on the publisher's
+commercial offer. price_value_minor always follows the selected listing
+currency: cents for USD, yen for JPY.
 
-Why: platform-fee accounting, embedded-wallet settlement, the 93.4% / 6.6%
-revenue split, and the $5.00/month minimum for subscription APIs all
-operate in USD. Mixing currencies would fragment payouts and break the fee
-model.
+ToolManual.currency for a payment tool still describes that tool's own
+payment payload. It is not a substitute for the listing-level
+AppManifest.currency used by Store subscriptions.
 
-Your jurisdiction still controls governing law, tax, consumer-protection
-framework, and data residency — just not the currency.
+Your jurisdiction controls governing law, tax, consumer-protection
+framework, and data residency. It does not implicitly choose the Store
+listing currency.
 
 ## FAQ
 
@@ -190,9 +191,9 @@ Consumer-protection laws of the end-user's country may still apply, but
 your contract is under US law.
 
 **Q: We're based in Japan and sell mostly to JP customers. Can we price in JPY?**
-A: No. `jurisdiction = "JP"` is fine — that's your governing law — but
+A: No. `jurisdiction = "JP"` is fine 窶・that's your governing law 窶・but
 pricing is USD. Convert at your current FX and set a round USD number
-(e.g. ¥2,980/mo → $19.99/mo).
+(e.g. ﾂ･2,980/mo 竊・$19.99/mo).
 
 **Q: We operate in multiple countries with separate legal entities.**
 A: Register separate APIs per entity, each with its own `capability_key`

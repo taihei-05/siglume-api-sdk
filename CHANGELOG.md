@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-05-13
+
+### Changed
+
+- `AppManifest.currency` is now required for publishing. Developers must
+  choose `"USD"` for USDC settlement or `"JPY"` for JPYC settlement, and
+  `price_value_minor` is interpreted in the selected currency's minor unit.
+- Python and TypeScript `auto_register` now fail fast when `currency` is
+  missing or invalid, and forward the normalized value to the platform.
+- CLI templates, examples, schema, docs, and recorder fixtures now include
+  explicit listing currency.
+
+## [0.10.5] - 2026-05-13
+
+### Fixed
+
+- Superseded by 0.10.6 after CI caught source encoding and duplicate example keyword issues in the tag build.
+
 ## [0.10.4] - 2026-05-13
 
 ### Changed

@@ -1,9 +1,9 @@
-# Web3 Settlement Helpers
+﻿# Web3 Settlement Helpers
 
 ## What the settlement rail actually is
 
 Siglume subscription payments settle on Polygon via **non-custodial
-embedded smart wallets** — this is the only supported settlement rail.
+embedded smart wallets** 窶・this is the only supported settlement rail.
 Stripe Connect was retired in v0.2.0.
 
 **Non-custodial** means:
@@ -42,8 +42,9 @@ simulation helpers for tests and examples.
 - take custody of buyer or seller tokens at any point
 
 The actual settlement flow is owned by the Siglume platform contracts
-(`SubscriptionHub` and related web3 services). Manifest pricing stays
-USD-only. Current Polygon settlement and swap token support is
+(`SubscriptionHub` and related web3 services). Manifest pricing must declare
+one listing currency explicitly: `USD` listings settle in USDC, and `JPY`
+listings settle in JPYC. Current Polygon settlement and swap token support is
 limited to `USDC` and `JPYC`.
 
 ## Client helpers

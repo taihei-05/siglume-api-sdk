@@ -77,6 +77,12 @@ export const StoreVertical = {
 } as const;
 export type StoreVertical = (typeof StoreVertical)[keyof typeof StoreVertical];
 
+export const ListingCurrency = {
+  USD: "USD",
+  JPY: "JPY",
+} as const;
+export type ListingCurrency = (typeof ListingCurrency)[keyof typeof ListingCurrency];
+
 export interface ConnectedAccountRef {
   provider_key: string;
   session_token: string;
@@ -97,7 +103,7 @@ export interface AppManifest {
   permission_scopes?: string[];
   price_model?: PriceModel;
   price_value_minor?: number;
-  currency?: "USD";
+  currency: ListingCurrency;
   jurisdiction: string;
   applicable_regulations?: string[];
   data_residency?: string;

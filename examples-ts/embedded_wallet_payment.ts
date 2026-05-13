@@ -1,7 +1,7 @@
 /*
 API: recurring subscription payment through embedded wallet settlement on Polygon.
 Intended user: seller-side payment adapter author shipping a PAYMENT tool.
-Connected account: none — settlement runs on the platform's on-chain contracts
+Connected account: none  Esettlement runs on the platform's on-chain contracts
 (SubscriptionHub) and the platform paymaster sponsors gas. Wallets stay
 non-custodial: Siglume never holds the buyer's or seller's funds or keys, and
 the SubscriptionHub contract can only pull up to the mandate cap the buyer
@@ -39,6 +39,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.SUBSCRIPTION,
+    currency: "USD" as const,
       price_value_minor: 1480,
       jurisdiction: "US",
       short_description: "Simulate an ERC-4337 charge with platform-covered gas.",
@@ -72,7 +73,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
         output: {
           summary,
           amount_usd,
-          currency: "USD",
+          currency: "USD" as const,
           mandate_id: mandate.mandate_id,
           settlement_token,
           monthly_cap_minor: amount_minor,
@@ -89,7 +90,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
         output: {
           summary: `Quoted ${settlement_token} ${(amount_minor / 100).toFixed(2)} for the upcoming renewal.`,
           amount_usd,
-          currency: "USD",
+          currency: "USD" as const,
           mandate_id: mandate.mandate_id,
           monthly_cap_minor: amount_minor,
           settlement_token,
@@ -98,7 +99,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
         receipt_summary: {
           action: "embedded_wallet_quote",
           amount_usd,
-          currency: "USD",
+          currency: "USD" as const,
           mandate_id: mandate.mandate_id,
           monthly_cap_minor: amount_minor,
           settlement_token,
@@ -119,7 +120,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
       output: {
         summary: `Charged ${settlement_token} ${(amount_minor / 100).toFixed(2)} via embedded wallet settlement.`,
         amount_usd,
-        currency: "USD",
+        currency: "USD" as const,
         mandate_id: mandate.mandate_id,
         tx_hash: charge.tx_hash,
         user_operation_hash: charge.user_operation_hash,
@@ -130,7 +131,7 @@ export class EmbeddedWalletPaymentApp extends AppAdapter {
       receipt_summary: {
         action: "embedded_wallet_charge",
         amount_usd,
-        currency: "USD",
+        currency: "USD" as const,
         mandate_id: mandate.mandate_id,
         tx_hash: charge.tx_hash,
         user_operation_hash: charge.user_operation_hash,
@@ -225,7 +226,7 @@ export function buildToolManual() {
       required: ["monthly_cap_minor", "amount_usd", "currency", "settlement_token"],
       additionalProperties: false,
     },
-    currency: "USD",
+    currency: "USD" as const,
     settlement_mode: SettlementMode.EMBEDDED_WALLET_CHARGE,
     refund_or_cancellation_note: "Cancellations before final settlement follow the seller policy; on-chain settlement itself is not reversed by the SDK helper.",
     jurisdiction: "US",

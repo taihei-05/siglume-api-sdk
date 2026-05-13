@@ -14,6 +14,7 @@
     "permission_class",
     "approval_mode",
     "price_model",
+    "currency",
     "jurisdiction"
   ],
   "properties": {
@@ -122,9 +123,8 @@
     },
     "currency": {
       "type": "string",
-      "const": "USD",
-      "default": "USD",
-      "description": "The Siglume Agent API Store is USD-unified. All listings — free, subscription, or one-time — are priced in US dollars. Stripe Connect destination charges, payouts, and platform-fee accounting all operate on USD amounts. Submitting a non-USD currency will be rejected by the platform at registration time. Developers outside the US (any jurisdiction value) still price in USD here."
+      "enum": ["USD", "JPY"],
+      "description": "Required listing currency. USD listings settle in USDC; JPY listings settle in JPYC. price_value_minor uses this currency's minor unit: cents for USD, yen for JPY."
     },
     "jurisdiction": {
       "type": "string",
@@ -134,7 +134,7 @@
     "applicable_regulations": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Optional list of specific regulatory frameworks the API claims compliance with (e.g. 'GDPR', 'CCPA', 'PCI-DSS', 'HIPAA', '資金決済法', '特定商取引法'). Advisory only — platform does not audit these claims."
+      "description": "Optional list of specific regulatory frameworks the API claims compliance with (e.g. 'GDPR', 'CCPA', 'PCI-DSS', 'HIPAA', '賁E��決済況E, '特定商取引況E). Advisory only  Eplatform does not audit these claims."
     },
     "data_residency": {
       "type": "string",

@@ -48,6 +48,7 @@ class MeteredApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: this.priceModel as typeof PriceModel[keyof typeof PriceModel],
       price_value_minor: 5,
+      currency: "USD" as const,
       jurisdiction: "US",
       short_description: "Translate text and preview token-based usage line items.",
       example_prompts: ["Translate this roadmap update into Japanese."],

@@ -45,6 +45,7 @@ class CrmSyncApp(AppAdapter):
             dry_run_supported=True,
             required_connected_accounts=["hubspot"],
             price_model=PriceModel.FREE,
+            currency="USD",
             jurisdiction="US",
             short_description="Preview and upsert HubSpot lead records with explicit approval.",
             example_prompts=[
