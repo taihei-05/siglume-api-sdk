@@ -28,6 +28,7 @@ _LEGACY_PUBLIC_EXPORTS = [
     "ReceiptRef",
     "SettlementMode",
     "SideEffectRecord",
+    "StoreVertical",
     "StubProvider",
     "ToolManual",
     "ToolManualIssue",

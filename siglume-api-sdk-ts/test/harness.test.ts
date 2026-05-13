@@ -17,6 +17,7 @@ class PaymentQuoteApp extends AppAdapter {
       name: "Payment Quote",
       job_to_be_done: "Quote a USD charge and complete the payment only after owner approval.",
       category: AppCategory.FINANCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.PAYMENT,
       approval_mode: ApprovalMode.ALWAYS_ASK,
       dry_run_supported: true,

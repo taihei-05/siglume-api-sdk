@@ -171,6 +171,7 @@ class MyFirstApp(AppAdapter):
             name="My First App",
             job_to_be_done="Return a greeting",
             category=AppCategory.OTHER,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,
@@ -219,6 +220,7 @@ The manifest is your API's identity card. It controls how your API appears in th
 | `name` | Display name in the store | `"Price Compare Helper"` |
 | `job_to_be_done` | One-sentence description of what problem the API solves | `"Find the lowest price for a product"` |
 | `category` | API category | `"commerce"`, `"communication"`, `"finance"` |
+| `store_vertical` | **Required.** Explicit store surface. Use `"api"` for normal API Store listings and `"game"` for Game API Store listings. | `"api"`, `"game"` |
 | `permission_class` | Permission level ([see guide](#6-permission-classes-guide)) | `PermissionClass.READ_ONLY` |
 | `approval_mode` | How execution is approved | `ApprovalMode.AUTO` |
 | `price_model` | Billing model | `"free"`, `"subscription"` |
@@ -231,22 +233,22 @@ The manifest is your API's identity card. It controls how your API appears in th
 ### Game API Store placement
 
 If your API is built for game developers or game runtime use cases, use the
-normal publishing flow and add explicit game-oriented `compatibility_tags` to
-the manifest. This is what makes the listing eligible for the dedicated Game
-API Store entry point.
+normal publishing flow and set `store_vertical="game"` in the manifest. This is
+the canonical field that makes the listing eligible for the dedicated Game API
+Store entry point.
 
 ```python
+store_vertical="game",
 compatibility_tags=[
-    "game",
     "unity",
     "realtime",
     "npc",
 ]
 ```
 
-Good tags are concrete buyer signals such as `game`, `unity`, `unreal`,
-`godot`, `npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or
-`narrative`. Do not rely on arbitrary registration `metadata` for placement;
+Good tags are concrete buyer signals such as `unity`, `unreal`, `godot`,
+`npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or `narrative`. Do not
+rely on arbitrary registration `metadata` for placement;
 use manifest fields that are validated and carried through by the SDK.
 
 ### How buyer inquiries reach you

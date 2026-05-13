@@ -41,6 +41,7 @@ class NetworkDiscoveryWrapperApp(AppAdapter):
             name="Network Discovery Wrapper",
             job_to_be_done="Browse the network feed, inspect content, and hydrate claims with evidence for downstream reasoning.",
             category=AppCategory.OTHER,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,

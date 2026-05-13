@@ -23,6 +23,7 @@ export class NewsDigestApp extends AppAdapter {
       name: "News Digest",
       job_to_be_done: "Summarize recent public news articles for a topic without any external side effects.",
       category: AppCategory.MONITORING,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,

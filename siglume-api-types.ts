@@ -10,6 +10,7 @@ export type ExecutionKind = "dry_run" | "quote" | "action" | "payment";
 export type Environment = "sandbox" | "live";
 export type PriceModel = "free" | "subscription" | "one_time" | "bundle" | "usage_based" | "per_action";
 export type AppCategory = "commerce" | "booking" | "crm" | "finance" | "document" | "communication" | "monitoring" | "other";
+export type StoreVertical = "api" | "game";
 
 export interface ConnectedAccountRef {
   provider_key: string;
@@ -53,6 +54,8 @@ export interface AppManifest {
   short_description: string;
   docs_url: string;
   support_contact: string;
+  /** Explicit store surface: "api" for normal API Store, "game" for API games. */
+  store_vertical: StoreVertical;
   compatibility_tags: string[];
   example_prompts: string[];
   latency_tier?: string;

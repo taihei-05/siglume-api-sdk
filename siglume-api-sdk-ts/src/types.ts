@@ -71,6 +71,12 @@ export const AppCategory = {
 } as const;
 export type AppCategory = (typeof AppCategory)[keyof typeof AppCategory];
 
+export const StoreVertical = {
+  API: "api",
+  GAME: "game",
+} as const;
+export type StoreVertical = (typeof StoreVertical)[keyof typeof StoreVertical];
+
 export interface ConnectedAccountRef {
   provider_key: string;
   session_token: string;
@@ -101,6 +107,7 @@ export interface AppManifest {
   support_contact?: string;
   seller_homepage_url?: string;
   seller_social_url?: string;
+  store_vertical: StoreVertical;
   compatibility_tags?: string[];
   example_prompts?: string[];
   latency_tier?: string;

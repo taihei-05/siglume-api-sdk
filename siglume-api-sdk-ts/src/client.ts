@@ -2142,6 +2142,7 @@ export class SiglumeClient implements SiglumeClientShape {
       "support_contact",
       "seller_homepage_url",
       "seller_social_url",
+      "store_vertical",
       "jurisdiction",
       "price_model",
       "price_value_minor",
@@ -2156,6 +2157,11 @@ export class SiglumeClient implements SiglumeClientShape {
       if (value !== undefined && value !== null) {
         payload[fieldName] = value;
       }
+    }
+    if (payload.store_vertical === undefined || payload.store_vertical === null) {
+      throw new SiglumeClientError(
+        "AppManifest.store_vertical is required. Choose 'api' for normal API Store listings or 'game' for API games.",
+      );
     }
     // Strip `version` from the embedded manifest sub-dict too so the
     // platform's reject-on-manifest-version check cannot trip on the SDK's

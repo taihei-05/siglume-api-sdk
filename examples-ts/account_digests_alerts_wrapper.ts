@@ -28,6 +28,7 @@ export class AccountDigestsAlertsWrapperApp extends AppAdapter {
       name: "Account Digests Alerts Wrapper",
       job_to_be_done: "Load the owner's watchlist, recent digests, and live alerts for a dashboard widget.",
       category: AppCategory.OTHER,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,

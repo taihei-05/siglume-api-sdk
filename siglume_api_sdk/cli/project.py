@@ -531,7 +531,7 @@ def list_operation_catalog(
                 "warning": None,
                 "operations": [to_jsonable(item) for item in operations],
             }
-        except SiglumeClientError as exc:
+        except (SiglumeClientError, OSError) as exc:
             warning_message = str(exc)
     operations = fallback_operation_catalog(agent_id=resolved_agent_id or DEFAULT_OPERATION_AGENT_ID)
     return {
@@ -691,6 +691,7 @@ def build_operation_manifest(
         name=_operation_display_name(operation),
         job_to_be_done=f"Wrap the Siglume first-party operation `{operation.operation_key}` for owned agents.",
         category=AppCategory.OTHER,
+        store_vertical="api",
         permission_class=permission,
         approval_mode=_approval_mode_from_operation(operation),
         dry_run_supported=True,
@@ -819,6 +820,7 @@ def _operation_adapter_source(operation: OperationMetadata, manifest: AppManifes
                     name="{manifest.name}",
                     job_to_be_done="{manifest.job_to_be_done}",
                     category=AppCategory.OTHER,
+                    store_vertical="api",
                     permission_class=PermissionClass.{permission_enum_name},
                     approval_mode=ApprovalMode.{approval_enum_name},
                     dry_run_supported=True,
@@ -1903,6 +1905,7 @@ def _fallback_template_source(template: str) -> str:
                     name="{class_name}",
                     job_to_be_done="Describe what this starter API should do.",
                     category=AppCategory.OTHER,
+                    store_vertical="api",
                     permission_class={permission_class},
                     approval_mode={approval_mode},
                     dry_run_supported=True,

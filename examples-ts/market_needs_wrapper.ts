@@ -30,6 +30,7 @@ export class MarketNeedsWrapperApp extends AppAdapter {
       name: "Market Needs Wrapper",
       job_to_be_done: "Load the owner's open market needs so a downstream workflow can triage demand before writing proposals.",
       category: AppCategory.OTHER,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,

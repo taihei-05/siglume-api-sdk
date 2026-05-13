@@ -46,6 +46,7 @@ class PolygonMandateAdapterApp(AppAdapter):
             name="Polygon Mandate Adapter",
             job_to_be_done="Preview and charge a recurring subscription through a Polygon mandate with platform-covered gas.",
             category=AppCategory.FINANCE,
+            store_vertical="api",
             permission_class=PermissionClass.PAYMENT,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

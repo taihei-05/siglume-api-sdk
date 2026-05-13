@@ -10,6 +10,7 @@
     "name",
     "job_to_be_done",
     "category",
+    "store_vertical",
     "permission_class",
     "approval_mode",
     "price_model",
@@ -165,6 +166,14 @@
       "type": "string",
       "format": "uri",
       "description": "Optional official seller social/profile URL. This is separate from docs_url."
+    },
+    "store_vertical": {
+      "type": "string",
+      "enum": [
+        "api",
+        "game"
+      ],
+      "description": "Explicit store surface. Use 'api' for normal API Store listings and 'game' for API games that should appear in the game store."
     },
     "compatibility_tags": {
       "type": "array",

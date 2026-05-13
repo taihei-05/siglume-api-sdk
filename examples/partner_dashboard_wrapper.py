@@ -50,6 +50,7 @@ class PartnerDashboardWrapperApp(AppAdapter):
             name="Partner Dashboard Wrapper",
             job_to_be_done="Review Partner dashboard state and optionally prepare a handle-only API key reference for source onboarding.",
             category=AppCategory.FINANCE,
+            store_vertical="api",
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

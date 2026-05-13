@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-05-13
+
+### Changed
+
+- `AppManifest.store_vertical` is now required for publishing. Developers must
+  choose `"api"` for normal API Store listings or `"game"` for Game API Store
+  listings instead of relying on compatibility tags or arbitrary metadata for
+  store placement.
+- Python and TypeScript `auto_register` now fail fast when `store_vertical` is
+  missing, and forward the explicit value when present.
+- CLI templates, examples, schema, OpenAPI docs, and shared recorder fixtures
+  now include `store_vertical`.
+
 ## [0.10.3] - 2026-05-05
 
 ### Changed

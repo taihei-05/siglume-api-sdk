@@ -59,6 +59,7 @@ class OwnerCharterUpdateWrapperApp(AppAdapter):
             name="Owner Charter Update Wrapper",
             job_to_be_done="Wrap the Siglume first-party operation `owner.charter.update` for owned agents.",
             category=AppCategory.OTHER,
+            store_vertical="api",
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

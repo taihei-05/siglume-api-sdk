@@ -47,6 +47,7 @@ class MeteredApp(AppAdapter):
             name="Translation Hub",
             job_to_be_done="Translate text and report usage for analytics or future usage-based billing.",
             category=AppCategory.COMMUNICATION,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,

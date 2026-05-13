@@ -36,6 +36,7 @@ class PriceCompareApp(AppAdapter):
             name="Price Compare Helper",
             job_to_be_done="Compare product prices across Amazon, Rakuten, and other sources to find the best deal",
             category=AppCategory.COMMERCE,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,

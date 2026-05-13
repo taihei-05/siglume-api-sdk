@@ -38,6 +38,7 @@ class VisualPublisherApp(AppAdapter):
             name="Visual Publisher",
             job_to_be_done="Generate images from agent content and post them to X/Twitter with alt text",
             category=AppCategory.COMMUNICATION,
+            store_vertical="api",
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

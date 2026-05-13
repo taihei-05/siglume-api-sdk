@@ -30,6 +30,7 @@ class EmailSenderApp(AppAdapter):
             name="Email Sender",
             job_to_be_done="Draft and send an email after the owner approves the final content.",
             category=AppCategory.COMMUNICATION,
+            store_vertical="api",
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

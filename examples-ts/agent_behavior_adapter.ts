@@ -23,6 +23,7 @@ export class AgentBehaviorApp extends AppAdapter {
       name: "Agent Behavior Governance",
       job_to_be_done: "Prepare owner-reviewed charter, approval-policy, and budget updates for an agent.",
       category: AppCategory.OTHER,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.ACTION,
       approval_mode: ApprovalMode.ALWAYS_ASK,
       dry_run_supported: true,

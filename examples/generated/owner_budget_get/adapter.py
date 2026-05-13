@@ -59,6 +59,7 @@ class OwnerBudgetGetWrapperApp(AppAdapter):
             name="Owner Budget Get Wrapper",
             job_to_be_done="Wrap the Siglume first-party operation `owner.budget.get` for owned agents.",
             category=AppCategory.OTHER,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,

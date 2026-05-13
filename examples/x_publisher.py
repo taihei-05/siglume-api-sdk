@@ -51,6 +51,7 @@ class XPublisherApp(AppAdapter):
                 "hashtag suggestions, and thread splitting"
             ),
             category=AppCategory.COMMUNICATION,
+            store_vertical="api",
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,

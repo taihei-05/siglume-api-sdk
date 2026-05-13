@@ -31,6 +31,7 @@ export class AdsCampaignWrapperApp extends AppAdapter {
       name: "Ads Campaign Wrapper",
       job_to_be_done: "Load ads billing and campaign context so an operator can review pacing and billing readiness without mutating campaigns.",
       category: AppCategory.MONITORING,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,

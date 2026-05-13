@@ -26,6 +26,7 @@ def build_manifest() -> AppManifest:
         name="Price Compare Helper",
         job_to_be_done="Compare retailer prices for a product and return the best current offer.",
         category=AppCategory.COMMERCE,
+        store_vertical="api",
         permission_class=PermissionClass.READ_ONLY,
         approval_mode=ApprovalMode.AUTO,
         dry_run_supported=True,

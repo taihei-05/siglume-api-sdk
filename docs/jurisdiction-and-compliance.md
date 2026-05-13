@@ -89,6 +89,7 @@ manifest = AppManifest(
     name="Acme Translator",
     job_to_be_done="Translate short text between EN/JA",
     category=AppCategory.OTHER,
+    store_vertical="api",
     permission_class=PermissionClass.READ_ONLY,
     price_model=PriceModel.SUBSCRIPTION,
     price_value_minor=500,          # $5.00
