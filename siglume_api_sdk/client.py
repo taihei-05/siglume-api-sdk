@@ -118,6 +118,8 @@ class AppListingRecord:
     price_model: str | None = None
     price_value_minor: int = 0
     currency: str = "USD"
+    allow_free_trial: bool = False
+    free_trial_duration_days: int = 30
     short_description: str | None = None
     description: str | None = None
     docs_url: str | None = None
@@ -1412,6 +1414,8 @@ def _build_auto_register_request(
         "price_model",
         "price_value_minor",
         "currency",
+        "allow_free_trial",
+        "free_trial_duration_days",
         "permission_class",
         "approval_mode",
         "dry_run_supported",
@@ -1438,6 +1442,22 @@ def _build_auto_register_request(
             f"AppManifest.currency must be 'USD' or 'JPY'. Got {payload.get('currency')!r}."
         )
     payload["currency"] = currency
+    if "allow_free_trial" not in payload:
+        raise SiglumeClientError(
+            "AppManifest.allow_free_trial is required. Pass True to offer a Plus/Pro "
+            "buyer free trial or False to disable trials."
+        )
+    if bool(payload.get("allow_free_trial")):
+        duration = payload.get("free_trial_duration_days", 30)
+        if not isinstance(duration, int) or isinstance(duration, bool):
+            raise SiglumeClientError(
+                "AppManifest.free_trial_duration_days must be an int when allow_free_trial=True."
+            )
+        if not 1 <= duration <= 90:
+            raise SiglumeClientError(
+                "AppManifest.free_trial_duration_days must be between 1 and 90 when "
+                f"allow_free_trial=True, got: {duration}."
+            )
 
     # Strip ``version`` from the embedded manifest sub-dict too so the
     # platform's reject-on-manifest-version check cannot trip on the SDK's
@@ -1487,6 +1507,8 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         price_model=_string_or_none(data.get("price_model")),
         price_value_minor=int(data.get("price_value_minor") or 0),
         currency=str(data.get("currency") or "USD"),
+        allow_free_trial=bool(data.get("allow_free_trial") or False),
+        free_trial_duration_days=int(data.get("free_trial_duration_days") or 30),
         short_description=_string_or_none(data.get("short_description")),
         description=_string_or_none(data.get("description")),
         docs_url=_string_or_none(data.get("docs_url")),

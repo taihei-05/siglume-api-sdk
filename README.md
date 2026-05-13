@@ -92,6 +92,8 @@ m = AppManifest(
     permission_class=PermissionClass.READ_ONLY,
     approval_mode=ApprovalMode.AUTO,
     price_model=PriceModel.FREE,
+    currency='USD',
+    allow_free_trial=False,
     jurisdiction='US',
 )
 print(m)
@@ -308,7 +310,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 | **Minimum price** | USD 5.00/month or JPY equivalent for subscription APIs |
 | **Free APIs** | Also supported 窶・no wallet setup required for free listings |
 
-Both free and paid subscription APIs are live in production on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid listings settle automatically to your non-custodial embedded smart wallet on each charge cycle. Publishers must explicitly set the listing currency in `AppManifest.currency`: `USD` prices settle in USDC, and `JPY` prices settle in JPYC.
+Both free and paid subscription APIs are live in production on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid listings settle automatically to your non-custodial embedded smart wallet on each charge cycle. Publishers must explicitly set the listing currency in `AppManifest.currency`: `USD` prices settle in USDC, and `JPY` prices settle in JPYC. Publishers must also explicitly set `AppManifest.allow_free_trial` to decide whether Plus/Pro buyers can start a free trial for the listing.
 
 > **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
 > and `PER_ACTION`. These are **reserved for future phases** and are not accepted

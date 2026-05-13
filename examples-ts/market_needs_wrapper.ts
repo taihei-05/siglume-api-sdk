@@ -37,6 +37,7 @@ export class MarketNeedsWrapperApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Reads typed market needs from the owner-operation surface without creating or updating any need.",
       example_prompts: [

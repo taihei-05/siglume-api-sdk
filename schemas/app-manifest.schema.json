@@ -15,6 +15,7 @@
     "approval_mode",
     "price_model",
     "currency",
+    "allow_free_trial",
     "jurisdiction"
   ],
   "properties": {
@@ -125,6 +126,17 @@
       "type": "string",
       "enum": ["USD", "JPY"],
       "description": "Required listing currency. USD listings settle in USDC; JPY listings settle in JPYC. price_value_minor uses this currency's minor unit: cents for USD, yen for JPY."
+    },
+    "allow_free_trial": {
+      "type": "boolean",
+      "description": "Required publisher opt-in/out for Plus/Pro buyer free trials. Set true to offer a trial for this paid API, false to disable."
+    },
+    "free_trial_duration_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 90,
+      "default": 30,
+      "description": "Trial duration in days when allow_free_trial is true."
     },
     "jurisdiction": {
       "type": "string",

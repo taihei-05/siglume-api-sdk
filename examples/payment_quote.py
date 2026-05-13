@@ -38,6 +38,7 @@ class PaymentQuoteApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Preview, quote, and complete a USD payment flow with explicit approval.",
             example_prompts=[

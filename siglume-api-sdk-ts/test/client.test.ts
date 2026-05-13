@@ -60,6 +60,7 @@ function buildManifest() {
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
     jurisdiction: "US",
     short_description: "Search multiple retailers and summarize the best current price.",
     description: "Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
@@ -241,6 +242,42 @@ describe("SiglumeClient", () => {
         runtime_validation: buildRuntimeValidation(),
       }),
     ).rejects.toThrow("AppManifest.currency is required");
+  });
+
+  it("requires an explicit free-trial opt-in before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+    const manifest = { ...buildManifest() };
+    delete (manifest as Record<string, unknown>).allow_free_trial;
+
+    await expect(
+      client.auto_register(manifest, buildToolManual(), {
+        runtime_validation: buildRuntimeValidation(),
+      }),
+    ).rejects.toThrow("AppManifest.allow_free_trial is required");
+  });
+
+  it("rejects out-of-range free-trial duration before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        { ...buildManifest(), allow_free_trial: true, free_trial_duration_days: 200 },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("free_trial_duration_days must be between 1 and 90");
   });
 
   it("forwards JPY as the listing currency for auto_register", async () => {

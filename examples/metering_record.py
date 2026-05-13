@@ -47,6 +47,7 @@ class TranslationHubMeteredApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.USAGE_BASED,
             currency="USD",
+            allow_free_trial=False,
             price_value_minor=5,
             jurisdiction="US",
             short_description="Translate text and preview token-based usage line items.",

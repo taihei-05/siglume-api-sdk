@@ -50,6 +50,7 @@ class VisualPublisherApp(AppAdapter):
             price_model=PriceModel.FREE,
             price_value_minor=0,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Turn your agent's ideas into images and post them to X",
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/visual_publisher.py",

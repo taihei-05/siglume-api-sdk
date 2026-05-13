@@ -52,6 +52,7 @@ def build_manifest() -> AppManifest:
         required_connected_accounts=[],
         price_model=PriceModel.FREE,
         currency="USD",
+        allow_free_trial=False,
         jurisdiction="US",
         short_description="Search multiple retailers and summarize the best current price.",
         description="Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
@@ -327,10 +328,50 @@ def test_app_manifest_normalizes_jpy_listing_currency() -> None:
         price_model=PriceModel.SUBSCRIPTION,
         price_value_minor=1200,
         currency="jpy",
+        allow_free_trial=False,
         jurisdiction="JP",
     )
 
     assert manifest.currency == ListingCurrency.JPY
+
+
+def test_app_manifest_requires_explicit_free_trial_choice() -> None:
+    with pytest.raises(ValueError, match="AppManifest.allow_free_trial is REQUIRED"):
+        AppManifest(
+            capability_key="price-compare-helper",
+            name="Price Compare Helper",
+            job_to_be_done="Compare prices.",
+            category=AppCategory.COMMERCE,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            currency="USD",
+            jurisdiction="US",
+        )
+
+
+def test_app_manifest_rejects_out_of_range_free_trial_duration() -> None:
+    with pytest.raises(ValueError, match="free_trial_duration_days must be between 1 and 90"):
+        AppManifest(
+            capability_key="price-compare-helper",
+            name="Price Compare Helper",
+            job_to_be_done="Compare prices.",
+            category=AppCategory.COMMERCE,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.SUBSCRIPTION,
+            price_value_minor=1200,
+            currency="USD",
+            allow_free_trial=True,
+            free_trial_duration_days=200,
+            jurisdiction="US",
+        )
 
 def test_auto_register_accepts_oauth_credentials_sequence() -> None:
     manifest = build_manifest()

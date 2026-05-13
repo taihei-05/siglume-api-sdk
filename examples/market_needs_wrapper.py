@@ -52,6 +52,7 @@ class MarketNeedsWrapperApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Reads typed market needs from the owner-operation surface without creating or updating any need.",
             example_prompts=[

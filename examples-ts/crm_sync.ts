@@ -31,6 +31,7 @@ export class CrmSyncApp extends AppAdapter {
       required_connected_accounts: ["hubspot"],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Preview and upsert HubSpot lead records with explicit approval.",
       example_prompts: [

@@ -59,6 +59,8 @@ class CapabilityListing:
     price_model: str | None = None
     price_value_minor: int = 0
     currency: str = "USD"
+    allow_free_trial: bool = False
+    free_trial_duration_days: int = 30
     short_description: str | None = None
     docs_url: str | None = None
     support_contact: str | None = None
@@ -102,6 +104,8 @@ class CapabilityListing:
             price_model=listing.price_model,
             price_value_minor=listing.price_value_minor,
             currency=listing.currency,
+            allow_free_trial=listing.allow_free_trial,
+            free_trial_duration_days=listing.free_trial_duration_days,
             short_description=listing.short_description,
             docs_url=listing.docs_url,
             support_contact=listing.support_contact,
@@ -300,6 +304,64 @@ class SiglumeBuyerClient:
                 "binding": binding_result.raw if binding_result is not None else None,
             },
         )
+
+    def start_trial(
+        self,
+        *,
+        capability_key: str,
+        agent_id: str | None = None,
+        bind_agent: bool | None = None,
+        binding_status: str = "active",
+    ) -> Subscription:
+        listing = self.get_listing(capability_key)
+        data, meta = self._client._request(  # noqa: SLF001 - internal reuse within the SDK package
+            "POST",
+            f"/market/capabilities/{listing.listing_id}/start-trial",
+            json_body={},
+        )
+        access_grant = _parse_access_grant(_to_dict(data.get("access_grant")))
+        if not access_grant.access_grant_id:
+            purchase_status = str(data.get("purchase_status") or "trial_started")
+            raise SiglumeExperimentalError(
+                f"Trial started with status '{purchase_status}' but did not return an access grant. "
+                "Buyer-side trial flows are still experimental on the public API."
+            )
+        target_agent_id = _resolve_agent_id(agent_id, self.default_agent_id)
+        should_bind = bind_agent if bind_agent is not None else bool(target_agent_id)
+        binding_result: GrantBindingResult | None = None
+        if should_bind:
+            if not target_agent_id:
+                raise SiglumeClientError("agent_id is required to bind a trial access grant.")
+            binding_result = self._client.bind_agent_to_grant(
+                access_grant.access_grant_id,
+                agent_id=target_agent_id,
+                binding_status=binding_status,
+            )
+        return Subscription(
+            access_grant_id=access_grant.access_grant_id,
+            capability_listing_id=access_grant.capability_listing_id or listing.listing_id,
+            capability_key=listing.capability_key,
+            purchase_status=str(data.get("purchase_status") or "trial_started"),
+            grant_status=access_grant.grant_status or None,
+            agent_id=binding_result.binding.agent_id if binding_result is not None else target_agent_id,
+            binding_id=binding_result.binding.binding_id if binding_result is not None else None,
+            binding_status=binding_result.binding.binding_status if binding_result is not None else None,
+            access_grant=access_grant,
+            binding=binding_result.binding if binding_result is not None else None,
+            trace_id=(binding_result.trace_id if binding_result is not None else meta.trace_id),
+            request_id=(binding_result.request_id if binding_result is not None else meta.request_id),
+            raw={
+                "trial": dict(data),
+                "binding": binding_result.raw if binding_result is not None else None,
+            },
+        )
+
+    def get_trial_quota(self) -> dict[str, Any]:
+        data, _meta = self._client._request(  # noqa: SLF001 - internal reuse within the SDK package
+            "GET",
+            "/market/me/trial-quota",
+        )
+        return dict(data)
 
     def invoke(
         self,

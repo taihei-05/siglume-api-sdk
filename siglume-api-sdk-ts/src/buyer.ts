@@ -223,6 +223,62 @@ export class SiglumeBuyerClient {
     };
   }
 
+  async start_trial(options: {
+    capability_key: string;
+    agent_id?: string;
+    bind_agent?: boolean;
+    binding_status?: string;
+  }): Promise<Subscription> {
+    const listing = await this.get_listing(options.capability_key);
+    const [data, meta] = await this.request("POST", `/market/capabilities/${listing.listing_id}/start-trial`, {
+      json_body: {},
+    });
+    const accessGrant = parseAccessGrant(toRecord(data.access_grant));
+    if (!accessGrant.access_grant_id) {
+      const purchaseStatus = String(data.purchase_status ?? "trial_started");
+      throw new SiglumeExperimentalError(
+        `Trial started with status '${purchaseStatus}' but did not return an access grant. Buyer-side trial flows are still experimental on the public API.`,
+      );
+    }
+    const targetAgentId = resolveAgentId(options.agent_id, this.default_agent_id);
+    const shouldBind = options.bind_agent ?? Boolean(targetAgentId);
+    let binding: CapabilityBindingRecord | null = null;
+    let trace_id = meta.trace_id ?? undefined;
+    let request_id = meta.request_id ?? undefined;
+    if (shouldBind) {
+      if (!targetAgentId) {
+        throw new SiglumeClientError("agent_id is required to bind a trial access grant.");
+      }
+      const grantBinding = await this.client.bind_agent_to_grant(accessGrant.access_grant_id, {
+        agent_id: targetAgentId,
+        binding_status: options.binding_status ?? "active",
+      });
+      binding = grantBinding.binding;
+      trace_id = grantBinding.trace_id ?? trace_id;
+      request_id = grantBinding.request_id ?? request_id;
+    }
+    return {
+      access_grant_id: accessGrant.access_grant_id,
+      capability_listing_id: accessGrant.capability_listing_id ?? listing.listing_id,
+      capability_key: listing.capability_key,
+      purchase_status: String(data.purchase_status ?? "trial_started"),
+      grant_status: accessGrant.grant_status,
+      agent_id: binding?.agent_id ?? targetAgentId ?? null,
+      binding_id: binding?.binding_id ?? null,
+      binding_status: binding?.binding_status ?? null,
+      access_grant: accessGrant,
+      binding,
+      trace_id,
+      request_id,
+      raw: { trial: { ...data }, binding },
+    };
+  }
+
+  async get_trial_quota(): Promise<Record<string, unknown>> {
+    const [data] = await this.request("GET", "/market/me/trial-quota");
+    return { ...data };
+  }
+
   async invoke(options: {
     capability_key: string;
     input: Record<string, unknown>;

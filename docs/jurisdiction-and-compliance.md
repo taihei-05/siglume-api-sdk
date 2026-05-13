@@ -94,6 +94,7 @@ manifest = AppManifest(
     price_model=PriceModel.SUBSCRIPTION,
     price_value_minor=500,          # $5.00
     currency="USD",
+    allow_free_trial=False,
     jurisdiction="US",              # required 窶・ISO 3166-1 alpha-2
     applicable_regulations=["CCPA"],
     data_residency="US",            # optional; defaults to jurisdiction

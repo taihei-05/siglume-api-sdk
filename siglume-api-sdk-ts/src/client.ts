@@ -800,6 +800,8 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     price_model: stringOrNull(data.price_model),
     price_value_minor: Number(data.price_value_minor ?? 0),
     currency: String(data.currency ?? "USD"),
+    allow_free_trial: Boolean(data.allow_free_trial ?? false),
+    free_trial_duration_days: Number(data.free_trial_duration_days ?? 30),
     short_description: stringOrNull(data.short_description),
     description: stringOrNull(data.description),
     docs_url: stringOrNull(data.docs_url),
@@ -2147,6 +2149,8 @@ export class SiglumeClient implements SiglumeClientShape {
       "price_model",
       "price_value_minor",
       "currency",
+      "allow_free_trial",
+      "free_trial_duration_days",
       "permission_class",
       "approval_mode",
       "dry_run_supported",
@@ -2174,6 +2178,24 @@ export class SiglumeClient implements SiglumeClientShape {
       throw new SiglumeClientError(`AppManifest.currency must be 'USD' or 'JPY'. Got ${String(payload.currency)}.`);
     }
     payload.currency = currency;
+    if (payload.allow_free_trial === undefined || payload.allow_free_trial === null) {
+      throw new SiglumeClientError(
+        "AppManifest.allow_free_trial is required. Pass true to offer a Plus/Pro buyer free trial or false to disable trials.",
+      );
+    }
+    if (Boolean(payload.allow_free_trial)) {
+      const duration = payload.free_trial_duration_days ?? 30;
+      if (typeof duration !== "number" || !Number.isInteger(duration)) {
+        throw new SiglumeClientError(
+          "AppManifest.free_trial_duration_days must be an integer when allow_free_trial=true.",
+        );
+      }
+      if (duration < 1 || duration > 90) {
+        throw new SiglumeClientError(
+          `AppManifest.free_trial_duration_days must be between 1 and 90 when allow_free_trial=true, got: ${duration}.`,
+        );
+      }
+    }
     // Strip `version` from the embedded manifest sub-dict too so the
     // platform's reject-on-manifest-version check cannot trip on the SDK's
     // local-tracking default. The SDK's AppManifest.version is local-only

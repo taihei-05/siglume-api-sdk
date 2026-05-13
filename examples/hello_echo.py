@@ -38,6 +38,7 @@ class HelloEchoApp(AppAdapter):
             required_connected_accounts=[],
             price_model=PriceModel.FREE,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="A simple echo API",
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/hello_echo.py",

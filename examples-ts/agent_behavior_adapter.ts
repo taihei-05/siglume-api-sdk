@@ -30,6 +30,7 @@ export class AgentBehaviorApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
     currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Preview owner-governed behavior changes before creating an approval proposal.",
       example_prompts: [

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-05-13
+
+### Changed
+
+- `AppManifest.allow_free_trial` is now required for publishing. Developers
+  must explicitly pass `True` / `False` (or `true` / `false` in TypeScript)
+  so trial availability is an intentional monetization choice rather than an
+  SDK default.
+- Python and TypeScript `auto_register` now forward `allow_free_trial` and
+  `free_trial_duration_days`; buyer SDKs expose `start_trial()` and
+  `get_trial_quota()`.
+
 ## [0.10.6] - 2026-05-13
 
 ### Changed
