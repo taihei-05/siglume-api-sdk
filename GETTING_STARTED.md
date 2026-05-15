@@ -229,6 +229,7 @@ The manifest is your API's identity card. It controls how your API appears in th
 | `support_contact` | **Required for production registration.** Real support email address or public support URL. Placeholder domains are rejected. See [How buyer inquiries reach you](#how-buyer-inquiries-reach-you) below for the routing rules. | `"support@your-domain.com"` |
 | `seller_homepage_url` | Optional official seller/company homepage, separate from `docs_url`. | `"https://your-domain.com"` |
 | `seller_social_url` | Optional official seller social/profile URL, separate from `docs_url`. | `"https://x.com/your_account"` |
+| `persistence` | Optional save-state policy. Required only when `store_vertical="game"` and `persistence.mode` is not `"none"`. | `PersistencePolicy(mode="platform", save_data_schema={...})` |
 
 ### Game API Store placement
 
@@ -250,6 +251,44 @@ Good tags are concrete buyer signals such as `unity`, `unreal`, `godot`,
 `npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or `narrative`. Do not
 rely on arbitrary registration `metadata` for placement;
 use manifest fields that are validated and carried through by the SDK.
+
+#### Game save data contract
+
+If your game has save data, add `persistence.save_data_schema` to the manifest.
+This is the JSON Schema for the top-level save object your game writes. It is
+required for game listings when `persistence.mode` is `local`, `platform`, or
+`developer_server`. It is not required for normal API listings, or for games
+that explicitly set `persistence.mode="none"`.
+
+```python
+from siglume_api_sdk import PersistencePolicy
+
+SAVE_DATA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "agent": {"type": "object"},
+        "avatar_config": {"type": "object"},
+        "replays": {"type": "array"},
+    },
+    "required": ["agent"],
+}
+
+manifest = AppManifest(
+    # ...other required fields...
+    store_vertical="game",
+    persistence=PersistencePolicy(
+        mode="platform",
+        save_data_schema=SAVE_DATA_SCHEMA,
+    ),
+)
+```
+
+Use a stable, top-level object shape and keep the schema under 8192 bytes. When
+you change the save format, add or bump your own `schema_version` and keep
+backward compatibility for existing players. The SDK and platform reject missing
+or malformed save schemas before publish, and platform-managed saves perform
+basic runtime checks for object shape, required fields, declared property types,
+and array item types.
 
 ### How buyer inquiries reach you
 
@@ -1438,13 +1477,14 @@ payload["manifest"]["price_model"] = "subscription"
 payload["manifest"]["price_value_minor"] = 999
 ```
 
-`price_value_minor` is in cents. $5.00 = 500, $9.99 = 999, $29.99 = 2999.
+`price_value_minor` uses the selected listing currency's minor unit: cents for
+USD (`$5.00 = 500`) and yen for JPY (`JPY 500 = 500`).
 
 ### Platform fee
 
 - **Platform fee: 6.6%**
 - **Developer receives: 93.4%**
-- Pricing: USD-denominated (actual settlement currency post-cutover will be announced with the on-chain cutover; see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md))
+- Pricing: choose `AppManifest.currency="USD"` or `"JPY"`. USD listings settle in USDC; JPY listings settle in JPYC. `price_value_minor` is cents for USD and yen for JPY.
 - Siglume never holds your funds.
 
 Example for a $9.99/month-equivalent subscription:

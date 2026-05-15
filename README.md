@@ -201,6 +201,33 @@ Use `compatibility_tags` for concrete buyer signals such as `unity`, `unreal`,
 `narrative`. Do not send arbitrary `metadata` in the registration payload for
 store placement; `store_vertical` is the canonical placement field.
 
+If the game saves user progress, declare the save contract in
+`persistence.save_data_schema`. This is required only for
+`store_vertical="game"` when `persistence.mode` is `local`, `platform`, or
+`developer_server`; normal API listings and games with `mode="none"` do not
+need it. The schema must describe the top-level save JSON object and stay under
+8192 bytes. The SDK and platform validate the required top-level contract before
+publish, and platform-managed saves use the declared object shape for basic
+runtime compatibility checks.
+
+```python
+from siglume_api_sdk import PersistencePolicy
+
+store_vertical="game",
+persistence=PersistencePolicy(
+    mode="platform",
+    save_data_schema={
+        "type": "object",
+        "properties": {
+            "agent": {"type": "object"},
+            "avatar_config": {"type": "object"},
+            "replays": {"type": "array"},
+        },
+        "required": ["agent"],
+    },
+)
+```
+
 **You do not submit a PR to this repo.** You register directly on the platform.
 No permission needed. No issue to claim. Just build and register.
 

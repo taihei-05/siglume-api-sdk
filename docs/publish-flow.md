@@ -201,6 +201,10 @@ preflight errors before calling `auto-register`.
     `matchmaking`, `multiplayer`, `realtime`, `ugc`, or `narrative`. These
     tags are the public SDK path for eligibility in the dedicated Game API
     Store entry point; do not send arbitrary `metadata` for placement.
+  - optional `persistence`. For game APIs that save progress,
+    `persistence.save_data_schema` is required when `persistence.mode` is
+    `local`, `platform`, or `developer_server`. Normal API listings and games
+    with `persistence.mode="none"` do not need a save schema.
 - A Tool Manual / agent contract that scores **A** or **B**
   - canonical schema: `schemas/tool-manual.schema.json`
   - required core fields include `input_schema`, `output_schema`,

@@ -18,6 +18,8 @@ from siglume_api_sdk import (  # noqa: E402
     AppManifest,
     ApprovalMode,
     PermissionClass,
+    PersistenceMode,
+    PersistencePolicy,
     PriceModel,
     ListingCurrency,
     SiglumeAPIError,
@@ -62,6 +64,17 @@ def build_manifest() -> AppManifest:
         seller_social_url="https://x.com/example",
         example_prompts=["Compare prices for Sony WH-1000XM5."],
     )
+
+
+SAVE_DATA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "agent": {"type": "object"},
+        "avatar_config": {"type": "object"},
+        "replays": {"type": "array"},
+    },
+    "required": ["agent"],
+}
 
 
 def build_tool_manual() -> ToolManual:
@@ -333,6 +346,209 @@ def test_app_manifest_normalizes_jpy_listing_currency() -> None:
     )
 
     assert manifest.currency == ListingCurrency.JPY
+
+
+def test_game_manifest_with_save_persistence_requires_save_data_schema() -> None:
+    with pytest.raises(ValueError, match="persistence.save_data_schema is REQUIRED"):
+        AppManifest(
+            capability_key="arena-game",
+            name="Arena Game",
+            job_to_be_done="Play a persistent API game.",
+            category=AppCategory.OTHER,
+            store_vertical=StoreVertical.GAME,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            currency="USD",
+            allow_free_trial=False,
+            jurisdiction="US",
+            persistence=PersistencePolicy(mode="platform"),
+        )
+
+
+def test_game_manifest_accepts_save_data_schema_for_save_persistence() -> None:
+    manifest = AppManifest(
+        capability_key="arena-game",
+        name="Arena Game",
+        job_to_be_done="Play a persistent API game.",
+        category=AppCategory.OTHER,
+        store_vertical=StoreVertical.GAME,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
+        jurisdiction="US",
+        persistence=PersistencePolicy(mode="platform", save_data_schema=SAVE_DATA_SCHEMA),
+    )
+
+    assert manifest.persistence["save_data_schema"] == SAVE_DATA_SCHEMA
+
+
+def test_game_manifest_rejects_oversized_save_data_schema() -> None:
+    oversized_schema = {
+        "type": "object",
+        "properties": {
+            "agent": {"type": "object", "description": "x" * 8200},
+        },
+        "required": ["agent"],
+    }
+
+    with pytest.raises(ValueError, match="save_data_schema must be at most 8192 bytes"):
+        AppManifest(
+            capability_key="arena-game",
+            name="Arena Game",
+            job_to_be_done="Play a persistent API game.",
+            category=AppCategory.OTHER,
+            store_vertical=StoreVertical.GAME,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            currency="USD",
+            allow_free_trial=False,
+            jurisdiction="US",
+            persistence=PersistencePolicy(mode="platform", save_data_schema=oversized_schema),
+        )
+
+
+def test_api_manifest_does_not_require_save_data_schema() -> None:
+    manifest = AppManifest(
+        capability_key="normal-api",
+        name="Normal API",
+        job_to_be_done="Return non-game data.",
+        category=AppCategory.OTHER,
+        store_vertical=StoreVertical.API,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
+        jurisdiction="US",
+        persistence=PersistencePolicy(mode="platform"),
+    )
+
+    assert manifest.persistence["mode"] == "platform"
+
+
+def test_mapping_persistence_accepts_enum_mode() -> None:
+    manifest = AppManifest(
+        capability_key="arena-game",
+        name="Arena Game",
+        job_to_be_done="Play a persistent API game.",
+        category=AppCategory.OTHER,
+        store_vertical=StoreVertical.GAME,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
+        jurisdiction="US",
+        persistence={"mode": PersistenceMode.PLATFORM, "save_data_schema": SAVE_DATA_SCHEMA},
+    )
+
+    assert manifest.persistence["mode"] == "platform"
+
+
+def test_auto_register_dict_manifest_requires_game_save_data_schema() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    manifest = {
+        "capability_key": "arena-game",
+        "name": "Arena Game",
+        "job_to_be_done": "Play a persistent API game.",
+        "category": "other",
+        "store_vertical": "game",
+        "permission_class": "read-only",
+        "approval_mode": "auto",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "free",
+        "currency": "USD",
+        "allow_free_trial": False,
+        "jurisdiction": "US",
+        "example_prompts": ["Start a run.", "Load my save."],
+    }
+    manifest["persistence"] = {"mode": "platform"}
+
+    with build_client(handler) as client:
+        with pytest.raises(SiglumeClientError, match="persistence.save_data_schema is required"):
+            client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_dict_manifest_rejects_oversized_save_data_schema() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    manifest = {
+        "capability_key": "arena-game",
+        "name": "Arena Game",
+        "job_to_be_done": "Play a persistent API game.",
+        "category": "other",
+        "store_vertical": "game",
+        "permission_class": "read-only",
+        "approval_mode": "auto",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "free",
+        "currency": "USD",
+        "allow_free_trial": False,
+        "jurisdiction": "US",
+        "example_prompts": ["Start a run.", "Load my save."],
+        "persistence": {
+            "mode": "platform",
+            "save_data_schema": {
+                "type": "object",
+                "properties": {"agent": {"type": "object", "description": "x" * 8200}},
+                "required": ["agent"],
+            },
+        },
+    }
+
+    with build_client(handler) as client:
+        with pytest.raises(SiglumeClientError, match="save_data_schema must be at most 8192 bytes"):
+            client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_dict_manifest_accepts_enum_persistence_mode() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content.decode()))
+        return httpx.Response(201, json=envelope({"listing_id": "lst_game", "status": "draft"}))
+
+    manifest = {
+        "capability_key": "arena-game",
+        "name": "Arena Game",
+        "job_to_be_done": "Play a persistent API game.",
+        "category": "other",
+        "store_vertical": "game",
+        "permission_class": "read-only",
+        "approval_mode": "auto",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "free",
+        "currency": "USD",
+        "allow_free_trial": False,
+        "jurisdiction": "US",
+        "example_prompts": ["Start a run.", "Load my save."],
+        "persistence": {"mode": PersistenceMode.PLATFORM, "save_data_schema": SAVE_DATA_SCHEMA},
+    }
+
+    with build_client(handler) as client:
+        client.auto_register(manifest, build_tool_manual())
+
+    assert captured["persistence"]["mode"] == "platform"
 
 
 def test_app_manifest_requires_explicit_free_trial_choice() -> None:
