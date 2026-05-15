@@ -30,6 +30,7 @@ import type {
   BillingPortalLink,
   BudgetPolicy,
   CapabilityBindingRecord,
+  CapabilitySaveStateRecord,
   ConnectedAccountRecord,
   CursorPage,
   DeveloperPortalSummary,
@@ -135,6 +136,60 @@ export interface SiglumeClientOptions {
   fetch?: FetchLike;
 }
 
+function validateManifestPersistenceContract(payload: Record<string, unknown>): void {
+  const vertical = String(payload.store_vertical ?? "").trim().toLowerCase();
+  const persistence = payload.persistence;
+  if (persistence === undefined || persistence === null) {
+    return;
+  }
+  if (!isRecord(persistence)) {
+    throw new SiglumeClientError("AppManifest.persistence must be an object.");
+  }
+  const mode = String(persistence.mode ?? (vertical === "game" ? "platform" : "none"))
+    .trim()
+    .toLowerCase();
+  if (!["none", "local", "platform", "developer_server"].includes(mode)) {
+    throw new SiglumeClientError(
+      "AppManifest.persistence.mode must be one of: none, local, platform, developer_server.",
+    );
+  }
+  const schema = persistence.save_data_schema;
+  if (vertical === "game" && mode !== "none" && schema === undefined) {
+    throw new SiglumeClientError(
+      "AppManifest.persistence.save_data_schema is required when store_vertical='game' and persistence.mode is not 'none'.",
+    );
+  }
+  if (schema !== undefined) {
+    validateSaveDataSchema(schema, "AppManifest.persistence.save_data_schema");
+  }
+}
+
+function validateSaveDataSchema(schema: unknown, fieldName: string): void {
+  if (!isRecord(schema)) {
+    throw new SiglumeClientError(`${fieldName} must be a JSON Schema object.`);
+  }
+  const schemaSize = new TextEncoder().encode(JSON.stringify(schema)).length;
+  if (schemaSize > 8192) {
+    throw new SiglumeClientError(`${fieldName} must be at most 8192 bytes.`);
+  }
+  if (schema.type !== "object") {
+    throw new SiglumeClientError(`${fieldName}.type must be 'object'.`);
+  }
+  const properties = schema.properties;
+  if (!isRecord(properties) || Object.keys(properties).length === 0) {
+    throw new SiglumeClientError(`${fieldName}.properties must be a non-empty object.`);
+  }
+  if (schema.required !== undefined) {
+    if (!Array.isArray(schema.required) || !schema.required.every((item) => typeof item === "string")) {
+      throw new SiglumeClientError(`${fieldName}.required must be an array of strings when provided.`);
+    }
+    const missing = schema.required.filter((item) => !(item in properties));
+    if (missing.length > 0) {
+      throw new SiglumeClientError(`${fieldName}.required references undefined properties: ${missing.join(", ")}.`);
+    }
+  }
+}
+
 type PendingConfirmation = {
   manifest: Record<string, unknown>;
   tool_manual: Record<string, unknown>;
@@ -165,6 +220,14 @@ export interface SiglumeClientShape {
   submit_review(listing_id: string): Promise<AppListingRecord>;
   list_my_listings(options?: { status?: string; limit?: number; cursor?: string }): Promise<CursorPage<AppListingRecord>>;
   get_listing(listing_id: string): Promise<AppListingRecord>;
+  get_capability_state(capability_key: string, save_key?: string): Promise<CapabilitySaveStateRecord>;
+  put_capability_state(
+    capability_key: string,
+    save_key?: string,
+    payload?: Record<string, unknown>,
+    options?: { schema_version?: string; expected_revision?: number | null; metadata?: Record<string, unknown> },
+  ): Promise<CapabilitySaveStateRecord>;
+  delete_capability_state(capability_key: string, save_key?: string): Promise<CapabilitySaveStateRecord>;
   list_capabilities(options?: {
     mine?: boolean;
     status?: string;
@@ -787,6 +850,12 @@ function buildUrl(baseUrl: string, path: string, params?: RequestOptions["params
 }
 
 function parseListing(data: Record<string, unknown>): AppListingRecord {
+  const metadata = isRecord(data.metadata) ? data.metadata : {};
+  const persistence = isRecord(data.persistence)
+    ? data.persistence
+    : isRecord(metadata.persistence)
+      ? metadata.persistence
+      : {};
   return {
     listing_id: String(data.listing_id ?? data.id ?? ""),
     capability_key: String(data.capability_key ?? ""),
@@ -814,8 +883,25 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     submission_blockers: Array.isArray(data.submission_blockers)
       ? data.submission_blockers.filter((item): item is string => typeof item === "string")
       : [],
+    persistence: { ...persistence },
     created_at: stringOrNull(data.created_at),
     updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
+function parseCapabilitySaveState(data: Record<string, unknown>): CapabilitySaveStateRecord {
+  return {
+    capability_key: String(data.capability_key ?? ""),
+    save_key: String(data.save_key ?? ""),
+    schema_version: String(data.schema_version ?? "1"),
+    revision: Number(data.revision ?? 0),
+    payload: toRecord(data.payload),
+    metadata: toRecord(data.metadata),
+    checksum: stringOrNull(data.checksum),
+    updated_at: stringOrNull(data.updated_at),
+    created_at: stringOrNull(data.created_at),
+    exists: Boolean(data.exists ?? false),
     raw: { ...data },
   };
 }
@@ -2157,6 +2243,7 @@ export class SiglumeClient implements SiglumeClientShape {
       "required_connected_accounts",
       "permission_scopes",
       "compatibility_tags",
+      "persistence",
     ]) {
       const value = manifestPayload[fieldName];
       if (value !== undefined && value !== null) {
@@ -2196,6 +2283,7 @@ export class SiglumeClient implements SiglumeClientShape {
         );
       }
     }
+    validateManifestPersistenceContract(payload);
     // Strip `version` from the embedded manifest sub-dict too so the
     // platform's reject-on-manifest-version check cannot trip on the SDK's
     // local-tracking default. The SDK's AppManifest.version is local-only
@@ -2335,6 +2423,40 @@ export class SiglumeClient implements SiglumeClientShape {
   async get_listing(listing_id: string): Promise<AppListingRecord> {
     const [data] = await this.request("GET", `/market/capabilities/${listing_id}`);
     return parseListing(data);
+  }
+
+  async get_capability_state(
+    capability_key: string,
+    save_key = "default",
+  ): Promise<CapabilitySaveStateRecord> {
+    const [data] = await this.request("GET", `/market/capability-state/${capability_key}/${save_key}`);
+    return parseCapabilitySaveState(data);
+  }
+
+  async put_capability_state(
+    capability_key: string,
+    save_key = "default",
+    payload: Record<string, unknown> = {},
+    options: { schema_version?: string; expected_revision?: number | null; metadata?: Record<string, unknown> } = {},
+  ): Promise<CapabilitySaveStateRecord> {
+    const body: Record<string, unknown> = {
+      payload: toRecord(payload),
+      schema_version: options.schema_version ?? "1",
+      metadata: toRecord(options.metadata),
+    };
+    if (options.expected_revision !== undefined && options.expected_revision !== null) {
+      body.expected_revision = Math.trunc(options.expected_revision);
+    }
+    const [data] = await this.request("PUT", `/market/capability-state/${capability_key}/${save_key}`, { json_body: body });
+    return parseCapabilitySaveState(data);
+  }
+
+  async delete_capability_state(
+    capability_key: string,
+    save_key = "default",
+  ): Promise<CapabilitySaveStateRecord> {
+    const [data] = await this.request("DELETE", `/market/capability-state/${capability_key}/${save_key}`);
+    return parseCapabilitySaveState(data);
   }
 
   // ----- Capability bundles (v0.7 track 2) ---------------------------------

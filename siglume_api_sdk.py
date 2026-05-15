@@ -12,6 +12,7 @@ Developers implement the AppAdapter protocol and register it with Siglume.
 from __future__ import annotations
 
 import abc
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +22,7 @@ from typing import Any, Mapping
 # ISO 3166-1 alpha-2 country code, optionally with a sub-region suffix.
 # Examples: "US", "US-CA", "JP", "GB", "DE", "SG".
 _JURISDICTION_PATTERN = re.compile(r"^[A-Z]{2}(-[A-Z0-9]{1,3})?$")
+_MAX_SAVE_DATA_SCHEMA_BYTES = 8192
 
 
 # 笏笏 Permission & Execution Models 笏笏
@@ -91,11 +93,86 @@ class StoreVertical(str, Enum):
     GAME = "game"
 
 
+class PersistenceMode(str, Enum):
+    NONE = "none"
+    LOCAL = "local"
+    PLATFORM = "platform"
+    DEVELOPER_SERVER = "developer_server"
+
+
 # 笏笏 Data Transfer Objects 笏笏
 
 class ListingCurrency(str, Enum):
     USD = "USD"
     JPY = "JPY"
+
+
+@dataclass
+class PersistencePolicy:
+    mode: PersistenceMode | str = PersistenceMode.NONE
+    schema_version: str = "1"
+    scope: str = "user_capability"
+    restore_required: bool = False
+    max_bytes: int | None = None
+    endpoint: str | None = None
+    description: str = ""
+    save_data_schema: dict[str, Any] | None = None
+
+
+def _normalize_persistence_mapping(value: PersistencePolicy | Mapping[str, Any] | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, PersistencePolicy):
+        mode = value.mode.value if isinstance(value.mode, PersistenceMode) else str(value.mode)
+        result: dict[str, Any] = {
+            "mode": mode,
+            "schema_version": value.schema_version,
+            "scope": value.scope,
+            "restore_required": bool(value.restore_required),
+        }
+        if value.max_bytes is not None:
+            result["max_bytes"] = value.max_bytes
+        if value.endpoint is not None:
+            result["endpoint"] = value.endpoint
+        if value.description:
+            result["description"] = value.description
+        if value.save_data_schema is not None:
+            result["save_data_schema"] = value.save_data_schema
+        return result
+    if isinstance(value, Mapping):
+        return dict(value)
+    raise ValueError("AppManifest.persistence must be a PersistencePolicy or mapping.")
+
+
+def _persistence_mode_to_string(value: Any) -> str:
+    raw = value.value if isinstance(value, PersistenceMode) else value
+    return str(raw or "").strip().lower()
+
+
+def _validate_save_data_schema(schema: Any, *, field_name: str) -> None:
+    if not isinstance(schema, Mapping):
+        raise ValueError(f"{field_name} must be a JSON Schema object.")
+    try:
+        schema_size = len(json.dumps(dict(schema), ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be JSON-serializable.") from None
+    if schema_size > _MAX_SAVE_DATA_SCHEMA_BYTES:
+        raise ValueError(f"{field_name} must be at most {_MAX_SAVE_DATA_SCHEMA_BYTES} bytes.")
+    schema_type = schema.get("type")
+    if schema_type != "object":
+        raise ValueError(f"{field_name}.type must be 'object'.")
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping) or not properties:
+        raise ValueError(f"{field_name}.properties must be a non-empty object.")
+    required = schema.get("required")
+    if required is not None:
+        if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
+            raise ValueError(f"{field_name}.required must be an array of strings when provided.")
+        missing = [item for item in required if item not in properties]
+        if missing:
+            raise ValueError(
+                f"{field_name}.required references undefined properties: {', '.join(missing)}."
+            )
 
 
 @dataclass
@@ -146,6 +223,7 @@ class AppManifest:
     compatibility_tags: list[str] = field(default_factory=list)
     latency_tier: str = "normal"           # fast, normal, slow
     example_prompts: list[str] = field(default_factory=list)
+    persistence: PersistencePolicy | dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.currency is None or str(self.currency).strip() == "":
@@ -192,6 +270,7 @@ class AppManifest:
                 f"Got: {self.store_vertical!r}"
             )
         self.store_vertical = StoreVertical(vertical)
+        self._validate_persistence_contract()
 
         if not self.jurisdiction:
             raise ValueError(
@@ -218,6 +297,32 @@ class AppManifest:
                 f"AppManifest.data_residency must be ISO 3166-1 alpha-2 "
                 f"(optionally -subregion), got: {self.data_residency!r}"
             )
+
+    def _validate_persistence_contract(self) -> None:
+        policy = _normalize_persistence_mapping(self.persistence)
+        if not policy:
+            return
+        mode = _persistence_mode_to_string(policy.get("mode"))
+        if not mode:
+            mode = "platform" if self.store_vertical == StoreVertical.GAME else "none"
+            policy["mode"] = mode
+        if mode not in {item.value for item in PersistenceMode}:
+            raise ValueError(
+                "AppManifest.persistence.mode must be one of: none, local, "
+                "platform, developer_server."
+            )
+        schema = policy.get("save_data_schema")
+        if self.store_vertical == StoreVertical.GAME and mode != PersistenceMode.NONE.value:
+            if schema is None:
+                raise ValueError(
+                    "AppManifest.persistence.save_data_schema is REQUIRED when "
+                    "store_vertical='game' and persistence.mode is not 'none'. "
+                    "Declare the JSON Schema for the game's save data."
+                )
+        if schema is not None:
+            _validate_save_data_schema(schema, field_name="AppManifest.persistence.save_data_schema")
+        if policy is not self.persistence:
+            self.persistence = policy
 
 
 @dataclass

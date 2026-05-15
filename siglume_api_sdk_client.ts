@@ -33,8 +33,23 @@ export interface AppListingRecord {
   review_status?: string | null;
   review_note?: string | null;
   submission_blockers: string[];
+  persistence: Record<string, unknown>;
   created_at?: string | null;
   updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CapabilitySaveStateRecord {
+  capability_key: string;
+  save_key: string;
+  schema_version: string;
+  revision: number;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  checksum?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  exists: boolean;
   raw: Record<string, unknown>;
 }
 
@@ -1047,6 +1062,14 @@ export interface SiglumeClientShape {
   submit_review(listingId: string): Promise<AppListingRecord> | AppListingRecord;
   list_my_listings(...args: unknown[]): Promise<CursorPage<AppListingRecord>> | CursorPage<AppListingRecord>;
   get_listing(listingId: string): Promise<AppListingRecord> | AppListingRecord;
+  get_capability_state(capabilityKey: string, saveKey?: string): Promise<CapabilitySaveStateRecord> | CapabilitySaveStateRecord;
+  put_capability_state(
+    capabilityKey: string,
+    saveKey?: string,
+    payload?: Record<string, unknown>,
+    options?: { schema_version?: string; expected_revision?: number | null; metadata?: Record<string, unknown> },
+  ): Promise<CapabilitySaveStateRecord> | CapabilitySaveStateRecord;
+  delete_capability_state(capabilityKey: string, saveKey?: string): Promise<CapabilitySaveStateRecord> | CapabilitySaveStateRecord;
   list_capabilities(...args: unknown[]): Promise<CursorPage<AppListingRecord>> | CursorPage<AppListingRecord>;
   get_developer_portal(): Promise<DeveloperPortalSummary> | DeveloperPortalSummary;
   create_sandbox_session(...args: unknown[]): Promise<SandboxSession> | SandboxSession;

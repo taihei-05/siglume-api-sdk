@@ -8,6 +8,7 @@ import {
   AppCategory,
   ApprovalMode,
   PermissionClass,
+  PersistenceMode,
   PriceModel,
   RecordMode,
   Recorder,
@@ -17,6 +18,16 @@ import {
 } from "../src/index";
 
 const tempDirs: string[] = [];
+
+const SAVE_DATA_SCHEMA = {
+  type: "object",
+  properties: {
+    agent: { type: "object" },
+    avatar_config: { type: "object" },
+    replays: { type: "array" },
+  },
+  required: ["agent"],
+};
 
 function requestUrl(input: RequestInfo | URL): URL {
   if (input instanceof Request) {
@@ -278,6 +289,256 @@ describe("SiglumeClient", () => {
         { runtime_validation: buildRuntimeValidation() },
       ),
     ).rejects.toThrow("free_trial_duration_days must be between 1 and 90");
+  });
+
+  it("requires save_data_schema for game manifests with save persistence", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("persistence.save_data_schema is required");
+  });
+
+  it("rejects invalid persistence contracts before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        { ...buildManifest(), persistence: { mode: "remote" } },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("persistence.mode must be one of");
+
+    await expect(
+      client.auto_register(
+        { ...buildManifest(), persistence: "platform" },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("persistence must be an object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: "agent" },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema must be a JSON Schema object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: null },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema must be a JSON Schema object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: { type: "array", properties: {} } },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.type must be 'object'");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: { type: "object", properties: {} } },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.properties must be a non-empty object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: { type: "object", properties: { agent: { type: "object" } }, required: "agent" },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.required must be an array of strings");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: {
+              type: "object",
+              properties: { agent: { type: "object", description: "x".repeat(8200) } },
+              required: ["agent"],
+            },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema must be at most 8192 bytes");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: { type: "object", properties: { agent: { type: "object" } }, required: ["agent", 3] },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.required must be an array of strings");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: { type: "object", properties: { agent: { type: "object" } }, required: ["missing"] },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("required references undefined properties");
+  });
+
+  it("accepts save_data_schema for game manifests with save persistence", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.persistence).toMatchObject({ mode: "platform", save_data_schema: SAVE_DATA_SCHEMA });
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_game", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        store_vertical: "game",
+        persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: SAVE_DATA_SCHEMA },
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
+
+  it("allows game manifests without save schema when persistence is none", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.persistence).toMatchObject({ mode: "none" });
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_game_none", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        store_vertical: "game",
+        persistence: { mode: PersistenceMode.NONE },
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
+
+  it("allows non-game manifests to carry an optional save schema", async () => {
+    const schemaWithoutRequired = {
+      type: "object",
+      properties: { state: { type: "object" } },
+    };
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.persistence).toMatchObject({ mode: "platform", save_data_schema: schemaWithoutRequired });
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_api_state", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: schemaWithoutRequired },
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
   });
 
   it("forwards JPY as the listing currency for auto_register", async () => {
@@ -854,6 +1115,13 @@ describe("SiglumeClient", () => {
     });
 
     await expect(client.create_plan_web3_mandate({ target_tier: "" })).rejects.toThrow("target_tier is required.");
+  });
+
+  it("keeps default API error details empty when omitted", () => {
+    const error = new SiglumeAPIError("failed", { status_code: 500 });
+
+    expect(error.details).toEqual({});
+    expect(error.response_body).toBeUndefined();
   });
 
   it("parses sparse account preference and plan payloads", async () => {
@@ -2159,6 +2427,30 @@ describe("SiglumeClient", () => {
         },
       },
     ]);
+  });
+
+  it("rejects blank owner operation keys before transport", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("execute_owner_operation should fail before transport");
+      },
+    });
+
+    await expect(client.execute_owner_operation("agt_owner_demo", " ")).rejects.toThrow("operation_key is required.");
+  });
+
+  it("rejects object-only API methods when the response body is an array", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response(JSON.stringify([]), { status: 200 }),
+    });
+
+    await expect(client.get_account_preferences()).rejects.toThrow(
+      "Expected the Siglume API response body to be an object.",
+    );
   });
 
   it("falls back to the bundled owner operation catalog when the route is unavailable", async () => {

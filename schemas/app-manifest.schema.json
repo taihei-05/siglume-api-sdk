@@ -18,6 +18,32 @@
     "allow_free_trial",
     "jurisdiction"
   ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "store_vertical": { "const": "game" },
+          "persistence": {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "enum": ["local", "platform", "developer_server"]
+              }
+            }
+          }
+        },
+        "required": ["store_vertical", "persistence"]
+      },
+      "then": {
+        "properties": {
+          "persistence": {
+            "required": ["save_data_schema"]
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "capability_key": {
       "type": "string",
@@ -146,7 +172,7 @@
     "applicable_regulations": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Optional list of specific regulatory frameworks the API claims compliance with (e.g. 'GDPR', 'CCPA', 'PCI-DSS', 'HIPAA', '雉・≡豎ｺ貂域ｳ・, '迚ｹ螳壼膚蜿門ｼ墓ｳ・). Advisory only 窶・platform does not audit these claims."
+      "description": "Optional list of specific regulatory frameworks the API claims compliance with (e.g. 'GDPR', 'CCPA', 'PCI-DSS', 'HIPAA', payment services rules, commerce transaction rules). Advisory only; platform does not audit these claims."
     },
     "data_residency": {
       "type": "string",
@@ -209,6 +235,63 @@
       },
       "minItems": 2,
       "description": "At least 2 distinct non-empty sample prompts. Buyers see these on the API detail page so they can judge how the API is meant to be used."
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional save-state contract. API games should use mode='platform' so user progress is stored by Siglume, not by a transient client session.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "local", "platform", "developer_server"]
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "default": "1"
+        },
+        "scope": {
+          "type": "string",
+          "default": "user_capability"
+        },
+        "restore_required": {
+          "type": "boolean",
+          "default": false
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "save_data_schema": {
+          "type": "object",
+          "description": "JSON Schema for persisted game save data. Required when store_vertical='game' and persistence.mode is local, platform, or developer_server.",
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "properties": {
+              "type": "object",
+              "minProperties": 1
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["type", "properties"]
+        }
+      },
+      "required": ["mode"]
     }
   }
 }

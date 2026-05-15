@@ -83,6 +83,29 @@ export const ListingCurrency = {
 } as const;
 export type ListingCurrency = (typeof ListingCurrency)[keyof typeof ListingCurrency];
 
+export const PersistenceMode = {
+  NONE: "none",
+  LOCAL: "local",
+  PLATFORM: "platform",
+  DEVELOPER_SERVER: "developer_server",
+} as const;
+export type PersistenceMode = (typeof PersistenceMode)[keyof typeof PersistenceMode];
+
+export interface CapabilityPersistencePolicy {
+  mode: PersistenceMode;
+  schema_version?: string;
+  scope?: string;
+  restore_required?: boolean;
+  max_bytes?: number;
+  endpoint?: string | null;
+  description?: string;
+  /**
+   * JSON Schema for persisted game save data.
+   * Required when store_vertical is "game" and mode is not "none".
+   */
+  save_data_schema?: Record<string, unknown>;
+}
+
 export interface ConnectedAccountRef {
   provider_key: string;
   session_token: string;
@@ -119,6 +142,7 @@ export interface AppManifest {
   compatibility_tags?: string[];
   example_prompts?: string[];
   latency_tier?: string;
+  persistence?: CapabilityPersistencePolicy;
 }
 
 export interface ExecutionContext {
@@ -302,8 +326,23 @@ export interface AppListingRecord {
   review_status?: string | null;
   review_note?: string | null;
   submission_blockers: string[];
+  persistence: Record<string, unknown>;
   created_at?: string | null;
   updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CapabilitySaveStateRecord {
+  capability_key: string;
+  save_key: string;
+  schema_version: string;
+  revision: number;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  checksum?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  exists: boolean;
   raw: Record<string, unknown>;
 }
 

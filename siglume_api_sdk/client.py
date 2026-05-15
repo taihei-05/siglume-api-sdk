@@ -130,8 +130,24 @@ class AppListingRecord:
     review_status: str | None = None
     review_note: str | None = None
     submission_blockers: list[str] = field(default_factory=list)
+    persistence: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class CapabilitySaveStateRecord:
+    capability_key: str
+    save_key: str
+    schema_version: str = "1"
+    revision: int = 0
+    payload: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    checksum: str | None = None
+    updated_at: str | None = None
+    created_at: str | None = None
+    exists: bool = False
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -1422,6 +1438,7 @@ def _build_auto_register_request(
         "required_connected_accounts",
         "permission_scopes",
         "compatibility_tags",
+        "persistence",
     ):
         value = manifest_payload.get(field_name)
         if value is not None:
@@ -1458,6 +1475,7 @@ def _build_auto_register_request(
                 "AppManifest.free_trial_duration_days must be between 1 and 90 when "
                 f"allow_free_trial=True, got: {duration}."
             )
+    _validate_manifest_persistence_contract(payload)
 
     # Strip ``version`` from the embedded manifest sub-dict too so the
     # platform's reject-on-manifest-version check cannot trip on the SDK's
@@ -1482,6 +1500,54 @@ def _build_auto_register_request(
     return payload
 
 
+def _validate_manifest_persistence_contract(payload: Mapping[str, Any]) -> None:
+    vertical = str(payload.get("store_vertical") or "").strip().lower()
+    persistence = payload.get("persistence")
+    if persistence is None:
+        return
+    if not isinstance(persistence, Mapping):
+        raise SiglumeClientError("AppManifest.persistence must be an object.")
+    raw_mode = persistence.get("mode") or ("platform" if vertical == "game" else "none")
+    mode = str(getattr(raw_mode, "value", raw_mode)).strip().lower()
+    if mode not in {"none", "local", "platform", "developer_server"}:
+        raise SiglumeClientError(
+            "AppManifest.persistence.mode must be one of: none, local, platform, developer_server."
+        )
+    schema = persistence.get("save_data_schema")
+    if vertical == "game" and mode != "none" and schema is None:
+        raise SiglumeClientError(
+            "AppManifest.persistence.save_data_schema is required when "
+            "store_vertical='game' and persistence.mode is not 'none'."
+        )
+    if schema is not None:
+        _validate_save_data_schema(schema, field_name="AppManifest.persistence.save_data_schema")
+
+
+def _validate_save_data_schema(schema: Any, *, field_name: str) -> None:
+    if not isinstance(schema, Mapping):
+        raise SiglumeClientError(f"{field_name} must be a JSON Schema object.")
+    try:
+        schema_size = len(json.dumps(dict(schema), ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    except (TypeError, ValueError):
+        raise SiglumeClientError(f"{field_name} must be JSON-serializable.") from None
+    if schema_size > 8192:
+        raise SiglumeClientError(f"{field_name} must be at most 8192 bytes.")
+    if schema.get("type") != "object":
+        raise SiglumeClientError(f"{field_name}.type must be 'object'.")
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping) or not properties:
+        raise SiglumeClientError(f"{field_name}.properties must be a non-empty object.")
+    required = schema.get("required")
+    if required is not None:
+        if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
+            raise SiglumeClientError(f"{field_name}.required must be an array of strings when provided.")
+        missing = [item for item in required if item not in properties]
+        if missing:
+            raise SiglumeClientError(
+                f"{field_name}.required references undefined properties: {', '.join(missing)}."
+            )
+
+
 def _parse_retry_after(response: httpx.Response) -> float | None:
     retry_after = response.headers.get("Retry-After")
     if retry_after is None:
@@ -1494,6 +1560,10 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
 
 def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
     listing_id = str(data.get("listing_id") or data.get("id") or "")
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), Mapping) else {}
+    persistence = data.get("persistence")
+    if not isinstance(persistence, Mapping):
+        persistence = metadata.get("persistence") if isinstance(metadata, Mapping) else {}
     return AppListingRecord(
         listing_id=listing_id,
         capability_key=str(data.get("capability_key") or ""),
@@ -1521,8 +1591,25 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         submission_blockers=[
             str(item) for item in data.get("submission_blockers", []) if isinstance(item, str)
         ],
+        persistence=dict(persistence) if isinstance(persistence, Mapping) else {},
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_capability_save_state(data: Mapping[str, Any]) -> CapabilitySaveStateRecord:
+    return CapabilitySaveStateRecord(
+        capability_key=str(data.get("capability_key") or ""),
+        save_key=str(data.get("save_key") or ""),
+        schema_version=str(data.get("schema_version") or "1"),
+        revision=int(data.get("revision") or 0),
+        payload=_to_dict(data.get("payload")),
+        metadata=_to_dict(data.get("metadata")),
+        checksum=_string_or_none(data.get("checksum")),
+        updated_at=_string_or_none(data.get("updated_at")),
+        created_at=_string_or_none(data.get("created_at")),
+        exists=bool(data.get("exists") or False),
         raw=dict(data),
     )
 
@@ -3051,6 +3138,44 @@ class SiglumeClient:
     def get_listing(self, listing_id: str) -> AppListingRecord:
         data, _meta = self._request("GET", f"/market/capabilities/{listing_id}")
         return _parse_listing(data)
+
+    def get_capability_state(self, capability_key: str, save_key: str = "default") -> CapabilitySaveStateRecord:
+        data, _meta = self._request(
+            "GET",
+            f"/market/capability-state/{capability_key}/{save_key}",
+        )
+        return _parse_capability_save_state(data)
+
+    def put_capability_state(
+        self,
+        capability_key: str,
+        save_key: str = "default",
+        payload: Mapping[str, Any] | None = None,
+        *,
+        schema_version: str = "1",
+        expected_revision: int | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> CapabilitySaveStateRecord:
+        body: dict[str, Any] = {
+            "payload": _coerce_mapping(payload or {}, "payload"),
+            "schema_version": str(schema_version or "1"),
+            "metadata": _coerce_mapping(metadata or {}, "metadata"),
+        }
+        if expected_revision is not None:
+            body["expected_revision"] = int(expected_revision)
+        data, _meta = self._request(
+            "PUT",
+            f"/market/capability-state/{capability_key}/{save_key}",
+            json_body=body,
+        )
+        return _parse_capability_save_state(data)
+
+    def delete_capability_state(self, capability_key: str, save_key: str = "default") -> CapabilitySaveStateRecord:
+        data, _meta = self._request(
+            "DELETE",
+            f"/market/capability-state/{capability_key}/{save_key}",
+        )
+        return _parse_capability_save_state(data)
 
     # ----- Capability bundles (v0.7 track 2) ------------------------------
 

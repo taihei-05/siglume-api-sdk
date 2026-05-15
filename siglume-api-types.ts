@@ -11,6 +11,20 @@ export type Environment = "sandbox" | "live";
 export type PriceModel = "free" | "subscription" | "one_time" | "bundle" | "usage_based" | "per_action";
 export type AppCategory = "commerce" | "booking" | "crm" | "finance" | "document" | "communication" | "monitoring" | "other";
 export type StoreVertical = "api" | "game";
+export type ListingCurrency = "USD" | "JPY";
+export type PersistenceMode = "none" | "local" | "platform" | "developer_server";
+
+export interface CapabilityPersistencePolicy {
+  mode: PersistenceMode;
+  schema_version?: string;
+  scope?: string;
+  restore_required?: boolean;
+  max_bytes?: number;
+  endpoint?: string | null;
+  description?: string;
+  /** Required for Game API Store listings when mode is not "none". */
+  save_data_schema?: Record<string, unknown>;
+}
 
 export interface ConnectedAccountRef {
   provider_key: string;
@@ -33,11 +47,10 @@ export interface AppManifest {
   price_model: PriceModel;
   price_value_minor: number;
   /**
-   * The API Store is USD-unified. All listings price in US dollars
-   * regardless of the developer's jurisdiction. Non-USD submissions are
-   * rejected by the platform.
+   * Required listing currency. USD listings settle in USDC; JPY listings
+   * settle in JPYC. price_value_minor uses cents for USD and yen for JPY.
    */
-  currency: "USD";
+  currency: ListingCurrency;
   /**
    * ISO 3166-1 alpha-2 country code (optionally with sub-region, e.g. "US-CA")
    * declaring the governing law this API is designed to comply with.
@@ -59,6 +72,7 @@ export interface AppManifest {
   compatibility_tags: string[];
   example_prompts: string[];
   latency_tier?: string;
+  persistence?: CapabilityPersistencePolicy;
 }
 
 export interface ExecutionContext {
