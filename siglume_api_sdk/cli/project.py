@@ -1388,21 +1388,14 @@ def _ensure_paid_payout_ready(
     project: LoadedProject,
     client: SiglumeClient,
     company_publishers: list[Any] | None = None,
+    company_publisher: Any | None = None,
 ) -> dict[str, Any] | None:
     if _manifest_price_model(project.manifest) == "free":
         return None
     if _manifest_publisher_type(project.manifest) == "company":
-        company_id = _manifest_company_id(project.manifest)
-        if not company_id:
-            raise click.ClickException("Paid company registration requires --company <company_id> or manifest.company_id.")
-        companies = company_publishers if company_publishers is not None else client.list_company_publishers()
-        company = next((item for item in companies if getattr(item, "company_id", "") == company_id), None)
-        if company is None:
-            raise click.ClickException(f"Company {company_id} is not available to this API key.")
-        if getattr(company, "can_publish", True) is False:
-            reasons = ", ".join(getattr(company, "disabled_reasons", []) or ["company publisher is disabled"])
-            raise click.ClickException(f"Company {company_id} cannot publish: {reasons}.")
+        company = company_publisher or _ensure_company_publisher_available(project, client, company_publishers)
         if getattr(company, "settlement_wallet_ready", False) is not True:
+            company_id = _manifest_company_id(project.manifest)
             name = getattr(company, "name", company_id)
             raise click.ClickException(
                 f"Paid company registration requires a verified company settlement wallet for {name}. "
@@ -1419,6 +1412,26 @@ def _ensure_paid_payout_ready(
             "`payout_readiness.verified_destination` is true."
         )
     return to_jsonable(portal)
+
+
+def _ensure_company_publisher_available(
+    project: LoadedProject,
+    client: SiglumeClient,
+    company_publishers: list[Any] | None = None,
+) -> Any | None:
+    if _manifest_publisher_type(project.manifest) != "company":
+        return None
+    company_id = _manifest_company_id(project.manifest)
+    if not company_id:
+        raise click.ClickException("Company registration requires --company <company_id> or manifest.company_id.")
+    companies = company_publishers if company_publishers is not None else client.list_company_publishers()
+    company = next((item for item in companies if getattr(item, "company_id", "") == company_id), None)
+    if company is None:
+        raise click.ClickException(f"Company {company_id} is not available to this API key.")
+    if getattr(company, "can_publish", True) is False:
+        reasons = ", ".join(getattr(company, "disabled_reasons", []) or ["company publisher is disabled"])
+        raise click.ClickException(f"Company {company_id} cannot publish: {reasons}.")
+    return company
 
 
 def _ensure_manifest_publisher_identity(project: LoadedProject) -> None:
@@ -1653,7 +1666,8 @@ def run_registration(
                 raise click.ClickException(f"Company {getattr(match, 'company_id', requested_company_slug)} cannot publish: {reasons}.")
             _set_manifest_company(project, str(getattr(match, "company_id", "")))
         registration_preflight = _registration_preflight(project, client)
-        portal_preflight = _ensure_paid_payout_ready(project, client, company_publishers)
+        company_publisher = _ensure_company_publisher_available(project, client, company_publishers)
+        portal_preflight = _ensure_paid_payout_ready(project, client, company_publishers, company_publisher)
         receipt = client.auto_register(
             project.manifest,
             project.tool_manual,

@@ -562,12 +562,11 @@ describe("SiglumeClient", () => {
     });
 
     await client.auto_register(
-      {
-        ...buildManifest(),
-        publisher_type: "company",
-        company_id: "",
-        publisher_company_id: "co_123",
-      },
+        {
+          ...buildManifest(),
+          publisher_type: "company",
+          publisher_company_id: "co_123",
+        },
       buildToolManual(),
       { runtime_validation: buildRuntimeValidation() },
     );

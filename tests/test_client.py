@@ -680,7 +680,6 @@ def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
 def test_auto_register_forwards_company_publisher_identifiers() -> None:
     manifest = asdict(build_manifest())
     manifest["publisher_type"] = "company"
-    manifest["company_id"] = ""
     manifest["publisher_company_id"] = "co_123"
 
     def handler(request: httpx.Request) -> httpx.Response:
