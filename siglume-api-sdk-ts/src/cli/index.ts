@@ -268,11 +268,13 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
     .option("--confirm", "explicitly confirm the registration; this is the default unless --draft-only is set", false)
     .option("--draft-only", "create or refresh the draft without confirming publication", false)
     .option("--submit-review", "legacy alias: publish immediately if your environment still routes through submit-review", false)
+    .option("--company <companyId>", "publish under a Siglume company name; revenue is split equally among active members", "")
+    .option("--company-slug <slug>", "publish under a Siglume company by matching the slugified company name", "")
     .option("--json", "emit machine-readable JSON", false)
     .argument("[path]", ".", "project path")
     .action(async (
       path: string,
-      options: { confirm?: boolean; draftOnly?: boolean; submitReview?: boolean; json?: boolean; ["draft-only"]?: boolean; ["submit-review"]?: boolean },
+      options: { confirm?: boolean; draftOnly?: boolean; submitReview?: boolean; company?: string; companySlug?: string; json?: boolean; ["draft-only"]?: boolean; ["submit-review"]?: boolean; ["company-slug"]?: string },
     ) => {
       const draftOnly = Boolean(options.draftOnly);
       if (draftOnly && options.confirm) {
@@ -282,7 +284,13 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         throw new SiglumeProjectError("--draft-only cannot be combined with --submit-review.");
       }
       const shouldConfirm = Boolean(options.confirm) || (!draftOnly && !options.submitReview);
-      const report = await runRegistration(path, { confirm: shouldConfirm, draft_only: draftOnly, submit_review: options.submitReview }, deps);
+      const report = await runRegistration(path, {
+        confirm: shouldConfirm,
+        draft_only: draftOnly,
+        submit_review: options.submitReview,
+        company_id: options.company,
+        company_slug: options.companySlug,
+      }, deps);
       if (options.json) {
         emit(stdout, renderJson(report));
       } else {

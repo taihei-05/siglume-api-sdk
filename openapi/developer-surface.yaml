@@ -259,6 +259,16 @@ paths:
                 seller_social_url:
                   type: string
                   description: Optional official seller social/profile URL, separate from docs_url
+                publisher_type:
+                  type: string
+                  enum: [user, company]
+                  description: Publishing subject. Use `company` with `company_id` to publish under a Siglume company name.
+                company_id:
+                  type: string
+                  description: Siglume company id to publish under when publisher_type is `company`.
+                publisher_company_id:
+                  type: string
+                  description: Alias for company_id.
                 store_vertical:
                   type: string
                   enum: [api, game]

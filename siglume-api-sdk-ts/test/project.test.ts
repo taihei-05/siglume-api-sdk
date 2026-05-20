@@ -617,6 +617,53 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(true);
   });
 
+  it("treats publisher_company_id as a company publisher during paid preflight", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        price_model: PriceModel.SUBSCRIPTION,
+        price_value_minor: 1200,
+        company_id: "",
+        publisher_company_id: "co_123",
+      },
+    });
+    let listCompanyPublishersCalled = false;
+    let personalPortalCalled = false;
+
+    const report = await runRegistration(
+      projectDir,
+      {},
+      {
+        env: { SIGLUME_API_KEY: "sig_test_key" },
+        client_factory: () =>
+          ({
+            async preview_quality_score() {
+              return publishableQualityReport();
+            },
+            async list_company_publishers() {
+              listCompanyPublishersCalled = true;
+              return [{ company_id: "co_123", name: "Acme Labs", settlement_wallet_ready: true }];
+            },
+            async get_developer_portal() {
+              personalPortalCalled = true;
+              throw new Error("personal payout preflight should not run");
+            },
+            async auto_register(manifest: Record<string, unknown>) {
+              expect(manifest.publisher_company_id).toBe("co_123");
+              return { listing_id: "lst_company_alias", status: "draft", auto_manifest: {}, confidence: {} };
+            },
+            async confirm_registration(listing_id: string) {
+              return confirmedRegistration(listing_id);
+            },
+          }) as unknown as SiglumeClientShape,
+      },
+    );
+
+    expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_company_alias");
+    expect(listCompanyPublishersCalled).toBe(true);
+    expect(personalPortalCalled).toBe(false);
+  });
+
   it("covers registration, support, and usage helper branches", async () => {
     const projectDir = await createObjectProject();
     const usageCapture = { api_key: undefined as string | undefined, usage_calls: 0 };
