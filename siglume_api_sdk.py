@@ -276,7 +276,7 @@ class AppManifest:
         self._validate_persistence_contract()
 
         company_id = (self.company_id or self.publisher_company_id or "").strip()
-        publisher_type = (self.publisher_type or ("company" if company_id else "user")).strip().lower()
+        publisher_type = (self.publisher_type or "user").strip().lower()
         if publisher_type not in {"user", "company"}:
             raise ValueError("AppManifest.publisher_type must be 'user' or 'company'.")
         if publisher_type == "company" and not company_id:

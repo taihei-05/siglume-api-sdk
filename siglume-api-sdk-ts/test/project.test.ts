@@ -617,12 +617,13 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(true);
   });
 
-  it("treats publisher_company_id as a company publisher during paid preflight", async () => {
+  it("treats publisher_company_id as a company publisher when publisher_type is company", async () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
         price_model: PriceModel.SUBSCRIPTION,
         price_value_minor: 1200,
+        publisher_type: "company",
         company_id: "",
         publisher_company_id: "co_123",
       },
@@ -670,6 +671,7 @@ describe("cli project helpers", () => {
         ...manifestBase(),
         price_model: PriceModel.SUBSCRIPTION,
         price_value_minor: 1200,
+        publisher_type: "company",
         company_id: "co_blocked",
       },
     });

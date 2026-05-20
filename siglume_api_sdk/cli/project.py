@@ -1373,9 +1373,8 @@ def _manifest_company_id(manifest: AppManifest) -> str:
 
 
 def _manifest_publisher_type(manifest: AppManifest) -> str:
-    company_id = _manifest_company_id(manifest)
     payload = to_jsonable(manifest)
-    return str(payload.get("publisher_type") or ("company" if company_id else "user")).strip().lower()
+    return str(payload.get("publisher_type") or "user").strip().lower()
 
 
 def _set_manifest_company(project: LoadedProject, company_id: str) -> None:
@@ -1429,7 +1428,11 @@ def _ensure_manifest_publisher_identity(project: LoadedProject) -> None:
     seller_homepage_url = str(manifest_payload.get("seller_homepage_url") or "").strip()
     seller_social_url = str(manifest_payload.get("seller_social_url") or "").strip()
     jurisdiction = str(manifest_payload.get("jurisdiction") or "").strip()
+    company_id = str(manifest_payload.get("company_id") or manifest_payload.get("publisher_company_id") or "").strip()
+    publisher_type = str(manifest_payload.get("publisher_type") or "user").strip().lower()
     issues = []
+    if company_id and publisher_type != "company":
+        issues.append("manifest.company_id requires manifest.publisher_type to be \"company\"")
     if not docs_url:
         issues.append("manifest.docs_url is required")
     elif _looks_like_placeholder(docs_url):

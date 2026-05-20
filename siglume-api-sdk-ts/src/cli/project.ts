@@ -521,7 +521,13 @@ function ensureManifestPublisherIdentity(project: LoadedProject): void {
   const sellerHomepageUrl = String(manifestPayload.seller_homepage_url ?? "").trim();
   const sellerSocialUrl = String(manifestPayload.seller_social_url ?? "").trim();
   const jurisdiction = String(manifestPayload.jurisdiction ?? "").trim();
+  const companyId = String(manifestPayload.company_id ?? "").trim()
+    || String(manifestPayload.publisher_company_id ?? "").trim();
+  const publisherType = String(manifestPayload.publisher_type ?? "user").trim().toLowerCase();
   const issues: string[] = [];
+  if (companyId && publisherType !== "company") {
+    issues.push("manifest.company_id requires manifest.publisher_type to be \"company\"");
+  }
   if (!docsUrl) {
     issues.push("manifest.docs_url is required");
   } else if (looksLikePlaceholder(docsUrl)) {
@@ -767,7 +773,7 @@ export async function runRegistration(
   if (String(project.manifest.price_model ?? "free").toLowerCase() !== "free") {
     const companyId = String(project.manifest.company_id ?? "").trim()
       || String(project.manifest.publisher_company_id ?? "").trim();
-    const publisherType = String(project.manifest.publisher_type ?? (companyId ? "company" : "user")).toLowerCase();
+    const publisherType = String(project.manifest.publisher_type ?? "user").toLowerCase();
     if (publisherType === "company") {
       if (!companyId) {
         throw new SiglumeProjectError("Paid company registration requires --company <company_id> or manifest.company_id.");

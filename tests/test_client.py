@@ -679,7 +679,7 @@ def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
 
 def test_auto_register_forwards_company_publisher_identifiers() -> None:
     manifest = asdict(build_manifest())
-    manifest.pop("publisher_type", None)
+    manifest["publisher_type"] = "company"
     manifest["company_id"] = ""
     manifest["publisher_company_id"] = "co_123"
 
@@ -709,6 +709,20 @@ def test_auto_register_forwards_company_publisher_identifiers() -> None:
         )
 
     assert receipt.listing_id == "lst_company"
+
+
+def test_auto_register_rejects_company_identifiers_without_company_publisher_type() -> None:
+    manifest = asdict(build_manifest())
+    manifest.pop("publisher_type", None)
+    manifest["company_id"] = "co_123"
+
+    with build_client(lambda request: pytest.fail("auto_register should fail before transport")) as client:
+        with pytest.raises(SiglumeClientError, match="cannot be combined with publisher_type='user'"):
+            client.auto_register(
+                manifest,
+                build_tool_manual(),
+                runtime_validation=build_runtime_validation(),
+            )
 
 
 def test_auto_register_rejects_user_publisher_with_company_identifiers() -> None:

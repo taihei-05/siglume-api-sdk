@@ -2329,7 +2329,7 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     const explicitPublisherType = payload.publisher_type !== undefined && payload.publisher_type !== null;
     const companyId = String(payload.company_id ?? "").trim() || String(payload.publisher_company_id ?? "").trim();
-    const publisherType = String(payload.publisher_type ?? (companyId ? "company" : "user")).trim().toLowerCase();
+    const publisherType = String(payload.publisher_type ?? "user").trim().toLowerCase();
     if (publisherType !== "user" && publisherType !== "company") {
       throw new SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.");
     }

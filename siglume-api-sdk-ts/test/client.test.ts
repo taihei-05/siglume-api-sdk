@@ -541,7 +541,7 @@ describe("SiglumeClient", () => {
     );
   });
 
-  it("forwards company publisher identifiers when company_id is present", async () => {
+  it("forwards company publisher identifiers when publisher_type is company", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",
       base_url: "https://api.example.test/v1",
@@ -564,12 +564,34 @@ describe("SiglumeClient", () => {
     await client.auto_register(
       {
         ...buildManifest(),
+        publisher_type: "company",
         company_id: "",
         publisher_company_id: "co_123",
       },
       buildToolManual(),
       { runtime_validation: buildRuntimeValidation() },
     );
+  });
+
+  it("rejects company identifiers without explicit company publisher_type", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          company_id: "co_123",
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("AppManifest.company_id cannot be combined with publisher_type='user'.");
   });
 
   it("parses disabled company publisher candidate metadata", async () => {

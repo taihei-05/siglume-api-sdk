@@ -72,6 +72,19 @@
           ]
         }
       }
+    },
+    {
+      "if": {
+        "not": { "required": ["publisher_type"] }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["company_id"] },
+            { "required": ["publisher_company_id"] }
+          ]
+        }
+      }
     }
   ],
   "properties": {

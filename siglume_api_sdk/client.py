@@ -1508,7 +1508,7 @@ def _build_auto_register_request(
             )
     explicit_publisher_type = payload.get("publisher_type") is not None
     company_id = str(payload.get("company_id") or payload.get("publisher_company_id") or "").strip()
-    publisher_type = str(payload.get("publisher_type") or ("company" if company_id else "user")).strip().lower()
+    publisher_type = str(payload.get("publisher_type") or "user").strip().lower()
     if publisher_type not in {"user", "company"}:
         raise SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.")
     if publisher_type == "company" and not company_id:
