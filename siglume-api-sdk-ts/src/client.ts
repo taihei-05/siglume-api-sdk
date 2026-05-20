@@ -21,6 +21,7 @@ import type {
   AgentTopicSubscription,
   AppListingRecord,
   AppManifest,
+  CompanyPublisherRecord,
   ApprovalPolicy,
   BundleListingRecord,
   BundleMember,
@@ -220,6 +221,12 @@ export interface SiglumeClientShape {
   submit_review(listing_id: string): Promise<AppListingRecord>;
   list_my_listings(options?: { status?: string; limit?: number; cursor?: string }): Promise<CursorPage<AppListingRecord>>;
   get_listing(listing_id: string): Promise<AppListingRecord>;
+  list_company_publishers(): Promise<CompanyPublisherRecord[]>;
+  request_company_publish_approval(listing_id: string, note?: string): Promise<AppListingRecord>;
+  decide_company_publish_approval(
+    listing_id: string,
+    options: { decision: "approve" | "reject"; reason?: string },
+  ): Promise<AppListingRecord>;
   get_capability_state(capability_key: string, save_key?: string): Promise<CapabilitySaveStateRecord>;
   put_capability_state(
     capability_key: string,
@@ -878,6 +885,12 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     seller_display_name: stringOrNull(data.seller_display_name),
     seller_homepage_url: stringOrNull(data.seller_homepage_url),
     seller_social_url: stringOrNull(data.seller_social_url),
+    publisher_type: stringOrNull(data.publisher_type),
+    publisher_company_id: stringOrNull(data.publisher_company_id),
+    company_id: stringOrNull(data.company_id),
+    company_name: stringOrNull(data.company_name),
+    company_publish_status: stringOrNull(data.company_publish_status),
+    company_terms_version: stringOrNull(data.company_terms_version),
     review_status: stringOrNull(data.review_status),
     review_note: stringOrNull(data.review_note),
     submission_blockers: Array.isArray(data.submission_blockers)
@@ -886,6 +899,28 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     persistence: { ...persistence },
     created_at: stringOrNull(data.created_at),
     updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
+function parseCompanyPublisher(data: Record<string, unknown>): CompanyPublisherRecord {
+  const wallets = Array.isArray(data.settlement_wallets)
+    ? data.settlement_wallets.filter((item): item is Record<string, unknown> => isRecord(item))
+    : [];
+  return {
+    company_id: String(data.company_id ?? data.id ?? ""),
+    name: String(data.name ?? ""),
+    status: String(data.status ?? ""),
+    description: stringOrNull(data.description),
+    is_founder: Boolean(data.is_founder ?? false),
+    membership_role: stringOrNull(data.membership_role),
+    can_publish: Boolean(data.can_publish ?? true),
+    can_approve: Boolean(data.can_approve ?? false),
+    company_terms_version: stringOrNull(data.company_terms_version),
+    active_listing_count: Number(data.active_listing_count ?? 0),
+    pending_approval_count: Number(data.pending_approval_count ?? 0),
+    settlement_wallet_ready: Boolean(data.settlement_wallet_ready ?? false),
+    settlement_wallets: wallets.map((item) => ({ ...item })),
     raw: { ...data },
   };
 }
@@ -2230,6 +2265,9 @@ export class SiglumeClient implements SiglumeClientShape {
       "support_contact",
       "seller_homepage_url",
       "seller_social_url",
+      "publisher_type",
+      "company_id",
+      "publisher_company_id",
       "store_vertical",
       "jurisdiction",
       "price_model",
@@ -2282,6 +2320,25 @@ export class SiglumeClient implements SiglumeClientShape {
           `AppManifest.free_trial_duration_days must be between 1 and 90 when allow_free_trial=true, got: ${duration}.`,
         );
       }
+    }
+    const explicitPublisherType = payload.publisher_type !== undefined && payload.publisher_type !== null;
+    const companyId = String(payload.company_id ?? "").trim() || String(payload.publisher_company_id ?? "").trim();
+    const publisherType = String(payload.publisher_type ?? (companyId ? "company" : "user")).trim().toLowerCase();
+    if (publisherType !== "user" && publisherType !== "company") {
+      throw new SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.");
+    }
+    if (publisherType === "company" && !companyId) {
+      throw new SiglumeClientError("AppManifest.company_id is required when publisher_type='company'.");
+    }
+    if (publisherType === "user" && companyId) {
+      throw new SiglumeClientError("AppManifest.company_id cannot be combined with publisher_type='user'.");
+    }
+    if (explicitPublisherType || companyId) {
+      payload.publisher_type = publisherType;
+    }
+    if (companyId) {
+      payload.company_id = companyId;
+      payload.publisher_company_id = companyId;
     }
     validateManifestPersistenceContract(payload);
     // Strip `version` from the embedded manifest sub-dict too so the
@@ -2422,6 +2479,33 @@ export class SiglumeClient implements SiglumeClientShape {
 
   async get_listing(listing_id: string): Promise<AppListingRecord> {
     const [data] = await this.request("GET", `/market/capabilities/${listing_id}`);
+    return parseListing(data);
+  }
+
+  async list_company_publishers(): Promise<CompanyPublisherRecord[]> {
+    const [data] = await this.request("GET", "/market/company-publishers");
+    return Array.isArray(data.items)
+      ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseCompanyPublisher)
+      : [];
+  }
+
+  async request_company_publish_approval(listing_id: string, note?: string): Promise<AppListingRecord> {
+    const [data] = await this.request("POST", `/market/capabilities/${listing_id}/company-publish-approval`, {
+      json_body: note ? { note } : {},
+    });
+    return parseListing(data);
+  }
+
+  async decide_company_publish_approval(
+    listing_id: string,
+    options: { decision: "approve" | "reject"; reason?: string },
+  ): Promise<AppListingRecord> {
+    const [data] = await this.request("POST", `/market/capabilities/${listing_id}/company-publish-approval/decision`, {
+      json_body: {
+        decision: options.decision,
+        ...(options.reason ? { reason: options.reason } : {}),
+      },
+    });
     return parseListing(data);
   }
 

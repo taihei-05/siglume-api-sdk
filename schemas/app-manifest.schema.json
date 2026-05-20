@@ -205,6 +205,19 @@
       "format": "uri",
       "description": "Optional official seller social/profile URL. This is separate from docs_url."
     },
+    "publisher_type": {
+      "type": "string",
+      "enum": ["user", "company"],
+      "description": "Publishing subject. Omit or use 'user' for individual publishing; use 'company' with company_id to publish under a Siglume company name."
+    },
+    "company_id": {
+      "type": "string",
+      "description": "Siglume company id to publish under when publisher_type is 'company'."
+    },
+    "publisher_company_id": {
+      "type": "string",
+      "description": "Alias for company_id."
+    },
     "store_vertical": {
       "type": "string",
       "enum": [

@@ -90,6 +90,7 @@ from .client import (  # noqa: E402, F401
     BudgetPolicy,
     CapabilityBindingRecord,
     CapabilitySaveStateRecord,
+    CompanyPublisherRecord,
     ConnectedAccountLifecycleResult,
     ConnectedAccountOAuthStart,
     ConnectedAccountRecord,

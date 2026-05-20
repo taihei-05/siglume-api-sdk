@@ -541,6 +541,59 @@ describe("SiglumeClient", () => {
     );
   });
 
+  it("forwards company publisher identifiers when company_id is present", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.publisher_type).toBe("company");
+          expect(body.company_id).toBe("co_123");
+          expect(body.publisher_company_id).toBe("co_123");
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_company", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        company_id: "",
+        publisher_company_id: "co_123",
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
+
+  it("rejects user publisher manifests with company identifiers", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          publisher_type: "user",
+          company_id: "co_123",
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("AppManifest.company_id cannot be combined with publisher_type='user'.");
+  });
+
   it("forwards JPY as the listing currency for auto_register", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",

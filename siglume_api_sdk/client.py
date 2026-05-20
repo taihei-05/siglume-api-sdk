@@ -127,12 +127,36 @@ class AppListingRecord:
     seller_display_name: str | None = None
     seller_homepage_url: str | None = None
     seller_social_url: str | None = None
+    publisher_type: str | None = None
+    publisher_company_id: str | None = None
+    company_id: str | None = None
+    company_name: str | None = None
+    company_publish_status: str | None = None
+    company_terms_version: str | None = None
     review_status: str | None = None
     review_note: str | None = None
     submission_blockers: list[str] = field(default_factory=list)
     persistence: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class CompanyPublisherRecord:
+    company_id: str
+    name: str
+    status: str
+    description: str | None = None
+    is_founder: bool = False
+    membership_role: str | None = None
+    can_publish: bool = True
+    can_approve: bool = False
+    company_terms_version: str | None = None
+    active_listing_count: int = 0
+    pending_approval_count: int = 0
+    settlement_wallet_ready: bool = False
+    settlement_wallets: list[dict[str, Any]] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -1425,6 +1449,9 @@ def _build_auto_register_request(
         "support_contact",
         "seller_homepage_url",
         "seller_social_url",
+        "publisher_type",
+        "company_id",
+        "publisher_company_id",
         "store_vertical",
         "jurisdiction",
         "price_model",
@@ -1475,6 +1502,20 @@ def _build_auto_register_request(
                 "AppManifest.free_trial_duration_days must be between 1 and 90 when "
                 f"allow_free_trial=True, got: {duration}."
             )
+    explicit_publisher_type = payload.get("publisher_type") is not None
+    company_id = str(payload.get("company_id") or payload.get("publisher_company_id") or "").strip()
+    publisher_type = str(payload.get("publisher_type") or ("company" if company_id else "user")).strip().lower()
+    if publisher_type not in {"user", "company"}:
+        raise SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.")
+    if publisher_type == "company" and not company_id:
+        raise SiglumeClientError("AppManifest.company_id is required when publisher_type='company'.")
+    if publisher_type == "user" and company_id:
+        raise SiglumeClientError("AppManifest.company_id cannot be combined with publisher_type='user'.")
+    if explicit_publisher_type or company_id:
+        payload["publisher_type"] = publisher_type
+    if company_id:
+        payload["company_id"] = company_id
+        payload["publisher_company_id"] = company_id
     _validate_manifest_persistence_contract(payload)
 
     # Strip ``version`` from the embedded manifest sub-dict too so the
@@ -1586,6 +1627,12 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         seller_display_name=_string_or_none(data.get("seller_display_name")),
         seller_homepage_url=_string_or_none(data.get("seller_homepage_url")),
         seller_social_url=_string_or_none(data.get("seller_social_url")),
+        publisher_type=_string_or_none(data.get("publisher_type")),
+        publisher_company_id=_string_or_none(data.get("publisher_company_id")),
+        company_id=_string_or_none(data.get("company_id")),
+        company_name=_string_or_none(data.get("company_name")),
+        company_publish_status=_string_or_none(data.get("company_publish_status")),
+        company_terms_version=_string_or_none(data.get("company_terms_version")),
         review_status=_string_or_none(data.get("review_status")),
         review_note=_string_or_none(data.get("review_note")),
         submission_blockers=[
@@ -1594,6 +1641,26 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         persistence=dict(persistence) if isinstance(persistence, Mapping) else {},
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
+        raw=dict(data),
+    )
+
+
+def _parse_company_publisher(data: Mapping[str, Any]) -> CompanyPublisherRecord:
+    wallets = data.get("settlement_wallets") if isinstance(data.get("settlement_wallets"), list) else []
+    return CompanyPublisherRecord(
+        company_id=str(data.get("company_id") or data.get("id") or ""),
+        name=str(data.get("name") or ""),
+        status=str(data.get("status") or ""),
+        description=_string_or_none(data.get("description")),
+        is_founder=bool(data.get("is_founder") or False),
+        membership_role=_string_or_none(data.get("membership_role")),
+        can_publish=bool(data.get("can_publish") if data.get("can_publish") is not None else True),
+        can_approve=bool(data.get("can_approve") or False),
+        company_terms_version=_string_or_none(data.get("company_terms_version")),
+        active_listing_count=int(data.get("active_listing_count") or 0),
+        pending_approval_count=int(data.get("pending_approval_count") or 0),
+        settlement_wallet_ready=bool(data.get("settlement_wallet_ready") or False),
+        settlement_wallets=[dict(item) for item in wallets if isinstance(item, Mapping)],
         raw=dict(data),
     )
 
@@ -3137,6 +3204,37 @@ class SiglumeClient:
 
     def get_listing(self, listing_id: str) -> AppListingRecord:
         data, _meta = self._request("GET", f"/market/capabilities/{listing_id}")
+        return _parse_listing(data)
+
+    def list_company_publishers(self) -> list[CompanyPublisherRecord]:
+        data, _meta = self._request("GET", "/market/company-publishers")
+        items = data.get("items") if isinstance(data.get("items"), list) else []
+        return [_parse_company_publisher(item) for item in items if isinstance(item, Mapping)]
+
+    def request_company_publish_approval(self, listing_id: str, note: str | None = None) -> AppListingRecord:
+        payload = {"note": note} if note else {}
+        data, _meta = self._request(
+            "POST",
+            f"/market/capabilities/{listing_id}/company-publish-approval",
+            json_body=payload,
+        )
+        return _parse_listing(data)
+
+    def decide_company_publish_approval(
+        self,
+        listing_id: str,
+        *,
+        decision: str,
+        reason: str | None = None,
+    ) -> AppListingRecord:
+        data, _meta = self._request(
+            "POST",
+            f"/market/capabilities/{listing_id}/company-publish-approval/decision",
+            json_body={
+                "decision": decision,
+                **({"reason": reason} if reason else {}),
+            },
+        )
         return _parse_listing(data)
 
     def get_capability_state(self, capability_key: str, save_key: str = "default") -> CapabilitySaveStateRecord:
