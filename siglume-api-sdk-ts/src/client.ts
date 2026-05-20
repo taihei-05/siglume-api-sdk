@@ -914,8 +914,14 @@ function parseCompanyPublisher(data: Record<string, unknown>): CompanyPublisherR
     description: stringOrNull(data.description),
     is_founder: Boolean(data.is_founder ?? false),
     membership_role: stringOrNull(data.membership_role),
+    membership_status: stringOrNull(data.membership_status),
     can_publish: Boolean(data.can_publish ?? true),
     can_approve: Boolean(data.can_approve ?? false),
+    approval_required: Boolean(data.approval_required ?? false),
+    paid_listing_allowed: Boolean(data.paid_listing_allowed ?? false),
+    disabled_reasons: Array.isArray(data.disabled_reasons)
+      ? data.disabled_reasons.filter((item): item is string => typeof item === "string")
+      : [],
     company_terms_version: stringOrNull(data.company_terms_version),
     active_listing_count: Number(data.active_listing_count ?? 0),
     pending_approval_count: Number(data.pending_approval_count ?? 0),
@@ -2323,7 +2329,7 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     const explicitPublisherType = payload.publisher_type !== undefined && payload.publisher_type !== null;
     const companyId = String(payload.company_id ?? "").trim() || String(payload.publisher_company_id ?? "").trim();
-    const publisherType = String(payload.publisher_type ?? (companyId ? "company" : "user")).trim().toLowerCase();
+    const publisherType = String(payload.publisher_type ?? "user").trim().toLowerCase();
     if (publisherType !== "user" && publisherType !== "company") {
       throw new SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.");
     }

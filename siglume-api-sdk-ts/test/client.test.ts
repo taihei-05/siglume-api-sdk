@@ -541,7 +541,7 @@ describe("SiglumeClient", () => {
     );
   });
 
-  it("forwards company publisher identifiers when company_id is present", async () => {
+  it("forwards company publisher identifiers when publisher_type is company", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",
       base_url: "https://api.example.test/v1",
@@ -562,14 +562,80 @@ describe("SiglumeClient", () => {
     });
 
     await client.auto_register(
-      {
-        ...buildManifest(),
-        company_id: "",
-        publisher_company_id: "co_123",
-      },
+        {
+          ...buildManifest(),
+          publisher_type: "company",
+          publisher_company_id: "co_123",
+        },
       buildToolManual(),
       { runtime_validation: buildRuntimeValidation() },
     );
+  });
+
+  it("rejects company identifiers without explicit company publisher_type", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          company_id: "co_123",
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("AppManifest.company_id cannot be combined with publisher_type='user'.");
+  });
+
+  it("parses disabled company publisher candidate metadata", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/company-publishers") {
+          return new Response(
+            JSON.stringify(envelope({
+              items: [
+                {
+                  company_id: "co_pending",
+                  name: "Pending Labs",
+                  status: "active",
+                  is_founder: false,
+                  membership_role: "member",
+                  membership_status: "pending",
+                  can_publish: false,
+                  can_approve: false,
+                  approval_required: false,
+                  paid_listing_allowed: false,
+                  disabled_reasons: ["membership_pending"],
+                  settlement_wallet_ready: false,
+                  settlement_wallets: [],
+                },
+              ],
+            })),
+            { status: 200 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const companies = await client.list_company_publishers();
+    const company = companies[0];
+    if (!company) {
+      throw new Error("expected company publisher");
+    }
+    expect(company.company_id).toBe("co_pending");
+    expect(company.membership_status).toBe("pending");
+    expect(company.can_publish).toBe(false);
+    expect(company.disabled_reasons).toEqual(["membership_pending"]);
   });
 
   it("rejects user publisher manifests with company identifiers", async () => {

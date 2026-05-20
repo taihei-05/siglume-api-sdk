@@ -617,13 +617,13 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(true);
   });
 
-  it("treats publisher_company_id as a company publisher during paid preflight", async () => {
+  it("treats publisher_company_id as a company publisher when publisher_type is company", async () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
         price_model: PriceModel.SUBSCRIPTION,
         price_value_minor: 1200,
-        company_id: "",
+        publisher_type: "company",
         publisher_company_id: "co_123",
       },
     });
@@ -662,6 +662,96 @@ describe("cli project helpers", () => {
     expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_company_alias");
     expect(listCompanyPublishersCalled).toBe(true);
     expect(personalPortalCalled).toBe(false);
+  });
+
+  it("rejects disabled free company publishers before registration", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        publisher_type: "company",
+        company_id: "co_blocked",
+      },
+    });
+    let autoRegisterCalled = false;
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport();
+              },
+              async list_company_publishers() {
+                return [
+                  {
+                    company_id: "co_blocked",
+                    name: "Blocked Labs",
+                    settlement_wallet_ready: false,
+                    can_publish: false,
+                    disabled_reasons: ["founder_required"],
+                  },
+                ];
+              },
+              async auto_register() {
+                autoRegisterCalled = true;
+                throw new Error("auto_register should not run");
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("founder_required");
+
+    expect(autoRegisterCalled).toBe(false);
+  });
+
+  it("rejects disabled company publishers before registration", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        price_model: PriceModel.SUBSCRIPTION,
+        price_value_minor: 1200,
+        publisher_type: "company",
+        company_id: "co_blocked",
+      },
+    });
+    let autoRegisterCalled = false;
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport();
+              },
+              async list_company_publishers() {
+                return [
+                  {
+                    company_id: "co_blocked",
+                    name: "Blocked Labs",
+                    settlement_wallet_ready: true,
+                    can_publish: false,
+                    disabled_reasons: ["membership_pending"],
+                  },
+                ];
+              },
+              async auto_register() {
+                autoRegisterCalled = true;
+                throw new Error("auto_register should not run");
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("membership_pending");
+
+    expect(autoRegisterCalled).toBe(false);
   });
 
   it("covers registration, support, and usage helper branches", async () => {

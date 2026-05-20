@@ -1373,9 +1373,8 @@ def _manifest_company_id(manifest: AppManifest) -> str:
 
 
 def _manifest_publisher_type(manifest: AppManifest) -> str:
-    company_id = _manifest_company_id(manifest)
     payload = to_jsonable(manifest)
-    return str(payload.get("publisher_type") or ("company" if company_id else "user")).strip().lower()
+    return str(payload.get("publisher_type") or "user").strip().lower()
 
 
 def _set_manifest_company(project: LoadedProject, company_id: str) -> None:
@@ -1389,18 +1388,14 @@ def _ensure_paid_payout_ready(
     project: LoadedProject,
     client: SiglumeClient,
     company_publishers: list[Any] | None = None,
+    company_publisher: Any | None = None,
 ) -> dict[str, Any] | None:
     if _manifest_price_model(project.manifest) == "free":
         return None
     if _manifest_publisher_type(project.manifest) == "company":
-        company_id = _manifest_company_id(project.manifest)
-        if not company_id:
-            raise click.ClickException("Paid company registration requires --company <company_id> or manifest.company_id.")
-        companies = company_publishers if company_publishers is not None else client.list_company_publishers()
-        company = next((item for item in companies if getattr(item, "company_id", "") == company_id), None)
-        if company is None:
-            raise click.ClickException(f"Company {company_id} is not available to this API key.")
+        company = company_publisher or _ensure_company_publisher_available(project, client, company_publishers)
         if getattr(company, "settlement_wallet_ready", False) is not True:
+            company_id = _manifest_company_id(project.manifest)
             name = getattr(company, "name", company_id)
             raise click.ClickException(
                 f"Paid company registration requires a verified company settlement wallet for {name}. "
@@ -1419,6 +1414,26 @@ def _ensure_paid_payout_ready(
     return to_jsonable(portal)
 
 
+def _ensure_company_publisher_available(
+    project: LoadedProject,
+    client: SiglumeClient,
+    company_publishers: list[Any] | None = None,
+) -> Any | None:
+    if _manifest_publisher_type(project.manifest) != "company":
+        return None
+    company_id = _manifest_company_id(project.manifest)
+    if not company_id:
+        raise click.ClickException("Company registration requires --company <company_id> or manifest.company_id.")
+    companies = company_publishers if company_publishers is not None else client.list_company_publishers()
+    company = next((item for item in companies if getattr(item, "company_id", "") == company_id), None)
+    if company is None:
+        raise click.ClickException(f"Company {company_id} is not available to this API key.")
+    if getattr(company, "can_publish", True) is False:
+        reasons = ", ".join(getattr(company, "disabled_reasons", []) or ["company publisher is disabled"])
+        raise click.ClickException(f"Company {company_id} cannot publish: {reasons}.")
+    return company
+
+
 def _ensure_manifest_publisher_identity(project: LoadedProject) -> None:
     manifest_payload = to_jsonable(project.manifest)
     docs_url = str(manifest_payload.get("docs_url") or manifest_payload.get("documentation_url") or "").strip()
@@ -1426,7 +1441,11 @@ def _ensure_manifest_publisher_identity(project: LoadedProject) -> None:
     seller_homepage_url = str(manifest_payload.get("seller_homepage_url") or "").strip()
     seller_social_url = str(manifest_payload.get("seller_social_url") or "").strip()
     jurisdiction = str(manifest_payload.get("jurisdiction") or "").strip()
+    company_id = str(manifest_payload.get("company_id") or manifest_payload.get("publisher_company_id") or "").strip()
+    publisher_type = str(manifest_payload.get("publisher_type") or "user").strip().lower()
     issues = []
+    if company_id and publisher_type != "company":
+        issues.append("manifest.company_id requires manifest.publisher_type to be \"company\"")
     if not docs_url:
         issues.append("manifest.docs_url is required")
     elif _looks_like_placeholder(docs_url):
@@ -1641,9 +1660,14 @@ def run_registration(
                 raise click.ClickException(f"Company slug {requested_company_slug} is not available to this API key.")
             if len(matches) > 1:
                 raise click.ClickException(f"Company slug {requested_company_slug} is ambiguous; use --company <company_id> instead.")
-            _set_manifest_company(project, str(getattr(matches[0], "company_id", "")))
+            match = matches[0]
+            if getattr(match, "can_publish", True) is False:
+                reasons = ", ".join(getattr(match, "disabled_reasons", []) or ["company publisher is disabled"])
+                raise click.ClickException(f"Company {getattr(match, 'company_id', requested_company_slug)} cannot publish: {reasons}.")
+            _set_manifest_company(project, str(getattr(match, "company_id", "")))
         registration_preflight = _registration_preflight(project, client)
-        portal_preflight = _ensure_paid_payout_ready(project, client, company_publishers)
+        company_publisher = _ensure_company_publisher_available(project, client, company_publishers)
+        portal_preflight = _ensure_paid_payout_ready(project, client, company_publishers, company_publisher)
         receipt = client.auto_register(
             project.manifest,
             project.tool_manual,

@@ -348,8 +348,12 @@ export interface CompanyPublisherRecord {
   description?: string | null;
   is_founder: boolean;
   membership_role?: string | null;
+  membership_status?: string | null;
   can_publish: boolean;
   can_approve: boolean;
+  approval_required: boolean;
+  paid_listing_allowed: boolean;
+  disabled_reasons: string[];
   company_terms_version?: string | null;
   active_listing_count: number;
   pending_approval_count: number;

@@ -521,7 +521,13 @@ function ensureManifestPublisherIdentity(project: LoadedProject): void {
   const sellerHomepageUrl = String(manifestPayload.seller_homepage_url ?? "").trim();
   const sellerSocialUrl = String(manifestPayload.seller_social_url ?? "").trim();
   const jurisdiction = String(manifestPayload.jurisdiction ?? "").trim();
+  const companyId = String(manifestPayload.company_id ?? "").trim()
+    || String(manifestPayload.publisher_company_id ?? "").trim();
+  const publisherType = String(manifestPayload.publisher_type ?? "user").trim().toLowerCase();
   const issues: string[] = [];
+  if (companyId && publisherType !== "company") {
+    issues.push("manifest.company_id requires manifest.publisher_type to be \"company\"");
+  }
   if (!docsUrl) {
     issues.push("manifest.docs_url is required");
   } else if (looksLikePlaceholder(docsUrl)) {
@@ -709,7 +715,7 @@ export async function runRegistration(
   const project = await loadProject(path);
   let requestedCompanyId = String(options.company_id ?? "").trim();
   const requestedCompanySlug = String(options.company_slug ?? "").trim();
-  let companyPublisherCandidates: Array<{ company_id: string; name: string; settlement_wallet_ready?: boolean }> | null = null;
+  let companyPublisherCandidates: Array<{ company_id: string; name: string; settlement_wallet_ready?: boolean; can_publish?: boolean; disabled_reasons?: string[] }> | null = null;
   if (requestedCompanySlug) {
     if (requestedCompanyId) {
       throw new SiglumeProjectError("--company and --company-slug cannot be combined.");
@@ -749,6 +755,11 @@ export async function runRegistration(
     if (!match) {
       throw new SiglumeProjectError(`Company slug ${requestedCompanySlug} is not available to this API key.`);
     }
+    if (match.can_publish === false) {
+      const disabledReasons = match.disabled_reasons ?? [];
+      const reasons = disabledReasons.length > 0 ? disabledReasons.join(", ") : "company publisher is disabled";
+      throw new SiglumeProjectError(`Company ${match.company_id} cannot publish: ${reasons}.`);
+    }
     requestedCompanyId = match.company_id;
     project.manifest = {
       ...project.manifest,
@@ -758,17 +769,37 @@ export async function runRegistration(
     };
   }
   const preflight = await registrationPreflight(project, client);
+  let companyPublisherPreflight: {
+    company_id: string;
+    name: string;
+    settlement_wallet_ready?: boolean;
+    can_publish?: boolean;
+    disabled_reasons?: string[];
+  } | null = null;
+  const companyId = String(project.manifest.company_id ?? "").trim()
+    || String(project.manifest.publisher_company_id ?? "").trim();
+  const publisherType = String(project.manifest.publisher_type ?? "user").toLowerCase();
+  if (publisherType === "company") {
+    if (!companyId) {
+      throw new SiglumeProjectError("Company registration requires --company <company_id> or manifest.company_id.");
+    }
+    const companies = companyPublisherCandidates ?? await client.list_company_publishers();
+    companyPublisherCandidates = companies;
+    const company = companies.find((item) => item.company_id === companyId);
+    if (!company) {
+      throw new SiglumeProjectError(`Company ${companyId} is not available to this API key.`);
+    }
+    if (company.can_publish === false) {
+      const disabledReasons = company.disabled_reasons ?? [];
+      const reasons = disabledReasons.length > 0 ? disabledReasons.join(", ") : "company publisher is disabled";
+      throw new SiglumeProjectError(`Company ${companyId} cannot publish: ${reasons}.`);
+    }
+    companyPublisherPreflight = company;
+  }
   let developerPortalPreflight: unknown = null;
   if (String(project.manifest.price_model ?? "free").toLowerCase() !== "free") {
-    const companyId = String(project.manifest.company_id ?? "").trim()
-      || String(project.manifest.publisher_company_id ?? "").trim();
-    const publisherType = String(project.manifest.publisher_type ?? (companyId ? "company" : "user")).toLowerCase();
     if (publisherType === "company") {
-      if (!companyId) {
-        throw new SiglumeProjectError("Paid company registration requires --company <company_id> or manifest.company_id.");
-      }
-      const companies = companyPublisherCandidates ?? await client.list_company_publishers();
-      const company = companies.find((item) => item.company_id === companyId);
+      const company = companyPublisherPreflight;
       if (!company) {
         throw new SiglumeProjectError(`Company ${companyId} is not available to this API key.`);
       }

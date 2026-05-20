@@ -42,6 +42,49 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "publisher_type": { "const": "company" }
+        },
+        "required": ["publisher_type"]
+      },
+      "then": {
+        "anyOf": [
+          { "required": ["company_id"] },
+          { "required": ["publisher_company_id"] }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publisher_type": { "const": "user" }
+        },
+        "required": ["publisher_type"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["company_id"] },
+            { "required": ["publisher_company_id"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "not": { "required": ["publisher_type"] }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["company_id"] },
+            { "required": ["publisher_company_id"] }
+          ]
+        }
+      }
     }
   ],
   "properties": {
@@ -212,10 +255,12 @@
     },
     "company_id": {
       "type": "string",
+      "minLength": 1,
       "description": "Siglume company id to publish under when publisher_type is 'company'."
     },
     "publisher_company_id": {
       "type": "string",
+      "minLength": 1,
       "description": "Alias for company_id."
     },
     "store_vertical": {
