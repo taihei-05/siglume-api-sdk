@@ -229,6 +229,8 @@ The manifest is your API's identity card. It controls how your API appears in th
 | `support_contact` | **Required for production registration.** Real support email address or public support URL. Placeholder domains are rejected. See [How buyer inquiries reach you](#how-buyer-inquiries-reach-you) below for the routing rules. | `"support@your-domain.com"` |
 | `seller_homepage_url` | Optional official seller/company homepage, separate from `docs_url`. | `"https://your-domain.com"` |
 | `seller_social_url` | Optional official seller social/profile URL, separate from `docs_url`. | `"https://x.com/your_account"` |
+| `publisher_type` | Optional publishing subject. Omit or use `"user"` for individual publishing; use `"company"` only with `company_id`. | `"user"`, `"company"` |
+| `company_id` | Required when `publisher_type="company"`. Only the company founder can publish under the company name in the Phase 2 MVP. | `"company_123"` |
 | `persistence` | Optional save-state policy. Required only when `store_vertical="game"` and `persistence.mode` is not `"none"`. | `PersistencePolicy(mode="platform", save_data_schema={...})` |
 
 ### Game API Store placement
@@ -529,11 +531,17 @@ siglume score . --remote
 siglume preflight .              # checks blockers without creating a draft
 siglume register .                # preflight + auto-register + confirm/publish
 siglume register . --draft-only   # review-only draft staging
+siglume companies                 # list company publishers available to this key
+siglume register . --company company_123
 ```
 
 Useful flags:
 
 - `--draft-only`: create or refresh the immutable draft without confirming publication
+- `--company <company_id>`: publish under a company name. This is founder-only
+  in the Phase 2 MVP and paid listings require a verified company settlement
+  wallet. Siglume does not fall back to the registrant's personal payout wallet.
+- `--company-slug <slug>`: resolve a listed company publisher by slug-compatible name
 - `--confirm`: explicit compatibility alias; confirmation is already the default
 - `--submit-review`: legacy alias for older environments
 - `--json`: emit machine-readable JSON

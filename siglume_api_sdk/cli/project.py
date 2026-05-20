@@ -1400,6 +1400,9 @@ def _ensure_paid_payout_ready(
         company = next((item for item in companies if getattr(item, "company_id", "") == company_id), None)
         if company is None:
             raise click.ClickException(f"Company {company_id} is not available to this API key.")
+        if getattr(company, "can_publish", True) is False:
+            reasons = ", ".join(getattr(company, "disabled_reasons", []) or ["company publisher is disabled"])
+            raise click.ClickException(f"Company {company_id} cannot publish: {reasons}.")
         if getattr(company, "settlement_wallet_ready", False) is not True:
             name = getattr(company, "name", company_id)
             raise click.ClickException(
@@ -1641,7 +1644,11 @@ def run_registration(
                 raise click.ClickException(f"Company slug {requested_company_slug} is not available to this API key.")
             if len(matches) > 1:
                 raise click.ClickException(f"Company slug {requested_company_slug} is ambiguous; use --company <company_id> instead.")
-            _set_manifest_company(project, str(getattr(matches[0], "company_id", "")))
+            match = matches[0]
+            if getattr(match, "can_publish", True) is False:
+                reasons = ", ".join(getattr(match, "disabled_reasons", []) or ["company publisher is disabled"])
+                raise click.ClickException(f"Company {getattr(match, 'company_id', requested_company_slug)} cannot publish: {reasons}.")
+            _set_manifest_company(project, str(getattr(match, "company_id", "")))
         registration_preflight = _registration_preflight(project, client)
         portal_preflight = _ensure_paid_payout_ready(project, client, company_publishers)
         receipt = client.auto_register(

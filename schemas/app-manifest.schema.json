@@ -42,6 +42,36 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "publisher_type": { "const": "company" }
+        },
+        "required": ["publisher_type"]
+      },
+      "then": {
+        "anyOf": [
+          { "required": ["company_id"] },
+          { "required": ["publisher_company_id"] }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publisher_type": { "const": "user" }
+        },
+        "required": ["publisher_type"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["company_id"] },
+            { "required": ["publisher_company_id"] }
+          ]
+        }
+      }
     }
   ],
   "properties": {

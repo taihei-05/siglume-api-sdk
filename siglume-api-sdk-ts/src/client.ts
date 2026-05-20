@@ -914,8 +914,14 @@ function parseCompanyPublisher(data: Record<string, unknown>): CompanyPublisherR
     description: stringOrNull(data.description),
     is_founder: Boolean(data.is_founder ?? false),
     membership_role: stringOrNull(data.membership_role),
+    membership_status: stringOrNull(data.membership_status),
     can_publish: Boolean(data.can_publish ?? true),
     can_approve: Boolean(data.can_approve ?? false),
+    approval_required: Boolean(data.approval_required ?? false),
+    paid_listing_allowed: Boolean(data.paid_listing_allowed ?? false),
+    disabled_reasons: Array.isArray(data.disabled_reasons)
+      ? data.disabled_reasons.filter((item): item is string => typeof item === "string")
+      : [],
     company_terms_version: stringOrNull(data.company_terms_version),
     active_listing_count: Number(data.active_listing_count ?? 0),
     pending_approval_count: Number(data.pending_approval_count ?? 0),

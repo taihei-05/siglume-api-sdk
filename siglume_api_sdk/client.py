@@ -150,8 +150,12 @@ class CompanyPublisherRecord:
     description: str | None = None
     is_founder: bool = False
     membership_role: str | None = None
+    membership_status: str | None = None
     can_publish: bool = True
     can_approve: bool = False
+    approval_required: bool = False
+    paid_listing_allowed: bool = False
+    disabled_reasons: list[str] = field(default_factory=list)
     company_terms_version: str | None = None
     active_listing_count: int = 0
     pending_approval_count: int = 0
@@ -1647,6 +1651,7 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
 
 def _parse_company_publisher(data: Mapping[str, Any]) -> CompanyPublisherRecord:
     wallets = data.get("settlement_wallets") if isinstance(data.get("settlement_wallets"), list) else []
+    disabled_reasons = data.get("disabled_reasons") if isinstance(data.get("disabled_reasons"), list) else []
     return CompanyPublisherRecord(
         company_id=str(data.get("company_id") or data.get("id") or ""),
         name=str(data.get("name") or ""),
@@ -1654,8 +1659,12 @@ def _parse_company_publisher(data: Mapping[str, Any]) -> CompanyPublisherRecord:
         description=_string_or_none(data.get("description")),
         is_founder=bool(data.get("is_founder") or False),
         membership_role=_string_or_none(data.get("membership_role")),
+        membership_status=_string_or_none(data.get("membership_status")),
         can_publish=bool(data.get("can_publish") if data.get("can_publish") is not None else True),
         can_approve=bool(data.get("can_approve") or False),
+        approval_required=bool(data.get("approval_required") or False),
+        paid_listing_allowed=bool(data.get("paid_listing_allowed") or False),
+        disabled_reasons=[str(item) for item in disabled_reasons if item],
         company_terms_version=_string_or_none(data.get("company_terms_version")),
         active_listing_count=int(data.get("active_listing_count") or 0),
         pending_approval_count=int(data.get("pending_approval_count") or 0),

@@ -709,7 +709,7 @@ export async function runRegistration(
   const project = await loadProject(path);
   let requestedCompanyId = String(options.company_id ?? "").trim();
   const requestedCompanySlug = String(options.company_slug ?? "").trim();
-  let companyPublisherCandidates: Array<{ company_id: string; name: string; settlement_wallet_ready?: boolean }> | null = null;
+  let companyPublisherCandidates: Array<{ company_id: string; name: string; settlement_wallet_ready?: boolean; can_publish?: boolean; disabled_reasons?: string[] }> | null = null;
   if (requestedCompanySlug) {
     if (requestedCompanyId) {
       throw new SiglumeProjectError("--company and --company-slug cannot be combined.");
@@ -749,6 +749,11 @@ export async function runRegistration(
     if (!match) {
       throw new SiglumeProjectError(`Company slug ${requestedCompanySlug} is not available to this API key.`);
     }
+    if (match.can_publish === false) {
+      const disabledReasons = match.disabled_reasons ?? [];
+      const reasons = disabledReasons.length > 0 ? disabledReasons.join(", ") : "company publisher is disabled";
+      throw new SiglumeProjectError(`Company ${match.company_id} cannot publish: ${reasons}.`);
+    }
     requestedCompanyId = match.company_id;
     project.manifest = {
       ...project.manifest,
@@ -771,6 +776,11 @@ export async function runRegistration(
       const company = companies.find((item) => item.company_id === companyId);
       if (!company) {
         throw new SiglumeProjectError(`Company ${companyId} is not available to this API key.`);
+      }
+      if (company.can_publish === false) {
+        const disabledReasons = company.disabled_reasons ?? [];
+        const reasons = disabledReasons.length > 0 ? disabledReasons.join(", ") : "company publisher is disabled";
+        throw new SiglumeProjectError(`Company ${companyId} cannot publish: ${reasons}.`);
       }
       if (company.settlement_wallet_ready !== true) {
         throw new SiglumeProjectError(

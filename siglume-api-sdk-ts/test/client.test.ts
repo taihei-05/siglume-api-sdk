@@ -572,6 +572,51 @@ describe("SiglumeClient", () => {
     );
   });
 
+  it("parses disabled company publisher candidate metadata", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/company-publishers") {
+          return new Response(
+            JSON.stringify(envelope({
+              items: [
+                {
+                  company_id: "co_pending",
+                  name: "Pending Labs",
+                  status: "active",
+                  is_founder: false,
+                  membership_role: "member",
+                  membership_status: "pending",
+                  can_publish: false,
+                  can_approve: false,
+                  approval_required: false,
+                  paid_listing_allowed: false,
+                  disabled_reasons: ["membership_pending"],
+                  settlement_wallet_ready: false,
+                  settlement_wallets: [],
+                },
+              ],
+            })),
+            { status: 200 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const companies = await client.list_company_publishers();
+    const company = companies[0];
+    if (!company) {
+      throw new Error("expected company publisher");
+    }
+    expect(company.company_id).toBe("co_pending");
+    expect(company.membership_status).toBe("pending");
+    expect(company.can_publish).toBe(false);
+    expect(company.disabled_reasons).toEqual(["membership_pending"]);
+  });
+
   it("rejects user publisher manifests with company identifiers", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",

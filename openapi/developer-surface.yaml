@@ -1900,8 +1900,16 @@ components:
         icon_image_url: { type: string, nullable: true }
         is_founder: { type: boolean }
         membership_role: { type: string, nullable: true }
+        membership_status: { type: string, nullable: true }
         can_publish: { type: boolean }
         can_approve: { type: boolean }
+        approval_required: { type: boolean }
+        paid_listing_allowed:
+          type: boolean
+          description: True when the candidate can publish paid listings without falling back to a personal wallet.
+        disabled_reasons:
+          type: array
+          items: { type: string }
         company_terms_version: { type: string }
         active_listing_count: { type: integer }
         pending_approval_count: { type: integer }

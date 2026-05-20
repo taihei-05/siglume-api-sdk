@@ -242,6 +242,12 @@ No permission needed. No issue to claim. Just build and register.
 
 - Free APIs can be drafted and published without wallet setup.
 - Paid APIs require an active embedded Polygon wallet before publish.
+- Company-name publishing is founder-only in the Phase 2 MVP. Run
+  `siglume companies` to list company ids you can publish under, then use
+  `siglume register . --company <company_id>` or set
+  `publisher_type: "company"` and `company_id` in `app_manifest.yaml`.
+- Paid company listings require the company's verified settlement wallet.
+  Siglume will not fall back to the registrant's personal payout wallet.
 - Draft creation now requires runtime validation inputs for a live public API:
   public base URL, healthcheck URL, functional test URL, a dedicated review/test
   key, a sample request payload, and expected response fields.
@@ -291,6 +297,8 @@ siglume score . --remote
 siglume preflight .              # checks blockers without creating a draft
 siglume register .                # preflight + auto-register + confirm/publish
 siglume register . --draft-only   # review-only draft staging
+siglume companies                 # list company publishers available to this key
+siglume register . --company company_123
 ```
 
 `siglume register` now runs manifest validation and remote Tool Manual quality
