@@ -873,6 +873,17 @@ export async function getUsageReport(
   };
 }
 
+export async function listCompanyPublishersReport(
+  deps: CliProjectDependencies = {},
+): Promise<Record<string, unknown>> {
+  const client = await createClient(deps);
+  const companies = await client.list_company_publishers();
+  return {
+    companies: companies.map((item) => toJsonable(item)),
+    count: companies.length,
+  };
+}
+
 export async function diffJsonFiles(
   oldPath: string,
   newPath: string,
