@@ -281,6 +281,8 @@ class AppManifest:
             raise ValueError("AppManifest.publisher_type must be 'user' or 'company'.")
         if publisher_type == "company" and not company_id:
             raise ValueError("AppManifest.company_id is required when publisher_type='company'.")
+        if publisher_type == "user" and company_id:
+            raise ValueError("AppManifest.company_id cannot be combined with publisher_type='user'.")
         self.publisher_type = publisher_type
         self.company_id = company_id or None
         self.publisher_company_id = company_id or None

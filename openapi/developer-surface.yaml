@@ -488,6 +488,31 @@ paths:
                     type: string
                     description: Dashboard URL where the seller can inspect the receipt before publishing.
 
+  /market/company-publishers:
+    get:
+      operationId: listCompanyPublishers
+      summary: List companies available for company-name publishing
+      description: |
+        Returns active companies where the authenticated user can publish API
+        Store or Game API Store listings under the company name. Paid company
+        registrations must use a company with `settlement_wallet_ready=true`;
+        resulting net seller revenue is split equally among active formal
+        members captured at revenue-confirmation time.
+      tags: [Capabilities]
+      responses:
+        '200':
+          description: Company publisher candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyPublisherPageEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /market/capabilities/{listingId}/confirm-auto-register:
     post:
       operationId: confirmAutoRegister
@@ -579,6 +604,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConfirmAutoRegisterEnvelope'
+
+  /market/capabilities/{listingId}/company-publish-approval:
+    post:
+      operationId: requestCompanyPublishApproval
+      summary: Request founder approval for a company listing
+      description: |
+        Used by a responsible company member after auto-register creates or
+        updates a company-name listing. Founder users are approved immediately;
+        other active members move the listing to `approval_required` and notify
+        the founder before public publish can continue.
+      tags: [Capabilities]
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyPublishApprovalRequest'
+      responses:
+        '200':
+          description: Updated listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/capabilities/{listingId}/company-publish-approval/decision:
+    post:
+      operationId: decideCompanyPublishApproval
+      summary: Approve or reject company listing publication
+      description: |
+        Founder-only decision endpoint for company-name API Store and Game API
+        Store listings. Approved listings may proceed through the normal
+        self-serve publish gate; rejected listings keep the reason so the
+        responsible publisher can reapply.
+      tags: [Capabilities]
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyPublishApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Updated listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '403':
+          description: Founder required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 
   /market/tool-manuals/preview-quality:
     post:
@@ -1756,6 +1853,10 @@ components:
         support_contact: { type: string, description: "Real support email address or public support URL." }
         seller_homepage_url: { type: string, description: "Optional official seller homepage, separate from docs_url." }
         seller_social_url: { type: string, description: "Optional official seller social/profile URL, separate from docs_url." }
+        publisher_type: { type: string, enum: [user, company], description: "Publishing subject. Use company with company_id for company-name listings." }
+        company_id: { type: string, description: "Siglume company id when publisher_type is company." }
+        publisher_company_id: { type: string, description: "Alias for company_id." }
+        store_vertical: { type: string, enum: [api, game], description: "Store surface: api for API Store or game for Game API Store." }
         jurisdiction: { type: string, description: Governing ISO 3166-1 alpha-2 country code for the API }
         input_shape_summary: { type: string }
         output_shape_summary: { type: string }
@@ -1787,6 +1888,74 @@ components:
         sandbox_support: { type: string }
         status: { type: string }
         visibility: { type: string }
+
+    CompanyPublisher:
+      type: object
+      properties:
+        company_id: { type: string }
+        id: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string }
+        icon_image_url: { type: string, nullable: true }
+        is_founder: { type: boolean }
+        membership_role: { type: string, nullable: true }
+        can_publish: { type: boolean }
+        can_approve: { type: boolean }
+        company_terms_version: { type: string }
+        active_listing_count: { type: integer }
+        pending_approval_count: { type: integer }
+        settlement_wallet_ready:
+          type: boolean
+          description: True when a verified company settlement wallet exists for paid company listings.
+        settlement_wallets:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    CompanyPublisherPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyPublisher'
+        company_terms_version: { type: string }
+
+    CompanyPublisherPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/CompanyPublisherPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    CompanyPublishApprovalRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          description: Optional note shown in the company event log.
+
+    CompanyPublishApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, approved, reject, rejected]
+        reason:
+          type: string
+          description: Required by product policy when rejecting, shown to the responsible publisher.
+        note:
+          type: string
+          description: Alias for reason.
 
     AppListingPage:
       type: object
@@ -1838,6 +2007,23 @@ components:
         seller_display_name: { type: string, nullable: true }
         seller_homepage_url: { type: string, nullable: true }
         seller_social_url: { type: string, nullable: true }
+        publisher_type: { type: string, enum: [user, company], nullable: true }
+        seller_type: { type: string, enum: [user, company], nullable: true }
+        publisher_company_id: { type: string, nullable: true }
+        company_id: { type: string, nullable: true }
+        publisher_company_name: { type: string, nullable: true }
+        company_name: { type: string, nullable: true }
+        company_publish_status:
+          type: string
+          nullable: true
+          enum: [not_required, approval_required, approval_requested, approved, rejected]
+        company_publish_rejection_reason: { type: string, nullable: true }
+        company_terms_version: { type: string, nullable: true }
+        store_revenue_total_net_minor:
+          type: integer
+          nullable: true
+          description: Lifetime company store net revenue after platform/payment/refund/adjustment deductions.
+        store_revenue_last_confirmed_at: { type: string, format: date-time, nullable: true }
         required_connected_accounts:
           type: array
           items:

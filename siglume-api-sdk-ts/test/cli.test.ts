@@ -84,6 +84,19 @@ function createMockClient() {
         raw: {},
       };
     },
+    async list_company_publishers() {
+      return [
+        {
+          company_id: "co_123",
+          name: "Northwind AI",
+          membership_role: "founder",
+          is_founder: true,
+          settlement_wallet_ready: true,
+          pending_approval_count: 2,
+          raw: {},
+        },
+      ];
+    },
     async list_operations() {
       return [
         {
@@ -560,6 +573,186 @@ describe("siglume CLI", () => {
     expect(seen.trace_id).toBe("trc_123");
   });
 
+  it("lists company publishers for company-name registration", async () => {
+    const jsonLines: string[] = [];
+    const tableLines: string[] = [];
+
+    const jsonExit = await runCli(["companies", "--json"], {
+      client_factory: () => createMockClient() as unknown as SiglumeClientShape,
+      stdout: (line) => jsonLines.push(line),
+    });
+    const tableExit = await runCli(["companies"], {
+      client_factory: () => createMockClient() as unknown as SiglumeClientShape,
+      stdout: (line) => tableLines.push(line),
+    });
+    const payload = JSON.parse(jsonLines.join("\n"));
+
+    expect(jsonExit).toBe(0);
+    expect(tableExit).toBe(0);
+    expect(payload.companies[0].company_id).toBe("co_123");
+    expect(tableLines.join("\n")).toContain("Northwind AI");
+    expect(tableLines.join("\n")).toContain("ready");
+  });
+
+  it("prints an empty company publisher state", async () => {
+    const lines: string[] = [];
+    const exit = await runCli(["companies"], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async list_company_publishers() {
+          return [];
+        },
+      }) as unknown as SiglumeClientShape,
+      stdout: (line) => lines.push(line),
+    });
+
+    expect(exit).toBe(0);
+    expect(lines.join("\n")).toContain("No company publishers available for this API key.");
+  });
+
+  it("prints company publishers without founder role or settlement readiness", async () => {
+    const lines: string[] = [];
+    const exit = await runCli(["companies"], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async list_company_publishers() {
+          return [
+            {
+              company_id: "co_wait",
+              name: "Waiting Co",
+              is_founder: false,
+              settlement_wallet_ready: false,
+              pending_approval_count: 0,
+              raw: {},
+            },
+          ];
+        },
+      }) as unknown as SiglumeClientShape,
+      stdout: (line) => lines.push(line),
+    });
+
+    expect(exit).toBe(0);
+    expect(lines.join("\n")).toContain("Waiting Co");
+    expect(lines.join("\n")).toContain("not_ready");
+  });
+
+  it("registers a draft under an explicit company publisher", async () => {
+    const projectDir = await createTestProject();
+    const captured: { manifest?: Record<string, unknown> } = {};
+    const stdout: string[] = [];
+
+    const exit = await runCli(["register", projectDir, "--company", "co_123", "--draft-only", "--json"], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async auto_register(manifest: Record<string, unknown>) {
+          captured.manifest = manifest;
+          return createMockClient().auto_register();
+        },
+      }) as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stdout: (line) => stdout.push(line),
+    });
+
+    expect(exit).toBe(0);
+    expect(captured.manifest?.publisher_type).toBe("company");
+    expect(captured.manifest?.company_id).toBe("co_123");
+    expect(captured.manifest?.publisher_company_id).toBe("co_123");
+    expect(JSON.parse(stdout.join("\n")).receipt.listing_id).toBe("lst_123");
+  });
+
+  it("registers a draft under a company resolved by slug", async () => {
+    const projectDir = await createTestProject();
+    const captured: { manifest?: Record<string, unknown> } = {};
+
+    const exit = await runCli(["register", projectDir, "--company-slug", "northwind-ai", "--draft-only"], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async auto_register(manifest: Record<string, unknown>) {
+          captured.manifest = manifest;
+          return createMockClient().auto_register();
+        },
+      }) as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+
+    expect(exit).toBe(0);
+    expect(captured.manifest?.publisher_type).toBe("company");
+    expect(captured.manifest?.company_id).toBe("co_123");
+  });
+
+  it("rejects invalid company publisher selectors", async () => {
+    const projectDir = await createTestProject();
+    const stderr: string[] = [];
+    const combinedExit = await runCli(["register", projectDir, "--company", "co_123", "--company-slug", "northwind-ai"], {
+      client_factory: () => createMockClient() as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stderr: (line) => stderr.push(line),
+    });
+    const missingExit = await runCli(["register", projectDir, "--company-slug", "missing-company"], {
+      client_factory: () => createMockClient() as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stderr: (line) => stderr.push(line),
+    });
+    const invalidExit = await runCli(["register", projectDir, "--company-slug", "!!!"], {
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stderr: (line) => stderr.push(line),
+    });
+
+    expect(combinedExit).toBe(1);
+    expect(missingExit).toBe(1);
+    expect(invalidExit).toBe(1);
+    expect(stderr.join("\n")).toContain("--company and --company-slug cannot be combined.");
+    expect(stderr.join("\n")).toContain("Company slug missing-company is not available to this API key.");
+    expect(stderr.join("\n")).toContain("Company slug !!! is not slug-compatible; use --company <company_id> instead.");
+  });
+
+  it("prints registration mode specific human-readable status messages", async () => {
+    const projectDir = await createTestProject();
+    const acceptedLines: string[] = [];
+    const refreshedLines: string[] = [];
+    const createdLines: string[] = [];
+    const acceptedExit = await runCli(["register", projectDir], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async auto_register() {
+          const receipt = await createMockClient().auto_register();
+          return { ...receipt, registration_mode: "create" };
+        },
+      }) as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stdout: (line) => acceptedLines.push(line),
+    });
+    const refreshedExit = await runCli(["register", projectDir, "--draft-only"], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async auto_register() {
+          const receipt = await createMockClient().auto_register();
+          return { ...receipt, registration_mode: "refresh" };
+        },
+      }) as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stdout: (line) => refreshedLines.push(line),
+    });
+    const createdExit = await runCli(["register", projectDir, "--draft-only"], {
+      client_factory: () => ({
+        ...createMockClient(),
+        async auto_register() {
+          const receipt = await createMockClient().auto_register();
+          return { ...receipt, registration_mode: undefined };
+        },
+      }) as unknown as SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+      stdout: (line) => createdLines.push(line),
+    });
+
+    expect(acceptedExit).toBe(0);
+    expect(refreshedExit).toBe(0);
+    expect(createdExit).toBe(0);
+    expect(acceptedLines.join("\n")).toContain("Registration accepted.");
+    expect(refreshedLines.join("\n")).toContain("Draft refreshed.");
+    expect(createdLines.join("\n")).toContain("Draft listing created.");
+  });
+
   it("prints register review metadata in human-readable mode", async () => {
     const projectDir = await createTestProject();
     const stdout: string[] = [];
@@ -650,6 +843,73 @@ describe("siglume CLI", () => {
     expect(payload.ok).toBe(true);
     expect(payload.registration_preflight).toBeTruthy();
     expect(autoRegisterCalled).toBe(false);
+  });
+
+  it("prints preflight metadata in human-readable mode", async () => {
+    const projectDir = await createTestProject();
+    const stdout: string[] = [];
+
+    const preflightExit = await runCli(["preflight", projectDir], {
+      stdout: (line) => stdout.push(line),
+      client_factory: (() => createMockClient()) as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+
+    expect(preflightExit).toBe(0);
+    expect(stdout.join("\n")).toContain("Preflight passed.");
+    expect(stdout.join("\n")).toContain("preflight_quality: A (92/100)");
+    expect(stdout.join("\n")).toContain("runtime_validation_path:");
+  });
+
+  it("prints harness failure metadata in human-readable mode", async () => {
+    const projectDir = await createTestProject();
+    const importHref = pathToFileURL(join(process.cwd(), "src", "index.ts")).href;
+    await writeFile(
+      join(projectDir, "adapter.ts"),
+      [
+        `import { AppAdapter, AppCategory, ApprovalMode, PermissionClass, PriceModel } from "${importHref}";`,
+        "",
+        "export default class FailingPaymentQuoteApp extends AppAdapter {",
+        "  manifest() {",
+        "    return {",
+        "      capability_key: \"payment-quote\",",
+        "      name: \"Payment Quote\",",
+        "      job_to_be_done: \"Quote a USD charge and complete the payment only after owner approval.\",",
+        "      category: AppCategory.FINANCE,",
+        "      store_vertical: 'api' as const,",
+        "      permission_class: PermissionClass.PAYMENT,",
+        "      approval_mode: ApprovalMode.ALWAYS_ASK,",
+        "      dry_run_supported: true,",
+        "      required_connected_accounts: [],",
+        "      price_model: PriceModel.FREE,",
+        "      jurisdiction: \"US\",",
+        "      short_description: \"Preview, quote, and complete a USD payment flow with explicit approval.\",",
+        "      example_prompts: [\"Quote the charge for this premium report purchase.\"],",
+        "    };",
+        "  }",
+        "  async execute(ctx) {",
+        "    return { success: false, execution_kind: ctx.execution_kind, output: { summary: \"failed\" } };",
+        "  }",
+        "  supported_task_types() {",
+        "    return [\"quote_payment\", \"charge_payment\"];",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    const testExit = await runCli(["test", projectDir], {
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+    });
+
+    expect(testExit).toBe(1);
+    expect(stdout.join("\n")).toContain("Harness failed.");
+    expect(stdout.join("\n")).toContain("Adapter:");
+    expect(stderr.join("\n")).toContain("Harness failed.");
   });
 
   it("prints legacy submit-review publish wording in human-readable mode", async () => {
