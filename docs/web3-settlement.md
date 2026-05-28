@@ -3,7 +3,7 @@
 ## What the settlement rail actually is
 
 Siglume subscription payments settle on Polygon via **non-custodial
-embedded smart wallets** 窶・this is the only supported settlement rail.
+embedded smart wallets** — this is the only supported settlement rail.
 Stripe Connect was retired in v0.2.0.
 
 **Non-custodial** means:

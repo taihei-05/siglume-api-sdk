@@ -311,7 +311,7 @@ function isPlatformManagedRequirement(value: unknown): boolean {
 /**
  * Extract the opaque `provider_key` from a requirement entry.
  *
- * Returns the value VERBATIM  Eno lowercasing, no rewriting of
+ * Returns the value VERBATIM — no lowercasing, no rewriting of
  * non-alphanumeric characters. `provider_key` is a contract-defined
  * opaque identifier used for OAuth flow routing; keys such as
  * `AzureAD_v2`, `microsoft/graph`, `foo.bar` must be transmitted
@@ -1782,7 +1782,7 @@ function isManifestPayload(payload: Record<string, unknown>): boolean {
 function isToolManualPayload(payload: Record<string, unknown>): boolean {
   // Identify ToolManual by tool_name. AppManifest has no tool_name field,
   // so this is unambiguous against manifests. Optional fields are not
-  // required for discrimination  Ethe diff engine fills in defaults.
+  // required for discrimination — the diff engine fills in defaults.
   const toolName = payload.tool_name;
   return typeof toolName === "string" && toolName.trim().length > 0;
 }

@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -13,6 +14,52 @@ def _read(relative_path: str) -> str:
 def _read_optional(relative_path: str) -> str:
     path = SDK_ROOT / relative_path
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def test_tracked_text_files_do_not_contain_known_mojibake_markers() -> None:
+    markers = (
+        "\u7ab6",  # mojibake for UTF-8 punctuation such as em dash / bullet / ellipsis
+        "\u7aca",  # mojibake for arrows
+        "\u7b28",  # mojibake for check marks
+        "\u7b0f",  # mojibake for box-drawing characters
+        "\ue05e",  # mojibake prefix for emoji
+        "\u2001E",  # mojibake for an em dash followed by ASCII text
+        "\u96c9\u30fb\u2261\u8c4e",  # mojibake for Japanese legal text
+        "\u8fda\uff79\u87b3",
+        "\u86df\u5036\uff7a\uff7a",
+        "\u87d2\uff7a\u907d",
+        "\uff82\uff65",  # mojibake for yen sign
+    )
+    try:
+        tracked_files = subprocess.check_output(["git", "ls-files"], cwd=SDK_ROOT, text=True).splitlines()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        tracked_files = [
+            str(path.relative_to(SDK_ROOT))
+            for path in SDK_ROOT.rglob("*")
+            if path.is_file()
+            and ".git" not in path.parts
+            and "node_modules" not in path.parts
+            and ".pytest_cache" not in path.parts
+        ]
+    offenders: list[str] = []
+
+    for relative_path in tracked_files:
+        path = SDK_ROOT / relative_path
+        data = path.read_bytes()
+        if b"\x00" in data:
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            for marker in markers:
+                if marker in line:
+                    escaped_marker = marker.encode("unicode_escape").decode("ascii")
+                    offenders.append(f"{relative_path}:{line_no}: {escaped_marker}")
+
+    assert offenders == []
 
 
 def test_readme_keeps_coding_agent_prompt() -> None:

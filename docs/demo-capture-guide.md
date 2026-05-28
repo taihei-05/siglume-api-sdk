@@ -169,7 +169,7 @@ docs/assets/demo/siglume-owner-publish-demo.gif
 ## README embed snippet
 
 ```md
-[![噫 Quick Start](https://img.shields.io/badge/%F0%9F%9A%80-Quick%20Start-111827?style=flat-square)](./GETTING_STARTED.md)
+[![🚀 Quick Start](https://img.shields.io/badge/%F0%9F%9A%80-Quick%20Start-111827?style=flat-square)](./GETTING_STARTED.md)
 [![Examples](https://img.shields.io/badge/examples-starter%20apps-0ea5e9?style=flat-square)](#examples)
 [![License](https://img.shields.io/badge/license-MIT-16a34a?style=flat-square)](./LICENSE)
 

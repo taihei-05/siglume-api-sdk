@@ -2498,7 +2498,7 @@ def test_update_budget_policy_sanitizes_server_managed_fields() -> None:
 
 
 def test_update_budget_policy_forwards_null_period_dates_to_clear_them() -> None:
-    """period_start / period_end are nullable  Esending None must clear the boundary on the server."""
+    """period_start / period_end are nullable — sending None must clear the boundary on the server."""
 
     captured_payload: dict[str, Any] = {}
 
