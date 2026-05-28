@@ -1,7 +1,7 @@
 /*
 API: recurring subscription payment through embedded wallet settlement on Polygon.
 Intended user: seller-side payment adapter author shipping a PAYMENT tool.
-Connected account: none  Esettlement runs on the platform's on-chain contracts
+Connected account: none — settlement runs on the platform's on-chain contracts
 (SubscriptionHub) and the platform paymaster sponsors gas. Wallets stay
 non-custodial: Siglume never holds the buyer's or seller's funds or keys, and
 the SubscriptionHub contract can only pull up to the mandate cap the buyer

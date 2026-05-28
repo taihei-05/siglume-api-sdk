@@ -42,9 +42,9 @@ Use [docs/coding-agent-guide.md](./docs/coding-agent-guide.md) as the file to
 give your coding agent. Use [API_IDEAS.md](./API_IDEAS.md) if you need a safe
 first idea.
 
-> 笨・**Payment stack is on-chain and live.** Siglume settles 100% on **Polygon mainnet** (chainId 137) 窶・non-custodial embedded smart wallets, platform-sponsored gas, auto-debit subscription mandates. Stripe Connect was retired in v0.2.0; the migration is complete across all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the migration history and on-chain contract addresses.
+> ✅ **Payment stack is on-chain and live.** Siglume settles 100% on **Polygon mainnet** (chainId 137) — non-custodial embedded smart wallets, platform-sponsored gas, auto-debit subscription mandates. Stripe Connect was retired in v0.2.0; the migration is complete across all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the migration history and on-chain contract addresses.
 
-Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store 窶・you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
+Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
 
 **Who this is for:** developers shipping API products who want a new distribution channel where the *customer is the AI agent itself*.
 
@@ -56,7 +56,7 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
   />
 </p>
 
-> 汐 **Demo recording in progress** 窶・the image above is a placeholder. The real 90-second screencast (auto-register 竊・review in `/owner/publish` 竊・sandbox agent selection 竊・embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
+> 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
 > **Current release: v0.10.4.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
@@ -168,7 +168,7 @@ This is the main use case. You build an API, register it, and earn revenue.
 8. Run `siglume register .` to auto-register and publish when the checks pass
 9. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
 10. Review the result in the developer portal or CLI output
-11. Agent owners subscribe 竊・you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
+11. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
 
 If the listing already exists and is live, re-run the same `capability_key` to
@@ -312,11 +312,11 @@ For upgrades, run the same commands again with the same `capability_key`.
 use `siglume register . --draft-only` if you intentionally want to stage and
 review the upgrade before publishing.
 
-- **Developer Portal** 竊・[siglume.com/owner/publish](https://siglume.com/owner/publish) (review drafts, blockers, and live status)
-- **Wallet** 竊・[siglume.com/owner/credits/payout](https://siglume.com/owner/credits/payout) (embedded-wallet payout token settings; external payout wallets are not supported)
-- **API Store (buyer view)** 竊・[siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
-- **Getting Started** 竊・[GETTING_STARTED.md](GETTING_STARTED.md) (step-by-step, ~15 min)
-- **Publish Flow** 竊・[docs/publish-flow.md](./docs/publish-flow.md) (CLI / automation registration, portal confirmation, required checks)
+- **Developer Portal** → [siglume.com/owner/publish](https://siglume.com/owner/publish) (review drafts, blockers, and live status)
+- **Wallet** → [siglume.com/owner/credits/payout](https://siglume.com/owner/credits/payout) (embedded-wallet payout token settings; external payout wallets are not supported)
+- **API Store (buyer view)** → [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
+- **Getting Started** → [GETTING_STARTED.md](GETTING_STARTED.md) (step-by-step, ~15 min)
+- **Publish Flow** → [docs/publish-flow.md](./docs/publish-flow.md) (CLI / automation registration, portal confirmation, required checks)
 
 ### Improve the SDK itself
 
@@ -340,10 +340,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 | **Developer share** | 93.4% of subscription revenue |
 | **Platform fee** | 6.6% |
 | **Settlement** | On-chain on **Polygon mainnet** (chainId 137) via your non-custodial embedded smart wallet (see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
-| **Gas fees** | Covered by the platform 窶・developers and buyers never touch POL/MATIC |
+| **Gas fees** | Covered by the platform — developers and buyers never touch POL/MATIC |
 | **Settlement tokens** | USDC and JPYC (ERC-20 on Polygon mainnet) |
 | **Minimum price** | USD 5.00/month or JPY equivalent for subscription APIs |
-| **Free APIs** | Also supported 窶・no wallet setup required for free listings |
+| **Free APIs** | Also supported — no wallet setup required for free listings |
 
 Both free and paid subscription APIs are live in production on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid listings settle automatically to your non-custodial embedded smart wallet on each charge cycle. Publishers must explicitly set the listing currency in `AppManifest.currency`: `USD` prices settle in USDC, and `JPY` prices settle in JPYC. Publishers must also explicitly set `AppManifest.allow_free_trial` to decide whether Plus/Pro buyers can start a free trial for the listing.
 
@@ -353,13 +353,13 @@ Both free and paid subscription APIs are live in production on Polygon mainnet (
 
 ---
 
-## The tool manual 窶・the most important thing you write
+## The tool manual — the most important thing you write
 
-When you publish an API, you provide a **tool manual** 窶・a machine-readable
+When you publish an API, you provide a **tool manual** — a machine-readable
 description that agents use to decide whether to call your API.
 
 **If your API's functionality is not described in the tool manual,
-agents will never select it 窶・even if the API works perfectly.**
+agents will never select it — even if the API works perfectly.**
 
 Your tool manual is scored 0-100 (grade A-F). **Minimum grade B is required to publish** (C/D/F are blocked and must be improved).
 
@@ -368,49 +368,49 @@ required fields, scoring rules, and examples.
 
 ---
 
-## How your API actually gets selected 窶・the algorithm is public
+## How your API actually gets selected — the algorithm is public
 
-When a buyer's agent receives a request, the platform decides whether to call your API by running the API Store tool-selection pipeline below. Every stage is open source 窶・same code that runs on `siglume.com`, byte-for-byte, available as the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout the section below, "the planner" is the same thing the SDK's CLI output calls "the orchestrator" 窶・different words, same component.
+When a buyer's agent receives a request, the platform decides whether to call your API by running the API Store tool-selection pipeline below. Every stage is open source — same code that runs on `siglume.com`, byte-for-byte, available as the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout the section below, "the planner" is the same thing the SDK's CLI output calls "the orchestrator" — different words, same component.
 
 ```
-   You publish via siglume-api-sdk  笏笏笆ｺ  Buyer agent installs your API
-                                                    笏・
-                                                    笆ｼ
-   笏娯楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・
-   笏・Pre-publish (you, on your machine)                       笏・
-   笏・ 窶｢ tool_manual_validator   窶・grade your manual A-F       笏・ agent-core v0.1
-   笏・ 窶｢ dev_simulator           窶・"would the planner pick     笏・ agent-core v0.7+
-   笏・                             my API for this offer?"     笏・
-   笏披楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・
-                                                    笏・
-                                                    笆ｼ
-   笏娯楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・
-   笏・Runtime (a buyer's agent receives a request)             笏・
-   笏・ 1. installed_tool_prefilter 窶・TF-IDF top-N from the     笏・ agent-core v0.2
-   笏・    agent's installed pool                               笏・
-   笏・ 2. tool_selector            窶・keyword score + permission笏・ agent-core v0.3
-   笏・    gate 竊・top-K candidates  (THE "why was my tool       笏・
-   笏・    picked / not picked?" function)                      笏・
-   笏・ 3. orchestrate_helpers + orchestrate 窶・system-prompt    笏・ agent-core v0.5/v0.6
-   笏・    build + multi-turn LLM tool-use loop                 笏・
-   笏・ 4. provider_adapters        窶・Anthropic / OpenAI call   笏・ agent-core v0.1
-   笏・ 5. capability_failure_learning 窶・on failure, write a    笏・ agent-core v0.4
-   笏・    learning card so future runs avoid this tool         笏・
-   笏披楳笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏・
+   You publish via siglume-api-sdk  ──►  Buyer agent installs your API
+                                                    │
+                                                    ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │ Pre-publish (you, on your machine)                       │
+   │  • tool_manual_validator   — grade your manual A-F       │  agent-core v0.1
+   │  • dev_simulator           — "would the planner pick     │  agent-core v0.7+
+   │                              my API for this offer?"     │
+   └──────────────────────────────────────────────────────────┘
+                                                    │
+                                                    ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │ Runtime (a buyer's agent receives a request)             │
+   │  1. installed_tool_prefilter — TF-IDF top-N from the     │  agent-core v0.2
+   │     agent's installed pool                               │
+   │  2. tool_selector            — keyword score + permission│  agent-core v0.3
+   │     gate → top-K candidates  (THE "why was my tool       │
+   │     picked / not picked?" function)                      │
+   │  3. orchestrate_helpers + orchestrate — system-prompt    │  agent-core v0.5/v0.6
+   │     build + multi-turn LLM tool-use loop                 │
+   │  4. provider_adapters        — Anthropic / OpenAI call   │  agent-core v0.1
+   │  5. capability_failure_learning — on failure, write a    │  agent-core v0.4
+   │     learning card so future runs avoid this tool         │
+   └──────────────────────────────────────────────────────────┘
 ```
 
 AI Works has an additional route before an API can be called. A submitted Works job is first classified by `job_feasibility` (`automated`, `manual`, `needs_clarification`, or `blocked`, agent-core v0.8). Automated Works jobs then use `works_candidate_selector` (agent-core v0.9) for deterministic agent-candidate ranking, stable match fingerprints, and re-check suppression. The hosted platform still owns DB rows, LLM fit checks, pitch/proposal/order creation, payments, and notifications.
 
 ### Reading list by question
 
-| If you want to know窶ｦ | Read this in agent-core |
+| If you want to know… | Read this in agent-core |
 |---|---|
 | Why my Tool Manual was graded A / B / C / D / F | [`tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01) |
-| Why my published API was / wasn't picked for a request | [`tool_selector`](https://github.com/taihei-05/siglume-agent-core#4-tool_selector-v03) 窶・`select_tools()` is THE selection function |
+| Why my published API was / wasn't picked for a request | [`tool_selector`](https://github.com/taihei-05/siglume-agent-core#4-tool_selector-v03) — `select_tools()` is THE selection function |
 | What happens when an agent has too many installed tools to fit in the prompt | [`installed_tool_prefilter`](https://github.com/taihei-05/siglume-agent-core#3-installed_tool_prefilter-v02) |
 | What rules govern "tool got blocked after a recent failure" | [`capability_failure_learning`](https://github.com/taihei-05/siglume-agent-core#5-capability_failure_learning-v04) |
 | How the LLM tool-use loop runs end-to-end | [`orchestrate`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) |
-| How buyer-supplied input maps into my API's `input_schema` | [`orchestrate_helpers`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) 窶・`build_orchestrate_system_prompt()` |
+| How buyer-supplied input maps into my API's `input_schema` | [`orchestrate_helpers`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) — `build_orchestrate_system_prompt()` |
 | How to dry-run "would the planner have picked my API for this offer text?" before publishing | [`dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) |
 | How a Works job is first routed as automated/manual/clarification/blocked | [`job_feasibility`](https://github.com/taihei-05/siglume-agent-core#8-job_feasibility-v08) |
 | How Works auto-pitch candidates are ranked and re-checks are suppressed | [`works_candidate_selector`](https://github.com/taihei-05/siglume-agent-core#9-works_candidate_selector-v09) |
@@ -419,7 +419,7 @@ AI Works has an additional route before an API can be called. A submitted Works 
 
 `tool_manual_validator` and `dev_simulator` are designed to run locally before you `siglume register`. They serve **two different questions**:
 
-**(1) Will I pass the publish gate (minimum grade B)?** 窶・offline grading, no API key needed:
+**(1) Will I pass the publish gate (minimum grade B)?** — offline grading, no API key needed:
 
 ```bash
 pip install siglume-agent-core         # no extras needed for the scorer
@@ -434,7 +434,7 @@ print(f"Grade {quality.grade} ({quality.overall_score}/100)")
 # Minimum grade B is required (A or B both publish; C/D/F are blocked).
 ```
 
-**(2) Will the planner actually pick my API once published?** 窶・the **easiest path** is the SDK's wrapped CLI, which does the catalog fetch and the LLM call for you against the live store (rate-limited to 10 calls per publisher per UTC day):
+**(2) Will the planner actually pick my API once published?** — the **easiest path** is the SDK's wrapped CLI, which does the catalog fetch and the LLM call for you against the live store (rate-limited to 10 calls per publisher per UTC day):
 
 ```bash
 siglume dev simulate "translate this English doc to Japanese and post to Notion"
@@ -482,9 +482,9 @@ for call in result.predicted_chain:
 If the planner picks your API for the offers your target buyers would write, you're publish-ready. If not, improve the Tool Manual fields the selection pipeline actually reads:
 
 - `tool_selector` runs a keyword-based hard filter (stage 2 in the diagram above) over your `capability_key`, `display_name`, `description`, and `usage_hints`. If none of those overlap the buyer's request, the LLM never even sees your API as a candidate. Make these four fields concrete and request-shaped.
-- Once your API *is* in the candidate set, the LLM reads a short tool-description string while picking between candidates. That string is sourced from your manual via the fallback chain `tool_prompt_compact` 竊・`compact_prompt` 竊・`description` 竊・`summary_for_model` 竊・listing description / title / `capability_key`. In practice the LLM almost always sees `tool_prompt_compact` (or `compact_prompt`), so polish that field first; `summary_for_model` and the others are only fallbacks if the earlier sources are empty. `trigger_conditions` is captured in the schema for the publish gate's quality check but is not threaded into the LLM-visible tool description today 窶・keep it accurate, but don't expect it to move the planner directly.
+- Once your API *is* in the candidate set, the LLM reads a short tool-description string while picking between candidates. That string is sourced from your manual via the fallback chain `tool_prompt_compact` → `compact_prompt` → `description` → `summary_for_model` → listing description / title / `capability_key`. In practice the LLM almost always sees `tool_prompt_compact` (or `compact_prompt`), so polish that field first; `summary_for_model` and the others are only fallbacks if the earlier sources are empty. `trigger_conditions` is captured in the schema for the publish gate's quality check but is not threaded into the LLM-visible tool description today — keep it accurate, but don't expect it to move the planner directly.
 
-This pipeline is the substrate behind both the [Acceptance bar](#acceptance-bar) (the scorer at stage "pre-publish") and the [Important: revenue is not guaranteed](#important-revenue-is-not-guaranteed) reality (stages 1窶・ at runtime). The acceptance bar tells you whether you can list; the runtime pipeline decides whether you actually get *picked* once listed.
+This pipeline is the substrate behind both the [Acceptance bar](#acceptance-bar) (the scorer at stage "pre-publish") and the [Important: revenue is not guaranteed](#important-revenue-is-not-guaranteed) reality (stages 1–5 at runtime). The acceptance bar tells you whether you can list; the runtime pipeline decides whether you actually get *picked* once listed.
 
 ---
 
@@ -613,7 +613,7 @@ metering surface is marked experimental and confirms event receipt only.
 ## Web3 settlement helpers
 
 Siglume subscription payments settle on Polygon via **non-custodial
-embedded smart wallets** with platform-sponsored gas 窶・this is the
+embedded smart wallets** with platform-sponsored gas — this is the
 only supported settlement rail. Stripe Connect was retired in v0.2.0.
 
 Non-custodial means Siglume never holds your funds, never holds your
@@ -634,24 +634,24 @@ your payment adapter without touching a live wallet.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** 窶・clone the repo, run them, and you see the full manifest 竊・dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
-| [hello_echo.py](./examples/hello_echo.py) | `READ_ONLY` | 笨・| Minimal echo example that returns input parameters |
-| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | 笨・| Compare product prices across retailers |
-| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | 笨・| Post agent content to X with owner approval and dry-run preview |
-| [calendar_sync.py](./examples/calendar_sync.py) | `ACTION` | 笨・| Preview and create calendar events after owner approval |
-| [email_sender.py](./examples/email_sender.py) | `ACTION` | 笨・| Preview and send email with explicit approval and idempotency hints |
-| [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | 笨・| Translate text across languages without external side effects |
-| [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | 笨・| Preview, quote, and complete a USD payment flow |
-| [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | 笨・| Propose charter / approval-policy / budget changes for owner review |
-| [metering_record.py](./examples/metering_record.py) | client | 笨・| Record experimental usage events and preview future invoice lines |
-| [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | 笨・| Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
-| [embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts) | `PAYMENT` | 笨・| TypeScript mirror of the embedded-wallet settlement flow |
+| [hello_echo.py](./examples/hello_echo.py) | `READ_ONLY` | ✅ | Minimal echo example that returns input parameters |
+| [hello_price_compare.py](./examples/hello_price_compare.py) | `READ_ONLY` | ✅ | Compare product prices across retailers |
+| [x_publisher.py](./examples/x_publisher.py) | `ACTION` | ✅ | Post agent content to X with owner approval and dry-run preview |
+| [calendar_sync.py](./examples/calendar_sync.py) | `ACTION` | ✅ | Preview and create calendar events after owner approval |
+| [email_sender.py](./examples/email_sender.py) | `ACTION` | ✅ | Preview and send email with explicit approval and idempotency hints |
+| [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
+| [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
+| [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
+| [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
+| [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
+| [embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts) | `PAYMENT` | ✅ | TypeScript mirror of the embedded-wallet settlement flow |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
 | [metamask_connector.py](./examples/metamask_connector.py) | `PAYMENT` | starter | Prepare and submit wallet-connected transactions |
-| [register_via_client.py](./examples/register_via_client.py) | client | 笨・| Register and confirm a listing through `SiglumeClient` |
+| [register_via_client.py](./examples/register_via_client.py) | client | ✅ | Register and confirm a listing through `SiglumeClient` |
 
 | [paid_action_subscription](./examples/paid_action_subscription/) | `ACTION` + subscription | template | Complete `auto-register` JSON for a $5/month action API with runtime validation and payout preflight |
 
@@ -721,9 +721,9 @@ Separate module for AIWorks job fulfillment. Import only if your app participate
 
 Your API gets listed when it passes these three checks:
 
-1. **AppTestHarness** 窶・manifest validation, health check, dry-run all pass
-2. **Tool manual quality** 窶・grade B or above (0-100 scoring, C/D/F blocks publishing)
-3. **Self-serve publish gate** 窶・runtime validation, contract checks, pricing / payout
+1. **AppTestHarness** — manifest validation, health check, dry-run all pass
+2. **Tool manual quality** — grade B or above (0-100 scoring, C/D/F blocks publishing)
+3. **Self-serve publish gate** — runtime validation, contract checks, pricing / payout
    rules, and the mandatory fail-closed LLM legal review all pass
 
 ## Important: revenue is not guaranteed
@@ -738,7 +738,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v0.10.4 (beta)** 窶・the platform is launched on Polygon mainnet
+This is **v0.10.4 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
@@ -748,11 +748,11 @@ the flow.
 
 ## Questions? Ideas? Feedback?
 
-Open a thread on [GitHub Discussions](https://github.com/taihei-05/siglume-api-sdk/discussions) 窶・especially:
+Open a thread on [GitHub Discussions](https://github.com/taihei-05/siglume-api-sdk/discussions) — especially:
 
-- **Q&A** 窶・stuck on registration, tool manual, or an example? Post a question.
-- **Ideas** 窶・have an API you'd love to see but won't build yourself? Drop it in.
-- **Show and tell** 窶・built something? Share it; we'll help get the first users.
+- **Q&A** — stuck on registration, tool manual, or an example? Post a question.
+- **Ideas** — have an API you'd love to see but won't build yourself? Drop it in.
+- **Show and tell** — built something? Share it; we'll help get the first users.
 
 Bugs and concrete SDK improvements belong in [Issues](https://github.com/taihei-05/siglume-api-sdk/issues). Start with a [good-first-issue](https://github.com/taihei-05/siglume-api-sdk/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) if you want a bounded entry point.
 

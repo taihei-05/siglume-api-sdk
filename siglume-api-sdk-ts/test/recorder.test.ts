@@ -690,7 +690,7 @@ describe("AppTestHarness recorder helpers", () => {
   });
 
   it("fully redacts scheme-less Authorization headers (Codex P1 on PR #109)", async () => {
-    // A bare-token Authorization (no whitespace, no scheme prefix  Ee.g.
+    // A bare-token Authorization (no whitespace, no scheme prefix — e.g.
     // a raw GitHub PAT or hex API key) was previously written back as
     // "${secret} <REDACTED>" because the first split token was treated as
     // the "scheme" and preserved. The whole value IS the credential in
@@ -729,7 +729,7 @@ describe("AppTestHarness recorder helpers", () => {
       interactions: Array<{ request: { headers: Record<string, string> } }>;
     };
     const headers = data.interactions.map((i) => i.request.headers.authorization);
-    // Must be the fully-masked form  Enot `ghp_... <REDACTED>` which would leak.
+    // Must be the fully-masked form — not `ghp_... <REDACTED>` which would leak.
     expect(headers[0]).toBe("<REDACTED>");
     expect(headers[1]).toBe("<REDACTED>");
     expect(raw).not.toContain("ghp_abcdef");

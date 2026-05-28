@@ -78,7 +78,7 @@ class MetaMaskConnectorApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            applicable_regulations=["BSA"],  # US Bank Secrecy Act  EMSB rules
+            applicable_regulations=["BSA"],  # US Bank Secrecy Act — MSB rules
             short_description="Connect your agent to Ethereum wallets for on-chain actions",
             docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/metamask_connector.py",
             support_contact="https://github.com/taihei-05/siglume-api-sdk/issues",
