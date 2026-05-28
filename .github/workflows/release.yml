@@ -35,6 +35,16 @@ on:
       tag:
         description: 'Existing annotated tag to build and publish (e.g. v0.2.1). Must already exist in refs/tags/.'
         required: true
+      publish_pypi:
+        description: 'Publish Python artifacts to PyPI.'
+        required: false
+        type: boolean
+        default: true
+      publish_npm:
+        description: 'Publish the TypeScript package to npm.'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -165,6 +175,7 @@ jobs:
   publish:
     name: Publish to PyPI via OIDC
     needs: build
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_pypi }}
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -189,24 +200,23 @@ jobs:
           attestations: true
 
   # Job 3: publish the TypeScript package to npm. Independent of PyPI —
-  # runs on the same tag push. Uses NPM_TOKEN from the repo secrets
-  # (automation token with 2FA-exempt publish scope).
+  # runs on the same tag push. Uses npm Trusted Publishing / OIDC, so no
+  # long-lived npm token is required.
   #
   # SETUP (one-time, npm-side — operator task):
   #   1. Sign in to https://www.npmjs.com/
-  #   2. Create an Automation access token (Settings → Access Tokens →
-  #      Generate New Token → Automation). This is 2FA-exempt and meant
-  #      for CI.
-  #   3. Add the token as a GitHub secret named NPM_TOKEN:
-  #      https://github.com/taihei-05/siglume-api-sdk/settings/secrets/actions/new
-  #   4. Ensure package.json "name" matches the npm scope you control
+  #   2. Configure Trusted Publishing for:
+  #      - GitHub owner: taihei-05
+  #      - Repository: siglume-api-sdk
+  #      - Workflow filename: release.yml
+  #      - Environment name: npm
+  #      - Allowed action: npm publish
+  #   3. Ensure package.json "name" matches the npm scope you control
   #      (currently @siglume/api-sdk).
-  #
-  # If NPM_TOKEN is not set, the job skips with a warning so
-  # PyPI-only releases still succeed.
   publish-npm:
     name: Publish TS to npm
     needs: build
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_npm }}
     runs-on: ubuntu-latest
     environment:
       name: npm
@@ -227,16 +237,13 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
-      - name: Check for NPM_TOKEN
-        id: npm_token
+      - name: Ensure npm supports trusted publishing
         run: |
-          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "NPM_TOKEN is not set; skipping npm publish."
-            echo "present=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          fi
+          npm install -g npm@^11.5.1
+          node --version
+          npm --version
 
       - name: Install dependencies (TS package)
         working-directory: siglume-api-sdk-ts
@@ -259,10 +266,9 @@ jobs:
         run: npm run pack:check
 
       - name: Publish to npm
-        if: steps.npm_token.outputs.present == 'true'
         working-directory: siglume-api-sdk-ts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         # --access public because the package is scoped (@siglume/...)
         # and npm defaults scoped packages to private.
-        run: npm publish --access public --provenance
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --access public
