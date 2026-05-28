@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.8] - 2026-05-28
+
+### Fixed
+
+- Restored UTF-8 punctuation, emoji, box-drawing characters, yen signs, and
+  Japanese legal terms that were committed as mojibake in public SDK docs,
+  examples, comments, and docstrings.
+- Added a repository-wide regression test that scans tracked UTF-8 text files
+  for known mojibake marker sequences.
+
 ## [0.10.7] - 2026-05-13
 
 ### Changed

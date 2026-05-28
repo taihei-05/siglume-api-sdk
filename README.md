@@ -58,17 +58,18 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v0.10.4.** Python and TypeScript are version-aligned and
+> **Current release: v0.10.8.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, seller-owned connected-account OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
 > long-form buyer-facing `description`, and platform-controlled release semver
-> via `version_bump`. v0.10.4 keeps the publisher observability commands under
+> via `version_bump`. v0.10.8 restores the public docs and package metadata
+> after a Windows encoding regression, and keeps the publisher observability commands under
 > `siglume dev`, including planner simulation, execution receipt tailing,
 > gap reports, listing stats, and market-vitals traffic snapshots, and aligns
 > the public agent-core references with Works routing and candidate selection.
 > See [CHANGELOG.md](./CHANGELOG.md),
-> [RELEASE_NOTES_v0.10.4.md](./RELEASE_NOTES_v0.10.4.md), and
+> [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md), and
 > [RELEASE_NOTES_v0.10.1.md](./RELEASE_NOTES_v0.10.1.md) for the current
 > release line.
 >
@@ -738,7 +739,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v0.10.4 (beta)** — the platform is launched on Polygon mainnet
+This is **v0.10.8 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
