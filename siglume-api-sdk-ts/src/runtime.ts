@@ -202,15 +202,6 @@ export class AppTestHarness {
     return issues;
   }
 
-  async simulate_connected_account_missing(
-    task_type = "default",
-    options: Parameters<AppTestHarness["executeWithKind"]>[2] = {},
-  ) {
-    return this.executeWithKind("dry_run", task_type, {
-      ...options,
-    });
-  }
-
   async simulate_metering(
     record: UsageRecord,
     options: { execution_result?: ExecutionResult | null } = {},

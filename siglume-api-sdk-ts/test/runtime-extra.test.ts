@@ -142,9 +142,9 @@ describe("runtime helpers", () => {
 
     const harness = new AppTestHarness(new RecordingApp());
     expect(harness.validate_tool_manual()).toEqual([true, []]);
-    const missing = await harness.simulate_connected_account_missing("lookup_price", {
+    const dryRun = await harness.dry_run("lookup_price", {
       input_params: { query: "headphones" },
     });
-    expect(missing.execution_kind).toBe("dry_run");
+    expect(dryRun.execution_kind).toBe("dry_run");
   });
 });

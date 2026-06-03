@@ -1560,14 +1560,6 @@ async function runHarnessForProject(project: LoadedProject): Promise<Record<stri
     checks.push(executionCheck("quote", await harness.execute_quote(task_type, { input_params: sample_input }), harness));
     checks.push(executionCheck("payment", await harness.execute_payment(task_type, { input_params: sample_input }), harness));
   }
-  checks.push(
-    executionCheck(
-      "missing_account_simulation",
-      await harness.simulate_connected_account_missing(task_type, { input_params: sample_input }),
-      harness,
-    ),
-  );
-
   return {
     adapter_path: project.adapter_path,
     task_type,

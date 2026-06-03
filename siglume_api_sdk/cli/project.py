@@ -1666,12 +1666,6 @@ async def _run_harness_async(project: LoadedProject) -> dict[str, Any]:
         payment_result = await harness.execute_payment(task_type=task_type, input_params=sample_input)
         checks.append(_execution_check("payment", payment_result, harness))
 
-    missing_account_result = await harness.simulate_connected_account_missing(
-        task_type=task_type,
-        input_params=sample_input,
-    )
-    checks.append(_execution_check("missing_account_simulation", missing_account_result, harness))
-
     overall_ok = all(check["ok"] for check in checks)
     return {
         "adapter_path": str(project.adapter_path),
