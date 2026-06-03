@@ -28,9 +28,10 @@ export interface CapabilityPersistencePolicy {
 
 export interface ConnectedAccountRef {
   provider_key: string;
-  session_token: string; // short-lived, scoped token managed by Siglume
-  scopes: string[];
-  environment: Environment;
+  external_account_ref?: string | null;
+  identity?: Record<string, unknown>;
+  scopes?: string[];
+  environment?: Environment;
 }
 
 export interface AppManifest {
