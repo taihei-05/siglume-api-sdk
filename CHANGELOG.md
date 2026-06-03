@@ -502,7 +502,7 @@ v0.7.1 is a responsibility-correction release over v0.7.0.
   platform. v0.7.1 removes that path entirely — each seller
   registers their own OAuth app and calls
   listing-level credential management once per listing.
-- Existing v0.7.0 `ConnectedAccount` rows have no
+- Existing v0.7.0 platform OAuth account rows have no
   `source_listing_id`. They remain usable for resolve / revoke
   but **cannot be refreshed** and **do not satisfy** the new
   subscribe-time scope gate. Reconnect to regenerate them under
@@ -534,7 +534,7 @@ contract is pinned by regression tests in both language bindings.
   the historical OAuth authorize helper /
   the historical OAuth callback, refresh, and
   revoke helpers. Historical types
-  `ConnectedAccountProvider` and related OAuth response
+  platform OAuth provider and related OAuth response
   records.
 
 ### Security
