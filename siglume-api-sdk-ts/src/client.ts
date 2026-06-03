@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AccessGrantRecord,
   AccountAlert,
   AccountContentDeleteResult,
@@ -25,8 +25,6 @@ import type {
   ApprovalPolicy,
   BundleListingRecord,
   BundleMember,
-  ConnectedAccountLifecycleResult,
-  ConnectedAccountOAuthStart,
   AutoRegistrationReceipt,
   BillingPortalLink,
   BudgetPolicy,
@@ -208,7 +206,6 @@ export interface SiglumeClientShape {
       source_code?: string;
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
-      oauth_credentials?: Record<string, unknown> | unknown[];
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
     },
@@ -274,35 +271,7 @@ export interface SiglumeClientShape {
   remove_bundle_capability(bundle_id: string, capability_listing_id: string): Promise<BundleListingRecord>;
   submit_bundle_for_review(bundle_id: string): Promise<BundleListingRecord>;
 
-  // Connected accounts (v0.7 track 3)
-  start_connected_account_oauth(input: {
-    listing_id: string;
-    redirect_uri: string;
-    scopes?: string[];
-    account_role?: string;
-  }): Promise<ConnectedAccountOAuthStart>;
-  set_listing_oauth_credentials(
-    listing_id: string,
-    input: {
-      provider_key: string;
-      client_id: string;
-      client_secret: string;
-      authorize_url: string;
-      token_url: string;
-      revoke_url?: string;
-      display_name?: string;
-      scope_separator?: string;
-      token_endpoint_auth?: string;
-      pkce_required?: boolean;
-      refresh_supported?: boolean;
-      available_scopes?: string[];
-      required_scopes?: string[];
-    },
-  ): Promise<Record<string, unknown>>;
-  get_listing_oauth_credentials_status(listing_id: string): Promise<Record<string, unknown>>;
-  complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>>;
-  refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
-  revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
+  // Connected accounts: publisher APIs own external OAuth and token storage.
 
   get_developer_portal(): Promise<DeveloperPortalSummary>;
   create_sandbox_session(options: { agent_id: string; capability_key: string }): Promise<SandboxSession>;
@@ -956,21 +925,6 @@ function parseBundleMember(data: Record<string, unknown>): BundleMember {
     status: stringOrNull(data.status),
     added_at: stringOrNull(data.added_at),
     link_id: stringOrNull(data.link_id),
-  };
-}
-
-function parseConnectedAccountLifecycle(data: Record<string, unknown>): ConnectedAccountLifecycleResult {
-  return {
-    connected_account_id: String(data.connected_account_id ?? ""),
-    provider_key: String(data.provider_key ?? ""),
-    expires_at: stringOrNull(data.expires_at),
-    scopes: Array.isArray(data.scopes)
-      ? data.scopes.filter((s): s is string => typeof s === "string")
-      : [],
-    refreshed_at: stringOrNull(data.refreshed_at),
-    connection_status: stringOrNull(data.connection_status),
-    provider_revoked: typeof data.provider_revoked === "boolean" ? data.provider_revoked : null,
-    revoked_at: stringOrNull(data.revoked_at),
   };
 }
 
@@ -2212,7 +2166,6 @@ export class SiglumeClient implements SiglumeClientShape {
       source_code?: string;
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
-      oauth_credentials?: Record<string, unknown> | unknown[];
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
     } = {},
@@ -2236,15 +2189,6 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     if (options.runtime_validation) {
       payload.runtime_validation = coerceMapping(options.runtime_validation, "runtime_validation");
-    }
-    if (options.oauth_credentials) {
-      payload.oauth_credentials = Array.isArray(options.oauth_credentials)
-        ? {
-            items: options.oauth_credentials.map((item, index) =>
-              coerceMapping(item, `oauth_credentials[${index}]`),
-            ),
-          }
-        : coerceMapping(options.oauth_credentials, "oauth_credentials");
     }
     if (options.source_context) {
       payload.source_context = coerceMapping(options.source_context, "source_context");
@@ -2386,7 +2330,6 @@ export class SiglumeClient implements SiglumeClientShape {
       auto_manifest: toRecord(data.auto_manifest),
       confidence: toRecord(data.confidence),
       validation_report: toRecord(data.validation_report),
-      oauth_status: toRecord(data.oauth_status),
       review_url: stringOrNull(data.review_url),
       trace_id: meta.trace_id,
       request_id: meta.request_id,
@@ -2649,97 +2592,9 @@ export class SiglumeClient implements SiglumeClientShape {
 
   // ----- end bundles -------------------------------------------------------
 
-  // ----- Connected accounts (v0.7 track 3) ---------------------------------
-  // `resolve()` is intentionally NOT wrapped: runtime-only, never over the wire.
-
-  async start_connected_account_oauth(input: {
-    listing_id: string;
-    redirect_uri: string;
-    scopes?: string[];
-    account_role?: string;
-  }): Promise<ConnectedAccountOAuthStart> {
-    const body: Record<string, unknown> = {
-      listing_id: input.listing_id,
-      redirect_uri: input.redirect_uri,
-    };
-    if (input.scopes !== undefined) body.scopes = input.scopes;
-    if (input.account_role !== undefined) body.account_role = input.account_role;
-    const [data] = await this.request("POST", "/me/connected-accounts/oauth/authorize", {
-      json_body: body,
-    });
-    return {
-      authorize_url: String(data.authorize_url ?? ""),
-      state: String(data.state ?? ""),
-      provider_key: String(data.provider_key ?? ""),
-      scopes: Array.isArray(data.scopes)
-        ? data.scopes.filter((s: unknown): s is string => typeof s === "string")
-        : [],
-      pkce_method: stringOrNull(data.pkce_method),
-    };
-  }
-
-  async complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>> {
-    const [data] = await this.request("POST", "/me/connected-accounts/oauth/callback", {
-      json_body: { state: input.state, code: input.code },
-    });
-    return { ...data };
-  }
-
-  async refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
-    const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/refresh`);
-    return parseConnectedAccountLifecycle(data);
-  }
-
-  async revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
-    const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/revoke`);
-    return parseConnectedAccountLifecycle(data);
-  }
-
-  async set_listing_oauth_credentials(
-    listing_id: string,
-    input: {
-      provider_key: string;
-      client_id: string;
-      client_secret: string;
-      authorize_url: string;
-      token_url: string;
-      revoke_url?: string;
-      display_name?: string;
-      scope_separator?: string;
-      token_endpoint_auth?: string;
-      pkce_required?: boolean;
-      refresh_supported?: boolean;
-      available_scopes?: string[];
-      required_scopes?: string[];
-    },
-  ): Promise<Record<string, unknown>> {
-    const body: Record<string, unknown> = {
-      provider_key: input.provider_key,
-      client_id: input.client_id,
-      client_secret: input.client_secret,
-      authorize_url: input.authorize_url,
-      token_url: input.token_url,
-    };
-    if (input.revoke_url !== undefined) body.revoke_url = input.revoke_url;
-    if (input.display_name !== undefined) body.display_name = input.display_name;
-    if (input.scope_separator !== undefined) body.scope_separator = input.scope_separator;
-    if (input.token_endpoint_auth !== undefined) body.token_endpoint_auth = input.token_endpoint_auth;
-    if (input.pkce_required !== undefined) body.pkce_required = input.pkce_required;
-    if (input.refresh_supported !== undefined) body.refresh_supported = input.refresh_supported;
-    if (input.available_scopes !== undefined) body.available_scopes = input.available_scopes;
-    if (input.required_scopes !== undefined) body.required_scopes = input.required_scopes;
-    const [data] = await this.request("PUT", `/market/capabilities/${listing_id}/oauth-credentials`, {
-      json_body: body,
-    });
-    return { ...data };
-  }
-
-  async get_listing_oauth_credentials_status(listing_id: string): Promise<Record<string, unknown>> {
-    const [data] = await this.request("GET", `/market/capabilities/${listing_id}/oauth-credentials`);
-    return { ...data };
-  }
-
-  // ----- end connected accounts --------------------------------------------
+  // ----- Connected accounts ------------------------------------------------
+  // Architecture B: publisher APIs own external OAuth and token storage.
+  // The SDK no longer exposes platform OAuth or listing credential APIs.
 
   async get_developer_portal(): Promise<DeveloperPortalSummary> {
     const [data, meta] = await this.request("GET", "/market/developer/portal");

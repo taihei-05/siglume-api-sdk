@@ -116,9 +116,9 @@ class VisualPublisherApp(AppAdapter):
         # if not x_token:
         #     return ExecutionResult(success=False, error_message="X account not connected")
         #
-        # media_id = await self._upload_media(x_token.session_token, image_result["data"])
+        # media_id = await self._upload_media(user_token, image_result["data"])
         # tweet = await self._create_tweet_with_media(
-        #     x_token.session_token, caption, media_id, alt_text
+        #     user_token, caption, media_id, alt_text
         # )
 
         return ExecutionResult(

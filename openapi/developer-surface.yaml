@@ -99,8 +99,7 @@ paths:
         The `201` response is the registration receipt consumed by the CLI and
         SDK before optional immediate publish. It includes whether the operation
         created a fresh draft, refreshed an existing draft, or staged an upgrade
-        against an already-published listing, plus seller OAuth readiness when
-        connected-account seeds were provided.
+        against an already-published listing.
 
         `source_code` is still accepted when you want the platform to infer
         fields heuristically. `source_url` is also accepted as the provenance
@@ -319,27 +318,11 @@ paths:
                     type: string
                 required_connected_accounts:
                   type: array
-                  description: Manifest/listing connected-account requirements. Plain strings are API-managed; objects with platform_managed=true require seller OAuth credentials and must match ToolManual.requires_connected_accounts.
+                  description: Manifest/listing connected-account requirements. Use managed_by="api" with an absolute connect_url when an external account authorization flow is required.
                   items:
                     oneOf:
                       - type: string
                       - type: object
-                oauth_credentials:
-                  type: object
-                  description: |
-                    Optional seller-owned OAuth app credentials. Required when
-                    `required_connected_accounts` declares platform-managed
-                    OAuth provider objects. Plain provider strings are
-                    API-managed and do not require this seed. Include these
-                    during the initial registration and during upgrades that add
-                    a new platform-managed provider. The portal OAuth panel is
-                    for rotation / repair after registration, not the initial
-                    setup step.
-                  properties:
-                    items:
-                      type: array
-                      items:
-                        $ref: '#/components/schemas/ListingOAuthCredentialsRequest'
                 runtime_validation:
                   type: object
                   description: |
@@ -473,17 +456,6 @@ paths:
                             metadata:
                               type: object
                               additionalProperties: true
-                  oauth_status:
-                    type: object
-                    description: Seller OAuth seed readiness derived from the submitted oauth_credentials payload.
-                    properties:
-                      configured:
-                        type: boolean
-                      missing_providers:
-                        type: array
-                        items:
-                          type: string
-                    additionalProperties: true
                   review_url:
                     type: string
                     description: Dashboard URL where the seller can inspect the receipt before publishing.
@@ -1431,118 +1403,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConnectedAccountEnvelope'
 
-  /me/connected-accounts/oauth/authorize:
-    post:
-      operationId: startConnectedAccountOAuth
-      summary: Begin the buyer OAuth flow for a specific listing
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConnectedAccountOAuthAuthorizeRequest'
-      responses:
-        '201':
-          description: Authorization URL generated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountOAuthStartEnvelope'
-
-  /me/connected-accounts/oauth/callback:
-    post:
-      operationId: completeConnectedAccountOAuth
-      summary: Complete the buyer OAuth flow with provider callback params
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConnectedAccountOAuthCallbackRequest'
-      responses:
-        '200':
-          description: Connected-account lifecycle summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
-
-  /me/connected-accounts/{accountId}/refresh:
-    post:
-      operationId: refreshConnectedAccount
-      summary: Refresh a connected account without exposing provider tokens
-      parameters:
-        - name: accountId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Refreshed connected-account lifecycle summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
-
-  /me/connected-accounts/{accountId}/revoke:
-    post:
-      operationId: revokeConnectedAccount
-      summary: Revoke a connected account and return lifecycle metadata
-      parameters:
-        - name: accountId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Revoked connected-account lifecycle summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
-
-  /market/capabilities/{listingId}/oauth-credentials:
-    get:
-      operationId: getListingOAuthCredentialsStatus
-      summary: Read the post-registration seller OAuth credential status for a listing
-      parameters:
-        - name: listingId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Listing OAuth credential status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
-    put:
-      operationId: setListingOAuthCredentials
-      summary: Rotate or repair seller-owned OAuth client credentials for a listing
-      parameters:
-        - name: listingId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ListingOAuthCredentialsRequest'
-      responses:
-        '200':
-          description: Listing OAuth credential status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
-
   /market/sandbox/sessions:
     post:
       operationId: createSandboxSession
@@ -2147,145 +2007,6 @@ components:
         connection_status: { type: string, default: connected }
         scopes: { type: array, items: { type: string } }
         metadata: { type: object }
-
-    ConnectedAccountOAuthAuthorizeRequest:
-      type: object
-      required: [listing_id, redirect_uri]
-      properties:
-        listing_id: { type: string }
-        redirect_uri: { type: string, format: uri }
-        scopes:
-          type: array
-          items: { type: string }
-        account_role: { type: string, nullable: true }
-
-    ConnectedAccountOAuthStart:
-      type: object
-      properties:
-        authorize_url: { type: string, format: uri }
-        state: { type: string }
-        provider_key: { type: string }
-        scopes:
-          type: array
-          items: { type: string }
-        pkce_method: { type: string, nullable: true }
-
-    ConnectedAccountOAuthStartEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountOAuthStart'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ConnectedAccountOAuthCallbackRequest:
-      type: object
-      required: [state, code]
-      properties:
-        state: { type: string }
-        code: { type: string }
-
-    ConnectedAccountLifecycle:
-      type: object
-      properties:
-        connected_account_id: { type: string }
-        provider_key: { type: string }
-        expires_at: { type: string, format: date-time, nullable: true }
-        scopes:
-          type: array
-          items: { type: string }
-        refreshed_at: { type: string, format: date-time, nullable: true }
-        connection_status: { type: string, nullable: true }
-        provider_revoked: { type: boolean, nullable: true }
-        revoked_at: { type: string, format: date-time, nullable: true }
-
-    ConnectedAccountLifecycleEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountLifecycle'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ListingOAuthCredentialsRequest:
-      type: object
-      required: [provider_key, client_id, client_secret, authorize_url, token_url]
-      properties:
-        provider_key: { type: string }
-        client_id: { type: string }
-        client_secret: { type: string }
-        authorize_url: { type: string, format: uri }
-        token_url: { type: string, format: uri }
-        revoke_url: { type: string, format: uri, nullable: true }
-        display_name: { type: string, nullable: true }
-        scope_separator: { type: string, nullable: true, default: ' ' }
-        token_endpoint_auth: { type: string, nullable: true }
-        pkce_required: { type: boolean, nullable: true }
-        refresh_supported: { type: boolean, nullable: true }
-        available_scopes:
-          type: array
-          items: { type: string }
-        required_scopes:
-          type: array
-          items: { type: string }
-
-    ListingOAuthCredentialsStatus:
-      type: object
-      properties:
-        listing_id: { type: string }
-        provider_key: { type: string }
-        configured: { type: boolean }
-        required_scopes:
-          type: array
-          items: { type: string }
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              provider_key: { type: string }
-              configured: { type: boolean }
-              authorize_url: { type: string, nullable: true }
-              token_url: { type: string, nullable: true }
-              revoke_url: { type: string, nullable: true }
-              display_name: { type: string, nullable: true }
-              scope_separator: { type: string, nullable: true }
-              token_endpoint_auth: { type: string, nullable: true }
-              pkce_required: { type: boolean, nullable: true }
-              refresh_supported: { type: boolean, nullable: true }
-              available_scopes:
-                type: array
-                items: { type: string }
-              required_scopes:
-                type: array
-                items: { type: string }
-              updated_at:
-                anyOf:
-                  - type: string
-                  - type: 'null'
-
-    ListingOAuthCredentialsStatusEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ListingOAuthCredentialsStatus'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
 
     ApprovalChallengeRequest:
       type: object

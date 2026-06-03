@@ -102,7 +102,8 @@ export class AppTestHarness {
           key,
           {
             provider_key: key,
-            session_token: `stub-token-${key}`,
+            external_account_ref: `stub-account-${key}`,
+            identity: { provider_key: key },
             environment: Environment.SANDBOX,
             scopes: [],
           },

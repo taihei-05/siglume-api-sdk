@@ -1,10 +1,10 @@
-"""X Publisher -- post your agent's content to X (Twitter) with owner approval.
+﻿"""X Publisher -- post your agent's content to X (Twitter) with owner approval.
 
 A runnable reference implementation built on the Siglume SDK. Ships with a
 `MockXAPI` stub so you can exercise the full manifest -> dry-run -> action
 lifecycle locally without a real X developer account. To go live, replace
 the stubbed POST in `_post_to_x` with an authenticated call against X API v2
-using the token from `ctx.connected_accounts["x-twitter"]`.
+using the token your API stores for the Siglume platform user identity.
 
 Permission: ACTION (creates external posts)
 Approval:   ALWAYS_ASK (owner approves before each post)
@@ -55,7 +55,14 @@ class XPublisherApp(AppAdapter):
             permission_class=PermissionClass.ACTION,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,
-            required_connected_accounts=["x-twitter"],
+            required_connected_accounts=[
+                {
+                    "provider_key": "x-twitter",
+                    "managed_by": "api",
+                    "connect_url": "https://api.example.com/oauth/x/start",
+                    "required_scopes": ["tweet.write", "tweet.read", "users.read"],
+                }
+            ],
             permission_scopes=["tweet.write", "tweet.read", "users.read"],
             price_model=PriceModel.FREE,
             price_value_minor=0,
@@ -104,10 +111,9 @@ class XPublisherApp(AppAdapter):
                 approval_prompt=f'Post to X: "{formatted["text"][:100]}..."',
             )
 
-        # Live post. In production, swap `self._x_api` for a real X API v2 client
-        # that reads the user's OAuth token from
-        #     ctx.connected_accounts["x-twitter"].session_token
-        # The MockXAPI stub registered in __init__ stands in during sandbox tests.
+        # Live post. In production, swap `self._x_api` for a real X API v2 client.
+        # The publisher API should map Siglume identity from the invocation
+        # context to the user's token stored outside Siglume.
         response = await self._x_api.handle("create_tweet", {"text": formatted["text"]})
         tweet_id = response["data"]["id"]
         username = response.get("user", {}).get("username", "agent")
@@ -206,10 +212,10 @@ async def main() -> None:
     print("Next steps to go live on the API Store:")
     print("  1. Register an X developer app, enable OAuth 2.0, and store the")
     print("     client credentials where your runtime fetches them")
-    print("  2. Replace `_post_to_x` stub with a real X API v2 call that uses")
-    print("     ctx.connected_accounts['x-twitter'].session_token")
+    print("  2. Replace `_post_to_x` stub with a real X API v2 call that maps")
+    print("     Siglume identity to the user token stored by your API")
     print("  3. Write tool_manual.json -- see GETTING_STARTED.md #13")
-    print("  4. Keep oauth_credentials.json and runtime_validation.json local and Git-ignored")
+    print("  4. Keep runtime_validation.json local and Git-ignored")
     print("  5. Run: siglume test . && siglume score . --offline")
     print("  6. Deploy, fill runtime_validation.json, then run:")
     print("     siglume validate .")

@@ -1,4 +1,4 @@
-# Roadmap
+﻿# Roadmap
 
 What is shipped today on the public SDK, what is scheduled next, and
 what is explicitly out of scope. For the per-release changelog, see
@@ -41,11 +41,9 @@ Both v0.7 platform tracks landed:
   Python and TypeScript. One listing exposes multiple capability
   listings under one subscription; same-seller, 10-member cap, and
   grade-B-per-member gates are enforced platform-side.
-- **Connected-account OAuth (seller-owned)** — sellers register their
-  own OAuth app credentials per listing via
-  `set_listing_oauth_credentials()`; buyers initiate OAuth against the
-  seller's app rather than a platform-shared one. The
-  `client_secret` never leaves the SDK on the wire.
+- **Connected-account OAuth (publisher-owned)** — publisher APIs own OAuth,
+  token storage, refresh, revocation, and user-to-token mapping. Siglume passes
+  identity context only and does not expose token-broker SDK APIs.
 
 Plus production-onboarding hardening across v0.7.2 → v0.7.6:
 auto-register payload alignment, runtime-validation contract checks,

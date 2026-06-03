@@ -58,19 +58,17 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v0.10.8.** Python and TypeScript are version-aligned and
+> **Current release: v0.11.0.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
-> runtime validation, seller-owned connected-account OAuth, paid payout readiness,
+> runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
 > long-form buyer-facing `description`, and platform-controlled release semver
-> via `version_bump`. v0.10.8 restores the public docs and package metadata
-> after a Windows encoding regression, and keeps the publisher observability commands under
-> `siglume dev`, including planner simulation, execution receipt tailing,
-> gap reports, listing stats, and market-vitals traffic snapshots, and aligns
-> the public agent-core references with Works routing and candidate selection.
+> via `version_bump`. v0.11.0 removes platform OAuth broker APIs from the SDK:
+> publisher APIs now own external OAuth, token storage, refresh, revocation,
+> and user-to-token mapping behind their own `connect_url`.
 > See [CHANGELOG.md](./CHANGELOG.md),
-> [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md), and
-> [RELEASE_NOTES_v0.10.1.md](./RELEASE_NOTES_v0.10.1.md) for the current
+> [RELEASE_NOTES_v0.11.0.md](./RELEASE_NOTES_v0.11.0.md), and
+> [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md) for the current
 > release line.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
@@ -127,7 +125,7 @@ Constraints:
 - Start as a FREE and READ_ONLY API unless I explicitly say otherwise.
 - Do not add OAuth, payment, wallet, posting, or write actions for the first version.
 - Create adapter.py, tool_manual.json, and a local README.
-- Keep runtime_validation.json, oauth_credentials.json, .env, and real secrets Git-ignored.
+- Keep runtime_validation.json, .env, and real secrets Git-ignored.
 - Do not put real secrets in source code or committed docs.
 - Do not ask me to paste browser session tokens or production API keys into chat.
 - Do not run `siglume register .` unless I explicitly approve immediate publish; use `siglume register . --draft-only` for review-only staging.
@@ -163,21 +161,19 @@ This is the main use case. You build an API, register it, and earn revenue.
 2. Test locally with AppTestHarness
 3. Deploy the real API to a public URL
 4. Keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to your adapter
-5. If the API uses seller-side OAuth, also keep the local, Git-ignored `oauth_credentials.json` next to your adapter
-6. Run `siglume test .` and `siglume score . --offline`
-7. Issue `SIGLUME_API_KEY` from Developer Portal -> CLI / API keys, then run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
-8. Run `siglume register .` to auto-register and publish when the checks pass
-9. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
-10. Review the result in the developer portal or CLI output
+5. Run `siglume test .` and `siglume score . --offline`
+6. Issue `SIGLUME_API_KEY` from Developer Portal -> CLI / API keys, then run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
+7. Run `siglume register .` to auto-register and publish when the checks pass
+8. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
+9. Review the result in the developer portal or CLI output
 11. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
 
 If the listing already exists and is live, re-run the same `capability_key` to
 auto-register and publish the next non-material release when the same
 self-serve checks pass. Use `--draft-only` if you want to inspect the staged
-upgrade before publishing. If the upgrade adds a new
-platform-managed seller-side OAuth provider, the local Git-ignored `oauth_credentials.json` must
-already include that provider or the upgrade is rejected.
+upgrade before publishing. If the upgrade changes an external OAuth integration,
+update the publisher API's own OAuth flow and `connect_url` before registering.
 
 #### Game API Store placement
 
@@ -236,8 +232,8 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, local Git-ignored `runtime_validation.json`, and optional local Git-ignored `oauth_credentials.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
-| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; change content by rerunning the CLI / `auto-register` with the same `capability_key`. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. The OAuth section is for credential rotation / repair after registration, not the initial registration step. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json` and local Git-ignored `runtime_validation.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
+| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; change content by rerunning the CLI / `auto-register` with the same `capability_key`. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
 
@@ -252,12 +248,10 @@ No permission needed. No issue to claim. Just build and register.
 - Draft creation now requires runtime validation inputs for a live public API:
   public base URL, healthcheck URL, functional test URL, a dedicated review/test
   key, a sample request payload, and expected response fields.
-- Platform-managed OAuth APIs require seller-owned OAuth app credentials during
-  registration and upgrade:
-  - declare the provider in `required_connected_accounts` with `platform_managed: true`
-  - include the seller app credentials in the local Git-ignored `oauth_credentials.json`
-  - if a new platform-managed provider appears in an upgrade and the seed is missing, registration is blocked
-  - simple provider strings such as `"slack"` are treated as API-managed requirements and do not require `oauth_credentials.json`
+- External OAuth APIs must be publisher-managed:
+  - declare the provider in `required_connected_accounts` with `managed_by: "api", connect_url: "https://api.example.com/oauth/start"`
+  - implement authorization, token storage, refresh, revocation, and user-to-token mapping in the publisher API
+  - Siglume passes identity context during invocation but never stores or leases external user tokens
 - Siglume blocks draft creation if the public API cannot be reached or the
   functional test does not match the declared response shape.
 - Siglume also blocks draft creation when the Tool Manual contract is incomplete
@@ -291,7 +285,7 @@ siglume test .
 siglume score . --offline
 
 # deploy the real API, then edit the local runtime_validation.json with your public URL and review/test key
-# if the API uses seller-side OAuth, add the local oauth_credentials.json with the seller OAuth app credentials
+# if the API uses external OAuth, implement it in the publisher API and declare managed_by="api" with connect_url
 # issue SIGLUME_API_KEY from Developer Portal -> CLI / API keys, or configure ~/.siglume/credentials.toml
 siglume validate .
 siglume score . --remote
@@ -739,7 +733,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v0.10.8 (beta)** — the platform is launched on Polygon mainnet
+This is **v0.11.0 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.

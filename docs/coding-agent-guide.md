@@ -1,4 +1,4 @@
-# Coding Agent Guide
+﻿# Coding Agent Guide
 
 Use this file when a human asks a coding agent to build a Siglume API Store
 project. The goal is a small, publishable first API, not a complex platform
@@ -34,7 +34,6 @@ Create or update these files in the generated project:
 Prepare, but do not commit real secrets in:
 
 - `runtime_validation.json`
-- `oauth_credentials.json`
 - `.env`
 
 `runtime_validation.json` can contain placeholders during scaffolding. After
@@ -129,7 +128,7 @@ Do not add OAuth, payment, wallet, posting, or write actions for the first
 version.
 
 Create adapter.py, tool_manual.json, README.md, and any useful local tests.
-Keep runtime_validation.json, oauth_credentials.json, .env, and all real secrets
+Keep runtime_validation.json, .env, and all real secrets
 Git-ignored. Do not put real secrets in source code or committed docs.
 
 Make the project pass:

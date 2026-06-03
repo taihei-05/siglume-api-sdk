@@ -195,7 +195,7 @@ class AppManifest:
     permission_class: PermissionClass = PermissionClass.READ_ONLY
     approval_mode: ApprovalMode = ApprovalMode.AUTO
     dry_run_supported: bool = False
-    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. ["amazon"] or {"provider_key": "slack", "platform_managed": True}
+    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. {"provider_key": "slack", "managed_by": "api", "connect_url": "https://api.example.com/oauth/start"}
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
@@ -342,9 +342,10 @@ class AppManifest:
 
 @dataclass
 class ConnectedAccountRef:
-    """Opaque reference to a connected account. Does NOT contain raw credentials."""
+    """Identity-only reference to an external account requirement."""
     provider_key: str
-    session_token: str  # short-lived, scoped token managed by Siglume
+    external_account_ref: str | None = None
+    identity: dict[str, Any] = field(default_factory=dict)
     scopes: list[str] = field(default_factory=list)
     environment: Environment = Environment.LIVE
 
@@ -1134,7 +1135,11 @@ class AppTestHarness:
         """
         if connected_accounts is None:
             connected_accounts = {
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
+                k: ConnectedAccountRef(
+                    provider_key=k,
+                    external_account_ref=f"stub-account-{k}",
+                    identity={"provider_key": k},
+                )
                 for k in self.stubs
             }
         ctx = ExecutionContext(

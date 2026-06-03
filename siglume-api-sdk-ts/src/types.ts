@@ -108,7 +108,8 @@ export interface CapabilityPersistencePolicy {
 
 export interface ConnectedAccountRef {
   provider_key: string;
-  session_token: string;
+  external_account_ref?: string | null;
+  identity?: Record<string, unknown>;
   scopes?: string[];
   environment?: Environment;
 }
@@ -376,25 +377,6 @@ export interface CapabilitySaveStateRecord {
   raw: Record<string, unknown>;
 }
 
-export interface ConnectedAccountOAuthStart {
-  authorize_url: string;
-  state: string;
-  provider_key: string;
-  scopes: string[];
-  pkce_method?: string | null;
-}
-
-export interface ConnectedAccountLifecycleResult {
-  connected_account_id: string;
-  provider_key: string;
-  expires_at?: string | null;
-  scopes: string[];
-  refreshed_at?: string | null;
-  connection_status?: string | null;
-  provider_revoked?: boolean | null;
-  revoked_at?: string | null;
-}
-
 export interface BundleMember {
   capability_listing_id: string;
   capability_key?: string | null;
@@ -432,7 +414,6 @@ export interface AutoRegistrationReceipt {
   auto_manifest: Record<string, unknown>;
   confidence: Record<string, unknown>;
   validation_report?: Record<string, unknown>;
-  oauth_status?: Record<string, unknown>;
   review_url?: string | null;
   trace_id?: string | null;
   request_id?: string | null;

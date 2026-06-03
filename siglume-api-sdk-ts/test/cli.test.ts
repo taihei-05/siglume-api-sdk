@@ -29,7 +29,6 @@ function createMockClient() {
         status: "draft",
         registration_mode: "upgrade",
         listing_status: "active",
-        oauth_status: { configured: true },
         review_url: "https://siglume.com/owner/publish?listing=lst_123",
         trace_id: "trc_reg",
         request_id: "req_reg",
@@ -366,10 +365,9 @@ describe("siglume CLI", () => {
     expect(manifest.capability_key).toBe("echo-starter");
     const gitignoreText = await readFile(join(projectDir, ".gitignore"), "utf8");
     expect(gitignoreText).toContain("runtime_validation.json");
-    expect(gitignoreText).toContain("oauth_credentials.json");
     expect(readmeText).toContain("Start locally without a Siglume API key");
     expect(docsText).toContain("dedicated public usage guide");
-    expect(readmeText).toContain("Do not commit real review keys or OAuth client secrets");
+    expect(readmeText).toContain("Do not commit real review keys or external-provider secrets");
     expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(validatePayload.ok).toBe(true);
   });
@@ -492,7 +490,6 @@ describe("siglume CLI", () => {
     expect(manifest.docs_url).toBe("https://example.com/docs");
     expect(manifest.support_contact).toBe("support@example.com");
     expect(gitignoreText).toContain("runtime_validation.json");
-    expect(gitignoreText).toContain("oauth_credentials.json");
     expect(adapterText).toContain("execute_owner_operation");
     expect(adapterText).toContain("support_contact: \"support@example.com\"");
     expect(adapterText).toContain("docs_url: \"https://example.com/docs\"");
@@ -500,7 +497,7 @@ describe("siglume CLI", () => {
     expect(readmeText).toContain("Replace `support_contact` with a real support email address");
     expect(readmeText).toContain("Start locally without a Siglume API key");
     expect(docsText).toContain("dedicated public usage guide");
-    expect(readmeText).toContain("Do not commit real review keys or OAuth client secrets");
+    expect(readmeText).toContain("Do not commit real review keys or external-provider secrets");
     expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(readmeText.indexOf("npm test -- tests/test_adapter.ts")).toBeLessThan(
       readmeText.indexOf("siglume register ."),
@@ -767,7 +764,6 @@ describe("siglume CLI", () => {
     expect(stdout.join("\n")).toContain("Upgrade registered.");
     expect(stdout.join("\n")).toContain("Listing published.");
     expect(stdout.join("\n")).toContain("listing_status: active");
-    expect(stdout.join("\n")).toContain("oauth_configured: true");
     expect(stdout.join("\n")).toContain("confirmation_status: active");
     expect(stdout.join("\n")).toContain("release_status: published");
     expect(stdout.join("\n")).toContain("review_url: https://siglume.com/owner/publish?listing=lst_123");
@@ -941,7 +937,6 @@ describe("siglume CLI", () => {
     expect(stdout.join("\n")).toContain("Listing published.");
     expect(stdout.join("\n")).toContain("receipt_status: draft");
     expect(stdout.join("\n")).toContain("listing_status: active");
-    expect(stdout.join("\n")).toContain("oauth_configured: true");
     expect(stdout.join("\n")).toContain("confirmation_status: active");
     expect(stdout.join("\n")).toContain("release_status: published");
   });

@@ -18,7 +18,6 @@ Before a listing can publish, make sure you have all of these artifacts:
 | `docs_url` | Yes | Dedicated API usage guide. Root homepages are rejected; the page must be anonymous HTTP 200 and explain how to use this API. |
 | `support_contact` | Yes | Real support email address or public support URL. |
 | `seller_homepage_url` | No | Official seller/company URL. Helpful for buyers, but not a publish blocker. |
-| `oauth_credentials.json` | Only platform-managed OAuth APIs | Seller-owned OAuth app Client ID / Client Secret. This is separate from the buyer's connected account. |
 | Verified payout destination | Only paid APIs | Free APIs do not need wallet/payout setup before publish. |
 
 After the no-key local loop and deployment, use the production validation,
@@ -463,13 +462,12 @@ Does your API write to anything external?
 2. Deploy the real API to a public URL
 3. Keep `tool_manual.json` with the project
 4. Keep the local, Git-ignored `runtime_validation.json` next to the adapter
-5. If the API uses seller-side OAuth, also keep the local, Git-ignored `oauth_credentials.json` with the project
-6. Run `siglume test .` and `siglume score . --offline` before any API key is required
-7. After deployment, run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
-8. Run `siglume register .` to auto-register and publish when the checks pass
-9. Use `siglume register . --draft-only` instead when you intentionally need an immutable review draft
-10. Review the result in the developer portal when needed
-11. Live in the API Store
+5. Run `siglume test .` and `siglume score . --offline` before any API key is required
+6. After deployment, run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
+7. Run `siglume register .` to auto-register and publish when the checks pass
+8. Use `siglume register . --draft-only` instead when you intentionally need an immutable review draft
+9. Review the result in the developer portal when needed
+10. Live in the API Store
 ```
 
 ### Step 1: Run local tests
@@ -507,7 +505,7 @@ Use this flow from CLI / SDK / automation:
 - `siglume register` reads:
   - `tool_manual.json`
   - local, Git-ignored `runtime_validation.json`
-  - optional local, Git-ignored `oauth_credentials.json` for seller-side OAuth app credentials
+  - publisher API-managed OAuth flow and secret storage, when external authorization is required
 - `siglume register` runs manifest validation and remote Tool Manual quality
   preview before auto-registering by default
 - This route requires `SIGLUME_API_KEY` or `~/.siglume/credentials.toml`
@@ -516,8 +514,8 @@ Use this flow from CLI / SDK / automation:
 - If you need a token, issue it from the `CLI / API keys` submenu in the developer portal
 - The developer portal is used afterward to inspect the result, blockers, and
   live status
-- The developer portal OAuth panel is for rotating or repairing seller OAuth
-  app credentials after registration, not for the initial registration step
+- The developer portal is not an OAuth broker. External OAuth is implemented
+  by the publisher API behind its `connect_url`.
 
 Minimal CLI flow:
 
@@ -587,7 +585,7 @@ A quality check runs automatically at confirmation time:
 
 Preview quality and auto-register check different things. A
 `siglume score . --remote` result of `A` or `100/100` means the Tool Manual is
-strong; it does not prove that `docs_url`, seller OAuth app credentials,
+strong; it does not prove that `docs_url`, external OAuth `connect_url`,
 payout readiness, runtime validation, connected-account consistency, or legal
 checks are ready. Use `siglume preflight .` before `siglume register .` to see
 the registration blockers earlier.
@@ -611,14 +609,10 @@ the registration blockers earlier.
   - `input_schema` must accept the runtime sample request payload
   - `output_schema` must declare and match the live response fields
   - `requires_connected_accounts` must match the listing / Tool Manual contract
-- Seller OAuth app credentials during `auto-register`
-  - if `required_connected_accounts` declares a platform-managed OAuth provider
-    such as `{"provider_key": "slack", "platform_managed": true}`, include that
-    provider in the local, Git-ignored `oauth_credentials.json`
-  - simple provider strings such as `"slack"` are API-managed requirements and
-    do not require `oauth_credentials.json`
-  - if an upgrade adds a new platform-managed OAuth provider and the seed is
-    missing, registration is rejected
+- External OAuth during `auto-register`
+  - declare the provider with `{"provider_key": "slack", "managed_by": "api", "connect_url": "https://api.example.com/oauth/start"}`
+  - implement authorization, token storage, refresh, revocation, and user-to-token mapping in your API
+  - Siglume sends identity context during invocation but never stores or leases external user tokens
 - Tool Manual quality grade **B** or above
   - `input_schema` and `output_schema` are part of the canonical contract
   - if you need a stricter contract than the auto-generated seed, send a full
@@ -704,19 +698,18 @@ Setting `AUTO` on an `ACTION` or `PAYMENT` API will fail manifest validation.
 
 If your API needs OAuth tokens or API keys from the agent owner (e.g., X/Twitter credentials, a third-party provider API key), declare them in `required_connected_accounts`. The owner will be prompted to connect these accounts during installation.
 
-If Siglume should broker that provider flow with a seller-owned OAuth app,
-declare the requirement with `platform_managed: true` and include the seller
-app credentials in the local, Git-ignored `oauth_credentials.json` during
-registration. Plain strings such as `"slack"` mean your API manages that auth
-path itself and do not require `oauth_credentials.json`. Do not wait to create
-platform-managed OAuth configuration in the portal after publish.
+For external OAuth, declare the requirement with `managed_by: "api"` and an
+absolute `connect_url`, for example `{"provider_key": "slack", "managed_by": "api", "connect_url": "https://api.example.com/oauth/start"}`.
+Your API owns the provider OAuth app, redirect flow, token storage, refresh,
+revocation, and user-to-token mapping. There is no platform OAuth configuration
+to create in the portal.
 
 Responsibility split:
 
 ```text
-Developer / seller at registration
+Developer / seller before registration
   creates the upstream OAuth app
-  stores X_CLIENT_ID / X_CLIENT_SECRET in local oauth_credentials.json
+  stores X_CLIENT_ID / X_CLIENT_SECRET in the publisher API secret manager
   runs siglume preflight . and siglume register .
 
 Buyer / agent owner at installation
@@ -725,8 +718,8 @@ Buyer / agent owner at installation
   grants scopes for their agent to use during execution
 
 Your API runtime
-  receives only Siglume-scoped connected-account context
-  never receives the seller client secret or a raw long-lived buyer token
+  receives Siglume identity context
+  maps that identity to the token record stored outside Siglume
 ```
 
 ---
@@ -743,11 +736,11 @@ Submit again with the same `capability_key`.
 
 - If the listing is live, `siglume register` stages an upgrade instead of creating a new product.
 - `siglume register .` publishes the next release immediately when the self-serve checks pass again; use `--draft-only` when you intentionally want a staged review draft.
-- If the upgrade adds a new platform-managed seller-side OAuth provider, update the local, Git-ignored `oauth_credentials.json` before registering or the upgrade is rejected.
+- If the upgrade changes external OAuth, update your API-owned OAuth flow and `connect_url` before registering.
 
 ### How do I manage external API credentials?
 
-Declare the account type in `required_connected_accounts`. The agent owner connects their account during API installation. If Siglume should broker that connection with your seller-owned OAuth app, use `{"provider_key": "...", "platform_managed": true}` and provide that app's Client ID / Client Secret in the local, Git-ignored `oauth_credentials.json` during registration or upgrade. **Never hardcode secrets in your API code.**
+Declare the account type in `required_connected_accounts` with `managed_by: "api"` and an absolute `connect_url`. The agent owner is sent to your API to connect their account. **Never hardcode external provider secrets in your API code.**
 
 ### What's the difference between free and paid APIs?
 
@@ -770,7 +763,7 @@ Common causes:
 - `docs_url` points to a homepage instead of a dedicated anonymous API usage guide
 - `support_contact` is a placeholder or malformed email / support URL
 - `runtime_validation.json` still has placeholder URLs, missing expected fields, or a review key that is not dedicated to Siglume
-- Platform-managed OAuth APIs are missing seller app credentials in local `oauth_credentials.json`
+- OAuth-backed APIs declare a missing or unreachable `connect_url`
 - `ACTION` / `PAYMENT` API has `approval_mode=AUTO`
 - `ACTION` / `PAYMENT` API has `dry_run_supported=False`
 
@@ -1314,7 +1307,7 @@ Give your AI these instructions:
 
 > "Read my source code. Generate a listing for the Siglume API Store.
 > Include `manifest`, `tool_manual`, and `runtime_validation`.
-> If the API uses seller-side OAuth, also include `oauth_credentials`.
+> If the API uses external OAuth, include `managed_by: "api"` and an absolute `connect_url`.
 > Use `source_url` when GitHub is the source of truth, then call the
 > auto-register endpoint."
 
@@ -1352,7 +1345,14 @@ response = requests.post(
             "permission_class": "action",
             "approval_mode": "always-ask",
             "dry_run_supported": True,
-            "required_connected_accounts": ["slack"],
+            "required_connected_accounts": [
+                {
+                    "provider_key": "slack",
+                    "managed_by": "api",
+                    "connect_url": "https://api.acme.dev/oauth/slack/start",
+                    "required_scopes": ["chat:write", "channels:read"],
+                }
+            ],
         },
         "tool_manual": {
             "tool_name": "slack_digest_publisher",
@@ -1391,16 +1391,6 @@ response = requests.post(
             "usage_hints": ["Prefer a dry run first."],
             "result_hints": ["Show the posted channel and summary."],
             "error_hints": ["Ask the owner to reconnect Slack if posting fails."],
-        },
-        "oauth_credentials": {
-            "items": [
-                {
-                    "provider_key": "slack",
-                    "client_id": "seller-slack-client-id",
-                    "client_secret": "seller-slack-client-secret",
-                    "required_scopes": ["chat:write", "channels:read"],
-                }
-            ]
         },
         "runtime_validation": {
             "public_base_url": "https://api.example.com",

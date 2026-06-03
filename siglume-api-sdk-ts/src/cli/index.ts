@@ -280,7 +280,6 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         emit(stdout, `preflight_quality: ${preflight.remote_quality.grade} (${preflight.remote_quality.overall_score}/100)`);
       }
       if (report.runtime_validation_path) emit(stdout, `runtime_validation_path: ${String(report.runtime_validation_path)}`);
-      if (report.oauth_credentials_path) emit(stdout, `oauth_credentials_path: ${String(report.oauth_credentials_path)}`);
     });
 
   program
@@ -340,7 +339,6 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
           status: string;
           registration_mode?: string | null;
           listing_status?: string | null;
-          oauth_status?: { configured?: boolean } | null;
           review_url?: string | null;
           trace_id?: string | null;
           request_id?: string | null;
@@ -360,7 +358,6 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         emit(stdout, `listing_id: ${receipt.listing_id}`);
         emit(stdout, `receipt_status: ${receipt.status}`);
         if (receipt.listing_status) emit(stdout, `listing_status: ${receipt.listing_status}`);
-        if (receipt.oauth_status) emit(stdout, `oauth_configured: ${Boolean(receipt.oauth_status.configured)}`);
         if (receipt.review_url) emit(stdout, `review_url: ${receipt.review_url}`);
         if (receipt.trace_id) emit(stdout, `trace_id: ${receipt.trace_id}`);
         if (receipt.request_id) emit(stdout, `request_id: ${receipt.request_id}`);

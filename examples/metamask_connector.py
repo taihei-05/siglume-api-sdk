@@ -492,7 +492,8 @@ async def main():
         connected_accounts={
             "metamask": ConnectedAccountRef(
                 provider_key="metamask",
-                session_token="stub-token-metamask",
+                external_account_ref="stub-account-metamask",
+                identity={"provider_key": "metamask"},
             )
         },
         budget_remaining_minor=10000,
