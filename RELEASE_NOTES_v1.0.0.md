@@ -1,4 +1,4 @@
-﻿# Release notes v0.11.0
+﻿# Release notes v1.0.0
 
 Breaking release for Siglume connected-account OAuth Architecture B.
 

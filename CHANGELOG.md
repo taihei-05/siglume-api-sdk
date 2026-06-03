@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.0] - 2026-06-03
+## [1.0.0] - 2026-06-03
 
 ### Breaking
 
@@ -488,12 +488,12 @@ v0.7.1 is a responsibility-correction release over v0.7.0.
 
 - Historical note: v0.7.1 corrected the v0.7 connected-account ownership
   model from platform environment credentials to seller-owned OAuth app
-  credentials per listing. That Architecture A surface is retired in v0.11.0.
+  credentials per listing. That Architecture A surface is retired in v1.0.0.
 
 ### Added
 
 - Historical note: v0.7.1 added listing-level OAuth credential management
-  helpers in both bindings. Those helpers are retired in v0.11.0.
+  helpers in both bindings. Those helpers are retired in v1.0.0.
 
 ### Migration guide (v0.7.0 → v0.7.1)
 
