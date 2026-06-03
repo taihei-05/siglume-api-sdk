@@ -427,6 +427,29 @@ def test_register_allows_provider_managed_oauth_with_connect_url(monkeypatch, tm
     assert '"listing_id": "lst_api_oauth"' in result.output
 
 
+def test_register_rejects_api_managed_oauth_without_connect_url(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "api-managed-oauth-missing-connect"
+    _write_register_project(
+        project_dir,
+        required_connected_accounts=[
+            {
+                "provider_key": "custom-crm",
+                "managed_by": "api",
+                "required_scopes": ["record.write"],
+            }
+        ],
+    )
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
+
+    assert result.exit_code == 1
+    assert "API-managed OAuth requirements must include connect_url" in result.output
+    assert "custom-crm" in result.output
+
+
 def test_register_rejects_root_docs_url_before_remote_registration(tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "root-docs-url"

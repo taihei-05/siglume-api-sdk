@@ -335,6 +335,25 @@ def _required_oauth_providers(requirements: list[Any] | tuple[Any, ...] | None) 
     return providers
 
 
+def _api_managed_requirements_missing_connect_url(
+    requirements: list[Any] | tuple[Any, ...] | None,
+) -> list[str]:
+    missing: list[str] = []
+    for item in requirements or []:
+        if not isinstance(item, dict):
+            continue
+        managed_by = str(item.get("managed_by") or "").strip().lower().replace("_", "-")
+        if managed_by != "api":
+            continue
+        connect_url = str(item.get("connect_url") or "").strip()
+        if connect_url:
+            continue
+        label = _oauth_provider_key_from_requirement(item) or "(missing provider_key)"
+        if label not in missing:
+            missing.append(label)
+    return missing
+
+
 def _connected_account_requirement_label(value: Any) -> str:
     if isinstance(value, dict):
         for key in ("provider_key", "provider", "account_type", "name"):
@@ -1462,6 +1481,15 @@ def _registration_preflight(project: LoadedProject, client: SiglumeClient) -> di
             "Registration preflight failed. Fix these before calling auto-register:\n"
             + "- platform-managed OAuth is retired. Use managed_by=\"api\" with connect_url: "
             + ", ".join(retired_platform_oauth_providers)
+        )
+    api_managed_missing_connect_url = _api_managed_requirements_missing_connect_url(
+        project.manifest.required_connected_accounts
+    )
+    if api_managed_missing_connect_url:
+        raise click.ClickException(
+            "Registration preflight failed. Fix these before calling auto-register:\n"
+            + "- API-managed OAuth requirements must include connect_url: "
+            + ", ".join(api_managed_missing_connect_url)
         )
     remote_quality = client.preview_quality_score(project.tool_manual)
     errors: list[str] = []

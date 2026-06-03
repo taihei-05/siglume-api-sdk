@@ -150,6 +150,7 @@
           {
             "type": "object",
             "additionalProperties": true,
+            "required": ["provider_key", "managed_by", "connect_url"],
             "properties": {
               "provider_key": {
                 "type": "string"

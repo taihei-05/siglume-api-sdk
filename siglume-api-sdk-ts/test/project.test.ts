@@ -374,6 +374,36 @@ describe("cli project helpers", () => {
     expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_api_managed");
   });
 
+  it("blocks provider-managed connected accounts without connect_url", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: [
+          {
+            provider_key: "twitter",
+            managed_by: "api",
+          },
+        ],
+      },
+    });
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport();
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("API-managed OAuth requirements must include connect_url: twitter");
+  });
+
   it("blocks registration when a platform-managed OAuth API is declared", async () => {
     const projectDir = await createObjectProject({
       manifest: {

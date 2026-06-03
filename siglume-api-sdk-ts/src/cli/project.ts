@@ -341,6 +341,22 @@ function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
   return providers;
 }
 
+function apiManagedRequirementsMissingConnectUrl(requirements: unknown[] | undefined): string[] {
+  const missing: string[] = [];
+  for (const item of requirements ?? []) {
+    if (!isRecord(item)) continue;
+    const managedBy = String(item.managed_by ?? "").trim().toLowerCase().replaceAll("_", "-");
+    if (managedBy !== "api") continue;
+    const connectUrl = String(item.connect_url ?? "").trim();
+    if (connectUrl) continue;
+    const label = oauthProviderKeyFromRequirement(item) ?? "(missing provider_key)";
+    if (!missing.includes(label)) {
+      missing.push(label);
+    }
+  }
+  return missing;
+}
+
 function connectedAccountRequirementLabel(value: unknown): string {
   if (isRecord(value)) {
     for (const key of ["provider_key", "provider", "account_type", "name"]) {
@@ -548,6 +564,12 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
   if (retiredPlatformOauthProviders.length > 0) {
     throw new SiglumeProjectError(
       `Registration preflight failed. Fix these before calling auto-register:\n- platform-managed OAuth is retired. Use managed_by="api" with connect_url: ${retiredPlatformOauthProviders.join(", ")}`,
+    );
+  }
+  const apiManagedMissingConnectUrl = apiManagedRequirementsMissingConnectUrl(project.manifest.required_connected_accounts ?? []);
+  if (apiManagedMissingConnectUrl.length > 0) {
+    throw new SiglumeProjectError(
+      `Registration preflight failed. Fix these before calling auto-register:\n- API-managed OAuth requirements must include connect_url: ${apiManagedMissingConnectUrl.join(", ")}`,
     );
   }
   const remoteQuality = await client.preview_quality_score(project.tool_manual);
