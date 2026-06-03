@@ -106,13 +106,6 @@ export interface CapabilityPersistencePolicy {
   save_data_schema?: Record<string, unknown>;
 }
 
-export interface ConnectedAccountRef {
-  provider_key: string;
-  session_token: string;
-  scopes?: string[];
-  environment?: Environment;
-}
-
 export interface AppManifest {
   capability_key: string;
   version?: string;
@@ -156,7 +149,6 @@ export interface ExecutionContext {
   source_type?: string;
   environment?: Environment;
   execution_kind?: ExecutionKind;
-  connected_accounts?: Record<string, ConnectedAccountRef>;
   budget_remaining_minor?: number | null;
   trace_id?: string;
   idempotency_key?: string;
@@ -376,25 +368,6 @@ export interface CapabilitySaveStateRecord {
   raw: Record<string, unknown>;
 }
 
-export interface ConnectedAccountOAuthStart {
-  authorize_url: string;
-  state: string;
-  provider_key: string;
-  scopes: string[];
-  pkce_method?: string | null;
-}
-
-export interface ConnectedAccountLifecycleResult {
-  connected_account_id: string;
-  provider_key: string;
-  expires_at?: string | null;
-  scopes: string[];
-  refreshed_at?: string | null;
-  connection_status?: string | null;
-  provider_revoked?: boolean | null;
-  revoked_at?: string | null;
-}
-
 export interface BundleMember {
   capability_listing_id: string;
   capability_key?: string | null;
@@ -432,7 +405,6 @@ export interface AutoRegistrationReceipt {
   auto_manifest: Record<string, unknown>;
   confidence: Record<string, unknown>;
   validation_report?: Record<string, unknown>;
-  oauth_status?: Record<string, unknown>;
   review_url?: string | null;
   trace_id?: string | null;
   request_id?: string | null;
@@ -481,7 +453,6 @@ export interface SandboxSession {
   dry_run_supported: boolean;
   approval_mode?: string | null;
   required_connected_accounts: unknown[];
-  connected_accounts: Array<Record<string, unknown>>;
   stub_providers_enabled: boolean;
   simulated_receipts: boolean;
   approval_simulator: boolean;
@@ -518,20 +489,6 @@ export interface GrantBindingResult {
   access_grant: AccessGrantRecord;
   trace_id?: string | null;
   request_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface ConnectedAccountRecord {
-  connected_account_id: string;
-  provider_key: string;
-  account_role: string;
-  display_name?: string | null;
-  environment?: string | null;
-  connection_status?: string | null;
-  scopes: string[];
-  metadata: Record<string, unknown>;
-  created_at?: string | null;
-  updated_at?: string | null;
   raw: Record<string, unknown>;
 }
 

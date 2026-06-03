@@ -31,7 +31,6 @@ def _write_register_project(
     include_tool_manual: bool = True,
     runtime_validation: dict | None = None,
     required_connected_accounts: list | None = None,
-    oauth_credentials: dict | list | None = None,
     docs_url: str = "https://docs.siglume.test/register-project",
     support_contact: str = "https://support.siglume.test/register-project",
 ) -> None:
@@ -118,12 +117,6 @@ def _write_register_project(
         ),
         encoding="utf-8",
     )
-    if oauth_credentials is not None:
-        (project_dir / "oauth_credentials.json").write_text(
-            json.dumps(oauth_credentials),
-            encoding="utf-8",
-        )
-
 
 def test_init_command_writes_template_files() -> None:
     runner = CliRunner()
@@ -139,12 +132,11 @@ def test_init_command_writes_template_files() -> None:
         assert Path("README.md").exists()
         gitignore_text = Path(".gitignore").read_text(encoding="utf-8")
         assert "runtime_validation.json" in gitignore_text
-        assert "oauth_credentials.json" in gitignore_text
         readme_text = Path("README.md").read_text(encoding="utf-8")
         docs_text = Path("docs/api-usage.md").read_text(encoding="utf-8")
         assert "dedicated public usage guide" in docs_text
         assert "Start locally without a Siglume API key" in readme_text
-        assert "Do not commit real review keys or OAuth client secrets" in readme_text
+        assert "Do not commit real review keys or external-provider secrets" in readme_text
         assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
 
 
@@ -158,7 +150,6 @@ def test_init_command_merges_existing_gitignore() -> None:
         assert "custom-local.log" in gitignore_text
         assert "node_modules/" in gitignore_text
         assert "runtime_validation.json" in gitignore_text
-        assert "oauth_credentials.json" in gitignore_text
         assert Path("adapter.py").exists()
 
 
@@ -313,7 +304,7 @@ def test_register_allows_api_managed_connected_account_without_oauth_seed(monkey
             )
 
         def auto_register(self, manifest, tool_manual, **kwargs):
-            assert kwargs.get("oauth_credentials") is None
+            assert "oauth_credentials" not in kwargs
             return SimpleNamespace(listing_id="lst_api_managed", status="draft")
 
     monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
@@ -325,9 +316,9 @@ def test_register_allows_api_managed_connected_account_without_oauth_seed(monkey
     assert '"listing_id": "lst_api_managed"' in result.output
 
 
-def test_register_requires_oauth_seed_for_platform_managed_oauth_api(monkeypatch, tmp_path) -> None:
+def test_register_rejects_retired_platform_managed_oauth_api(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
-    project_dir = tmp_path / "oauth-required"
+    project_dir = tmp_path / "retired-platform-oauth"
     _write_register_project(
         project_dir,
         required_connected_accounts=[{"provider_key": "twitter", "platform_managed": True}],
@@ -363,7 +354,9 @@ def test_register_requires_oauth_seed_for_platform_managed_oauth_api(monkeypatch
     result = runner.invoke(main, ["register", str(project_dir), "--json"])
 
     assert result.exit_code == 1
-    assert "oauth_credentials.json" in result.output
+    assert "platform-managed OAuth is retired" in result.output
+    assert "managed_by=\"api\"" in result.output
+    assert "connect_url" in result.output
     assert "twitter" in result.output
 
 
@@ -383,128 +376,47 @@ def test_register_rejects_platform_managed_oauth_without_provider_key(monkeypatc
     assert "platform-managed entries must include a provider_key" in result.output
 
 
-def test_register_canonicalizes_oauth_seed_payload(monkeypatch, tmp_path) -> None:
+def test_register_allows_provider_managed_oauth_with_connect_url(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
-    project_dir = tmp_path / "oauth-canonical"
+    project_dir = tmp_path / "api-managed-oauth"
     _write_register_project(
         project_dir,
-        required_connected_accounts=[{"provider_key": "google", "platform_managed": True}],
-        oauth_credentials=[
-            {
-                "provider": "google",
-                "client_id": "google-client",
-                "client_secret": "google-secret",
-                "scopes": ["gmail.readonly"],
-                "authorize_url": "https://accounts.example.com/oauth/authorize",
-                "token_url": "https://accounts.example.com/oauth/token",
-            }
-        ],
-    )
-
-    class FakeClient:
-        def __init__(self, api_key: str) -> None:
-            self.api_key = api_key
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def preview_quality_score(self, manual):
-            from siglume_api_sdk import ToolManualQualityReport
-
-            return ToolManualQualityReport(
-                overall_score=90,
-                grade="A",
-                issues=[],
-                keyword_coverage_estimate=70,
-                improvement_suggestions=[],
-                publishable=True,
-                validation_ok=True,
-            )
-
-        def auto_register(self, manifest, tool_manual, **kwargs):
-            assert kwargs["oauth_credentials"] == {
-                "items": [
-                    {
-                        "provider_key": "google",
-                        "client_id": "google-client",
-                        "client_secret": "google-secret",
-                        "required_scopes": ["gmail.readonly"],
-                        "authorize_url": "https://accounts.example.com/oauth/authorize",
-                        "token_url": "https://accounts.example.com/oauth/token",
-                    }
-                ]
-            }
-            return SimpleNamespace(listing_id="lst_oauth", status="draft")
-
-    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
-    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
-
-    result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--json"])
-
-    assert result.exit_code == 0, result.output
-    assert '"listing_id": "lst_oauth"' in result.output
-
-
-def test_register_canonicalizes_contract_defined_unknown_oauth_provider(monkeypatch, tmp_path) -> None:
-    runner = CliRunner()
-    project_dir = tmp_path / "oauth-custom"
-    _write_register_project(
-        project_dir,
-        required_connected_accounts=[{"provider_key": "custom-crm", "platform_managed": True}],
-        oauth_credentials=[
+        required_connected_accounts=[
             {
                 "provider_key": "custom-crm",
-                "client_id": "custom-client",
-                "client_secret": "custom-secret",
-                "scopes": ["record.write"],
-                "authorize_url": "https://crm.example.com/oauth/authorize",
-                "token_url": "https://crm.example.com/oauth/token",
-                "scope_separator": ",",
-                "token_endpoint_auth": "client_secret_post",
-                "pkce_required": True,
-            }
-        ],
-    )
-
-    class FakeClient:
-        def __init__(self, api_key: str) -> None:
-            self.api_key = api_key
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def preview_quality_score(self, manual):
-            from siglume_api_sdk import ToolManualQualityReport
-
-            return ToolManualQualityReport(
-                overall_score=90,
-                grade="A",
-                issues=[],
-                keyword_coverage_estimate=70,
-                improvement_suggestions=[],
-                publishable=True,
-                validation_ok=True,
-            )
-
-        def auto_register(self, manifest, tool_manual, **kwargs):
-            assert kwargs["oauth_credentials"]["items"][0] == {
-                "provider_key": "custom-crm",
-                "client_id": "custom-client",
-                "client_secret": "custom-secret",
+                "managed_by": "api",
+                "connect_url": "https://crm.example.com/oauth/start",
                 "required_scopes": ["record.write"],
-                "authorize_url": "https://crm.example.com/oauth/authorize",
-                "token_url": "https://crm.example.com/oauth/token",
-                "scope_separator": ",",
-                "token_endpoint_auth": "client_secret_post",
-                "pkce_required": True,
             }
-            return SimpleNamespace(listing_id="lst_custom_oauth", status="draft")
+        ],
+    )
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=90,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=70,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            assert "oauth_credentials" not in kwargs
+            return SimpleNamespace(listing_id="lst_api_oauth", status="draft")
 
     monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
     monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
@@ -512,31 +424,30 @@ def test_register_canonicalizes_contract_defined_unknown_oauth_provider(monkeypa
     result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--json"])
 
     assert result.exit_code == 0, result.output
-    assert '"listing_id": "lst_custom_oauth"' in result.output
+    assert '"listing_id": "lst_api_oauth"' in result.output
 
 
-def test_register_rejects_string_oauth_scopes(tmp_path) -> None:
+def test_register_rejects_api_managed_oauth_without_connect_url(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
-    project_dir = tmp_path / "oauth-bad-scopes"
+    project_dir = tmp_path / "api-managed-oauth-missing-connect"
     _write_register_project(
         project_dir,
-        required_connected_accounts=["google"],
-        oauth_credentials=[
+        required_connected_accounts=[
             {
-                "provider": "google",
-                "client_id": "google-client",
-                "client_secret": "google-secret",
-                "authorize_url": "https://accounts.example.com/oauth/authorize",
-                "token_url": "https://accounts.example.com/oauth/token",
-                "scopes": "gmail.readonly",
+                "provider_key": "custom-crm",
+                "managed_by": "api",
+                "required_scopes": ["record.write"],
             }
         ],
     )
 
-    result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--json"])
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+
+    result = runner.invoke(main, ["register", str(project_dir), "--json"])
 
     assert result.exit_code == 1
-    assert "required_scopes must be a JSON array" in result.output
+    assert "API-managed OAuth requirements must include connect_url" in result.output
+    assert "custom-crm" in result.output
 
 
 def test_register_rejects_root_docs_url_before_remote_registration(tmp_path) -> None:
@@ -736,7 +647,6 @@ def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, t
                 status="draft",
                 registration_mode="upgrade",
                 listing_status="active",
-                oauth_status={"configured": True},
                 review_url="https://siglume.com/owner/publish?listing=lst_123",
                 trace_id="trc_reg",
                 request_id="req_reg",
@@ -763,7 +673,6 @@ def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, t
     assert "confirmation_status: active" in result.output
     assert "release_status: published" in result.output
     assert "listing_status: active" in result.output
-    assert "oauth_configured: True" in result.output
     assert "review_url: https://siglume.com/owner/publish?listing=lst_123" in result.output
     assert "trace_id: trc_reg" in result.output
     assert "request_id: req_reg" in result.output
@@ -1005,7 +914,6 @@ def test_init_command_generates_operation_wrapper_with_grade_b_or_better(monkeyp
         assert Path("tests/test_adapter.py").exists()
         gitignore_text = Path(".gitignore").read_text(encoding="utf-8")
         assert "runtime_validation.json" in gitignore_text
-        assert "oauth_credentials.json" in gitignore_text
         manifest = json.loads(Path("manifest.json").read_text(encoding="utf-8"))
         assert manifest["docs_url"] == "https://example.com/docs"
         assert manifest["support_contact"] == "support@example.com"
@@ -1021,7 +929,7 @@ def test_init_command_generates_operation_wrapper_with_grade_b_or_better(monkeyp
         assert "replace `docs_url` with a dedicated public API usage guide" in readme_text
         assert "Replace `support_contact` with a real support email address" in readme_text
         assert "Start locally without a Siglume API key" in readme_text
-        assert "Do not commit real review keys or OAuth client secrets" in readme_text
+        assert "Do not commit real review keys or external-provider secrets" in readme_text
         assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
         assert readme_text.index("pytest tests/test_adapter.py") < readme_text.index("siglume register .")
 

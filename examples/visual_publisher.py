@@ -112,14 +112,12 @@ class VisualPublisherApp(AppAdapter):
 
         # ACTION: Generate and post
         # TODO: Upload image to X media endpoint before creating tweet
-        # x_token = ctx.connected_accounts.get("x-twitter")
-        # if not x_token:
+        # token = await self._load_publisher_managed_token(ctx.owner_user_id, "x-twitter")
+        # if not token:
         #     return ExecutionResult(success=False, error_message="X account not connected")
         #
-        # media_id = await self._upload_media(x_token.session_token, image_result["data"])
-        # tweet = await self._create_tweet_with_media(
-        #     x_token.session_token, caption, media_id, alt_text
-        # )
+        # media_id = await self._upload_media(token, image_result["data"])
+        # tweet = await self._create_tweet_with_media(token, caption, media_id, alt_text)
 
         return ExecutionResult(
             success=True,
@@ -148,7 +146,7 @@ class VisualPublisherApp(AppAdapter):
 
         TODO: Replace with real DALL-E 3 / Stable Diffusion API call.
         Real implementation should:
-          1. Get the openai ConnectedAccountRef from ctx.connected_accounts
+          1. Load any publisher-managed image API credentials for ctx.owner_user_id
           2. Call POST https://api.openai.com/v1/images/generations
           3. Handle rate limits and content policy rejections
           4. Return the image URL or base64 data

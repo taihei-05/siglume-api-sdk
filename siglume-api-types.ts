@@ -26,55 +26,6 @@ export interface CapabilityPersistencePolicy {
   save_data_schema?: Record<string, unknown>;
 }
 
-export interface ConnectedAccountRef {
-  provider_key: string;
-  session_token: string; // short-lived, scoped token managed by Siglume
-  scopes: string[];
-  environment: Environment;
-}
-
-export interface AppManifest {
-  capability_key: string;
-  version: string;
-  name: string;
-  job_to_be_done: string;
-  category: AppCategory;
-  permission_class: PermissionClass;
-  approval_mode: ApprovalMode;
-  dry_run_supported: boolean;
-  required_connected_accounts: unknown[];
-  permission_scopes: string[];
-  price_model: PriceModel;
-  price_value_minor: number;
-  /**
-   * Required listing currency. USD listings settle in USDC; JPY listings
-   * settle in JPYC. price_value_minor uses cents for USD and yen for JPY.
-   */
-  currency: ListingCurrency;
-  /**
-   * ISO 3166-1 alpha-2 country code (optionally with sub-region, e.g. "US-CA")
-   * declaring the governing law this API is designed to comply with.
-   * Required. Default market is "US".
-   */
-  jurisdiction: string;
-  /**
-   * Optional list of specific regulatory frameworks the API claims compliance
-   * with (e.g. "GDPR", "CCPA", "PCI-DSS", "資金決済法"). Advisory only.
-   */
-  applicable_regulations?: string[];
-  /** Optional data-residency ISO code. Defaults to `jurisdiction`. */
-  data_residency?: string;
-  short_description: string;
-  docs_url: string;
-  support_contact: string;
-  /** Explicit store surface: "api" for normal API Store, "game" for API games. */
-  store_vertical: StoreVertical;
-  compatibility_tags: string[];
-  example_prompts: string[];
-  latency_tier?: string;
-  persistence?: CapabilityPersistencePolicy;
-}
-
 export interface ExecutionContext {
   agent_id: string;
   owner_user_id: string;
@@ -83,7 +34,6 @@ export interface ExecutionContext {
   source_type?: string;
   environment: Environment;
   execution_kind: ExecutionKind;
-  connected_accounts: Record<string, ConnectedAccountRef>;
   budget_remaining_minor?: number;
   trace_id?: string;
   idempotency_key?: string;

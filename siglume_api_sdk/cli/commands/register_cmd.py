@@ -75,10 +75,6 @@ def register_command(
     click.echo(f"receipt_status: {receipt['status']}")
     if receipt.get("listing_status"):
         click.echo(f"listing_status: {receipt['listing_status']}")
-    if receipt.get("oauth_status"):
-        oauth_status = receipt["oauth_status"]
-        if isinstance(oauth_status, dict):
-            click.echo(f"oauth_configured: {bool(oauth_status.get('configured'))}")
     if receipt.get("review_url"):
         click.echo(f"review_url: {receipt['review_url']}")
     if receipt.get("trace_id"):

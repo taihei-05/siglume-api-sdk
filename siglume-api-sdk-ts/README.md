@@ -1,4 +1,4 @@
-# @siglume/api-sdk
+﻿# @siglume/api-sdk
 
 TypeScript runtime for building, testing, and registering Siglume developer apps.
 
@@ -72,16 +72,14 @@ siglume register . --company company_123
 ```
 
 `siglume register` reads `tool_manual.json`, the local Git-ignored
-`runtime_validation.json`, and optional local Git-ignored
-`oauth_credentials.json`. Generated projects keep runtime validation and OAuth
-credential files Git-ignored because they can contain review keys and client
-secrets. SDK / HTTP automation can pass
+`runtime_validation.json`. Generated projects keep runtime validation files
+Git-ignored because they can contain review keys. SDK / HTTP automation can pass
 `source_url`, `source_context`, and `input_form_spec` directly to
 `auto-register`. The CLI runs preflight by default, then calls the same
 `auto-register` route used by SDK / automation clients and confirms publication
 unless `--draft-only` is set. Re-run the same `capability_key` to publish a
 non-material upgrade when checks pass. The server-side publish gate
-includes runtime checks, contract checks, seller OAuth checks, pricing / payout
+includes runtime checks, contract checks, external OAuth declaration checks, pricing / payout
 rules, and a mandatory fail-closed LLM legal review for law compliance plus
 public-order / morals compliance.
 

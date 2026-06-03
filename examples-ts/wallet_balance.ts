@@ -60,7 +60,7 @@ export class WalletBalanceApp extends AppAdapter {
     const token_symbol = String(ctx.input_params?.token_symbol ?? defaultSymbol).toUpperCase();
     const balance = token_symbol === defaultSymbol ? defaultBalance : token_symbol === "USDC" ? 250.0 : 18.75;
     const usd_equivalent = Math.round(balance * (TOKEN_PRICES[token_symbol] ?? defaultPrice) * 100) / 100;
-    const provider = ctx.connected_accounts?.metamask?.provider_key ?? "metamask";
+    const provider = "metamask"; // Publisher resolves the owner wallet from ctx.owner_user_id.
     return {
       success: true,
       execution_kind: ctx.execution_kind,

@@ -53,7 +53,7 @@ The Python CLI writes:
 - `manifest.json`: serialized `AppManifest`
 - `tool_manual.json`: machine-generated `ToolManual`
 - `runtime_validation.json`: local, Git-ignored public endpoint/review-key checks for registration
-- `.gitignore`: excludes local review keys and seller OAuth client secrets
+- `.gitignore`: excludes local review keys and runtime secrets
 - `README.md`: generated usage notes
 - `tests/test_adapter.py`: harness smoke test
 

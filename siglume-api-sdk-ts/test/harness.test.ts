@@ -85,13 +85,13 @@ describe("AppTestHarness", () => {
     expect(issues).toContain("Action/payment execution should report side effects");
   });
 
-  it("supports health checks and missing-account simulation", async () => {
+  it("supports health checks and dry-run execution", async () => {
     const harness = new AppTestHarness(new PaymentQuoteApp());
 
     const health = await harness.health();
-    const missing = await harness.simulate_connected_account_missing("quote_payment", { input_params: { amount_usd: 5 } });
+    const dryRun = await harness.dry_run("quote_payment", { input_params: { amount_usd: 5 } });
 
     expect(health.healthy).toBe(true);
-    expect(missing.success).toBe(true);
+    expect(dryRun.success).toBe(true);
   });
 });

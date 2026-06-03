@@ -150,12 +150,18 @@
           {
             "type": "object",
             "additionalProperties": true,
+            "required": ["provider_key", "managed_by", "connect_url"],
             "properties": {
               "provider_key": {
                 "type": "string"
               },
-              "platform_managed": {
-                "type": "boolean"
+              "managed_by": {
+                "type": "string",
+                "enum": ["api"]
+              },
+              "connect_url": {
+                "type": "string",
+                "format": "uri"
               },
               "required_scopes": {
                 "type": "array",

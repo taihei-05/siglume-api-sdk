@@ -73,7 +73,7 @@ class BrokenManifestApp extends AppAdapter {
 }
 
 describe("runtime helpers", () => {
-  it("normalizes execution results and injects stub connected accounts", async () => {
+  it("normalizes execution results and preserves identity context", async () => {
     const app = new RecordingApp();
     const harness = new AppTestHarness(app, { stripe: new StubProvider("stripe") });
 
@@ -90,7 +90,6 @@ describe("runtime helpers", () => {
     expect(result.amount_minor).toBe(0);
     expect(result.currency).toBe("USD");
     expect(result.provider_status).toBe("ok");
-    expect(app.lastContext?.connected_accounts?.stripe?.provider_key).toBe("stripe");
     expect(app.lastContext?.metadata).toEqual({ source: "test" });
     expect(app.lastContext?.trace_id).toBe("trc_123");
     expect(app.supported_task_types()).toEqual(["default"]);
@@ -143,9 +142,9 @@ describe("runtime helpers", () => {
 
     const harness = new AppTestHarness(new RecordingApp());
     expect(harness.validate_tool_manual()).toEqual([true, []]);
-    const missing = await harness.simulate_connected_account_missing("lookup_price", {
+    const dryRun = await harness.dry_run("lookup_price", {
       input_params: { query: "headphones" },
     });
-    expect(missing.execution_kind).toBe("dry_run");
+    expect(dryRun.execution_kind).toBe("dry_run");
   });
 });

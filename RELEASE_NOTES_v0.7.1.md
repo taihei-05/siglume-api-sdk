@@ -82,7 +82,7 @@ depends on (pattern A — Slack-as-seller).
 3. For every listing that uses a third-party OAuth provider, call
    `set_listing_oauth_credentials` once after registering your
    OAuth app with the provider.
-4. Reconnect any ConnectedAccount rows from v0.7.0 — they have
+4. Reconnect any v0.7.0 platform OAuth account rows — they have
    no `source_listing_id` and cannot be refreshed under the new
    model.
 

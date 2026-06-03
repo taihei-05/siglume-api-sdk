@@ -180,38 +180,6 @@ class CapabilitySaveStateRecord:
 
 
 @dataclass
-class ConnectedAccountOAuthStart:
-    """Result of ``start_connected_account_oauth`` — carries the URL
-    the owner's browser should be pointed at plus the state token
-    the callback must echo back."""
-    authorize_url: str
-    state: str
-    provider_key: str
-    scopes: list[str] = field(default_factory=list)
-    pkce_method: str | None = None
-
-
-@dataclass
-class ConnectedAccountLifecycleResult:
-    """Return value of ``refresh_connected_account`` / ``revoke_connected_account``.
-
-    Tokens are never returned — only status metadata. ``resolve`` is
-    intentionally NOT exposed in the SDK: capabilities access the
-    runtime handle in-process, not over the wire.
-    """
-    connected_account_id: str
-    provider_key: str
-    # refresh-only
-    expires_at: str | None = None
-    scopes: list[str] = field(default_factory=list)
-    refreshed_at: str | None = None
-    # revoke-only
-    connection_status: str | None = None
-    provider_revoked: bool | None = None
-    revoked_at: str | None = None
-
-
-@dataclass
 class BundleMember:
     """One capability listing inside a bundle (active membership)."""
     capability_listing_id: str
@@ -254,7 +222,6 @@ class AutoRegistrationReceipt:
     auto_manifest: dict[str, Any] = field(default_factory=dict)
     confidence: dict[str, Any] = field(default_factory=dict)
     validation_report: dict[str, Any] = field(default_factory=dict)
-    oauth_status: dict[str, Any] = field(default_factory=dict)
     review_url: str | None = None
     trace_id: str | None = None
     request_id: str | None = None
@@ -307,7 +274,6 @@ class SandboxSession:
     dry_run_supported: bool = False
     approval_mode: str | None = None
     required_connected_accounts: list[Any] = field(default_factory=list)
-    connected_accounts: list[dict[str, Any]] = field(default_factory=list)
     stub_providers_enabled: bool = False
     simulated_receipts: bool = False
     approval_simulator: bool = False
@@ -347,21 +313,6 @@ class GrantBindingResult:
     access_grant: AccessGrantRecord
     trace_id: str | None = None
     request_id: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class ConnectedAccountRecord:
-    connected_account_id: str
-    provider_key: str
-    account_role: str
-    display_name: str | None = None
-    environment: str | None = None
-    connection_status: str | None = None
-    scopes: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str | None = None
-    updated_at: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -1393,7 +1344,6 @@ def _build_auto_register_request(
     source_code: str | None,
     source_url: str | None,
     runtime_validation: Mapping[str, Any] | None,
-    oauth_credentials: Mapping[str, Any] | Sequence[Any] | None,
     source_context: Mapping[str, Any] | None,
     input_form_spec: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1416,18 +1366,6 @@ def _build_auto_register_request(
         payload["source_code"] = _build_registration_stub_source(manifest_payload, tool_manual_payload)
     if runtime_validation is not None:
         payload["runtime_validation"] = _coerce_mapping(runtime_validation, "runtime_validation")
-    if oauth_credentials is not None:
-        if isinstance(oauth_credentials, Mapping):
-            payload["oauth_credentials"] = dict(oauth_credentials)
-        elif isinstance(oauth_credentials, Sequence) and not isinstance(oauth_credentials, (str, bytes, bytearray)):
-            payload["oauth_credentials"] = {
-                "items": [
-                    _coerce_mapping(item, f"oauth_credentials[{index}]")
-                    for index, item in enumerate(oauth_credentials)
-                ]
-            }
-        else:
-            raise TypeError("oauth_credentials must be a mapping or a sequence of mappings")
     if source_context is not None:
         payload["source_context"] = _coerce_mapping(source_context, "source_context")
     if input_form_spec_for_request is not None:
@@ -1690,19 +1628,6 @@ def _parse_capability_save_state(data: Mapping[str, Any]) -> CapabilitySaveState
     )
 
 
-def _parse_connected_account_lifecycle(data: Mapping[str, Any]) -> ConnectedAccountLifecycleResult:
-    return ConnectedAccountLifecycleResult(
-        connected_account_id=str(data.get("connected_account_id") or ""),
-        provider_key=str(data.get("provider_key") or ""),
-        expires_at=_string_or_none(data.get("expires_at")),
-        scopes=[str(s) for s in (data.get("scopes") or []) if isinstance(s, str)],
-        refreshed_at=_string_or_none(data.get("refreshed_at")),
-        connection_status=_string_or_none(data.get("connection_status")),
-        provider_revoked=_bool_or_none(data.get("provider_revoked")),
-        revoked_at=_string_or_none(data.get("revoked_at")),
-    )
-
-
 def _parse_bundle_member(data: Mapping[str, Any]) -> BundleMember:
     return BundleMember(
         capability_listing_id=str(data.get("capability_listing_id") or ""),
@@ -1768,7 +1693,6 @@ def _parse_developer_portal(data: Mapping[str, Any], meta: EnvelopeMeta) -> Deve
 
 
 def _parse_sandbox_session(data: Mapping[str, Any], meta: EnvelopeMeta) -> SandboxSession:
-    connected_accounts = data.get("connected_accounts") if isinstance(data.get("connected_accounts"), list) else []
     required_connected_accounts = (
         data.get("required_connected_accounts") if isinstance(data.get("required_connected_accounts"), list) else []
     )
@@ -1781,7 +1705,6 @@ def _parse_sandbox_session(data: Mapping[str, Any], meta: EnvelopeMeta) -> Sandb
         dry_run_supported=bool(data.get("dry_run_supported") or False),
         approval_mode=_string_or_none(data.get("approval_mode")),
         required_connected_accounts=list(required_connected_accounts),
-        connected_accounts=[dict(item) for item in connected_accounts if isinstance(item, Mapping)],
         stub_providers_enabled=bool(data.get("stub_providers_enabled") or False),
         simulated_receipts=bool(data.get("simulated_receipts") or False),
         approval_simulator=bool(data.get("approval_simulator") or False),
@@ -1813,23 +1736,6 @@ def _parse_binding(data: Mapping[str, Any]) -> CapabilityBindingRecord:
         access_grant_id=str(data.get("access_grant_id") or ""),
         agent_id=str(data.get("agent_id") or ""),
         binding_status=str(data.get("binding_status") or ""),
-        created_at=_string_or_none(data.get("created_at")),
-        updated_at=_string_or_none(data.get("updated_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_connected_account(data: Mapping[str, Any]) -> ConnectedAccountRecord:
-    scopes = data.get("scopes") if isinstance(data.get("scopes"), list) else []
-    return ConnectedAccountRecord(
-        connected_account_id=str(data.get("connected_account_id") or data.get("id") or ""),
-        provider_key=str(data.get("provider_key") or ""),
-        account_role=str(data.get("account_role") or ""),
-        display_name=_string_or_none(data.get("display_name")),
-        environment=_string_or_none(data.get("environment")),
-        connection_status=_string_or_none(data.get("connection_status")),
-        scopes=[str(item) for item in scopes if isinstance(item, str)],
-        metadata=_to_dict(data.get("metadata")),
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
         raw=dict(data),
@@ -3069,7 +2975,6 @@ class SiglumeClient:
         source_code: str | None = None,
         source_url: str | None = None,
         runtime_validation: Mapping[str, Any] | None = None,
-        oauth_credentials: Mapping[str, Any] | Sequence[Any] | None = None,
         source_context: Mapping[str, Any] | None = None,
         input_form_spec: Mapping[str, Any] | None = None,
     ) -> AutoRegistrationReceipt:
@@ -3086,7 +2991,6 @@ class SiglumeClient:
             source_code=source_code,
             source_url=source_url,
             runtime_validation=runtime_validation,
-            oauth_credentials=oauth_credentials,
             source_context=source_context,
             input_form_spec=input_form_spec_payload,
         )
@@ -3107,7 +3011,6 @@ class SiglumeClient:
             auto_manifest=_to_dict(data.get("auto_manifest")),
             confidence=_to_dict(data.get("confidence")),
             validation_report=_to_dict(data.get("validation_report")),
-            oauth_status=_to_dict(data.get("oauth_status")),
             review_url=_string_or_none(data.get("review_url")),
             trace_id=meta.trace_id,
             request_id=meta.request_id,
@@ -3421,134 +3324,9 @@ class SiglumeClient:
 
     # ----- end bundles ----------------------------------------------------
 
-    # ----- Connected accounts (v0.7 track 3) -----------------------------
-    # Thin wrapper over the owner-operation bus + /v1/me/connected-accounts
-    # routes. ``resolve`` is NOT exposed: capabilities access the
-    # runtime handle in-process, not over the wire.
-
-    def start_connected_account_oauth(
-        self,
-        *,
-        listing_id: str,
-        redirect_uri: str,
-        scopes: list[str] | None = None,
-        account_role: str | None = None,
-    ) -> ConnectedAccountOAuthStart:
-        """Begin the OAuth dance for a specific listing.
-
-        v0.7.1 responsibility-correction: OAuth client credentials
-        live on the LISTING (the seller registered their own app
-        with the provider). The SDK caller passes the ``listing_id``
-        they're connecting for; the platform resolves the provider
-        + client credentials from that listing.
-        """
-        body: dict[str, Any] = {
-            "listing_id": listing_id,
-            "redirect_uri": redirect_uri,
-        }
-        if scopes is not None:
-            body["scopes"] = list(scopes)
-        if account_role is not None:
-            body["account_role"] = account_role
-        data, _meta = self._request(
-            "POST", "/me/connected-accounts/oauth/authorize", json_body=body,
-        )
-        return ConnectedAccountOAuthStart(
-            authorize_url=str(data.get("authorize_url") or ""),
-            state=str(data.get("state") or ""),
-            provider_key=str(data.get("provider_key") or ""),
-            scopes=[str(s) for s in (data.get("scopes") or []) if isinstance(s, str)],
-            pkce_method=_string_or_none(data.get("pkce_method")),
-        )
-
-    def complete_connected_account_oauth(
-        self,
-        *,
-        state: str,
-        code: str,
-    ) -> dict[str, Any]:
-        """Exchange the authorization code for a persisted token on
-        the platform. Returns the connected-account summary (no raw
-        tokens — those live only on the server)."""
-        data, _meta = self._request(
-            "POST", "/me/connected-accounts/oauth/callback",
-            json_body={"state": state, "code": code},
-        )
-        return dict(data)
-
-    def refresh_connected_account(self, account_id: str) -> ConnectedAccountLifecycleResult:
-        data, _meta = self._request(
-            "POST", f"/me/connected-accounts/{account_id}/refresh",
-        )
-        return _parse_connected_account_lifecycle(data)
-
-    def revoke_connected_account(self, account_id: str) -> ConnectedAccountLifecycleResult:
-        data, _meta = self._request(
-            "POST", f"/me/connected-accounts/{account_id}/revoke",
-        )
-        return _parse_connected_account_lifecycle(data)
-
-    def set_listing_oauth_credentials(
-        self,
-        listing_id: str,
-        *,
-        provider_key: str,
-        client_id: str,
-        client_secret: str,
-        authorize_url: str,
-        token_url: str,
-        revoke_url: str | None = None,
-        display_name: str | None = None,
-        scope_separator: str | None = None,
-        token_endpoint_auth: str | None = None,
-        pkce_required: bool | None = None,
-        refresh_supported: bool | None = None,
-        available_scopes: list[str] | None = None,
-        required_scopes: list[str] | None = None,
-    ) -> dict[str, Any]:
-        """Seller-side: register the OAuth client credentials for
-        your listing. v0.7.1 responsibility-correction — the seller
-        is the OAuth party, not the platform. ``client_secret`` is
-        stored encrypted server-side and is never returned on reads.
-        """
-        body: dict[str, Any] = {
-            "provider_key": provider_key,
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "authorize_url": authorize_url,
-            "token_url": token_url,
-        }
-        if revoke_url is not None:
-            body["revoke_url"] = revoke_url
-        if display_name is not None:
-            body["display_name"] = display_name
-        if scope_separator is not None:
-            body["scope_separator"] = scope_separator
-        if token_endpoint_auth is not None:
-            body["token_endpoint_auth"] = token_endpoint_auth
-        if pkce_required is not None:
-            body["pkce_required"] = bool(pkce_required)
-        if refresh_supported is not None:
-            body["refresh_supported"] = bool(refresh_supported)
-        if available_scopes is not None:
-            body["available_scopes"] = list(available_scopes)
-        if required_scopes is not None:
-            body["required_scopes"] = list(required_scopes)
-        data, _meta = self._request(
-            "PUT", f"/market/capabilities/{listing_id}/oauth-credentials",
-            json_body=body,
-        )
-        return dict(data)
-
-    def get_listing_oauth_credentials_status(self, listing_id: str) -> dict[str, Any]:
-        """Read-only: is OAuth configured on this listing? Never
-        returns the secret values themselves."""
-        data, _meta = self._request(
-            "GET", f"/market/capabilities/{listing_id}/oauth-credentials",
-        )
-        return dict(data)
-
-    # ----- end connected accounts ----------------------------------------
+    # ----- Connected accounts ------------------------------------------------
+    # Architecture B: publisher APIs own external OAuth and token storage.
+    # The SDK no longer exposes platform OAuth or listing credential APIs.
 
     def get_developer_portal(self) -> DeveloperPortalSummary:
         data, meta = self._request("GET", "/market/developer/portal")
@@ -5352,40 +5130,6 @@ class SiglumeClient:
             trace_id=meta.trace_id,
             request_id=meta.request_id,
             raw=dict(data),
-        )
-
-    def list_connected_accounts(
-        self,
-        *,
-        provider_key: str | None = None,
-        environment: str | None = None,
-        limit: int = 50,
-        cursor: str | None = None,
-    ) -> CursorPage[ConnectedAccountRecord]:
-        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
-        if provider_key:
-            params["provider_key"] = provider_key
-        if environment:
-            params["environment"] = environment
-        if cursor:
-            params["cursor"] = cursor
-        data, meta = self._request("GET", "/market/connected-accounts", params=params)
-        items = data.get("items") if isinstance(data.get("items"), list) else []
-        next_cursor = _string_or_none(data.get("next_cursor"))
-        return CursorPage(
-            items=[_parse_connected_account(item) for item in items if isinstance(item, Mapping)],
-            next_cursor=next_cursor,
-            limit=int(data["limit"]) if data.get("limit") is not None else params["limit"],
-            offset=int(data["offset"]) if data.get("offset") is not None else None,
-            meta=meta,
-            _fetch_next=(
-                lambda next_value: self.list_connected_accounts(
-                    provider_key=provider_key,
-                    environment=environment,
-                    limit=limit,
-                    cursor=next_value,
-                )
-            ) if next_cursor else None,
         )
 
     def create_support_case(

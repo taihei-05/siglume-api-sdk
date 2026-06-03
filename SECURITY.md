@@ -1,4 +1,4 @@
-# Security Policy
+﻿# Security Policy
 
 ## Supported Versions
 
@@ -57,6 +57,6 @@ when OIDC is unavailable. If a token is unavoidable:
    history, screenshots, logs, commits, or chat.
 
 Generated developer projects may contain local review keys in
-`runtime_validation.json` and OAuth client secrets in `oauth_credentials.json`.
+`runtime_validation.json` and external-provider secrets in the publisher API secret store.
 The SDK templates generate a `.gitignore` that excludes those files; verify
 with `git status --ignored` before publishing your own API source repository.

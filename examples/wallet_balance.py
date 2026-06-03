@@ -81,11 +81,7 @@ class WalletBalanceApp(AppAdapter):
             balance = 250.0 if token_symbol == "USDC" else 18.75
             usd_price = TOKEN_PRICES.get(token_symbol, 1.25)
         usd_equivalent = round(balance * usd_price, 2)
-        provider_key = (
-            ctx.connected_accounts.get("metamask").provider_key
-            if ctx.connected_accounts.get("metamask")
-            else "metamask"
-        )
+        provider_key = "metamask"  # Publisher resolves the owner wallet from ctx.owner_user_id.
         return ExecutionResult(
             success=True,
             execution_kind=ctx.execution_kind,

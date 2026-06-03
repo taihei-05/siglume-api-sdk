@@ -1,7 +1,6 @@
 import type {
   AppManifest,
   Awaitable,
-  ConnectedAccountRef,
   ExecutionContext,
   ExecutionKind,
   ExecutionResult,
@@ -86,7 +85,6 @@ export class AppTestHarness {
     execution_kind: ExecutionKind,
     task_type = "default",
     options: {
-      connected_accounts?: Record<string, ConnectedAccountRef>;
       input_params?: Record<string, unknown>;
       trace_id?: string;
       idempotency_key?: string;
@@ -95,26 +93,12 @@ export class AppTestHarness {
       metadata?: Record<string, unknown>;
     } = {},
   ): Promise<ExecutionResult> {
-    const connected_accounts =
-      options.connected_accounts ??
-      Object.fromEntries(
-        Object.keys(this.stubs).map((key) => [
-          key,
-          {
-            provider_key: key,
-            session_token: `stub-token-${key}`,
-            environment: Environment.SANDBOX,
-            scopes: [],
-          },
-        ]),
-      );
     const ctx: ExecutionContext = {
       agent_id: "test-agent-001",
       owner_user_id: "test-owner-001",
       task_type,
       environment: Environment.SANDBOX,
       execution_kind,
-      connected_accounts,
       input_params: options.input_params ?? {},
       trace_id: options.trace_id,
       idempotency_key: options.idempotency_key,
@@ -216,16 +200,6 @@ export class AppTestHarness {
     }
 
     return issues;
-  }
-
-  async simulate_connected_account_missing(
-    task_type = "default",
-    options: Parameters<AppTestHarness["executeWithKind"]>[2] = {},
-  ) {
-    return this.executeWithKind("dry_run", task_type, {
-      ...options,
-      connected_accounts: {},
-    });
   }
 
   async simulate_metering(

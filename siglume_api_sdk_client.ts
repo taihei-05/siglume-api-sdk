@@ -105,7 +105,6 @@ export interface SandboxSession {
   dry_run_supported: boolean;
   approval_mode?: string | null;
   required_connected_accounts: unknown[];
-  connected_accounts: Array<Record<string, unknown>>;
   stub_providers_enabled: boolean;
   simulated_receipts: boolean;
   approval_simulator: boolean;
@@ -142,20 +141,6 @@ export interface GrantBindingResult {
   access_grant: AccessGrantRecord;
   trace_id?: string | null;
   request_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface ConnectedAccountRecord {
-  connected_account_id: string;
-  provider_key: string;
-  account_role: string;
-  display_name?: string | null;
-  environment?: string | null;
-  connection_status?: string | null;
-  scopes: string[];
-  metadata: Record<string, unknown>;
-  created_at?: string | null;
-  updated_at?: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -1285,7 +1270,6 @@ export interface SiglumeClientShape {
   reject_market_proposal(...args: unknown[]): Promise<MarketProposalActionResult> | MarketProposalActionResult;
   list_access_grants(...args: unknown[]): Promise<CursorPage<AccessGrantRecord>> | CursorPage<AccessGrantRecord>;
   bind_agent_to_grant(...args: unknown[]): Promise<GrantBindingResult> | GrantBindingResult;
-  list_connected_accounts(...args: unknown[]): Promise<CursorPage<ConnectedAccountRecord>> | CursorPage<ConnectedAccountRecord>;
   create_support_case(...args: unknown[]): Promise<SupportCaseRecord> | SupportCaseRecord;
   list_support_cases(...args: unknown[]): Promise<CursorPage<SupportCaseRecord>> | CursorPage<SupportCaseRecord>;
   create_webhook_subscription(options: {

@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-06-03
+
+### Breaking
+
+- Retired Architecture A connected-account OAuth from the public SDK surface.
+- Removed platform OAuth authorize/callback/refresh/revoke helpers and listing OAuth credential helpers from Python and TypeScript clients.
+- Removed auto-register OAuth credential seed payload support.
+- Project preflight now rejects platform-managed connected-account requirements; publishers must use API-managed `connect_url` and own token storage.
 
 ## [0.10.8] - 2026-05-28
 
@@ -477,20 +486,14 @@ v0.7.1 is a responsibility-correction release over v0.7.0.
 
 ### Breaking
 
-- `start_connected_account_oauth(...)` now takes **`listing_id`**
-  instead of `provider_key`. OAuth client credentials
-  (`client_id` / `client_secret`) are registered by the **seller**
-  against their listing, not by the platform in env vars. The
-  platform resolves the seller's credentials from the listing
-  when the buyer initiates OAuth. This applies to both Python
-  and TypeScript.
+- Historical note: v0.7.1 corrected the v0.7 connected-account ownership
+  model from platform environment credentials to seller-owned OAuth app
+  credentials per listing. That Architecture A surface is retired in v1.0.0.
 
 ### Added
 
-- Seller-side: `set_listing_oauth_credentials(listing_id, ...)` +
-  `get_listing_oauth_credentials_status(listing_id)` in both
-  bindings. The setter encrypts `client_secret` at rest; the
-  reader never returns the secret values.
+- Historical note: v0.7.1 added listing-level OAuth credential management
+  helpers in both bindings. Those helpers are retired in v1.0.0.
 
 ### Migration guide (v0.7.0 → v0.7.1)
 
@@ -498,8 +501,8 @@ v0.7.1 is a responsibility-correction release over v0.7.0.
   `AGENT_SNS_PROVIDER_<KEY>_CLIENT_{ID,SECRET}` env vars on the
   platform. v0.7.1 removes that path entirely — each seller
   registers their own OAuth app and calls
-  `set_listing_oauth_credentials()` once per listing.
-- Existing v0.7.0 `ConnectedAccount` rows have no
+  listing-level credential management once per listing.
+- Existing v0.7.0 platform OAuth account rows have no
   `source_listing_id`. They remain usable for resolve / revoke
   but **cannot be refreshed** and **do not satisfy** the new
   subscribe-time scope gate. Reconnect to regenerate them under
@@ -528,11 +531,11 @@ contract is pinned by regression tests in both language bindings.
   same-seller, 10-member cap, and grade-B-per-member gates.
 - **Connected accounts** (track 3): Python + TypeScript wrap over
   `/v1/me/connected-accounts` — `list_connected_account_providers` /
-  `start_connected_account_oauth` /
-  `complete_connected_account_oauth` / `refresh_connected_account` /
-  `revoke_connected_account`. New types
-  `ConnectedAccountProvider`, `ConnectedAccountOAuthStart`,
-  `ConnectedAccountLifecycleResult`.
+  the historical OAuth authorize helper /
+  the historical OAuth callback, refresh, and
+  revoke helpers. Historical types
+  platform OAuth provider and related OAuth response
+  records.
 
 ### Security
 
@@ -818,7 +821,7 @@ First public alpha of the Siglume API Store SDK.
 
 - `AppAdapter` base class and `AppManifest` / `ExecutionContext` / `ExecutionResult` types for building agent-callable APIs.
 - `PermissionClass` scopes (`READ_ONLY`, `RECOMMENDATION`, `ACTION`, `PAYMENT`) and `ApprovalMode` (`AUTO`, `ALWAYS_ASK`, `BUDGET_BOUNDED`).
-- `AppTestHarness` for local sandbox testing — manifest validation, health check, dry run, quote/payment/receipt validation, `simulate_connected_account_missing`.
+- `AppTestHarness` for local sandbox testing — manifest validation, health check, dry run, quote/payment/receipt validation.
 - `StubProvider` for mocking external APIs in tests.
 - **Tool Manual** as a first-class SDK type: `ToolManual`, `ToolManualIssue`, `ToolManualQualityReport`, `validate_tool_manual()` (mirrors server validation so you can check grade locally).
 - **Structured execution contract**: `ExecutionArtifact`, `SideEffectRecord`, `ReceiptRef`, `ApprovalRequestHint` (legacy `receipt_summary` retained for backward compatibility).

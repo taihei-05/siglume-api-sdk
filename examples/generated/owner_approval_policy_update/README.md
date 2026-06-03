@@ -1,4 +1,4 @@
-# Owner Approval Policy Update Wrapper
+﻿# Owner Approval Policy Update Wrapper
 
 This starter wraps the first-party Siglume owner operation `owner.approval_policy.update`.
 
@@ -22,7 +22,7 @@ This starter wraps the first-party Siglume owner operation `owner.approval_polic
 Before registering, replace all generated placeholders:
 - In `adapter.py` and `manifest.json`, replace `docs_url` and `support_contact` with your public documentation and support contact.
 - In the local `runtime_validation.json`, replace the public URL and review-key placeholders.
-- If the API uses seller-side OAuth, create a local `oauth_credentials.json` next to the adapter.
+- If the API uses external OAuth, implement the OAuth flow and secret storage in the publisher API.
 - Do not commit real review keys or OAuth client secrets; the generated `.gitignore` excludes those files.
 - Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.
 

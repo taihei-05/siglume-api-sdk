@@ -195,7 +195,7 @@ class AppManifest:
     permission_class: PermissionClass = PermissionClass.READ_ONLY
     approval_mode: ApprovalMode = ApprovalMode.AUTO
     dry_run_supported: bool = False
-    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. ["amazon"] or {"provider_key": "slack", "platform_managed": True}
+    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. {"provider_key": "slack", "managed_by": "api", "connect_url": "https://api.example.com/oauth/start"}
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
@@ -341,15 +341,6 @@ class AppManifest:
 
 
 @dataclass
-class ConnectedAccountRef:
-    """Opaque reference to a connected account. Does NOT contain raw credentials."""
-    provider_key: str
-    session_token: str  # short-lived, scoped token managed by Siglume
-    scopes: list[str] = field(default_factory=list)
-    environment: Environment = Environment.LIVE
-
-
-@dataclass
 class ExecutionContext:
     """Provided by Siglume runtime when invoking the app."""
     agent_id: str
@@ -359,7 +350,6 @@ class ExecutionContext:
     source_type: str | None = None
     environment: Environment = Environment.LIVE
     execution_kind: ExecutionKind = ExecutionKind.DRY_RUN
-    connected_accounts: dict[str, ConnectedAccountRef] = field(default_factory=dict)
     budget_remaining_minor: int | None = None
     trace_id: str | None = None
     idempotency_key: str | None = None
@@ -1124,7 +1114,6 @@ class AppTestHarness:
         self,
         execution_kind: ExecutionKind,
         task_type: str = "default",
-        connected_accounts: dict[str, ConnectedAccountRef] | None = None,
         **kwargs,
     ) -> ExecutionResult:
         """Internal helper — build context and run execute().
@@ -1132,18 +1121,12 @@ class AppTestHarness:
         All public execute_* methods delegate here so that changes to
         context construction are made in one place.
         """
-        if connected_accounts is None:
-            connected_accounts = {
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
-                for k in self.stubs
-            }
         ctx = ExecutionContext(
             agent_id="test-agent-001",
             owner_user_id="test-owner-001",
             task_type=task_type,
             environment=Environment.SANDBOX,
             execution_kind=execution_kind,
-            connected_accounts=connected_accounts,
             **kwargs,
         )
         return await self.app.execute(ctx)
@@ -1249,20 +1232,6 @@ class AppTestHarness:
                 issues.append(f"side_effects[{i}].provider is empty")
 
         return issues
-
-    async def simulate_connected_account_missing(
-        self, task_type: str = "default", **kwargs,
-    ) -> ExecutionResult:
-        """Execute with NO connected accounts to test graceful degradation.
-
-        Apps that declare required_connected_accounts should handle the case
-        where an account is missing (e.g., return an error or fallback).
-        """
-        return await self._execute(
-            ExecutionKind.DRY_RUN, task_type,
-            connected_accounts={},  # intentionally empty
-            **kwargs,
-        )
 
     def simulate_metering(
         self,

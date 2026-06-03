@@ -183,16 +183,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
     manifest = build_manifest()
     tool_manual = build_tool_manual()
     runtime_validation = build_runtime_validation()
-    oauth_credentials = {
-        "items": [
-            {
-                "provider_key": "twitter",
-                "client_id": "client-id",
-                "client_secret": "client-secret",
-                "required_scopes": ["tweet.write", "users.read"],
-            }
-        ]
-    }
     requests: list[tuple[str, str, dict[str, object]]] = []
     cassette_path = tmp_path / "auto_register_recorded.json"
 
@@ -209,7 +199,7 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
             assert body["description"] == manifest.description
             assert body["tool_manual"]["tool_name"] == tool_manual.tool_name
             assert body["runtime_validation"]["invoke_url"] == runtime_validation["invoke_url"]
-            assert body["oauth_credentials"]["items"][0]["provider_key"] == "twitter"
+            assert "oauth_credentials" not in body
             assert body["publisher_identity"]["documentation_url"] == manifest.docs_url
             assert body["legal"]["publisher_identity"]["support_contact"] == manifest.support_contact
             assert body["publisher_identity"]["seller_homepage_url"] == manifest.seller_homepage_url
@@ -229,7 +219,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                         "auto_manifest": {"capability_key": manifest.capability_key},
                         "confidence": {"overall": 0.94},
                         "validation_report": {"checks": []},
-                        "oauth_status": {"configured": True, "missing_providers": []},
                         "review_url": "/owner/publish?listing=lst_123",
                     }
                 ),
@@ -266,7 +255,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                 manifest,
                 tool_manual,
                 runtime_validation=runtime_validation,
-                oauth_credentials=oauth_credentials,
             )
             confirmation = client.confirm_registration(receipt.listing_id)
 
@@ -279,7 +267,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                 manifest,
                 tool_manual,
                 runtime_validation=runtime_validation,
-                oauth_credentials=oauth_credentials,
             )
             replay_confirmation = client.confirm_registration(replay_receipt.listing_id)
 
@@ -287,7 +274,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
     assert receipt.trace_id == "trc_test"
     assert receipt.registration_mode == "upgrade"
     assert receipt.listing_status == "active"
-    assert receipt.oauth_status["configured"] is True
     assert confirmation.listing_id == "lst_123"
     assert confirmation.status == "active"
     assert confirmation.message.startswith("Listing published automatically")
@@ -589,49 +575,6 @@ def test_app_manifest_rejects_out_of_range_free_trial_duration() -> None:
             free_trial_duration_days=200,
             jurisdiction="US",
         )
-
-def test_auto_register_accepts_oauth_credentials_sequence() -> None:
-    manifest = build_manifest()
-    tool_manual = build_tool_manual()
-    runtime_validation = build_runtime_validation()
-    oauth_credentials = [
-        {
-            "provider_key": "twitter",
-            "client_id": "client-id",
-            "client_secret": "client-secret",
-            "required_scopes": ["tweet.write"],
-        }
-    ]
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content.decode("utf-8")) if request.content else {}
-        assert body["oauth_credentials"]["items"][0]["provider_key"] == "twitter"
-        assert body["oauth_credentials"]["items"][0]["required_scopes"] == ["tweet.write"]
-        return httpx.Response(
-            201,
-            json=envelope(
-                {
-                    "listing_id": "lst_seq",
-                    "status": "draft",
-                    "auto_manifest": {"capability_key": manifest.capability_key},
-                    "confidence": {"overall": 0.92},
-                    "validation_report": {"checks": []},
-                    "review_url": "/owner/publish?listing=lst_seq",
-                }
-            ),
-        )
-
-    with build_client(handler) as client:
-        receipt = client.auto_register(
-            manifest,
-            tool_manual,
-            runtime_validation=runtime_validation,
-            oauth_credentials=oauth_credentials,
-        )
-
-    assert receipt.listing_id == "lst_seq"
-
-
 def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
     manifest = build_manifest()
     tool_manual = build_tool_manual().to_dict()
@@ -1980,28 +1923,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
                     }
                 ),
             )
-        if request.url.path == "/v1/market/connected-accounts":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "items": [
-                            {
-                                "id": "ca_123",
-                                "provider_key": "slack",
-                                "account_role": "publisher",
-                                "display_name": "Team Slack",
-                                "environment": "live",
-                                "connection_status": "connected",
-                                "scopes": ["chat:write"],
-                            }
-                        ],
-                        "next_cursor": None,
-                        "limit": 50,
-                        "offset": 0,
-                    }
-                ),
-            )
         if request.url.path == "/v1/market/support-cases" and request.method == "POST":
             body = json.loads(request.content.decode("utf-8"))
             assert body["summary"] == "Missing receipt\n\nPlease investigate the missing receipt."
@@ -2061,7 +1982,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
         sandbox = client.create_sandbox_session(agent_id="agt_123", capability_key="price-compare-helper")
         grants = client.list_access_grants()
         binding = client.bind_agent_to_grant("grt_123", agent_id="agt_123")
-        accounts = client.list_connected_accounts()
         support_case = client.create_support_case("Missing receipt", "Please investigate the missing receipt.", trace_id="trc_support")
         support_cases = client.list_support_cases()
         review = client.submit_review("lst_1")
@@ -2070,7 +1990,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
     assert sandbox.session_id == "ses_123"
     assert grants.items[0].grant_status == "active"
     assert binding.binding.binding_status == "active"
-    assert accounts.items[0].provider_key == "slack"
     assert support_case.trace_id == "trc_support"
     assert support_cases.items[0].support_case_id == "sup_123"
     assert review.status == "active"

@@ -100,7 +100,6 @@ async function createObjectProject(options: {
   manualFileName?: "tool_manual.json" | "tool-manual.json";
   toolManual?: Record<string, unknown>;
   manifest?: Record<string, unknown>;
-  oauthCredentials?: Record<string, unknown> | unknown[];
 } = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "siglume-ts-project-"));
   const adapterSource = [
@@ -138,9 +137,6 @@ async function createObjectProject(options: {
     ),
     "utf8",
   );
-  if (options.oauthCredentials !== undefined) {
-    await writeFile(join(dir, "oauth_credentials.json"), JSON.stringify(options.oauthCredentials, null, 2), "utf8");
-  }
   return dir;
 }
 
@@ -240,7 +236,6 @@ describe("cli project helpers", () => {
     expect(gitignore).toContain("custom-local.log");
     expect(gitignore).toContain("node_modules/");
     expect(gitignore).toContain("runtime_validation.json");
-    expect(gitignore).toContain("oauth_credentials.json");
   });
 
   it("scores remote projects and marks non-publishable remote reports as failed", async () => {
@@ -341,11 +336,17 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(false);
   });
 
-  it("allows API-managed connected accounts without oauth_credentials.json", async () => {
+  it("allows provider-managed connected accounts with connect_url", async () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
-        required_connected_accounts: ["twitter"],
+        required_connected_accounts: [
+          {
+            provider_key: "twitter",
+            managed_by: "api",
+            connect_url: "https://publisher.example.test/oauth/twitter/start",
+          },
+        ],
       },
     });
 
@@ -359,8 +360,8 @@ describe("cli project helpers", () => {
             async preview_quality_score() {
               return publishableQualityReport();
             },
-            async auto_register(_manifest: unknown, _toolManual: unknown, options?: { oauth_credentials?: unknown }) {
-              expect(options?.oauth_credentials).toBeUndefined();
+            async auto_register(_manifest: unknown, _toolManual: unknown, options?: Record<string, unknown>) {
+              expect(options).not.toHaveProperty("oauth_credentials");
               return { listing_id: "lst_api_managed", status: "draft", auto_manifest: {}, confidence: {} };
             },
             async confirm_registration(listing_id: string) {
@@ -373,7 +374,37 @@ describe("cli project helpers", () => {
     expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_api_managed");
   });
 
-  it("blocks registration when a platform-managed OAuth API does not provide oauth_credentials.json", async () => {
+  it("blocks provider-managed connected accounts without connect_url", async () => {
+    const projectDir = await createObjectProject({
+      manifest: {
+        ...manifestBase(),
+        required_connected_accounts: [
+          {
+            provider_key: "twitter",
+            managed_by: "api",
+          },
+        ],
+      },
+    });
+
+    await expect(
+      runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport();
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      ),
+    ).rejects.toThrow("API-managed OAuth requirements must include connect_url: twitter");
+  });
+
+  it("blocks registration when a platform-managed OAuth API is declared", async () => {
     const projectDir = await createObjectProject({
       manifest: {
         ...manifestBase(),
@@ -400,7 +431,7 @@ describe("cli project helpers", () => {
             }) as unknown as SiglumeClientShape,
         },
       ),
-    ).rejects.toThrow("oauth_credentials.json is required for platform-managed OAuth APIs");
+    ).rejects.toThrow("platform-managed OAuth is retired");
     expect(autoRegisterCalled).toBe(false);
   });
 
@@ -430,156 +461,6 @@ describe("cli project helpers", () => {
         },
       ),
     ).rejects.toThrow("platform-managed entries must include a provider_key");
-  });
-
-  it("canonicalizes OAuth seed payloads before auto-register", async () => {
-    const projectDir = await createObjectProject({
-      manifest: {
-        ...manifestBase(),
-        required_connected_accounts: [{ provider_key: "google", platform_managed: true }],
-      },
-      oauthCredentials: [
-        {
-          provider: "google",
-          client_id: "google-client",
-          client_secret: "google-secret",
-          scopes: ["gmail.readonly"],
-          authorize_url: "https://accounts.example.com/oauth/authorize",
-          token_url: "https://accounts.example.com/oauth/token",
-        },
-      ],
-    });
-
-    const report = await runRegistration(
-      projectDir,
-      {},
-      {
-        env: { SIGLUME_API_KEY: "sig_test_key" },
-        client_factory: () =>
-          ({
-            async preview_quality_score() {
-              return publishableQualityReport();
-            },
-            async auto_register(
-              _manifest: unknown,
-              _tool_manual: unknown,
-              options?: { oauth_credentials?: Record<string, unknown> | unknown[] },
-            ) {
-              expect(options?.oauth_credentials).toEqual({
-                items: [
-                  {
-                    provider_key: "google",
-                    client_id: "google-client",
-                    client_secret: "google-secret",
-                    required_scopes: ["gmail.readonly"],
-                    authorize_url: "https://accounts.example.com/oauth/authorize",
-                    token_url: "https://accounts.example.com/oauth/token",
-                  },
-                ],
-              });
-              return { listing_id: "lst_oauth", status: "draft", auto_manifest: {}, confidence: {} };
-            },
-            async confirm_registration(listing_id: string) {
-              return confirmedRegistration(listing_id);
-            },
-          }) as unknown as SiglumeClientShape,
-      },
-    );
-
-    expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_oauth");
-  });
-
-  it("canonicalizes contract-defined unknown OAuth providers before auto-register", async () => {
-    const projectDir = await createObjectProject({
-      manifest: {
-        ...manifestBase(),
-        required_connected_accounts: [{ provider_key: "custom-crm", platform_managed: true }],
-      },
-      oauthCredentials: [
-        {
-          provider_key: "custom-crm",
-          client_id: "custom-client",
-          client_secret: "custom-secret",
-          scopes: ["record.write"],
-          authorize_url: "https://crm.example.com/oauth/authorize",
-          token_url: "https://crm.example.com/oauth/token",
-          scope_separator: ",",
-          token_endpoint_auth: "client_secret_post",
-          pkce_required: true,
-        },
-      ],
-    });
-
-    const report = await runRegistration(
-      projectDir,
-      {},
-      {
-        env: { SIGLUME_API_KEY: "sig_test_key" },
-        client_factory: () =>
-          ({
-            async preview_quality_score() {
-              return publishableQualityReport();
-            },
-            async auto_register(
-              _manifest: unknown,
-              _tool_manual: unknown,
-              options?: { oauth_credentials?: Record<string, unknown> | unknown[] },
-            ) {
-              expect(options?.oauth_credentials).toEqual({
-                items: [
-                  {
-                    provider_key: "custom-crm",
-                    client_id: "custom-client",
-                    client_secret: "custom-secret",
-                    required_scopes: ["record.write"],
-                    authorize_url: "https://crm.example.com/oauth/authorize",
-                    token_url: "https://crm.example.com/oauth/token",
-                    scope_separator: ",",
-                    token_endpoint_auth: "client_secret_post",
-                    pkce_required: true,
-                  },
-                ],
-              });
-              return { listing_id: "lst_custom_oauth", status: "draft", auto_manifest: {}, confidence: {} };
-            },
-            async confirm_registration(listing_id: string) {
-              return confirmedRegistration(listing_id);
-            },
-          }) as unknown as SiglumeClientShape,
-      },
-    );
-
-    expect((report.receipt as { listing_id: string }).listing_id).toBe("lst_custom_oauth");
-  });
-
-  it("rejects string OAuth scopes", async () => {
-    const projectDir = await createObjectProject({
-      manifest: {
-        ...manifestBase(),
-        required_connected_accounts: ["google"],
-      },
-      oauthCredentials: [
-        {
-          provider: "google",
-          client_id: "google-client",
-          client_secret: "google-secret",
-          authorize_url: "https://accounts.example.com/oauth/authorize",
-          token_url: "https://accounts.example.com/oauth/token",
-          scopes: "gmail.readonly",
-        },
-      ],
-    });
-
-    await expect(
-      runRegistration(
-        projectDir,
-        {},
-        {
-          env: { SIGLUME_API_KEY: "sig_test_key" },
-          client_factory: () => ({}) as unknown as SiglumeClientShape,
-        },
-      ),
-    ).rejects.toThrow("required_scopes must be a JSON array");
   });
 
   it("allows Tool Manual warnings during registration preflight", async () => {
