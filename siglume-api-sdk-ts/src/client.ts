@@ -30,7 +30,6 @@
   BudgetPolicy,
   CapabilityBindingRecord,
   CapabilitySaveStateRecord,
-  ConnectedAccountRecord,
   CursorPage,
   DeveloperPortalSummary,
   EnvelopeMeta,
@@ -612,12 +611,6 @@ export interface SiglumeClientShape {
     grant_id: string,
     options: { agent_id: string; binding_status?: string },
   ): Promise<GrantBindingResult>;
-  list_connected_accounts(options?: {
-    provider_key?: string;
-    environment?: string;
-    limit?: number;
-    cursor?: string;
-  }): Promise<CursorPage<ConnectedAccountRecord>>;
   create_support_case(
     subject: string,
     body: string,
@@ -1013,22 +1006,6 @@ function parseBinding(data: Record<string, unknown>): CapabilityBindingRecord {
     access_grant_id: String(data.access_grant_id ?? ""),
     agent_id: String(data.agent_id ?? ""),
     binding_status: String(data.binding_status ?? ""),
-    created_at: stringOrNull(data.created_at),
-    updated_at: stringOrNull(data.updated_at),
-    raw: { ...data },
-  };
-}
-
-function parseConnectedAccount(data: Record<string, unknown>): ConnectedAccountRecord {
-  return {
-    connected_account_id: String(data.connected_account_id ?? data.id ?? ""),
-    provider_key: String(data.provider_key ?? ""),
-    account_role: String(data.account_role ?? ""),
-    display_name: stringOrNull(data.display_name),
-    environment: stringOrNull(data.environment),
-    connection_status: stringOrNull(data.connection_status),
-    scopes: Array.isArray(data.scopes) ? data.scopes.filter((item): item is string => typeof item === "string") : [],
-    metadata: toRecord(data.metadata),
     created_at: stringOrNull(data.created_at),
     updated_at: stringOrNull(data.updated_at),
     raw: { ...data },
@@ -2629,9 +2606,6 @@ export class SiglumeClient implements SiglumeClientShape {
       dry_run_supported: Boolean(data.dry_run_supported ?? false),
       approval_mode: stringOrNull(data.approval_mode),
       required_connected_accounts: Array.isArray(data.required_connected_accounts) ? data.required_connected_accounts : [],
-      connected_accounts: Array.isArray(data.connected_accounts)
-        ? data.connected_accounts.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => ({ ...item }))
-        : [],
       stub_providers_enabled: Boolean(data.stub_providers_enabled ?? false),
       simulated_receipts: Boolean(data.simulated_receipts ?? false),
       approval_simulator: Boolean(data.approval_simulator ?? false),
@@ -4394,35 +4368,6 @@ export class SiglumeClient implements SiglumeClientShape {
       request_id: meta.request_id,
       raw: { ...data },
     };
-  }
-
-  async list_connected_accounts(options: {
-    provider_key?: string;
-    environment?: string;
-    limit?: number;
-    cursor?: string;
-  } = {}): Promise<CursorPageResult<ConnectedAccountRecord>> {
-    const params = {
-      provider_key: options.provider_key,
-      environment: options.environment,
-      limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 50), 100)),
-      cursor: options.cursor,
-    };
-    const [data, meta] = await this.request("GET", "/market/connected-accounts", { params });
-    const items = Array.isArray(data.items)
-      ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseConnectedAccount)
-      : [];
-    const next_cursor = stringOrNull(data.next_cursor);
-    return new CursorPageResult({
-      items,
-      next_cursor,
-      limit: typeof data.limit === "number" ? data.limit : params.limit,
-      offset: typeof data.offset === "number" ? data.offset : null,
-      meta,
-      fetchNext: next_cursor
-        ? (cursor) => this.list_connected_accounts({ ...options, cursor })
-        : undefined,
-    });
   }
 
   async create_support_case(

@@ -1363,46 +1363,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
-  /market/connected-accounts:
-    get:
-      operationId: listConnectedAccounts
-      summary: List connected external accounts
-      parameters:
-        - name: provider_key
-          in: query
-          schema: { type: string }
-        - name: environment
-          in: query
-          schema: { type: string, enum: [sandbox, live] }
-        - name: cursor
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Connected accounts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountPageEnvelope'
-    post:
-      operationId: createConnectedAccount
-      summary: Connect an external account
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConnectedAccountRequest'
-      responses:
-        '201':
-          description: Connected
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountEnvelope'
-
   /market/sandbox/sessions:
     post:
       operationId: createSandboxSession
@@ -1995,19 +1955,6 @@ components:
         agent_id: { type: string }
         binding_status: { type: string, default: active }
 
-    ConnectedAccountRequest:
-      type: object
-      required: [provider_key, account_role]
-      properties:
-        provider_key: { type: string }
-        account_role: { type: string }
-        external_account_ref: { type: string }
-        display_name: { type: string }
-        environment: { type: string, enum: [sandbox, live], default: live }
-        connection_status: { type: string, default: connected }
-        scopes: { type: array, items: { type: string } }
-        metadata: { type: object }
-
     ApprovalChallengeRequest:
       type: object
       required: [agent_id, capability_key, task_type]
@@ -2085,7 +2032,7 @@ components:
         binding_status: { type: string, enum: [active, paused, removed] }
         created_by_user_id: { type: string, nullable: true }
         disabled_at: { type: string, format: date-time, nullable: true }
-        selected_connected_accounts: { type: object }
+        metadata: { type: object }
         metadata: { type: object }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -2104,60 +2051,6 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/GrantBindingResult'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ConnectedAccount:
-      type: object
-      properties:
-        id: { type: string }
-        connected_account_id: { type: string }
-        owner_user_id: { type: string }
-        provider_key: { type: string }
-        account_role: { type: string }
-        external_account_ref: { type: string }
-        display_name: { type: string }
-        environment: { type: string, enum: [sandbox, live] }
-        connection_status: { type: string }
-        scopes: { type: array, items: { type: string } }
-        metadata: { type: object }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
-
-    ConnectedAccountPage:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConnectedAccount'
-        next_cursor: { type: string, nullable: true }
-        limit: { type: integer }
-        offset: { type: integer }
-
-    ConnectedAccountEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccount'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ConnectedAccountPageEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountPage'
         meta:
           $ref: '#/components/schemas/EnvelopeMeta'
         error:
@@ -2738,10 +2631,6 @@ components:
             oneOf:
               - type: string
               - type: object
-        connected_accounts:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConnectedAccount'
         stub_providers_enabled: { type: boolean }
         simulated_receipts: { type: boolean }
         approval_simulator: { type: boolean }

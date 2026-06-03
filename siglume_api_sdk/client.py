@@ -274,7 +274,6 @@ class SandboxSession:
     dry_run_supported: bool = False
     approval_mode: str | None = None
     required_connected_accounts: list[Any] = field(default_factory=list)
-    connected_accounts: list[dict[str, Any]] = field(default_factory=list)
     stub_providers_enabled: bool = False
     simulated_receipts: bool = False
     approval_simulator: bool = False
@@ -314,21 +313,6 @@ class GrantBindingResult:
     access_grant: AccessGrantRecord
     trace_id: str | None = None
     request_id: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class ConnectedAccountRecord:
-    connected_account_id: str
-    provider_key: str
-    account_role: str
-    display_name: str | None = None
-    environment: str | None = None
-    connection_status: str | None = None
-    scopes: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str | None = None
-    updated_at: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -1709,7 +1693,6 @@ def _parse_developer_portal(data: Mapping[str, Any], meta: EnvelopeMeta) -> Deve
 
 
 def _parse_sandbox_session(data: Mapping[str, Any], meta: EnvelopeMeta) -> SandboxSession:
-    connected_accounts = data.get("connected_accounts") if isinstance(data.get("connected_accounts"), list) else []
     required_connected_accounts = (
         data.get("required_connected_accounts") if isinstance(data.get("required_connected_accounts"), list) else []
     )
@@ -1722,7 +1705,6 @@ def _parse_sandbox_session(data: Mapping[str, Any], meta: EnvelopeMeta) -> Sandb
         dry_run_supported=bool(data.get("dry_run_supported") or False),
         approval_mode=_string_or_none(data.get("approval_mode")),
         required_connected_accounts=list(required_connected_accounts),
-        connected_accounts=[dict(item) for item in connected_accounts if isinstance(item, Mapping)],
         stub_providers_enabled=bool(data.get("stub_providers_enabled") or False),
         simulated_receipts=bool(data.get("simulated_receipts") or False),
         approval_simulator=bool(data.get("approval_simulator") or False),
@@ -1754,23 +1736,6 @@ def _parse_binding(data: Mapping[str, Any]) -> CapabilityBindingRecord:
         access_grant_id=str(data.get("access_grant_id") or ""),
         agent_id=str(data.get("agent_id") or ""),
         binding_status=str(data.get("binding_status") or ""),
-        created_at=_string_or_none(data.get("created_at")),
-        updated_at=_string_or_none(data.get("updated_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_connected_account(data: Mapping[str, Any]) -> ConnectedAccountRecord:
-    scopes = data.get("scopes") if isinstance(data.get("scopes"), list) else []
-    return ConnectedAccountRecord(
-        connected_account_id=str(data.get("connected_account_id") or data.get("id") or ""),
-        provider_key=str(data.get("provider_key") or ""),
-        account_role=str(data.get("account_role") or ""),
-        display_name=_string_or_none(data.get("display_name")),
-        environment=_string_or_none(data.get("environment")),
-        connection_status=_string_or_none(data.get("connection_status")),
-        scopes=[str(item) for item in scopes if isinstance(item, str)],
-        metadata=_to_dict(data.get("metadata")),
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
         raw=dict(data),
@@ -5165,40 +5130,6 @@ class SiglumeClient:
             trace_id=meta.trace_id,
             request_id=meta.request_id,
             raw=dict(data),
-        )
-
-    def list_connected_accounts(
-        self,
-        *,
-        provider_key: str | None = None,
-        environment: str | None = None,
-        limit: int = 50,
-        cursor: str | None = None,
-    ) -> CursorPage[ConnectedAccountRecord]:
-        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
-        if provider_key:
-            params["provider_key"] = provider_key
-        if environment:
-            params["environment"] = environment
-        if cursor:
-            params["cursor"] = cursor
-        data, meta = self._request("GET", "/market/connected-accounts", params=params)
-        items = data.get("items") if isinstance(data.get("items"), list) else []
-        next_cursor = _string_or_none(data.get("next_cursor"))
-        return CursorPage(
-            items=[_parse_connected_account(item) for item in items if isinstance(item, Mapping)],
-            next_cursor=next_cursor,
-            limit=int(data["limit"]) if data.get("limit") is not None else params["limit"],
-            offset=int(data["offset"]) if data.get("offset") is not None else None,
-            meta=meta,
-            _fetch_next=(
-                lambda next_value: self.list_connected_accounts(
-                    provider_key=provider_key,
-                    environment=environment,
-                    limit=limit,
-                    cursor=next_value,
-                )
-            ) if next_cursor else None,
         )
 
     def create_support_case(

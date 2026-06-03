@@ -73,7 +73,7 @@ class BrokenManifestApp extends AppAdapter {
 }
 
 describe("runtime helpers", () => {
-  it("normalizes execution results and injects stub connected accounts", async () => {
+  it("normalizes execution results and preserves identity context", async () => {
     const app = new RecordingApp();
     const harness = new AppTestHarness(app, { stripe: new StubProvider("stripe") });
 
@@ -90,7 +90,6 @@ describe("runtime helpers", () => {
     expect(result.amount_minor).toBe(0);
     expect(result.currency).toBe("USD");
     expect(result.provider_status).toBe("ok");
-    expect(app.lastContext?.connected_accounts?.stripe?.provider_key).toBe("stripe");
     expect(app.lastContext?.metadata).toEqual({ source: "test" });
     expect(app.lastContext?.trace_id).toBe("trc_123");
     expect(app.supported_task_types()).toEqual(["default"]);

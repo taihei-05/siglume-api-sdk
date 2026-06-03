@@ -341,16 +341,6 @@ class AppManifest:
 
 
 @dataclass
-class ConnectedAccountRef:
-    """Identity-only reference to an external account requirement."""
-    provider_key: str
-    external_account_ref: str | None = None
-    identity: dict[str, Any] = field(default_factory=dict)
-    scopes: list[str] = field(default_factory=list)
-    environment: Environment = Environment.LIVE
-
-
-@dataclass
 class ExecutionContext:
     """Provided by Siglume runtime when invoking the app."""
     agent_id: str
@@ -360,7 +350,6 @@ class ExecutionContext:
     source_type: str | None = None
     environment: Environment = Environment.LIVE
     execution_kind: ExecutionKind = ExecutionKind.DRY_RUN
-    connected_accounts: dict[str, ConnectedAccountRef] = field(default_factory=dict)
     budget_remaining_minor: int | None = None
     trace_id: str | None = None
     idempotency_key: str | None = None
@@ -1125,7 +1114,6 @@ class AppTestHarness:
         self,
         execution_kind: ExecutionKind,
         task_type: str = "default",
-        connected_accounts: dict[str, ConnectedAccountRef] | None = None,
         **kwargs,
     ) -> ExecutionResult:
         """Internal helper — build context and run execute().
@@ -1133,22 +1121,12 @@ class AppTestHarness:
         All public execute_* methods delegate here so that changes to
         context construction are made in one place.
         """
-        if connected_accounts is None:
-            connected_accounts = {
-                k: ConnectedAccountRef(
-                    provider_key=k,
-                    external_account_ref=f"stub-account-{k}",
-                    identity={"provider_key": k},
-                )
-                for k in self.stubs
-            }
         ctx = ExecutionContext(
             agent_id="test-agent-001",
             owner_user_id="test-owner-001",
             task_type=task_type,
             environment=Environment.SANDBOX,
             execution_kind=execution_kind,
-            connected_accounts=connected_accounts,
             **kwargs,
         )
         return await self.app.execute(ctx)
@@ -1254,20 +1232,6 @@ class AppTestHarness:
                 issues.append(f"side_effects[{i}].provider is empty")
 
         return issues
-
-    async def simulate_connected_account_missing(
-        self, task_type: str = "default", **kwargs,
-    ) -> ExecutionResult:
-        """Execute with NO connected accounts to test graceful degradation.
-
-        Apps that declare required_connected_accounts should handle the case
-        where an account is missing (e.g., return an error or fallback).
-        """
-        return await self._execute(
-            ExecutionKind.DRY_RUN, task_type,
-            connected_accounts={},  # intentionally empty
-            **kwargs,
-        )
 
     def simulate_metering(
         self,

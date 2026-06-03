@@ -1923,28 +1923,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
                     }
                 ),
             )
-        if request.url.path == "/v1/market/connected-accounts":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "items": [
-                            {
-                                "id": "ca_123",
-                                "provider_key": "slack",
-                                "account_role": "publisher",
-                                "display_name": "Team Slack",
-                                "environment": "live",
-                                "connection_status": "connected",
-                                "scopes": ["chat:write"],
-                            }
-                        ],
-                        "next_cursor": None,
-                        "limit": 50,
-                        "offset": 0,
-                    }
-                ),
-            )
         if request.url.path == "/v1/market/support-cases" and request.method == "POST":
             body = json.loads(request.content.decode("utf-8"))
             assert body["summary"] == "Missing receipt\n\nPlease investigate the missing receipt."
@@ -2004,7 +1982,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
         sandbox = client.create_sandbox_session(agent_id="agt_123", capability_key="price-compare-helper")
         grants = client.list_access_grants()
         binding = client.bind_agent_to_grant("grt_123", agent_id="agt_123")
-        accounts = client.list_connected_accounts()
         support_case = client.create_support_case("Missing receipt", "Please investigate the missing receipt.", trace_id="trc_support")
         support_cases = client.list_support_cases()
         review = client.submit_review("lst_1")
@@ -2013,7 +1990,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
     assert sandbox.session_id == "ses_123"
     assert grants.items[0].grant_status == "active"
     assert binding.binding.binding_status == "active"
-    assert accounts.items[0].provider_key == "slack"
     assert support_case.trace_id == "trc_support"
     assert support_cases.items[0].support_case_id == "sup_123"
     assert review.status == "active"

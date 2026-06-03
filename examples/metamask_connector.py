@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from siglume_api_sdk import (
     AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
     PermissionClass, ApprovalMode, ExecutionKind, PriceModel, AppCategory,
-    ConnectedAccountRef, StubProvider, AppTestHarness, HealthCheckResult,
+    StubProvider, AppTestHarness, HealthCheckResult,
     Environment,
 )
 
@@ -489,13 +489,6 @@ async def main():
         environment=Environment.SANDBOX,
         execution_kind=ExecutionKind.PAYMENT,
         input_params=transfer_params,
-        connected_accounts={
-            "metamask": ConnectedAccountRef(
-                provider_key="metamask",
-                external_account_ref="stub-account-metamask",
-                identity={"provider_key": "metamask"},
-            )
-        },
         budget_remaining_minor=10000,
     )
     result = await app.execute(payment_ctx)

@@ -877,20 +877,6 @@ describe("SiglumeClient", () => {
             access_grant: { id: "grant_1", capability_listing_id: "lst_1", grant_status: "active", bindings: [], metadata: {} },
           })), { status: 200 });
         }
-        if (url.pathname === "/v1/market/connected-accounts") {
-          return new Response(JSON.stringify(envelope({
-            items: [{
-              id: "conn_1",
-              provider_key: "stripe",
-              account_role: "seller",
-              scopes: ["charges:read"],
-              metadata: {},
-            }],
-            next_cursor: null,
-            limit: 50,
-            offset: 0,
-          })), { status: 200 });
-        }
         if (url.pathname === "/v1/market/support-cases" && init?.method === "POST") {
           return new Response(JSON.stringify(envelope({
             id: "case_1",
@@ -923,7 +909,6 @@ describe("SiglumeClient", () => {
     const sandbox = await client.create_sandbox_session({ agent_id: "agt_123", capability_key: "price-compare-helper" });
     const grants = await client.list_access_grants();
     const binding = await client.bind_agent_to_grant("grant_1", { agent_id: "agt_123" });
-    const accounts = await client.list_connected_accounts();
     const supportCase = await client.create_support_case("subject", "body", { trace_id: "trc_123" });
     const supportCases = await client.list_support_cases();
 
@@ -933,7 +918,6 @@ describe("SiglumeClient", () => {
     expect(sandbox.session_id).toBe("sns_123");
     expect((await grants.all_items()).map((item) => item.access_grant_id)).toEqual(["grant_1"]);
     expect(binding.binding.binding_id).toBe("bind_1");
-    expect((await accounts.all_items()).map((item) => item.connected_account_id)).toEqual(["conn_1"]);
     expect(supportCase.support_case_id).toBe("case_1");
     expect((await supportCases.all_items()).map((item) => item.support_case_id)).toEqual(["case_1"]);
   });
