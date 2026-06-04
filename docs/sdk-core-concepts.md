@@ -102,6 +102,7 @@ your `execute()`; skip it otherwise.
 
 - [Getting Started](../GETTING_STARTED.md) - end-to-end build, validate, and register flow
 - [Pricing And Billing](./pricing-and-billing.md) - free, subscription, operation plans, and prepay billing
+- [Developer Observability](./developer-observability.md) - logs, receipts, listing activity, and support identifiers
 - [Permission Scopes](./permission-scopes.md) - how to choose the minimum safe tier
 - [Dry Run and Approval](./dry-run-and-approval.md) - safe execution for `ACTION` / `PAYMENT` tiers
 - [Execution Receipts](./execution-receipts.md) - what to return after execution

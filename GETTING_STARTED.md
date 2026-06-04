@@ -844,6 +844,18 @@ Capture the `listing_id`, `capability_key`, `review_url`, `trace_id`, and
 CLI/API key for `auto-register`, but it must send the full registration
 contract: `manifest`, `tool_manual`, and `runtime_validation`.
 
+After a sandbox or live run, use the developer observability commands to see
+what happened:
+
+```bash
+siglume dev tail
+siglume dev tail --listing-id LISTING_ID
+```
+
+The listing-scoped view is privacy-redacted for publishers. It shows execution
+evidence and support identifiers without exposing buyer prompts, owner ids, or
+private agent details. See [Developer Observability](docs/developer-observability.md).
+
 ### Step 2: Inspect the result in the owner console
 
 Open the `review_url` returned by the CLI, or go to
@@ -883,6 +895,10 @@ Then verify the sandbox run through usage data:
 curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=my-api" \
   -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN"
 ```
+
+For normal developer diagnostics, prefer `siglume dev tail` or
+`siglume dev tail --listing-id LISTING_ID`; those commands expose recent
+execution receipts without relying on browser-session sandbox endpoints.
 
 Sandbox mode is isolated from live data. No real payments or side effects occur.
 When you are ready to go live, publish through `siglume register .` and the
@@ -1485,12 +1501,13 @@ other language before the draft can be confirmed.
 
 ## 12. Pricing and Payouts
 
-### Two pricing options
+### Three pricing options
 
 | Model | Description | Minimum |
 |---|---|---|
 | **Free** | No charge. Anyone can install. | - |
 | **Subscription** | Monthly recurring charge (USD). | $5.00/month |
+| **Operation-based billing** | Free upfront call, then a `pricing_plan` item charges only the operation that actually ran. | JPY/JPYC paid operations: 15 yen minimum |
 
 Set this in the `manifest` object inside your full `auto-register` payload. The
 full payload still needs the production registration contract: `manifest`,
@@ -1511,6 +1528,13 @@ payload["manifest"]["price_value_minor"] = 999
 
 `price_value_minor` uses the selected listing currency's minor unit: cents for
 USD (`$5.00 = 500`) and yen for JPY (`JPY 500 = 500`).
+
+For operation-priced APIs, use `price_model="usage_based"` or
+`price_model="per_action"`, set `price_value_minor=0`, define
+`pricing_plan.items`, and return the executed operation in
+`ExecutionResult.receipt_summary`. Use `billing_timing="prepay"` when a paid
+irreversible action must not run before payment succeeds. See
+[Pricing And Billing](docs/pricing-and-billing.md).
 
 ### Platform fee
 
@@ -1875,6 +1899,10 @@ Then verify the sandbox run through usage data:
 curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=price-compare-helper" \
   -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN"
 ```
+
+For published listings, use `siglume dev tail --listing-id LISTING_ID` to view
+recent privacy-redacted execution receipts as a publisher. Use
+`siglume dev tail` without `--listing-id` for owner-scoped receipts.
 
 This is the currently exposed manual fallback for end-to-end validation. The
 older release-level `sandbox-test` and release-publish endpoints are not part of

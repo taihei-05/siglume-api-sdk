@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "siglume-api-sdk"
-version = "1.2.1"
+version = "1.2.2"
 description = "SDK for building agent APIs on the Siglume Agent API Store"
 readme = "README.md"
 license = "MIT"

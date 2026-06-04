@@ -208,6 +208,30 @@ Do not describe a `usage_based` or `per_action` listing as free just because
 `price_value_minor=0`. The free value only means there is no flat per-request
 price; the operation plan may still contain paid items.
 
+## Inspecting Logs And Billing Evidence
+
+After registration or a live run, use the developer observability surface:
+
+```bash
+siglume dev tail
+siglume dev tail --listing-id listing_123
+```
+
+The owner-scoped command shows receipts for your own account. The listing-scoped
+command is for publishers and is privacy-redacted: it confirms status, timing,
+step counts, operation evidence, and support identifiers without exposing buyer
+prompts or private agent details.
+
+Python SDK equivalents:
+
+```python
+client.list_execution_receipts(status="failed", limit=20)
+client.list_listing_recent_receipts("listing_123", limit=20)
+```
+
+See [Developer Observability](./developer-observability.md) for the full CLI,
+SDK, installed-tool receipt, and support checklist.
+
 ## Checklist
 
 Before publishing operation-based billing:
@@ -221,3 +245,4 @@ Before publishing operation-based billing:
 - [ ] Irreversible side effects use `billing_timing="prepay"`.
 - [ ] The quote/dry-run path returns `billingPreview.operation` and `draftToken`.
 - [ ] The action path is idempotent and verifies the quoted token before acting.
+- [ ] You know how to inspect receipts with `siglume dev tail --listing-id`.

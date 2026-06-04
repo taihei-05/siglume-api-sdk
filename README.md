@@ -58,16 +58,18 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v1.2.1.** Python and TypeScript are version-aligned and
+> **Current release: v1.2.2.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
-> operation pricing plans, prepay quote billing, long-form buyer-facing `description`, and
+> operation pricing plans, prepay quote billing, developer receipt/log
+> observability, long-form buyer-facing `description`, and
 > platform-controlled release semver via `version_bump`. v1.0.0 removes
 > platform OAuth broker APIs from the SDK:
 > publisher APIs now own external OAuth, token storage, refresh, revocation,
 > and user-to-token mapping behind their own `connect_url`.
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v1.2.2.md](./RELEASE_NOTES_v1.2.2.md),
 > [RELEASE_NOTES_v1.2.1.md](./RELEASE_NOTES_v1.2.1.md),
 > [RELEASE_NOTES_v1.2.0.md](./RELEASE_NOTES_v1.2.0.md),
 > [RELEASE_NOTES_v1.1.0.md](./RELEASE_NOTES_v1.1.0.md),
@@ -81,6 +83,8 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 > [docs/publish-flow.md](./docs/publish-flow.md).
 > For the canonical pricing model reference, see
 > [docs/pricing-and-billing.md](./docs/pricing-and-billing.md).
+> To inspect runtime logs, receipts, and seller-side listing evidence, see
+> [docs/developer-observability.md](./docs/developer-observability.md).
 
 ### 3-minute first success
 
@@ -686,6 +690,12 @@ machine-readable `receipt_summary.operation` / `request_type` that matches a
 creates a post-execution payment requirement only for a positive plan-priced
 operation.
 
+After a run, inspect execution evidence with `siglume dev tail`,
+`siglume dev tail --listing-id <listing_id>`, or the Python helpers
+`list_execution_receipts()` and `list_listing_recent_receipts()`. See
+[Developer Observability](./docs/developer-observability.md) for the CLI,
+SDK, privacy boundary, and support checklist.
+
 ## Web3 settlement helpers
 
 Siglume subscription payments settle on Polygon via **non-custodial
@@ -751,6 +761,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
 | [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
 | [Metering](docs/metering.md) | Implement free-upfront usage/per-action billing and record usage-event analytics |
+| [Developer Observability](docs/developer-observability.md) | Inspect runtime logs, receipts, listing activity, and support identifiers |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
@@ -814,7 +825,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v1.2.1 (beta)** — the platform is launched on Polygon mainnet
+This is **v1.2.2 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
