@@ -136,6 +136,40 @@ function buildRuntimeValidation() {
 }
 
 describe("SiglumeClient", () => {
+  it("rejects JPY operation prices below the platform minimum before transport", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        throw new Error(`Validation should fail before transport: ${requestUrl(input).pathname}`);
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          capability_key: "x-poster",
+          name: "X Poster",
+          job_to_be_done: "Post approved social updates.",
+          category: AppCategory.COMMUNICATION,
+          permission_class: PermissionClass.ACTION,
+          approval_mode: ApprovalMode.ALWAYS_ASK,
+          dry_run_supported: true,
+          price_model: PriceModel.PER_ACTION,
+          price_value_minor: 0,
+          pricing_plan: {
+            currency: "JPY",
+            items: [{ key: "text_post", label: "Text post", price_minor: 5 }],
+          },
+          currency: "JPY",
+          jurisdiction: "JP",
+        },
+        buildToolManual(),
+      ),
+    ).rejects.toThrow("at least 15");
+  });
+
   it("returns typed objects for auto-register and confirm-registration", async () => {
     const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
     const manifest = buildManifest();

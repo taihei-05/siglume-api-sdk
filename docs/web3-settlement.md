@@ -47,6 +47,15 @@ one listing currency explicitly: `USD` listings settle in USDC, and `JPY`
 listings settle in JPYC. Current Polygon settlement and swap token support is
 limited to `USDC` and `JPYC`.
 
+For `usage_based` and `per_action` API Store / Game API Store listings, the
+capability invocation itself is free up front. The publisher API executes first
+and reports the executed operation/request type in its `ExecutionResult`. The
+matching `pricing_plan` item is authoritative for the charge. The platform then
+creates a post-execution payment requirement only when the matched plan price is
+positive; a `0`-priced operation produces no on-chain payment. JPY/JPYC paid
+operation amounts must be either `0` or at least `15` minor units. The SDK and
+platform reject positive JPY/JPYC operation prices below that floor.
+
 ## Client helpers
 
 ```python

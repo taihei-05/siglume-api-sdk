@@ -48,6 +48,13 @@ class MeteredApp extends AppAdapter {
       required_connected_accounts: [],
       price_model: this.priceModel as typeof PriceModel[keyof typeof PriceModel],
       price_value_minor: 5,
+      pricing_plan:
+        this.priceModel === PriceModel.USAGE_BASED || this.priceModel === PriceModel.PER_ACTION
+          ? {
+              currency: "USD",
+              items: [{ key: "tokens_in", label: "Input tokens", price_minor: 5 }],
+            }
+          : undefined,
       currency: "USD" as const,
       allow_free_trial: false,
       jurisdiction: "US",
@@ -541,7 +548,7 @@ describe("metering", () => {
       occurred_at_iso: "2026-04-19T10:00:00Z",
     });
 
-    expect(preview.experimental).toBe(true);
+    expect(preview.experimental).toBe(false);
     expect(preview.invoice_line_preview?.subtotal_minor).toBe(7615);
     expect(preview.invoice_line_preview?.billable_units).toBe(1523);
   });

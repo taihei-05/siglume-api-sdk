@@ -331,7 +331,7 @@ describe("TypeScript example suite", () => {
   it("returns stable summary lines for metering_record", async () => {
     const lines = await runMeteringRecordExample();
 
-    expect(lines[0]).toContain("experimental_note: usage_based / per_action remain planned");
+    expect(lines[0]).toContain("metering_note: usage_based / per_action are live price models");
     expect(lines[1]).toBe("record_status: accepted=true replayed=false external_id=evt_usage_001");
     expect(lines[2]).toBe("batch_items: 2 last_period=202604");
     expect(lines[3]).toBe("preview_subtotal_minor: 7615");

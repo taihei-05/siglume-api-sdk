@@ -277,11 +277,13 @@ paths:
                   description: Governing ISO 3166-1 alpha-2 country code for this API
                 price_model:
                   type: string
-                  enum: [free, subscription]
-                  description: Pricing model
+                  enum: [free, subscription, per_request, usage_based, per_action]
+                  description: Pricing model. `usage_based` and `per_action` are free to invoke up front and bill from the pricing_plan item selected by the execution receipt.
                 price_value_minor:
                   type: integer
-                  description: Price in cents (e.g., 999 for $9.99/month). Minimum 500 for subscriptions.
+                  description: Fixed price in minor currency units. Required for subscription/per_request; optional default hint for usage_based/per_action.
+                pricing_plan:
+                  $ref: '#/components/schemas/PricingPlan'
                 permission_class:
                   type: string
                   enum: [read-only, recommendation, action, payment]
@@ -554,6 +556,8 @@ paths:
                       type: string
                     price_value_minor:
                       type: integer
+                    pricing_plan:
+                      $ref: '#/components/schemas/PricingPlan'
                     dry_run_supported:
                       type: boolean
                     jurisdiction:
@@ -1263,9 +1267,9 @@ paths:
         immediately when the self-serve checks pass; it does not enqueue
         a separate manual review step.
 
-        Both free and subscription listings are supported.
-        Use `price_model=free` for free APIs, or `price_model=subscription`
-        for paid APIs with Polygon payout wallets (93.4% developer share).
+        Free, subscription, per_request, usage_based, and per_action listings are supported.
+        Use `price_model=usage_based` or `price_model=per_action` when the API must run
+        before the exact billable amount is known. Paid models require Polygon payout wallets.
       parameters:
         - name: listingId
           in: path
@@ -1422,7 +1426,7 @@ paths:
     post:
       operationId: recordUsageEvents
       summary: Record usage events
-      description: Experimental analytics / pre-billing ingest for future usage-based flows. The public platform still accepts only free and subscription price models for registration.
+      description: Usage analytics and metering ingest for usage_based and per_action flows.
       requestBody:
         required: true
         content:
@@ -1608,6 +1612,71 @@ paths:
 
 components:
   schemas:
+    PricingPlanItem:
+      type: object
+      additionalProperties: true
+      required: [key, price_minor]
+      properties:
+        key:
+          type: string
+          description: Stable operation key emitted in receipts, e.g. text_post or reply.
+        label:
+          type: string
+          description: Buyer-facing operation label.
+        price_minor:
+          type: integer
+          minimum: 0
+          description: Display price in minor currency units for this operation. JPY/JPYC paid operations must be 0 or at least 15.
+        amount_minor:
+          type: integer
+          minimum: 0
+          description: Alias for price_minor.
+        currency:
+          type: string
+          description: ISO currency or settlement token display code, e.g. JPY, USD, JPYC, USDC.
+        unit_label:
+          type: string
+        description:
+          type: string
+        receipt_code:
+          type: string
+          description: Optional receipt-side code that maps execution results to this row.
+
+    PricingPlan:
+      type: object
+      additionalProperties: true
+      description: |
+        Buyer-facing pricing plan. For usage_based/per_action listings, use
+        this to show operation-specific prices while keeping invocation free
+        up front. pricing_plan.items is required for usage_based/per_action.
+        Example items: connection check = 0 JPY, text post = 15 JPY, URL post = 20 JPY,
+        reply = 30 JPY. The execution receipt identifies the operation/request
+        type, but the matching pricing_plan item is authoritative for the
+        actual amount charged. For JPY/JPYC operation billing, 0 is allowed for
+        free operations and positive amounts must be at least 15 minor units.
+      properties:
+        billing_model:
+          type: string
+          enum: [free, subscription, per_request, usage_based, per_action]
+        display_name:
+          type: string
+        summary:
+          type: string
+        description:
+          type: string
+        currency:
+          type: string
+        unit_label:
+          type: string
+        free_upfront_invocation:
+          type: boolean
+        fallback_note:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingPlanItem'
+
     EnvelopeMeta:
       type: object
       required: [request_id, trace_id]
@@ -1633,8 +1702,10 @@ components:
         Listing request for the developer surface.
 
         Listing request for the Siglume developer surface.
-        Both free and subscription models are live. Use `price_model=free`
-        for free APIs, or `price_model=subscription` for paid APIs with a Polygon payout wallet.
+        Free, subscription, usage_based, and per_action models are live.
+        Use `price_model=free` for free APIs, `subscription` for recurring paid APIs,
+        or `usage_based` / `per_action` for free upfront invocation with post-execution
+        billing declared by the API result. Paid models require a Polygon payout wallet.
       properties:
         capability_key: { type: string, minLength: 1, maxLength: 128 }
         name: { type: string, minLength: 1, maxLength: 255 }
@@ -1662,12 +1733,14 @@ components:
         permission_scopes: { type: array, items: { type: string } }
         price_model:
           type: string
-          enum: [free, subscription]
-          description: Pricing model. Only free and subscription are currently accepted by the public registration flow.
+          enum: [free, subscription, per_request, usage_based, per_action]
+          description: Pricing model. `usage_based` and `per_action` are free upfront and bill only when the execution receipt selects a positive pricing_plan item.
         price_value_minor:
           type: integer
           minimum: 0
-          description: Price in minor currency units. Use 0 for free listings.
+          description: Fixed price in minor currency units. Use 0 for free and for post-execution models where each execution declares its own amount.
+        pricing_plan:
+          $ref: '#/components/schemas/PricingPlan'
         currency: { type: string, default: USD }
         docs_url: { type: string, description: "Public API usage guide; not a generic seller homepage." }
         support_contact: { type: string, description: "Real support email address or public support URL." }
@@ -1825,6 +1898,8 @@ components:
         dry_run_supported: { type: boolean }
         price_model: { type: string }
         price_value_minor: { type: integer }
+        pricing_plan:
+          $ref: '#/components/schemas/PricingPlan'
         currency: { type: string }
         fulfillment_kind: { type: string }
         status: { type: string }

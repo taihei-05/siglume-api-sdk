@@ -54,6 +54,7 @@ _SPECIAL_MANIFEST_KEYS = {
     "short_description",
     "permission_class",
     "price_model",
+    "pricing_plan",
     "currency",
     "jurisdiction",
 }
@@ -95,6 +96,15 @@ def diff_manifest(*, old: Any, new: Any) -> list[Change]:
         old_value=old_payload.get("price_model"),
         new_value=new_payload.get("price_model"),
         message="Manifest price_model changed; billing compatibility may break existing installs.",
+    )
+    _append_value_change(
+        changes,
+        emitted_keys,
+        level=ChangeLevel.BREAKING,
+        key="pricing_plan",
+        old_value=old_payload.get("pricing_plan"),
+        new_value=new_payload.get("pricing_plan"),
+        message="Manifest pricing_plan changed; operation-level billing display changed.",
     )
     _append_value_change(
         changes,

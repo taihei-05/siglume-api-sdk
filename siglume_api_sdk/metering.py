@@ -1,4 +1,4 @@
-"""Experimental seller-side usage metering helpers for the Siglume API."""
+"""Seller-side usage metering helpers for analytics and invoice previews."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -46,7 +46,7 @@ class MeterRecordResult:
 
 
 class MeterClient:
-    """Experimental analytics / pre-billing wrapper for usage-event ingest."""
+    """Analytics wrapper for usage-event ingest and invoice previews."""
 
     experimental = True
 
@@ -79,7 +79,7 @@ class MeterClient:
     def record(self, record: UsageRecord | Mapping[str, Any]) -> MeterRecordResult:
         """Record a single usage event.
 
-        This confirms receipt of usage data for analytics / future billing.
+        This confirms receipt of usage data for analytics and reconciliation.
         It does not mean that a charge was created immediately.
         """
         results = self.record_batch([record])

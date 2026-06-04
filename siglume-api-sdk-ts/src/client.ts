@@ -77,6 +77,7 @@
   WorksPosterDashboardStats,
   WorksRegistrationRecord,
 } from "./types";
+import { MINIMUM_JPY_OPERATION_PRICE_MINOR } from "./types";
 import { SiglumeAPIError, SiglumeClientError, SiglumeNotFoundError } from "./errors";
 import {
   type QueuedWebhookEvent,
@@ -116,6 +117,7 @@ import {
 
 export const DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1";
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+const MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = new Set(["JPY", "JPYC"]);
 
 type FetchLike = typeof fetch;
 
@@ -186,6 +188,65 @@ function validateSaveDataSchema(schema: unknown, fieldName: string): void {
       throw new SiglumeClientError(`${fieldName}.required references undefined properties: ${missing.join(", ")}.`);
     }
   }
+}
+
+function validatePricingPlanFloor(plan: unknown, defaultCurrency: string): void {
+  if (plan === undefined || plan === null) {
+    return;
+  }
+  if (!isRecord(plan)) {
+    throw new SiglumeClientError("AppManifest.pricing_plan must be an object when provided.");
+  }
+  const items = plan.items;
+  if (items === undefined || items === null) {
+    return;
+  }
+  if (!Array.isArray(items)) {
+    throw new SiglumeClientError("AppManifest.pricing_plan.items must be an array when provided.");
+  }
+  const planCurrency = String(plan.currency ?? defaultCurrency ?? "").trim().toUpperCase();
+  const seenKeys = new Set<string>();
+  items.forEach((item, index) => {
+    if (!isRecord(item)) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}] must be an object.`);
+    }
+    const itemKey = String(
+      item.key ?? item.operation ?? item.operation_key ?? item.request_type ?? item.receipt_code ?? item.action ?? "",
+    ).trim();
+    if (!itemKey) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].key is required.`);
+    }
+    if (seenKeys.has(itemKey)) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].key duplicates ${itemKey}.`);
+    }
+    seenKeys.add(itemKey);
+    const amountRaw = item.price_minor ?? item.amount_minor ?? item.cost_minor ?? item.value_minor;
+    if (amountRaw === undefined || amountRaw === null) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].price_minor is required.`);
+    }
+    const amountMinor =
+      typeof amountRaw === "number" ? amountRaw : typeof amountRaw === "string" && amountRaw.trim() ? Number(amountRaw) : NaN;
+    if (!Number.isInteger(amountMinor)) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].price_minor must be an integer.`);
+    }
+    if (amountMinor < 0) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].price_minor must be zero or positive.`);
+    }
+    const currency = String(item.currency ?? planCurrency ?? defaultCurrency ?? "").trim().toUpperCase();
+    if (
+      MINIMUM_JPY_OPERATION_PRICE_CURRENCIES.has(currency) &&
+      amountMinor > 0 &&
+      amountMinor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+    ) {
+      throw new SiglumeClientError(
+        `AppManifest.pricing_plan.items[${index}].price_minor must be 0 or at least ${MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing.`,
+      );
+    }
+  });
+}
+
+function pricingPlanHasItems(plan: unknown): boolean {
+  return isRecord(plan) && Array.isArray(plan.items) && plan.items.length > 0;
 }
 
 type PendingConfirmation = {
@@ -820,6 +881,11 @@ function buildUrl(baseUrl: string, path: string, params?: RequestOptions["params
 
 function parseListing(data: Record<string, unknown>): AppListingRecord {
   const metadata = isRecord(data.metadata) ? data.metadata : {};
+  const pricing_plan = isRecord(data.pricing_plan)
+    ? data.pricing_plan
+    : isRecord(metadata.pricing_plan)
+      ? metadata.pricing_plan
+      : null;
   const persistence = isRecord(data.persistence)
     ? data.persistence
     : isRecord(metadata.persistence)
@@ -837,6 +903,7 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     dry_run_supported: Boolean(data.dry_run_supported ?? false),
     price_model: stringOrNull(data.price_model),
     price_value_minor: Number(data.price_value_minor ?? 0),
+    pricing_plan: pricing_plan as AppListingRecord["pricing_plan"],
     currency: String(data.currency ?? "USD"),
     allow_free_trial: Boolean(data.allow_free_trial ?? false),
     free_trial_duration_days: Number(data.free_trial_duration_days ?? 30),
@@ -2199,6 +2266,7 @@ export class SiglumeClient implements SiglumeClientShape {
       "jurisdiction",
       "price_model",
       "price_value_minor",
+      "pricing_plan",
       "currency",
       "allow_free_trial",
       "free_trial_duration_days",
@@ -2215,6 +2283,12 @@ export class SiglumeClient implements SiglumeClientShape {
         payload[fieldName] = value;
       }
     }
+    if (
+      payload.pricing_plan !== undefined &&
+      (typeof payload.pricing_plan !== "object" || Array.isArray(payload.pricing_plan))
+    ) {
+      throw new SiglumeClientError("AppManifest.pricing_plan must be an object when provided.");
+    }
     if (payload.store_vertical === undefined || payload.store_vertical === null) {
       throw new SiglumeClientError(
         "AppManifest.store_vertical is required. Choose 'api' for normal API Store listings or 'game' for API games.",
@@ -2230,6 +2304,13 @@ export class SiglumeClient implements SiglumeClientShape {
       throw new SiglumeClientError(`AppManifest.currency must be 'USD' or 'JPY'. Got ${String(payload.currency)}.`);
     }
     payload.currency = currency;
+    if (payload.pricing_plan !== undefined) {
+      validatePricingPlanFloor(payload.pricing_plan, currency);
+    }
+    const priceModel = String(payload.price_model ?? "free").trim().toLowerCase();
+    if ((priceModel === "usage_based" || priceModel === "per_action") && !pricingPlanHasItems(payload.pricing_plan)) {
+      throw new SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.");
+    }
     if (payload.allow_free_trial === undefined || payload.allow_free_trial === null) {
       throw new SiglumeClientError(
         "AppManifest.allow_free_trial is required. Pass true to offer a Plus/Pro buyer free trial or false to disable trials.",

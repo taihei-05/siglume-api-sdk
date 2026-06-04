@@ -142,7 +142,7 @@ def test_metering_record_example_runs_with_mock_client() -> None:
 
     output = module.run_metering_example()
 
-    assert output[0].startswith("experimental_note: usage_based / per_action remain planned")
+    assert output[0].startswith("metering_note: usage_based / per_action are live price models")
     assert output[1] == "record_status: accepted=True replayed=False external_id=evt_usage_001"
     assert output[2] == "batch_items: 2 last_period=202604"
     assert output[3] == "preview_subtotal_minor: 7615"

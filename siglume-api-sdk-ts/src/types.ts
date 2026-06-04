@@ -83,6 +83,8 @@ export const ListingCurrency = {
 } as const;
 export type ListingCurrency = (typeof ListingCurrency)[keyof typeof ListingCurrency];
 
+export const MINIMUM_JPY_OPERATION_PRICE_MINOR = 15;
+
 export const PersistenceMode = {
   NONE: "none",
   LOCAL: "local",
@@ -119,6 +121,7 @@ export interface AppManifest {
   permission_scopes?: string[];
   price_model?: PriceModel;
   price_value_minor?: number;
+  pricing_plan?: PricingPlan;
   currency: ListingCurrency;
   allow_free_trial: boolean;
   free_trial_duration_days?: number;
@@ -286,6 +289,30 @@ export interface EnvelopeMeta {
   trace_id?: string | null;
 }
 
+export interface PricingPlanItem {
+  key?: string | null;
+  label?: string | null;
+  price_minor?: number | null;
+  amount_minor?: number | null;
+  currency?: string | null;
+  unit_label?: string | null;
+  description?: string | null;
+  conditions?: unknown;
+  receipt_code?: string | null;
+}
+
+export interface PricingPlan {
+  billing_model?: string | null;
+  display_name?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  currency?: string | null;
+  unit_label?: string | null;
+  free_upfront_invocation?: boolean | null;
+  fallback_note?: string | null;
+  items?: PricingPlanItem[];
+}
+
 export interface CursorPage<T> {
   items: T[];
   next_cursor?: string | null;
@@ -308,6 +335,7 @@ export interface AppListingRecord {
   dry_run_supported: boolean;
   price_model?: string | null;
   price_value_minor: number;
+  pricing_plan?: PricingPlan | null;
   currency: string;
   allow_free_trial: boolean;
   free_trial_duration_days: number;

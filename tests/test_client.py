@@ -335,6 +335,58 @@ def test_app_manifest_normalizes_jpy_listing_currency() -> None:
     assert manifest.currency == ListingCurrency.JPY
 
 
+def test_app_manifest_rejects_jpy_operation_price_below_minimum() -> None:
+    with pytest.raises(ValueError, match="at least 15"):
+        AppManifest(
+            capability_key="x-poster",
+            name="X Poster",
+            job_to_be_done="Post approved social updates.",
+            category=AppCategory.COMMUNICATION,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.ACTION,
+            approval_mode=ApprovalMode.ALWAYS_ASK,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.PER_ACTION,
+            price_value_minor=0,
+            pricing_plan={
+                "currency": "JPY",
+                "items": [{"key": "text_post", "label": "Text post", "price_minor": 5}],
+            },
+            currency="JPY",
+            allow_free_trial=False,
+            jurisdiction="JP",
+        )
+
+
+def test_app_manifest_accepts_free_and_minimum_jpy_operation_prices() -> None:
+    manifest = AppManifest(
+        capability_key="x-poster",
+        name="X Poster",
+        job_to_be_done="Post approved social updates.",
+        category=AppCategory.COMMUNICATION,
+        store_vertical=StoreVertical.API,
+        permission_class=PermissionClass.ACTION,
+        approval_mode=ApprovalMode.ALWAYS_ASK,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.PER_ACTION,
+        price_value_minor=0,
+        pricing_plan={
+            "currency": "JPY",
+            "items": [
+                {"key": "dry_run", "label": "Dry run", "price_minor": 0},
+                {"key": "text_post", "label": "Text post", "price_minor": 15},
+            ],
+        },
+        currency="JPY",
+        allow_free_trial=False,
+        jurisdiction="JP",
+    )
+
+    assert manifest.pricing_plan["items"][1]["price_minor"] == 15
+
+
 def test_game_manifest_with_save_persistence_requires_save_data_schema() -> None:
     with pytest.raises(ValueError, match="persistence.save_data_schema is REQUIRED"):
         AppManifest(
@@ -504,6 +556,37 @@ def test_auto_register_dict_manifest_rejects_oversized_save_data_schema() -> Non
 
     with build_client(handler) as client:
         with pytest.raises(SiglumeClientError, match="save_data_schema must be at most 8192 bytes"):
+            client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_dict_manifest_rejects_jpy_operation_price_below_minimum() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    manifest = {
+        "capability_key": "x-poster",
+        "name": "X Poster",
+        "job_to_be_done": "Post approved social updates.",
+        "category": "communication",
+        "store_vertical": "api",
+        "permission_class": "action",
+        "approval_mode": "always-ask",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "per_action",
+        "price_value_minor": 0,
+        "pricing_plan": {
+            "currency": "JPY",
+            "items": [{"key": "text_post", "label": "Text post", "price_minor": 5}],
+        },
+        "currency": "JPY",
+        "allow_free_trial": False,
+        "jurisdiction": "JP",
+        "example_prompts": ["Post this approved draft.", "Create a dry-run preview."],
+    }
+
+    with build_client(handler) as client:
+        with pytest.raises(SiglumeClientError, match="at least 15"):
             client.auto_register(manifest, build_tool_manual())
 
 

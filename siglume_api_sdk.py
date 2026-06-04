@@ -22,6 +22,8 @@ from typing import Any, Mapping
 # ISO 3166-1 alpha-2 country code, optionally with a sub-region suffix.
 # Examples: "US", "US-CA", "JP", "GB", "DE", "SG".
 _JURISDICTION_PATTERN = re.compile(r"^[A-Z]{2}(-[A-Z0-9]{1,3})?$")
+MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
+_MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
 _MAX_SAVE_DATA_SCHEMA_BYTES = 8192
 
 
@@ -65,16 +67,16 @@ class Environment(str, Enum):
 class PriceModel(str, Enum):
     """Pricing models for agent APIs.
 
-    Live: free, subscription (USD).
-    Planned: one_time, bundle, usage_based, per_action.
+    Live: free, subscription, usage_based, per_action.
+    Planned: one_time, bundle.
     Platform fee: 6.6%. Developer keeps 93.4%.
     """
     FREE = "free"                    # No charge.
     SUBSCRIPTION = "subscription"    # Monthly recurring (USD).
     ONE_TIME = "one_time"            # Planned: single purchase.
     BUNDLE = "bundle"                # Planned: bundled package.
-    USAGE_BASED = "usage_based"      # Planned: per-use metering.
-    PER_ACTION = "per_action"        # Planned: per-successful-action.
+    USAGE_BASED = "usage_based"      # Free upfront; execution declares billable usage.
+    PER_ACTION = "per_action"        # Free upfront; successful actions declare charges.
 
 
 class AppCategory(str, Enum):
@@ -175,6 +177,68 @@ def _validate_save_data_schema(schema: Any, *, field_name: str) -> None:
             )
 
 
+def _validate_pricing_plan_floor(plan: Any, *, default_currency: str) -> None:
+    """Validate operation-level prices before the platform rejects the manifest."""
+    if plan is None:
+        return
+    if not isinstance(plan, Mapping):
+        raise ValueError("AppManifest.pricing_plan must be a dict/object when provided.")
+    raw_items = plan.get("items")
+    if raw_items is None:
+        return
+    if not isinstance(raw_items, list):
+        raise ValueError("AppManifest.pricing_plan.items must be a list when provided.")
+    plan_currency = str(plan.get("currency") or default_currency or "").strip().upper()
+    seen_keys: set[str] = set()
+    for index, item in enumerate(raw_items):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}] must be a dict/object.")
+        item_key = str(
+            item.get("key")
+            or item.get("operation")
+            or item.get("operation_key")
+            or item.get("request_type")
+            or item.get("receipt_code")
+            or item.get("action")
+            or ""
+        ).strip()
+        if not item_key:
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}].key is required.")
+        if item_key in seen_keys:
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}].key duplicates {item_key!r}.")
+        seen_keys.add(item_key)
+        amount_raw = None
+        for key in ("price_minor", "amount_minor", "cost_minor", "value_minor"):
+            if key in item and item.get(key) is not None:
+                amount_raw = item.get(key)
+                break
+        if amount_raw is None:
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}].price_minor is required.")
+        try:
+            amount_minor = int(amount_raw)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be an integer."
+            ) from None
+        if amount_minor < 0:
+            raise ValueError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be zero or positive."
+            )
+        currency = str(item.get("currency") or plan_currency or default_currency or "").strip().upper()
+        if (
+            currency in _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES
+            and 0 < amount_minor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+        ):
+            raise ValueError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be 0 or at least "
+                f"{MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing."
+            )
+
+
+def _pricing_plan_has_items(plan: Any) -> bool:
+    return isinstance(plan, Mapping) and isinstance(plan.get("items"), list) and bool(plan.get("items"))
+
+
 @dataclass
 class AppManifest:
     """Declares what the app does and what it needs.
@@ -199,6 +263,7 @@ class AppManifest:
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
+    pricing_plan: dict[str, Any] | None = None  # optional buyer-facing operation price table
     currency: ListingCurrency | str | None = None  # REQUIRED: "USD" -> USDC, "JPY" -> JPYC
     allow_free_trial: bool | None = None   # REQUIRED: True/False must be an explicit publisher choice
     free_trial_duration_days: int = 30     # 1-90 when allow_free_trial=True
@@ -241,6 +306,12 @@ class AppManifest:
                 f"Got: {self.currency!r}"
             )
         self.currency = ListingCurrency(currency)
+        _validate_pricing_plan_floor(self.pricing_plan, default_currency=currency)
+        price_model_value = self.price_model.value if isinstance(self.price_model, PriceModel) else str(self.price_model or "")
+        if price_model_value in {PriceModel.USAGE_BASED.value, PriceModel.PER_ACTION.value} and not _pricing_plan_has_items(
+            self.pricing_plan
+        ):
+            raise ValueError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
 
         if self.allow_free_trial is None:
             raise ValueError(
@@ -1169,6 +1240,15 @@ class AppTestHarness:
             issues.append(
                 "example_prompts must include at least 2 distinct non-empty sample prompts"
             )
+        try:
+            _validate_pricing_plan_floor(m.pricing_plan, default_currency=str(m.currency.value if isinstance(m.currency, ListingCurrency) else m.currency))
+        except ValueError as exc:
+            issues.append(str(exc))
+        price_model_value = m.price_model.value if isinstance(m.price_model, PriceModel) else str(m.price_model or "")
+        if price_model_value in {PriceModel.USAGE_BASED.value, PriceModel.PER_ACTION.value} and not _pricing_plan_has_items(
+            m.pricing_plan
+        ):
+            issues.append("pricing_plan.items is required for usage_based/per_action pricing")
         if m.permission_class in (PermissionClass.ACTION, PermissionClass.PAYMENT):
             if not m.dry_run_supported:
                 issues.append("action/payment apps should support dry_run")
@@ -1239,11 +1319,10 @@ class AppTestHarness:
         *,
         execution_result: ExecutionResult | None = None,
     ) -> dict[str, Any]:
-        """Preview how a usage record would map to a future invoice line.
+        """Preview how a usage record would map to an invoice line.
 
-        This is an experimental analytics / pre-billing helper. It validates the
-        usage payload shape locally and returns a deterministic preview. It does
-        not create a charge.
+        This helper validates the usage payload shape locally and returns a
+        deterministic preview. It does not create a charge.
         """
         try:
             from siglume_api_sdk.metering import _normalize_usage_record as _normalize
@@ -1287,7 +1366,7 @@ class AppTestHarness:
             }
 
         return {
-            "experimental": usage_based_matches or per_action_matches,
+            "experimental": False,
             "usage_record": usage_record,
             "invoice_line_preview": invoice_line_preview,
         }
