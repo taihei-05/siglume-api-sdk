@@ -134,6 +134,14 @@ the fee.
 `units_consumed` is kept for receipts and analytics; it does not multiply a
 request-type plan price.
 
+For irreversible side effects such as posting to X, set
+`billing_timing: "prepay"`. The platform first calls your API as a quote
+(`execution_kind="quote"` / `dry_run=true`), reads `billingPreview.operation`
+and `draftToken`, collects the direct payment for that pricing-plan operation,
+then calls the ACTION endpoint with the same token as `commit_token`. If payment
+fails, the ACTION call is never made. Use the default `"post"` timing only for
+read-only or reversible usage.
+
 Company-name publishing is founder-only in the Phase 2 MVP. Use
 `publisher_type: "company"` with `company_id` in `app_manifest.yaml`, or pass
 `--company <company_id>` to the CLI. Paid company listings require the

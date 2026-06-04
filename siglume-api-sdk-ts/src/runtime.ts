@@ -219,6 +219,13 @@ export class AppTestHarness {
     }
     issues.push(...pricingPlanFloorIssues(manifest.pricing_plan, String(manifest.currency ?? "USD")));
     if (
+      manifest.billing_timing !== undefined &&
+      manifest.billing_timing !== "post" &&
+      manifest.billing_timing !== "prepay"
+    ) {
+      issues.push("billing_timing must be 'post' or 'prepay'");
+    }
+    if (
       (manifest.price_model === PriceModel.USAGE_BASED || manifest.price_model === PriceModel.PER_ACTION) &&
       (!manifest.pricing_plan || !Array.isArray(manifest.pricing_plan.items) || manifest.pricing_plan.items.length === 0)
     ) {

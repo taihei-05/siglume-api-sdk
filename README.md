@@ -364,6 +364,15 @@ dry-run previews, or disconnect actions should have a `pricing_plan` price of
 `units_consumed` is kept for receipts and analytics; it does not multiply a
 request-type plan price.
 
+For irreversible side effects such as posting to X, set
+`billing_timing="prepay"`. In that mode the platform first calls your API with
+`execution_kind="quote"` / `dry_run=True`; your API must return
+`billingPreview.operation` and a `draftToken`. The platform prices that
+operation from `pricing_plan`, collects the direct payment, then calls the
+ACTION endpoint with the same token as `commit_token`. If payment fails, the
+ACTION call is never made. Keep the default `billing_timing="post"` only for
+read-only or reversible usage where execute-then-settle is acceptable.
+
 Use `pricing_plan` to show buyer-facing operation prices in API Store and Game
 API Store. `pricing_plan.items` is required for `usage_based` and `per_action`
 listings:
@@ -380,6 +389,30 @@ pricing_plan={
         {"key": "reply", "label": "Reply", "price_minor": 30},
     ],
 }
+```
+
+```python
+manifest = AppManifest(
+    capability_key="x-poster",
+    name="X Poster",
+    permission_class=PermissionClass.ACTION,
+    approval_mode=ApprovalMode.ALWAYS_ASK,
+    dry_run_supported=True,
+    price_model=PriceModel.PER_ACTION,
+    price_value_minor=0,
+    billing_timing="prepay",
+    currency="JPY",
+    allow_free_trial=False,
+    jurisdiction="JP",
+    store_vertical="api",
+    pricing_plan={
+        "currency": "JPY",
+        "items": [
+            {"key": "text_only", "label": "Text only", "price_minor": 15},
+            {"key": "text_with_url", "label": "Text with URL", "price_minor": 28},
+        ],
+    },
+)
 ```
 
 `ONE_TIME` and `BUNDLE` remain reserved values.

@@ -58,6 +58,7 @@ export const PriceModel = {
   PER_ACTION: "per_action",
 } as const;
 export type PriceModel = (typeof PriceModel)[keyof typeof PriceModel];
+export type BillingTiming = "post" | "prepay";
 
 export const AppCategory = {
   COMMERCE: "commerce",
@@ -122,6 +123,7 @@ export interface AppManifest {
   price_model?: PriceModel;
   price_value_minor?: number;
   pricing_plan?: PricingPlan;
+  billing_timing?: BillingTiming;
   currency: ListingCurrency;
   allow_free_trial: boolean;
   free_trial_duration_days?: number;
@@ -336,6 +338,7 @@ export interface AppListingRecord {
   price_model?: string | null;
   price_value_minor: number;
   pricing_plan?: PricingPlan | null;
+  billing_timing?: BillingTiming | string | null;
   currency: string;
   allow_free_trial: boolean;
   free_trial_duration_days: number;

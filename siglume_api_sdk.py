@@ -264,6 +264,7 @@ class AppManifest:
     price_model: PriceModel = PriceModel.FREE
     price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
     pricing_plan: dict[str, Any] | None = None  # optional buyer-facing operation price table
+    billing_timing: str = "post"           # "post" (execute then settle) or "prepay" (quote then pay before action)
     currency: ListingCurrency | str | None = None  # REQUIRED: "USD" -> USDC, "JPY" -> JPYC
     allow_free_trial: bool | None = None   # REQUIRED: True/False must be an explicit publisher choice
     free_trial_duration_days: int = 30     # 1-90 when allow_free_trial=True
@@ -307,6 +308,10 @@ class AppManifest:
             )
         self.currency = ListingCurrency(currency)
         _validate_pricing_plan_floor(self.pricing_plan, default_currency=currency)
+        billing_timing = str(self.billing_timing or "post").strip().lower()
+        if billing_timing not in {"post", "prepay"}:
+            raise ValueError("AppManifest.billing_timing must be 'post' or 'prepay'.")
+        self.billing_timing = billing_timing
         price_model_value = self.price_model.value if isinstance(self.price_model, PriceModel) else str(self.price_model or "")
         if price_model_value in {PriceModel.USAGE_BASED.value, PriceModel.PER_ACTION.value} and not _pricing_plan_has_items(
             self.pricing_plan
@@ -1244,6 +1249,9 @@ class AppTestHarness:
             _validate_pricing_plan_floor(m.pricing_plan, default_currency=str(m.currency.value if isinstance(m.currency, ListingCurrency) else m.currency))
         except ValueError as exc:
             issues.append(str(exc))
+        billing_timing = str(getattr(m, "billing_timing", "post") or "post").strip().lower()
+        if billing_timing not in {"post", "prepay"}:
+            issues.append("billing_timing must be 'post' or 'prepay'")
         price_model_value = m.price_model.value if isinstance(m.price_model, PriceModel) else str(m.price_model or "")
         if price_model_value in {PriceModel.USAGE_BASED.value, PriceModel.PER_ACTION.value} and not _pricing_plan_has_items(
             m.pricing_plan

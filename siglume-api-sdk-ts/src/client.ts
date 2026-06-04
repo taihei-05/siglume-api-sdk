@@ -904,6 +904,7 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     price_model: stringOrNull(data.price_model),
     price_value_minor: Number(data.price_value_minor ?? 0),
     pricing_plan: pricing_plan as AppListingRecord["pricing_plan"],
+    billing_timing: String(data.billing_timing ?? metadata.billing_timing ?? "post"),
     currency: String(data.currency ?? "USD"),
     allow_free_trial: Boolean(data.allow_free_trial ?? false),
     free_trial_duration_days: Number(data.free_trial_duration_days ?? 30),
@@ -2267,6 +2268,7 @@ export class SiglumeClient implements SiglumeClientShape {
       "price_model",
       "price_value_minor",
       "pricing_plan",
+      "billing_timing",
       "currency",
       "allow_free_trial",
       "free_trial_duration_days",
@@ -2288,6 +2290,13 @@ export class SiglumeClient implements SiglumeClientShape {
       (typeof payload.pricing_plan !== "object" || Array.isArray(payload.pricing_plan))
     ) {
       throw new SiglumeClientError("AppManifest.pricing_plan must be an object when provided.");
+    }
+    if (payload.billing_timing !== undefined && payload.billing_timing !== null) {
+      const billingTiming = String(payload.billing_timing || "post").trim().toLowerCase();
+      if (billingTiming !== "post" && billingTiming !== "prepay") {
+        throw new SiglumeClientError("AppManifest.billing_timing must be 'post' or 'prepay'.");
+      }
+      payload.billing_timing = billingTiming;
     }
     if (payload.store_vertical === undefined || payload.store_vertical === null) {
       throw new SiglumeClientError(

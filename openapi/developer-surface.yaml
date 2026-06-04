@@ -278,12 +278,17 @@ paths:
                 price_model:
                   type: string
                   enum: [free, subscription, per_request, usage_based, per_action]
-                  description: Pricing model. `usage_based` and `per_action` are free to invoke up front and bill from the pricing_plan item selected by the execution receipt.
+                  description: Pricing model. `usage_based` and `per_action` price operations from pricing_plan. With billing_timing=post they settle after the execution receipt; with billing_timing=prepay they require a quote and direct payment before ACTION execution.
                 price_value_minor:
                   type: integer
                   description: Fixed price in minor currency units. Required for subscription/per_request; optional default hint for usage_based/per_action.
                 pricing_plan:
                   $ref: '#/components/schemas/PricingPlan'
+                billing_timing:
+                  type: string
+                  enum: [post, prepay]
+                  default: post
+                  description: Billing timing for usage_based/per_action. `post` settles from the execution receipt after the API runs. `prepay` requires a quote/draftToken and confirmed payment before ACTION execution.
                 permission_class:
                   type: string
                   enum: [read-only, recommendation, action, payment]
@@ -558,6 +563,9 @@ paths:
                       type: integer
                     pricing_plan:
                       $ref: '#/components/schemas/PricingPlan'
+                    billing_timing:
+                      type: string
+                      enum: [post, prepay]
                     dry_run_supported:
                       type: boolean
                     jurisdiction:
@@ -1734,13 +1742,18 @@ components:
         price_model:
           type: string
           enum: [free, subscription, per_request, usage_based, per_action]
-          description: Pricing model. `usage_based` and `per_action` are free upfront and bill only when the execution receipt selects a positive pricing_plan item.
+          description: Pricing model. `usage_based` and `per_action` price operations from pricing_plan. With billing_timing=post they settle after the execution receipt; with billing_timing=prepay they require a quote and direct payment before ACTION execution.
         price_value_minor:
           type: integer
           minimum: 0
           description: Fixed price in minor currency units. Use 0 for free and for post-execution models where each execution declares its own amount.
         pricing_plan:
           $ref: '#/components/schemas/PricingPlan'
+        billing_timing:
+          type: string
+          enum: [post, prepay]
+          default: post
+          description: Billing timing for usage_based/per_action. Use prepay for irreversible side effects.
         currency: { type: string, default: USD }
         docs_url: { type: string, description: "Public API usage guide; not a generic seller homepage." }
         support_contact: { type: string, description: "Real support email address or public support URL." }
@@ -1900,6 +1913,7 @@ components:
         price_value_minor: { type: integer }
         pricing_plan:
           $ref: '#/components/schemas/PricingPlan'
+        billing_timing: { type: string, enum: [post, prepay] }
         currency: { type: string }
         fulfillment_kind: { type: string }
         status: { type: string }
