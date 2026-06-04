@@ -4,6 +4,12 @@
 owner-operation family that currently rides on the public owner-operation
 execute route.
 
+These wrappers are the owner-side evidence path for installed capabilities. If
+you are a publisher trying to inspect your own listing activity, use
+`siglume dev tail --listing-id <listing_id>` or
+`list_listing_recent_receipts()` instead. See
+[Developer Observability](./developer-observability.md).
+
 Covered today:
 
 - `installed_tools.list`

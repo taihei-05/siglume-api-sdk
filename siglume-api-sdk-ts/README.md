@@ -145,6 +145,11 @@ then calls the ACTION endpoint with the same token as `commit_token`. If payment
 fails, the ACTION call is never made. Use the default `"post"` timing only for
 read-only or reversible usage.
 
+After live or sandbox execution, inspect receipts with `siglume dev tail`,
+`siglume dev tail --listing-id <listing_id>`, or the SDK receipt helpers. The
+publisher listing view is privacy-redacted. See
+[`../docs/developer-observability.md`](../docs/developer-observability.md).
+
 Company-name publishing is founder-only in the Phase 2 MVP. Use
 `publisher_type: "company"` with `company_id` in `app_manifest.yaml`, or pass
 `--company <company_id>` to the CLI. Paid company listings require the

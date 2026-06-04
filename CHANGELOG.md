@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-04
+
+### Fixed
+
+- Added [Developer Observability](docs/developer-observability.md) so new
+  developers can find `siglume dev tail`, seller listing receipts, owner
+  installed-tool receipts, support identifiers, and the privacy boundary.
+- Cross-linked receipt/log inspection from pricing, metering, publish, Getting
+  Started, execution receipt, TypeScript, and installed-tool docs.
+- Removed stale jurisdiction guidance that still described the payment stack as
+  migrating and incorrectly said Japan-based listings could not price in JPY.
+
 ## [1.2.1] - 2026-06-04
 
 ### Fixed

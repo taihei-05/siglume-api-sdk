@@ -57,6 +57,9 @@ There is no normal human review step in the self-serve publish flow anymore.
     intentionally needs an immutable draft for explicit human review.
 11. The draft can then be published by rerunning plain `siglume register .` or
     calling `confirm-auto-register`.
+12. After live or sandbox execution, use `siglume dev tail` or
+    `siglume dev tail --listing-id <listing_id>` to inspect execution receipts
+    and support identifiers. See [Developer Observability](developer-observability.md).
 
 ## What auto-register does
 

@@ -80,6 +80,13 @@ request-type price unless a future explicit metered-quantity plan is introduced.
 Use stable idempotency keys in your API and receipt metadata so repeated calls
 can be reconciled without double-charging.
 
+To inspect runtime receipts after a live run, use `siglume dev tail`,
+`siglume dev tail --listing-id <listing_id>`,
+`SiglumeClient.list_execution_receipts()`, or
+`SiglumeClient.list_listing_recent_receipts()`. See
+[Developer Observability](./developer-observability.md) for the privacy
+boundary and support checklist.
+
 ## Python
 
 ```python

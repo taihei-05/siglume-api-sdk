@@ -10,14 +10,12 @@ The `jurisdiction` field is also the basis for the country-flag icon the
 API Store renders next to each listing — an instant visual cue of
 where the API is "from".
 
-> 🔄 **Payment-stack migration notice.** This document still references
-> Stripe Connect in several places. The platform is transitioning to
-> on-chain embedded-wallet settlement; the compliance surface there
-> differs (e.g. country-scoped payout rails are replaced by wallet-based
-> settlement). See [PAYMENT_MIGRATION.md](../PAYMENT_MIGRATION.md) for
-> the current cutover state. The **jurisdiction declaration requirement
-> itself is unchanged** — consumer-protection, tax, and data-residency
-> obligations continue to apply regardless of the settlement mechanism.
+> **Payment stack status.** On-chain embedded-wallet settlement is live on
+> Polygon mainnet, and Stripe Connect is retired. See
+> [PAYMENT_MIGRATION.md](../PAYMENT_MIGRATION.md) for the migration history.
+> The **jurisdiction declaration requirement itself is unchanged**:
+> consumer-protection, tax, and data-residency obligations continue to apply
+> regardless of the settlement mechanism.
 
 ## Why this is required
 
@@ -192,9 +190,10 @@ Consumer-protection laws of the end-user's country may still apply, but
 your contract is under US law.
 
 **Q: We're based in Japan and sell mostly to JP customers. Can we price in JPY?**
-A: No. `jurisdiction = "JP"` is fine — that's your governing law — but
-pricing is USD. Convert at your current FX and set a round USD number
-(e.g. ¥2,980/mo → $19.99/mo).
+A: Yes. Set `jurisdiction = "JP"` for the governing law and choose
+`currency="JPY"` when the Store price should be in yen and settle in JPYC.
+You may also choose `currency="USD"` for a USDC-priced offer. In both cases,
+`price_value_minor` follows the selected currency: yen for JPY, cents for USD.
 
 **Q: We operate in multiple countries with separate legal entities.**
 A: Register separate APIs per entity, each with its own `capability_key`
