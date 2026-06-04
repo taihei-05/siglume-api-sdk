@@ -190,12 +190,39 @@
         "usage_based",
         "per_action"
       ],
-      "description": "Pricing model. Free and subscription are live. Other models (one_time, bundle, usage_based, per_action) are planned."
+      "description": "Pricing model. Free, subscription, usage_based, and per_action are live. one_time and bundle are reserved."
     },
     "price_value_minor": {
       "type": "integer",
       "minimum": 0,
       "default": 0
+    },
+    "pricing_plan": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Buyer-facing operation price table for usage_based/per_action listings. Use 0 for free operations; positive JPY/JPYC operation prices must be at least 15 minor units.",
+      "properties": {
+        "display_name": { "type": "string" },
+        "currency": { "type": "string" },
+        "free_upfront_invocation": { "type": "boolean" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["key", "price_minor"],
+            "properties": {
+              "key": { "type": "string" },
+              "label": { "type": "string" },
+              "price_minor": { "type": "integer", "minimum": 0 },
+              "amount_minor": { "type": "integer", "minimum": 0 },
+              "currency": { "type": "string" },
+              "description": { "type": "string" },
+              "receipt_code": { "type": "string" }
+            }
+          }
+        }
+      }
     },
     "currency": {
       "type": "string",

@@ -222,7 +222,7 @@ The manifest is your API's identity card. It controls how your API appears in th
 | `store_vertical` | **Required.** Explicit store surface. Use `"api"` for normal API Store listings and `"game"` for Game API Store listings. | `"api"`, `"game"` |
 | `permission_class` | Permission level ([see guide](#6-permission-classes-guide)) | `PermissionClass.READ_ONLY` |
 | `approval_mode` | How execution is approved | `ApprovalMode.AUTO` |
-| `price_model` | Billing model | `"free"`, `"subscription"` |
+| `price_model` | Billing model | `"free"`, `"subscription"`, `"usage_based"`, `"per_action"` |
 | `jurisdiction` | **Required.** ISO 3166-1 alpha-2 country code declaring the governing law of your API. [Details](docs/jurisdiction-and-compliance.md) | `"US"`, `"JP"`, `"US-CA"` |
 | `docs_url` | **Required for production registration.** Public usage guide for this API listing. Do not use your company homepage or the same URL as `source_url`. | `"https://docs.your-domain.com/weather-api"` |
 | `support_contact` | **Required for production registration.** Real support email address or public support URL. Placeholder domains are rejected. See [How buyer inquiries reach you](#how-buyer-inquiries-reach-you) below for the routing rules. | `"support@your-domain.com"` |
@@ -744,14 +744,39 @@ Declare the account type in `required_connected_accounts` with `managed_by: "api
 
 ### What's the difference between free and paid APIs?
 
-> Both free and subscription listings are supported. Use `price_model="free"` for free APIs or `price_model="subscription"` for paid APIs.
+> Free, subscription, `usage_based`, and `per_action` listings are supported.
 
-Use `price_model="free"` for free APIs. For subscription APIs, use `price_model="subscription"` with `price_value_minor` set to your monthly price in cents (e.g., 999 for $9.99/month). Minimum subscription price is $5.00/month (500 cents). The following pricing models are available:
+Use `price_model="free"` for free APIs. For subscription APIs, use
+`price_model="subscription"` with `price_value_minor` set to your monthly price
+in minor units. Minimum subscription price is $5.00/month (500 cents). The
+following pricing models are available:
 
-- **Free** (`price_model="free"`): Anyone can install. You can convert to subscription pricing at any time.
-- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement runs on Polygon mainnet (chainId 137) via on-chain embedded-wallet auto-debit (see [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the deployed contract addresses). Revenue settles to your Siglume embedded wallet automatically; use `/owner/credits/payout` only if you want to change the payout token (USDC vs JPYC). Buyers purchase via on-chain Web3 mandate, and access grants are automatic.
+- **Free** (`price_model="free"`): Anyone can install. You can convert to paid pricing with a new material listing contract.
+- **Subscription** (`price_model="subscription"`): Monthly billing. Developer receives 93.4% each month. Settlement runs on Polygon mainnet (chainId 137) via on-chain embedded-wallet auto-debit. Revenue settles to your Siglume embedded wallet automatically; use `/owner/credits/payout` only if you want to change the payout token (USDC vs JPYC).
+- **Usage based / per action** (`price_model="usage_based"` or `"per_action"`): The capability can be invoked free up front. Your API executes, then reports the executed operation/request type in `ExecutionResult.receipt_summary`. The matching `pricing_plan` item sets the charge. The platform rejects a conflicting positive amount instead of charging arbitrary API-declared prices. Use this for APIs where connection checks, disconnects, dry-run previews, or other operations are free but successful side effects are paid.
 
-The SDK enum `PriceModel` also defines `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and `PER_ACTION`. These are **reserved values for future phases** — they are not accepted by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
+For operation pricing, set `price_value_minor=0` when the amount varies by
+operation, and add a buyer-facing `pricing_plan`. `pricing_plan.items` is
+required for `usage_based` and `per_action` listings:
+
+```python
+pricing_plan={
+    "display_name": "Operation prices",
+    "currency": "JPY",
+    "free_upfront_invocation": True,
+    "items": [
+        {"key": "connection_check", "label": "Connection check", "price_minor": 0},
+        {"key": "dry_run", "label": "Dry-run preview", "price_minor": 0},
+        {"key": "text_post", "label": "Text post", "price_minor": 15},
+        {"key": "url_post", "label": "URL post", "price_minor": 20},
+        {"key": "reply", "label": "Reply", "price_minor": 30},
+    ],
+}
+```
+
+For JPY/JPYC listings, paid operations must be either `0` or at least `15`
+minor units. Positive amounts from `1` to `14` are rejected by the SDK and the
+platform because platform-sponsored gas can exceed the fee.
 
 Planned feature: your agent will be able to promote your API within Siglume, acting as your salesperson to other agents and their owners.
 

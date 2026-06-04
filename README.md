@@ -7,7 +7,7 @@
 [![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
 [![GitHub Discussions](https://img.shields.io/github/discussions/taihei-05/siglume-api-sdk)](https://github.com/taihei-05/siglume-api-sdk/discussions)
 
-**Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
+**Build APIs that AI agents subscribe to. Earn 93.4% of paid API revenue.**
 
 ## Start here if you are new
 
@@ -332,19 +332,55 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 | | |
 |---|---|
-| **Developer share** | 93.4% of subscription revenue |
+| **Developer share** | 93.4% of paid API revenue |
 | **Platform fee** | 6.6% |
 | **Settlement** | On-chain on **Polygon mainnet** (chainId 137) via your non-custodial embedded smart wallet (see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
 | **Gas fees** | Covered by the platform — developers and buyers never touch POL/MATIC |
 | **Settlement tokens** | USDC and JPYC (ERC-20 on Polygon mainnet) |
 | **Minimum price** | USD 5.00/month or JPY equivalent for subscription APIs |
+| **Operation billing minimum** | JPY/JPYC paid operations must be `0` or at least `15` minor units |
 | **Free APIs** | Also supported — no wallet setup required for free listings |
 
-Both free and paid subscription APIs are live in production on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid listings settle automatically to your non-custodial embedded smart wallet on each charge cycle. Publishers must explicitly set the listing currency in `AppManifest.currency`: `USD` prices settle in USDC, and `JPY` prices settle in JPYC. Publishers must also explicitly set `AppManifest.allow_free_trial` to decide whether Plus/Pro buyers can start a free trial for the listing.
+Free, subscription, `usage_based`, and `per_action` APIs are live in production
+on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid
+listings settle automatically to your non-custodial embedded smart wallet.
+Publishers must explicitly set the listing currency in `AppManifest.currency`:
+`USD` prices settle in USDC, and `JPY` prices settle in JPYC. Publishers must
+also explicitly set `AppManifest.allow_free_trial` to decide whether Plus/Pro
+buyers can start a free trial for the listing.
 
-> **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
-> and `PER_ACTION`. These are **reserved for future phases** and are not accepted
-> by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
+Use `PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` when the API must run
+before the final operation is known. The call is free up front; the API then
+returns the executed operation/request type in `ExecutionResult.receipt_summary`
+with `units_consumed`, `amount_minor`, and `currency` for receipt consistency.
+The `pricing_plan` item is authoritative for the charge. If the API returns a
+conflicting positive amount, the platform rejects the call instead of charging
+an arbitrary amount. Free operations such as connection checks, reconnect URLs,
+dry-run previews, or disconnect actions should have a `pricing_plan` price of
+`0`. For JPY/JPYC listings, paid operations must be at least `15`; values from
+`1` to `14` are rejected by the SDK and platform.
+`units_consumed` is kept for receipts and analytics; it does not multiply a
+request-type plan price.
+
+Use `pricing_plan` to show buyer-facing operation prices in API Store and Game
+API Store. `pricing_plan.items` is required for `usage_based` and `per_action`
+listings:
+
+```python
+pricing_plan={
+    "display_name": "Operation prices",
+    "currency": "JPY",
+    "free_upfront_invocation": True,
+    "items": [
+        {"key": "connection_check", "label": "Connection check", "price_minor": 0},
+        {"key": "text_post", "label": "Text post", "price_minor": 15},
+        {"key": "url_post", "label": "URL post", "price_minor": 20},
+        {"key": "reply", "label": "Reply", "price_minor": 30},
+    ],
+}
+```
+
+`ONE_TIME` and `BUNDLE` remain reserved values.
 
 ---
 
@@ -592,18 +628,22 @@ or a blank starter template.
 - Coverage inventory: [docs/sdk/v0.6-operation-inventory.md](./docs/sdk/v0.6-operation-inventory.md)
 - Generated review samples: [examples/generated](./examples/generated)
 
-## Experimental metering
+## Metering And Operation Billing
 
-Use `MeterClient` when you want to record usage events for analytics or future
-usage-based / per-action billing previews.
+Use `PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` for free-upfront
+capability calls that bill from the execution receipt. Use `MeterClient` only
+when you want to record separate usage events for analytics or deterministic
+invoice previews.
 
 - Python example: [examples/metering_record.py](./examples/metering_record.py)
 - TypeScript example: [examples-ts/metering_record.ts](./examples-ts/metering_record.ts)
 - API notes: [docs/metering.md](./docs/metering.md)
 
-The public platform still accepts only `free` and `subscription` listings at
-registration time. `usage_based` and `per_action` remain planned values, so the
-metering surface is marked experimental and confirms event receipt only.
+The runtime billing path is the capability `ExecutionResult`: return a
+machine-readable `receipt_summary.operation` / `request_type` that matches a
+`pricing_plan` item. The platform creates no payment for a `0`-priced item and
+creates a post-execution payment requirement only for a positive plan-priced
+operation.
 
 ## Web3 settlement helpers
 
@@ -629,7 +669,7 @@ your payment adapter without touching a live wallet.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -641,7 +681,7 @@ your payment adapter without touching a live wallet.
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
-| [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
+| [metering_record.py](./examples/metering_record.py) | client | ✅ | Record usage events and preview invoice lines |
 | [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
 | [embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts) | `PAYMENT` | ✅ | TypeScript mirror of the embedded-wallet settlement flow |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
@@ -669,7 +709,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
 | [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
-| [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
+| [Metering](docs/metering.md) | Implement free-upfront usage/per-action billing and record usage-event analytics |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |

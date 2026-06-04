@@ -8,7 +8,7 @@ import type {
   ToolManual,
   ToolManualIssue,
 } from "./types";
-import { ApprovalMode, Environment, PermissionClass, PriceModel } from "./types";
+import { ApprovalMode, Environment, MINIMUM_JPY_OPERATION_PRICE_MINOR, PermissionClass, PriceModel } from "./types";
 import type { MeteringSimulationResult, UsageRecord } from "./metering";
 import { Recorder, RecordMode } from "./testing/recorder";
 import { validate_tool_manual } from "./tool-manual-validator";
@@ -16,6 +16,77 @@ import type { EmbeddedWalletCharge, PolygonMandate } from "./web3";
 import { simulate_embedded_wallet_charge, simulate_polygon_mandate } from "./web3";
 
 const CAPABILITY_KEY_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = new Set(["JPY", "JPYC"]);
+
+function pricingPlanFloorIssues(plan: unknown, defaultCurrency: string): string[] {
+  const issues: string[] = [];
+  if (plan === undefined || plan === null) {
+    return issues;
+  }
+  if (typeof plan !== "object" || Array.isArray(plan)) {
+    return ["pricing_plan must be an object when provided"];
+  }
+  const record = plan as Record<string, unknown>;
+  const items = record.items;
+  if (items === undefined || items === null) {
+    return issues;
+  }
+  if (!Array.isArray(items)) {
+    return ["pricing_plan.items must be an array when provided"];
+  }
+  const planCurrency = String(record.currency ?? defaultCurrency ?? "").trim().toUpperCase();
+  const seenKeys = new Set<string>();
+  items.forEach((item, index) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      issues.push(`pricing_plan.items[${index}] must be an object`);
+      return;
+    }
+    const itemRecord = item as Record<string, unknown>;
+    const itemKey = String(
+      itemRecord.key ??
+        itemRecord.operation ??
+        itemRecord.operation_key ??
+        itemRecord.request_type ??
+        itemRecord.receipt_code ??
+        itemRecord.action ??
+        "",
+    ).trim();
+    if (!itemKey) {
+      issues.push(`pricing_plan.items[${index}].key is required`);
+    } else if (seenKeys.has(itemKey)) {
+      issues.push(`pricing_plan.items[${index}].key duplicates ${itemKey}`);
+    } else {
+      seenKeys.add(itemKey);
+    }
+    const amountRaw =
+      itemRecord.price_minor ?? itemRecord.amount_minor ?? itemRecord.cost_minor ?? itemRecord.value_minor;
+    if (amountRaw === undefined || amountRaw === null) {
+      issues.push(`pricing_plan.items[${index}].price_minor is required`);
+      return;
+    }
+    const amountMinor =
+      typeof amountRaw === "number" ? amountRaw : typeof amountRaw === "string" && amountRaw.trim() ? Number(amountRaw) : NaN;
+    if (!Number.isInteger(amountMinor)) {
+      issues.push(`pricing_plan.items[${index}].price_minor must be an integer`);
+      return;
+    }
+    if (amountMinor < 0) {
+      issues.push(`pricing_plan.items[${index}].price_minor must be zero or positive`);
+      return;
+    }
+    const currency = String(itemRecord.currency ?? planCurrency ?? defaultCurrency ?? "").trim().toUpperCase();
+    if (
+      MINIMUM_JPY_OPERATION_PRICE_CURRENCIES.has(currency) &&
+      amountMinor > 0 &&
+      amountMinor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+    ) {
+      issues.push(
+        `pricing_plan.items[${index}].price_minor must be 0 or at least ${MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing`,
+      );
+    }
+  });
+  return issues;
+}
 
 function normalizeExecutionResult(result: ExecutionResult, executionKind: ExecutionKind): ExecutionResult {
   return {
@@ -146,6 +217,13 @@ export class AppTestHarness {
     if (!manifest.example_prompts || manifest.example_prompts.length === 0) {
       issues.push("at least one example_prompt is recommended");
     }
+    issues.push(...pricingPlanFloorIssues(manifest.pricing_plan, String(manifest.currency ?? "USD")));
+    if (
+      (manifest.price_model === PriceModel.USAGE_BASED || manifest.price_model === PriceModel.PER_ACTION) &&
+      (!manifest.pricing_plan || !Array.isArray(manifest.pricing_plan.items) || manifest.pricing_plan.items.length === 0)
+    ) {
+      issues.push("pricing_plan.items is required for usage_based/per_action pricing");
+    }
     if (manifest.permission_class === PermissionClass.ACTION || manifest.permission_class === PermissionClass.PAYMENT) {
       if (!manifest.dry_run_supported) {
         issues.push("action/payment apps should support dry_run");
@@ -234,7 +312,7 @@ export class AppTestHarness {
     }
 
     return {
-      experimental: manifest.price_model === PriceModel.USAGE_BASED || manifest.price_model === PriceModel.PER_ACTION,
+      experimental: false,
       usage_record,
       invoice_line_preview,
     };

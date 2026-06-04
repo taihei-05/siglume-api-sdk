@@ -96,6 +96,7 @@ The following live-listing changes are material and are rejected with
 
 - `price_model`
 - `price_value_minor`
+- `pricing_plan`
 - `currency`
 - `price_value_minor_jpy`
 - `dual_currency`
@@ -213,6 +214,14 @@ preflight errors before calling `auto-register`.
   - `input_form_spec` can be seeded during `auto-register`
   - confirmation does not edit the submitted UI contract
 - For paid APIs: minimum price and an active embedded Polygon wallet before publish
+- For `usage_based` / `per_action` APIs:
+  - the capability is free to invoke up front and must declare the actual charge
+    in `ExecutionResult.units_consumed`, `amount_minor`, `currency`, and
+    `receipt_summary`
+  - use `pricing_plan` to expose buyer-facing operation prices in API Store and
+    Game API Store
+  - `0` is valid for free operations; positive JPY/JPYC operation prices must
+    be at least `15` minor units
 - For paid APIs, `AppManifest.allow_free_trial` must be explicitly set to
   `true` or `false`. When true, Plus/Pro buyers can start one lifetime trial
   per listing, subject to their monthly trial quota; `free_trial_duration_days`

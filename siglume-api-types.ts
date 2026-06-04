@@ -100,6 +100,30 @@ export interface ExecutionResult {
   approval_hint?: ApprovalRequestHint;
 }
 
+export interface PricingPlanItem {
+  key?: string;
+  label?: string;
+  price_minor?: number;
+  amount_minor?: number;
+  currency?: string;
+  unit_label?: string;
+  description?: string;
+  conditions?: unknown;
+  receipt_code?: string;
+}
+
+export interface PricingPlan {
+  billing_model?: string;
+  display_name?: string;
+  summary?: string;
+  description?: string;
+  currency?: string;
+  unit_label?: string;
+  free_upfront_invocation?: boolean;
+  fallback_note?: string;
+  items?: PricingPlanItem[];
+}
+
 export interface CapabilityListing {
   id: string;
   capability_key: string;
@@ -111,6 +135,7 @@ export interface CapabilityListing {
   dry_run_supported: boolean;
   price_model: PriceModel;
   price_value_minor: number;
+  pricing_plan?: PricingPlan;
   currency: string;
   status: string;
   short_description?: string;

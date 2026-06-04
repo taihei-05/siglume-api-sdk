@@ -83,6 +83,57 @@ includes runtime checks, contract checks, external OAuth declaration checks, pri
 rules, and a mandatory fail-closed LLM legal review for law compliance plus
 public-order / morals compliance.
 
+## Usage-Based And Per-Action Billing
+
+Use `price_model: PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` when the
+API must execute before the final operation is known. These listings are free to
+invoke up front. Your adapter returns the executed operation in
+`ExecutionResult.receipt_summary`; the matching `pricing_plan` item sets the
+charge:
+
+```ts
+return {
+  success: true,
+  output: { posted: true, post_url: "https://x.com/..." },
+  units_consumed: 1,
+  amount_minor: 20,
+  currency: "JPY",
+  receipt_summary: {
+    operation: "url_post",
+    amount_minor: 20,
+    currency: "JPY",
+  },
+};
+```
+
+Set `price_value_minor: 0` when prices vary by operation, and publish a
+buyer-facing `pricing_plan` so API Store and Game API Store can show the plan.
+`pricing_plan.items` is required for `usage_based` and `per_action` listings:
+
+```ts
+pricing_plan: {
+  display_name: "Operation prices",
+  currency: "JPY",
+  free_upfront_invocation: true,
+  items: [
+    { key: "connection_check", label: "Connection check", price_minor: 0 },
+    { key: "dry_run", label: "Dry-run preview", price_minor: 0 },
+    { key: "text_post", label: "Text post", price_minor: 15 },
+    { key: "url_post", label: "URL post", price_minor: 20 },
+    { key: "reply", label: "Reply", price_minor: 30 },
+  ],
+}
+```
+
+The `pricing_plan` is authoritative. If the adapter returns a conflicting
+positive amount, the platform rejects the call instead of charging an arbitrary
+API-declared amount. `0` is valid for free operations. For JPY/JPYC billing,
+positive operation prices must be at least `15` minor units; `1` through `14`
+are rejected by the SDK and platform because platform-sponsored gas can exceed
+the fee.
+`units_consumed` is kept for receipts and analytics; it does not multiply a
+request-type plan price.
+
 Company-name publishing is founder-only in the Phase 2 MVP. Use
 `publisher_type: "company"` with `company_id` in `app_manifest.yaml`, or pass
 `--company <company_id>` to the CLI. Paid company listings require the

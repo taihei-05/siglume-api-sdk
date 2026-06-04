@@ -58,6 +58,7 @@ class CapabilityListing:
     dry_run_supported: bool = False
     price_model: str | None = None
     price_value_minor: int = 0
+    pricing_plan: dict[str, Any] | None = None
     currency: str = "USD"
     allow_free_trial: bool = False
     free_trial_duration_days: int = 30
@@ -103,6 +104,7 @@ class CapabilityListing:
             dry_run_supported=listing.dry_run_supported,
             price_model=listing.price_model,
             price_value_minor=listing.price_value_minor,
+            pricing_plan=dict(listing.pricing_plan) if isinstance(listing.pricing_plan, dict) else None,
             currency=listing.currency,
             allow_free_trial=listing.allow_free_trial,
             free_trial_duration_days=listing.free_trial_duration_days,

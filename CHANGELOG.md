@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Made `usage_based` and `per_action` live API Store / Game API Store pricing
+  models. These capabilities are free to invoke up front and charge only the
+  positive amount declared by the execution result.
+- Added buyer-facing `pricing_plan` support to Python/TypeScript SDK listing
+  records, manifest forwarding, OpenAPI, schema, diff detection, and docs.
+- Enforced a JPY/JPYC operation billing floor: free operations may use `0`, but
+  positive operation prices must be at least `15` minor units.
+
 ## [1.0.0] - 2026-06-03
 
 ### Breaking

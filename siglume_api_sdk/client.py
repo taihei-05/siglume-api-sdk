@@ -40,6 +40,8 @@ if TYPE_CHECKING:
 
 DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1"
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
+_MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
 T = TypeVar("T")
 
 
@@ -117,6 +119,7 @@ class AppListingRecord:
     dry_run_supported: bool = False
     price_model: str | None = None
     price_value_minor: int = 0
+    pricing_plan: dict[str, Any] | None = None
     currency: str = "USD"
     allow_free_trial: bool = False
     free_trial_duration_days: int = 30
@@ -1398,6 +1401,7 @@ def _build_auto_register_request(
         "jurisdiction",
         "price_model",
         "price_value_minor",
+        "pricing_plan",
         "currency",
         "allow_free_trial",
         "free_trial_duration_days",
@@ -1412,6 +1416,8 @@ def _build_auto_register_request(
         value = manifest_payload.get(field_name)
         if value is not None:
             payload[field_name] = _enum_value(value)
+    if "pricing_plan" in payload and not isinstance(payload["pricing_plan"], Mapping):
+        raise SiglumeClientError("AppManifest.pricing_plan must be an object when provided.")
     if "store_vertical" not in payload:
         raise SiglumeClientError(
             "AppManifest.store_vertical is required. Choose 'api' for normal "
@@ -1428,6 +1434,11 @@ def _build_auto_register_request(
             f"AppManifest.currency must be 'USD' or 'JPY'. Got {payload.get('currency')!r}."
         )
     payload["currency"] = currency
+    if "pricing_plan" in payload:
+        _validate_pricing_plan_floor(payload.get("pricing_plan"), default_currency=currency)
+    price_model = str(payload.get("price_model") or "free").strip().lower()
+    if price_model in {"usage_based", "per_action"} and not _pricing_plan_has_items(payload.get("pricing_plan")):
+        raise SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
     if "allow_free_trial" not in payload:
         raise SiglumeClientError(
             "AppManifest.allow_free_trial is required. Pass True to offer a Plus/Pro "
@@ -1481,6 +1492,67 @@ def _build_auto_register_request(
         payload["publisher_identity"] = publisher_identity
         payload["legal"] = {"publisher_identity": publisher_identity}
     return payload
+
+
+def _validate_pricing_plan_floor(plan: Any, *, default_currency: str) -> None:
+    if plan is None:
+        return
+    if not isinstance(plan, Mapping):
+        raise SiglumeClientError("AppManifest.pricing_plan must be an object when provided.")
+    raw_items = plan.get("items")
+    if raw_items is None:
+        return
+    if not isinstance(raw_items, list):
+        raise SiglumeClientError("AppManifest.pricing_plan.items must be an array when provided.")
+    plan_currency = str(plan.get("currency") or default_currency or "").strip().upper()
+    seen_keys: set[str] = set()
+    for index, item in enumerate(raw_items):
+        if not isinstance(item, Mapping):
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}] must be an object.")
+        item_key = str(
+            item.get("key")
+            or item.get("operation")
+            or item.get("operation_key")
+            or item.get("request_type")
+            or item.get("receipt_code")
+            or item.get("action")
+            or ""
+        ).strip()
+        if not item_key:
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}].key is required.")
+        if item_key in seen_keys:
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}].key duplicates {item_key!r}.")
+        seen_keys.add(item_key)
+        amount_raw = None
+        for key in ("price_minor", "amount_minor", "cost_minor", "value_minor"):
+            if key in item and item.get(key) is not None:
+                amount_raw = item.get(key)
+                break
+        if amount_raw is None:
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}].price_minor is required.")
+        try:
+            amount_minor = int(amount_raw)
+        except (TypeError, ValueError):
+            raise SiglumeClientError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be an integer."
+            ) from None
+        if amount_minor < 0:
+            raise SiglumeClientError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be zero or positive."
+            )
+        currency = str(item.get("currency") or plan_currency or default_currency or "").strip().upper()
+        if (
+            currency in _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES
+            and 0 < amount_minor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+        ):
+            raise SiglumeClientError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be 0 or at least "
+                f"{MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing."
+            )
+
+
+def _pricing_plan_has_items(plan: Any) -> bool:
+    return isinstance(plan, Mapping) and isinstance(plan.get("items"), list) and bool(plan.get("items"))
 
 
 def _validate_manifest_persistence_contract(payload: Mapping[str, Any]) -> None:
@@ -1547,6 +1619,9 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
     persistence = data.get("persistence")
     if not isinstance(persistence, Mapping):
         persistence = metadata.get("persistence") if isinstance(metadata, Mapping) else {}
+    pricing_plan = data.get("pricing_plan")
+    if not isinstance(pricing_plan, Mapping) and isinstance(metadata, Mapping):
+        pricing_plan = metadata.get("pricing_plan")
     return AppListingRecord(
         listing_id=listing_id,
         capability_key=str(data.get("capability_key") or ""),
@@ -1559,6 +1634,7 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         dry_run_supported=bool(data.get("dry_run_supported") or False),
         price_model=_string_or_none(data.get("price_model")),
         price_value_minor=int(data.get("price_value_minor") or 0),
+        pricing_plan=dict(pricing_plan) if isinstance(pricing_plan, Mapping) else None,
         currency=str(data.get("currency") or "USD"),
         allow_free_trial=bool(data.get("allow_free_trial") or False),
         free_trial_duration_days=int(data.get("free_trial_duration_days") or 30),

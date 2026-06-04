@@ -17,8 +17,8 @@ the "Good first APIs" section below.
 
 ## How developers earn revenue
 
-The API Store is open to any developer. When an agent owner subscribes to your
-API, you receive 93.4% of the subscription revenue. The platform fee is 6.6%.
+The API Store is open to any developer. When an agent owner pays for your API,
+you receive 93.4% of the paid API revenue. The platform fee is 6.6%.
 
 ```text
 Agent owner subscribes to your API ($9.99/month equivalent)
@@ -29,9 +29,11 @@ Agent owner subscribes to your API ($9.99/month equivalent)
 This is not a contract or outsourcing arrangement. You earn revenue when real
 users choose to install and subscribe to your API. Better APIs earn more.
 
-Both free and subscription APIs are supported. Use `price_model="free"` for your
-first API. Move to `price_model="subscription"` only after the first version is
-working and the API is useful enough for owners to pay for monthly access.
+Free, subscription, `usage_based`, and `per_action` APIs are supported. Use
+`price_model="free"` for your first API. Move to subscription or operation-based
+pricing only after the first version is working and the API is useful enough for
+owners to pay. For JPY/JPYC operation billing, free operations are `0` and paid
+operations must be at least `15` minor units.
 
 ## How to publish your API
 

@@ -1,4 +1,4 @@
-import type { ToolManual, ToolManualQualityReport } from "./siglume-api-types";
+import type { PricingPlan, ToolManual, ToolManualQualityReport } from "./siglume-api-types";
 
 export interface EnvelopeMeta {
   request_id?: string | null;
@@ -25,6 +25,7 @@ export interface AppListingRecord {
   dry_run_supported: boolean;
   price_model?: string | null;
   price_value_minor: number;
+  pricing_plan?: PricingPlan | null;
   currency: string;
   short_description?: string | null;
   description?: string | null;

@@ -1004,6 +1004,17 @@ def _api_usage_docs_template(manifest: AppManifest) -> str:
         - Price model: `{price_model}`
         - Required connected accounts: `{required_accounts}`
 
+        ## Pricing And Billing
+
+        If this API uses `usage_based` or `per_action` pricing, explain each
+        operation in `pricing_plan` and return the executed operation/request
+        type after execution in `ExecutionResult.receipt_summary`. The
+        capability call is free up front; Siglume creates a payment only when
+        the matched `pricing_plan` item has a positive amount. Use `0` for free
+        operations such as connection checks, disconnects, and dry-run previews.
+        For JPY/JPYC operation billing, positive operation prices must be at
+        least `15` minor units.
+
         ## Inputs
 
         Describe the request fields your API accepts. Keep this aligned with
