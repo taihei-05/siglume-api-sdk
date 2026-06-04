@@ -120,6 +120,7 @@ class AppListingRecord:
     price_model: str | None = None
     price_value_minor: int = 0
     pricing_plan: dict[str, Any] | None = None
+    billing_timing: str = "post"
     currency: str = "USD"
     allow_free_trial: bool = False
     free_trial_duration_days: int = 30
@@ -1402,6 +1403,7 @@ def _build_auto_register_request(
         "price_model",
         "price_value_minor",
         "pricing_plan",
+        "billing_timing",
         "currency",
         "allow_free_trial",
         "free_trial_duration_days",
@@ -1418,6 +1420,11 @@ def _build_auto_register_request(
             payload[field_name] = _enum_value(value)
     if "pricing_plan" in payload and not isinstance(payload["pricing_plan"], Mapping):
         raise SiglumeClientError("AppManifest.pricing_plan must be an object when provided.")
+    if "billing_timing" in payload:
+        billing_timing = str(payload.get("billing_timing") or "post").strip().lower()
+        if billing_timing not in {"post", "prepay"}:
+            raise SiglumeClientError("AppManifest.billing_timing must be 'post' or 'prepay'.")
+        payload["billing_timing"] = billing_timing
     if "store_vertical" not in payload:
         raise SiglumeClientError(
             "AppManifest.store_vertical is required. Choose 'api' for normal "
@@ -1635,6 +1642,7 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         price_model=_string_or_none(data.get("price_model")),
         price_value_minor=int(data.get("price_value_minor") or 0),
         pricing_plan=dict(pricing_plan) if isinstance(pricing_plan, Mapping) else None,
+        billing_timing=str(data.get("billing_timing") or metadata.get("billing_timing") or "post"),
         currency=str(data.get("currency") or "USD"),
         allow_free_trial=bool(data.get("allow_free_trial") or False),
         free_trial_duration_days=int(data.get("free_trial_duration_days") or 30),

@@ -58,16 +58,17 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v1.1.0.** Python and TypeScript are version-aligned and
+> **Current release: v1.2.0.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
-> operation pricing plans, long-form buyer-facing `description`, and
+> operation pricing plans, prepay quote billing, long-form buyer-facing `description`, and
 > platform-controlled release semver via `version_bump`. v1.0.0 removes
 > platform OAuth broker APIs from the SDK:
 > publisher APIs now own external OAuth, token storage, refresh, revocation,
 > and user-to-token mapping behind their own `connect_url`.
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v1.2.0.md](./RELEASE_NOTES_v1.2.0.md),
 > [RELEASE_NOTES_v1.1.0.md](./RELEASE_NOTES_v1.1.0.md),
 > [RELEASE_NOTES_v1.0.0.md](./RELEASE_NOTES_v1.0.0.md), and
 > [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md) for the current
@@ -364,6 +365,15 @@ dry-run previews, or disconnect actions should have a `pricing_plan` price of
 `units_consumed` is kept for receipts and analytics; it does not multiply a
 request-type plan price.
 
+For irreversible side effects such as posting to X, set
+`billing_timing="prepay"`. In that mode the platform first calls your API with
+`execution_kind="quote"` / `dry_run=True`; your API must return
+`billingPreview.operation` and a `draftToken`. The platform prices that
+operation from `pricing_plan`, collects the direct payment, then calls the
+ACTION endpoint with the same token as `commit_token`. If payment fails, the
+ACTION call is never made. Keep the default `billing_timing="post"` only for
+read-only or reversible usage where execute-then-settle is acceptable.
+
 Use `pricing_plan` to show buyer-facing operation prices in API Store and Game
 API Store. `pricing_plan.items` is required for `usage_based` and `per_action`
 listings:
@@ -380,6 +390,30 @@ pricing_plan={
         {"key": "reply", "label": "Reply", "price_minor": 30},
     ],
 }
+```
+
+```python
+manifest = AppManifest(
+    capability_key="x-poster",
+    name="X Poster",
+    permission_class=PermissionClass.ACTION,
+    approval_mode=ApprovalMode.ALWAYS_ASK,
+    dry_run_supported=True,
+    price_model=PriceModel.PER_ACTION,
+    price_value_minor=0,
+    billing_timing="prepay",
+    currency="JPY",
+    allow_free_trial=False,
+    jurisdiction="JP",
+    store_vertical="api",
+    pricing_plan={
+        "currency": "JPY",
+        "items": [
+            {"key": "text_only", "label": "Text only", "price_minor": 15},
+            {"key": "text_with_url", "label": "Text with URL", "price_minor": 28},
+        ],
+    },
+)
 ```
 
 `ONE_TIME` and `BUNDLE` remain reserved values.
@@ -775,7 +809,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v1.1.0 (beta)** — the platform is launched on Polygon mainnet
+This is **v1.2.0 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
