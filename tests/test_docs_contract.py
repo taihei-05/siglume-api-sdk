@@ -100,7 +100,7 @@ def test_package_runtime_versions_match_release_metadata() -> None:
     python_version = str(pyproject["project"]["version"])
     ts_version = str(package_json["version"])
 
-    assert python_version == "1.2.0"
+    assert python_version == "1.2.1"
     assert ts_version == python_version
     assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
     assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
@@ -115,7 +115,7 @@ def test_onboarding_docs_match_generated_scaffold_and_no_key_first_loop() -> Non
 
     assert "v0.5.0 is out" not in readme
     assert "current v0.5 release line" not in ts_readme
-    assert "This is **v1.2.0 (beta)**" in readme
+    assert "This is **v1.2.1 (beta)**" in readme
     assert "Production releases are published by GitHub Actions with PyPI Trusted" in security
     assert "Do not create a PyPI API token or local `.pypirc` for the normal release path." in normalized_security
     assert "Rotate after every release" not in security
@@ -236,3 +236,37 @@ def test_payment_docs_match_current_polygon_settlement_language() -> None:
     assert "bank account or wallet address" not in docs
     assert "Wallet at `/owner/credits/payout`" in docs
     assert "external payout wallets are not supported" in docs
+
+
+def test_pricing_docs_match_live_operation_billing_contract() -> None:
+    docs = "\n".join(
+        [
+            _read("README.md"),
+            _read("GETTING_STARTED.md"),
+            _read("docs/pricing-and-billing.md"),
+            _read("docs/sdk-core-concepts.md"),
+            _read("docs/dry-run-and-approval.md"),
+            _read("docs/execution-receipts.md"),
+            _read("docs/metering.md"),
+            _read("docs/publish-flow.md"),
+            _read("siglume-api-sdk-ts/README.md"),
+        ]
+    )
+    normalized_docs = " ".join(docs.split())
+    schema = json.loads(_read("schemas/app-manifest.schema.json"))
+
+    assert "Reserved for future phases (not accepted by the platform" not in docs
+    assert "`USAGE_BASED` - operation-based billing" in docs
+    assert "`PER_ACTION` - action/request-type billing" in docs
+    assert "price_model=\"free\"" in docs
+    assert "price_model=\"subscription\"" in docs
+    assert "price_model=\"usage_based\"" in docs
+    assert "price_model=\"per_action\"" in docs
+    assert "pricing_plan.items" in docs
+    assert "billing_timing=\"prepay\"" in docs
+    assert "priceMinorIfActionSucceeds" in docs
+    assert "draftToken" in docs
+    assert "at least `15`" in docs
+    assert "does not automatically refund a confirmed payment" in normalized_docs
+    assert "Do not describe a `usage_based` or `per_action` listing as free just because" in docs
+    assert schema["properties"]["billing_timing"]["enum"] == ["post", "prepay"]

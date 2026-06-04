@@ -77,7 +77,8 @@ There is no normal human review step in the self-serve publish flow anymore.
 6. Sends a functional test request using your dedicated review/test key.
 7. Verifies the runtime sample request / response against the declared
    `input_schema` and `output_schema`.
-8. Checks connected-account requirements and paid pricing rules.
+ 8. Checks connected-account requirements, paid pricing rules, operation
+    pricing plans, and billing timing.
 9. Persists a private draft only if those checks pass. The CLI then confirms it
    by default unless `--draft-only` was requested.
 10. On confirmation, reruns the LLM legal review against the immutable stored
@@ -110,6 +111,11 @@ The following live-listing changes are material and are rejected with
 When a material term changes, create a new API listing with a new
 `capability_key`. Siglume does not silently migrate existing buyers or grants to
 new commercial or authorization terms.
+
+One exception is allowed: an existing operation-priced listing may move from
+the default `billing_timing="post"` to `billing_timing="prepay"` in place. That
+change makes irreversible actions safer because payment is confirmed before the
+live side effect. Other billing timing changes may still be treated as material.
 
 ## The mandatory LLM legal review
 
@@ -222,6 +228,8 @@ preflight errors before calling `auto-register`.
     Game API Store
   - `0` is valid for free operations; positive JPY/JPYC operation prices must
     be at least `15` minor units
+  - use `billing_timing="prepay"` for irreversible actions that must not run
+    before payment succeeds
 - For paid APIs, `AppManifest.allow_free_trial` must be explicitly set to
   `true` or `false`. When true, Plus/Pro buyers can start one lifetime trial
   per listing, subject to their monthly trial quota; `free_trial_duration_days`

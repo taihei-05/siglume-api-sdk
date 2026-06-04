@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-04
+
+### Fixed
+
+- Added the canonical [Pricing And Billing](docs/pricing-and-billing.md)
+  developer guide covering free APIs, subscriptions, operation-based
+  `usage_based` / `per_action` plans, JPY/JPYC minimum operation pricing, and
+  `billing_timing="prepay"`.
+- Updated SDK docs that still described `usage_based` / `per_action` as future
+  values, and added a regression test so docs stay aligned with the live
+  operation billing contract.
+- Added `billing_timing` to `schemas/app-manifest.schema.json` so schema-driven
+  editors and validation tools see the same manifest field as Python and
+  TypeScript SDKs.
+
 ## [1.2.0] - 2026-06-04
 
 ### Added

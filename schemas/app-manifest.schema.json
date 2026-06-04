@@ -224,6 +224,12 @@
         }
       }
     },
+    "billing_timing": {
+      "type": "string",
+      "enum": ["post", "prepay"],
+      "default": "post",
+      "description": "Operation billing timing for usage_based/per_action listings. Use 'post' to execute then settle; use 'prepay' to quote and collect payment before irreversible live actions."
+    },
     "currency": {
       "type": "string",
       "enum": ["USD", "JPY"],
