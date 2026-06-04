@@ -21,6 +21,19 @@ Good first API constraints:
 Avoid `ACTION`, `PAYMENT`, OAuth, and subscription pricing until the first API
 passes the local loop and the human understands the publish flow.
 
+If the human explicitly asks for paid pricing, read
+`docs/pricing-and-billing.md` first. Treat the live choices as:
+
+- free call: `price_model="free"`
+- subscription: `price_model="subscription"`
+- operation-based usage billing: `price_model="usage_based"` or
+  `"per_action"` plus `pricing_plan.items`
+
+For operation-based JPY/JPYC billing, free operations use `0` and paid
+operations must be at least `15` minor units. Use `billing_timing="prepay"` for
+irreversible side effects such as posting, sending, or other actions that must
+not run before payment succeeds.
+
 ## Files to create or update
 
 Create or update these files in the generated project:

@@ -15,6 +15,10 @@ operations, or when the amount depends on what the API actually did. Example:
 connection check = 0 JPY, dry-run preview = 0 JPY, text post = 15 JPY, URL post
 = 20 JPY, reply = 30 JPY.
 
+For irreversible side effects, use `billing_timing="prepay"` so the platform
+quotes the operation, collects payment, and only then calls the live action. See
+[Pricing And Billing](./pricing-and-billing.md) for the end-to-end contract.
+
 For JPY/JPYC listings, a paid operation must be either `0` or at least `15`
 minor units. `0` is valid for free operations. Positive amounts below `15` are
 rejected by the SDK and by the platform.

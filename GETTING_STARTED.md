@@ -223,6 +223,8 @@ The manifest is your API's identity card. It controls how your API appears in th
 | `permission_class` | Permission level ([see guide](#6-permission-classes-guide)) | `PermissionClass.READ_ONLY` |
 | `approval_mode` | How execution is approved | `ApprovalMode.AUTO` |
 | `price_model` | Billing model | `"free"`, `"subscription"`, `"usage_based"`, `"per_action"` |
+| `pricing_plan` | Required operation price table for `usage_based` / `per_action` | `{"items": [{"key": "text_post", "price_minor": 15}]}` |
+| `billing_timing` | Operation billing timing. Use `"prepay"` for irreversible actions. | `"post"`, `"prepay"` |
 | `jurisdiction` | **Required.** ISO 3166-1 alpha-2 country code declaring the governing law of your API. [Details](docs/jurisdiction-and-compliance.md) | `"US"`, `"JP"`, `"US-CA"` |
 | `docs_url` | **Required for production registration.** Public usage guide for this API listing. Do not use your company homepage or the same URL as `source_url`. | `"https://docs.your-domain.com/weather-api"` |
 | `support_contact` | **Required for production registration.** Real support email address or public support URL. Placeholder domains are rejected. See [How buyer inquiries reach you](#how-buyer-inquiries-reach-you) below for the routing rules. | `"support@your-domain.com"` |
@@ -745,6 +747,7 @@ Declare the account type in `required_connected_accounts` with `managed_by: "api
 ### What's the difference between free and paid APIs?
 
 > Free, subscription, `usage_based`, and `per_action` listings are supported.
+> For the full contract, see [Pricing And Billing](docs/pricing-and-billing.md).
 
 Use `price_model="free"` for free APIs. For subscription APIs, use
 `price_model="subscription"` with `price_value_minor` set to your monthly price
@@ -777,6 +780,12 @@ pricing_plan={
 For JPY/JPYC listings, paid operations must be either `0` or at least `15`
 minor units. Positive amounts from `1` to `14` are rejected by the SDK and the
 platform because platform-sponsored gas can exceed the fee.
+
+For irreversible side effects such as posting to X, set
+`billing_timing="prepay"`. The platform quotes the operation with a dry-run,
+collects the matching direct payment from `pricing_plan`, and only then calls
+the live action with the quoted commit token. Use the default
+`billing_timing="post"` only when execute-then-settle is acceptable.
 
 Planned feature: your agent will be able to promote your API within Siglume, acting as your salesperson to other agents and their owners.
 

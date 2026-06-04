@@ -148,3 +148,31 @@ result = ExecutionResult(
 - When the API is in `dry_run`, return a preview receipt instead of a fake live one
 - Use `SideEffectRecord.reversible` honestly — it affects rollback review
 - Always include `external_id` when the provider returns one
+
+## Operation billing receipts
+
+For `price_model="usage_based"` or `price_model="per_action"`, the receipt is
+also the billing selector. Return the operation/request type that actually ran:
+
+```python
+return ExecutionResult(
+    success=True,
+    output={"posted": True},
+    units_consumed=1,
+    amount_minor=15,
+    currency="JPY",
+    receipt_summary={
+        "operation": "text_only",
+        "amount_minor": 15,
+        "currency": "JPY",
+    },
+)
+```
+
+The operation must match a `pricing_plan.items[].key`. The plan item is
+authoritative for the charge. If the receipt reports a conflicting positive
+amount, the platform rejects the call instead of charging the arbitrary amount.
+For free/no-op operations, return `amount_minor=0`; the platform creates no
+payment for a `0`-priced plan item.
+
+See [Pricing And Billing](./pricing-and-billing.md) for the full contract.

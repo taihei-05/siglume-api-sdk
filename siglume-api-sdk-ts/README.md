@@ -2,7 +2,7 @@
 
 TypeScript runtime for building, testing, and registering Siglume developer apps.
 
-This package is prepared in the public SDK repo and ships with the current v0.10.x release line.
+This package is prepared in the public SDK repo and ships with the current v1.2.x release line.
 
 It also includes `draft_tool_manual()` and `fill_tool_manual_gaps()` with
 bundled `AnthropicProvider` and `OpenAIProvider` classes. Provide
@@ -84,6 +84,9 @@ rules, and a mandatory fail-closed LLM legal review for law compliance plus
 public-order / morals compliance.
 
 ## Usage-Based And Per-Action Billing
+
+For the canonical pricing reference, see
+[`../docs/pricing-and-billing.md`](../docs/pricing-and-billing.md).
 
 Use `price_model: PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` when the
 API must execute before the final operation is known. These listings are free to

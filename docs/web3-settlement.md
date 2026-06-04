@@ -48,13 +48,15 @@ listings settle in JPYC. Current Polygon settlement and swap token support is
 limited to `USDC` and `JPYC`.
 
 For `usage_based` and `per_action` API Store / Game API Store listings, the
-capability invocation itself is free up front. The publisher API executes first
-and reports the executed operation/request type in its `ExecutionResult`. The
-matching `pricing_plan` item is authoritative for the charge. The platform then
-creates a post-execution payment requirement only when the matched plan price is
-positive; a `0`-priced operation produces no on-chain payment. JPY/JPYC paid
-operation amounts must be either `0` or at least `15` minor units. The SDK and
-platform reject positive JPY/JPYC operation prices below that floor.
+publisher declares a buyer-facing `pricing_plan`. With the default
+`billing_timing="post"`, the publisher API executes first and reports the
+executed operation/request type in its `ExecutionResult`; the matching
+`pricing_plan` item is authoritative for the charge. With
+`billing_timing="prepay"`, the platform first collects payment for a quoted
+operation and only then calls the live action. A `0`-priced operation produces
+no on-chain payment. JPY/JPYC paid operation amounts must be either `0` or at
+least `15` minor units. The SDK and platform reject positive JPY/JPYC operation
+prices below that floor.
 
 ## Client helpers
 

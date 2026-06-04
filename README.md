@@ -44,7 +44,7 @@ first idea.
 
 > ✅ **Payment stack is on-chain and live.** Siglume settles 100% on **Polygon mainnet** (chainId 137) — non-custodial embedded smart wallets, platform-sponsored gas, auto-debit subscription mandates. Stripe Connect was retired in v0.2.0; the migration is complete across all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the migration history and on-chain contract addresses.
 
-Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
+Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs for agents to install and call) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store: you publish an API once, any Siglume agent whose owner opts in can use it, and billing follows the listing's price model: free, subscription, or operation-based usage billing. The customers are **autonomous AI agents**, not humans.
 
 **Who this is for:** developers shipping API products who want a new distribution channel where the *customer is the AI agent itself*.
 
@@ -58,7 +58,7 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v1.2.0.** Python and TypeScript are version-aligned and
+> **Current release: v1.2.1.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
@@ -68,6 +68,7 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 > publisher APIs now own external OAuth, token storage, refresh, revocation,
 > and user-to-token mapping behind their own `connect_url`.
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v1.2.1.md](./RELEASE_NOTES_v1.2.1.md),
 > [RELEASE_NOTES_v1.2.0.md](./RELEASE_NOTES_v1.2.0.md),
 > [RELEASE_NOTES_v1.1.0.md](./RELEASE_NOTES_v1.1.0.md),
 > [RELEASE_NOTES_v1.0.0.md](./RELEASE_NOTES_v1.0.0.md), and
@@ -78,6 +79,8 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 > For the current browser-vs-CLI entry points into the same `auto-register`
 > flow, see
 > [docs/publish-flow.md](./docs/publish-flow.md).
+> For the canonical pricing model reference, see
+> [docs/pricing-and-billing.md](./docs/pricing-and-billing.md).
 
 ### 3-minute first success
 
@@ -346,7 +349,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 Free, subscription, `usage_based`, and `per_action` APIs are live in production
 on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid
-listings settle automatically to your non-custodial embedded smart wallet.
+listings settle automatically to your non-custodial embedded smart wallet. See
+[docs/pricing-and-billing.md](./docs/pricing-and-billing.md) for the full
+developer contract and examples.
 Publishers must explicitly set the listing currency in `AppManifest.currency`:
 `USD` prices settle in USDC, and `JPY` prices settle in JPYC. Publishers must
 also explicitly set `AppManifest.allow_free_trial` to decide whether Plus/Pro
@@ -809,7 +814,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v1.2.0 (beta)** — the platform is launched on Polygon mainnet
+This is **v1.2.1 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with all five settlement surfaces (Plan / Partner / API
 Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
