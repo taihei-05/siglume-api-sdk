@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-04
+
 ### Changed
 
 - Made `usage_based` and `per_action` live API Store / Game API Store pricing
