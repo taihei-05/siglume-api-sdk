@@ -219,6 +219,13 @@ preflight errors before calling `auto-register`.
   - the live response must satisfy `output_schema`
   - runtime-checked response fields must be declared in `output_schema`
   - `requires_connected_accounts` must match between listing data and the Tool Manual
+  - if your API accepts files from external MCP agents, declare each file input
+    as a Siglume handle in `input_schema` (`"$ref": "#/$defs/handle"` or
+    `"format": "siglume-handle"`). The MCP Gateway brokers caller-supplied
+    `filename`, `mime_type`, and `content_base64` to your API as an inline
+    handle for that call only. Siglume does not store, host, scan, or classify
+    the file; MIME trust and content safety remain the publisher API's
+    responsibility.
 - Optional UI contract layer:
   - `input_form_spec` can be seeded during `auto-register`
   - confirmation does not edit the submitted UI contract

@@ -83,6 +83,10 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 > [docs/publish-flow.md](./docs/publish-flow.md).
 > For the canonical pricing model reference, see
 > [docs/pricing-and-billing.md](./docs/pricing-and-billing.md).
+> For APIs that accept images or other files from external MCP agents, declare a
+> Siglume handle in `input_schema`; the MCP Gateway brokers inline base64 to
+> your API without storing, hosting, scanning, or classifying the file. See
+> [SDK Core Concepts](./docs/sdk-core-concepts.md#mcp-file-inputs).
 > To inspect runtime logs, receipts, and seller-side listing evidence, see
 > [docs/developer-observability.md](./docs/developer-observability.md).
 

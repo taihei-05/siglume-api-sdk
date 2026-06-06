@@ -78,6 +78,61 @@ flows. See [Pricing And Billing](./pricing-and-billing.md).
 | `draft_tool_manual()` | Generate a Tool Manual skeleton from a job description using an LLM provider. |
 | `fill_tool_manual_gaps()` | Repair or fill missing fields on an existing Tool Manual. |
 
+### MCP file inputs
+
+If your API needs to receive images or other files from an external MCP agent,
+declare the corresponding `input_schema` property as a Siglume handle:
+
+```json
+{
+  "type": "object",
+  "$defs": {
+    "handle": {
+      "type": "object",
+      "required": ["handle_id", "filename", "mime_type", "size_bytes"],
+      "properties": {
+        "handle_id": { "type": "string" },
+        "filename": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "properties": {
+    "image": { "$ref": "#/$defs/handle" }
+  },
+  "required": ["image"]
+}
+```
+
+MCP callers see that field as `{ filename, mime_type, content_base64 }`. The
+MCP Gateway only brokers the transport: it checks that the payload can be
+decoded as base64, verifies `size_bytes` when supplied, applies the inline
+transport size limit, and then passes your API an inline JSON handle:
+
+```json
+{
+  "image": {
+    "handle": {
+      "handle_id": "mcp_inline_...",
+      "filename": "sample.png",
+      "mime_type": "image/png",
+      "size_bytes": 12345,
+      "sha256": "...",
+      "content_base64": "...",
+      "transport": "inline_base64"
+    }
+  }
+}
+```
+
+Siglume only brokers this payload for the current MCP call. It does not persist,
+host, retain, scan, or classify the file bytes. File safety, MIME trust, virus
+scanning, image moderation, and domain-specific validation are the publisher
+API's responsibility. Inline MCP file inputs are intended for modest payloads
+such as images and documents; the current decoded size limit is 25 MB.
+
 ## Testing helpers
 
 | Component | What it does |
