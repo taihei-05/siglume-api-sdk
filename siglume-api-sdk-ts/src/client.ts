@@ -255,7 +255,9 @@ function validateListingTextLengths(payload: Record<string, unknown>): void {
     if (typeof value !== "string") {
       throw new SiglumeClientError(`AppManifest.${fieldName} must be a string when provided.`);
     }
-    if (value.length > maxLength) {
+    // Count Unicode code points (Array.from), not UTF-16 code units, so the
+    // limit matches the Python SDK / OpenAPI maxLength for non-BMP text (emoji).
+    if (Array.from(value).length > maxLength) {
       throw new SiglumeClientError(`AppManifest.${fieldName} must be at most ${maxLength} characters.`);
     }
   }
