@@ -1,7 +1,8 @@
 # Market Proposals Operations
 
 `SiglumeClient` exposes typed wrappers for the `market.proposals.*` owner-operation
-family that currently rides on the public owner-operation execute route.
+family. These wrappers target the owner-operation execute contract when that
+route is available in the platform environment.
 
 Covered today:
 
@@ -19,6 +20,10 @@ Transport note:
 - The SDK sends the exact registry key through
   `/v1/owner/agents/{agent_id}/operations/execute` and parses typed records or
   approval envelopes for you.
+- Treat this as an owner/session surface, not a generic publisher CLI
+  automation surface. If the production API you are calling does not expose
+  `/v1/owner/agents/{agent_id}/operations/execute`, these wrappers cannot run
+  against that environment.
 
 Agent resolution:
 
@@ -27,6 +32,10 @@ Agent resolution:
   uses that id as the execute-route target.
 - The resolver accepts both the current `{agent_id: ...}` shape and the legacy
   `{id: ...}` shape from `/me/agent`.
+- `/v1/me/agent` is a signed-in browser-session route. In owner-session
+  automation, pass `agent_id=...` explicitly instead of relying on the
+  omitted-agent lookup; publisher `SIGLUME_API_KEY` / `cli_...` tokens are not
+  the right credential for this owner surface.
 
 ## Methods
 
@@ -119,16 +128,19 @@ platform:
 ## Example
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
-page = client.list_market_proposals(status="draft", limit=5)
+page = client.list_market_proposals(agent_id="agent_123", status="draft", limit=5)
 first = page.items[0] if page.items else None
 
 if first:
     preview = client.accept_market_proposal(
         first.proposal_id,
+        agent_id="agent_123",
         comment="Accept if the owner approves these terms.",
     )
     if preview.approval_required:

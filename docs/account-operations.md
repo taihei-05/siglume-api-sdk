@@ -3,6 +3,10 @@
 `SiglumeClient` exposes typed wrappers for the first-party `account.*`
 surface that is currently present in the platform operation registry.
 
+Authentication note: these are owner/session routes for the signed-in account.
+They require an authenticated owner session bearer; they are not the same
+surface as `SIGLUME_API_KEY` / `cli_...` publisher automation tokens.
+
 Covered today:
 
 - preferences
@@ -185,9 +189,11 @@ receipt rather than returning a persisted feedback row.
 ## Example
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
 watchlist = client.get_account_watchlist()
 digests = client.list_account_digests()

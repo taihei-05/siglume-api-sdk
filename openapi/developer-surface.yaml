@@ -232,12 +232,15 @@ paths:
                   description: Override auto-detected name
                 job_to_be_done:
                   type: string
+                  maxLength: 240
                   description: Buyer-facing task this API lets an agent complete.
                 short_description:
                   type: string
-                  description: Concise buyer-facing catalog summary.
+                  maxLength: 60
+                  description: Concise buyer-facing catalog tagline.
                 description:
                   type: string
+                  maxLength: 1000
                   description: Optional long buyer-facing detail shown on the API Store detail page.
                 category:
                   type: string
@@ -335,26 +338,38 @@ paths:
                   description: |
                     Public runtime checks that Siglume runs before creating the draft.
                     Siglume calls `healthcheck_url` with GET. It calls `invoke_url`
-                    with `invoke_method` (default POST), sends the dedicated review
-                    auth header, and sends `request_payload` as JSON for POST or
-                    query parameters for GET. The live JSON response must contain
-                    every path in `expected_response_fields`, and those paths must
-                    be declared by ToolManual.output_schema. `request_payload` is
-                    the canonical sample request field; compatibility aliases are
-                    also accepted by the server.
-                  anyOf:
-                    - required: [request_payload]
-                    - required: [test_request_body]
-                    - required: [runtime_sample]
-                    - required: [sample_request_payload]
-                    - required: [runtime_sample_request]
+                    with `invoke_method` (default POST), attaches the runtime auth
+                    header, and sends `request_payload` as JSON for POST or query
+                    parameters for GET. The live JSON response must contain every
+                    path in `expected_response_fields`, and those paths must be
+                    declared by ToolManual.output_schema.
+
+                    `runtime_auth_header_name` / `runtime_auth_header_value` carry
+                    the shared secret Siglume attaches when it calls `invoke_url`.
+                    The SAME value is used at registration validation AND at
+                    production runtime invocation — for ACTION / per-action / prepay
+                    APIs it is the trust boundary on live side-effect requests, not a
+                    throwaway test key. Use a strong, random, dedicated secret; keep
+                    it in the Git-ignored `runtime_validation.json`; never reuse your
+                    master API key; rotate it if it leaks. The legacy
+                    `test_auth_header_name` / `test_auth_header_value` aliases are
+                    still accepted. `request_payload` is the canonical sample request
+                    field; compatibility aliases are also accepted by the server.
                   required:
                     - public_base_url
                     - healthcheck_url
                     - invoke_url
-                    - test_auth_header_name
-                    - test_auth_header_value
                     - expected_response_fields
+                  allOf:
+                    - anyOf:
+                        - required: [request_payload]
+                        - required: [test_request_body]
+                        - required: [runtime_sample]
+                        - required: [sample_request_payload]
+                        - required: [runtime_sample_request]
+                    - anyOf:
+                        - required: [runtime_auth_header_name, runtime_auth_header_value]
+                        - required: [test_auth_header_name, test_auth_header_value]
                   properties:
                     public_base_url:
                       type: string
@@ -369,12 +384,28 @@ paths:
                       type: string
                       enum: [GET, POST]
                       description: HTTP method used for the functional test call
+                    runtime_auth_header_name:
+                      type: string
+                      description: |
+                        Name of the runtime auth header Siglume attaches when it
+                        calls invoke_url (e.g. "X-Siglume-Auth"). Used at both
+                        registration validation and production runtime invocation.
+                    runtime_auth_header_value:
+                      type: string
+                      description: |
+                        Value of the runtime auth header — a strong, dedicated shared
+                        secret Siglume sends on every invocation (registration
+                        validation AND production runtime). Keep it in the Git-ignored
+                        runtime_validation.json, never reuse your master API key, and
+                        rotate it if it leaks.
                     test_auth_header_name:
                       type: string
-                      description: Header name used for the dedicated review/test credential
+                      deprecated: true
+                      description: Legacy alias for runtime_auth_header_name. Prefer runtime_auth_header_name in new payloads.
                     test_auth_header_value:
                       type: string
-                      description: Header value used for the dedicated review/test credential
+                      deprecated: true
+                      description: Legacy alias for runtime_auth_header_value. Prefer runtime_auth_header_value in new payloads.
                     request_payload:
                       type: object
                       additionalProperties: true
@@ -935,6 +966,7 @@ paths:
     get:
       operationId: listOwnerAgentOperations
       summary: List first-party owner operations for an agent
+      description: Owner/session route for environments where the owner-operation catalog is exposed. It is not a publisher CLI/API-key automation route; pass an authenticated owner session bearer and the target agent_id.
       tags: [OwnerOperations]
       parameters:
         - name: agent_id
@@ -962,6 +994,7 @@ paths:
     post:
       operationId: executeOwnerAgentOperation
       summary: Execute a first-party owner operation
+      description: Owner/session route for environments where the owner-operation execute surface is exposed. It is not a publisher CLI/API-key automation route; pass an authenticated owner session bearer and the target agent_id.
       tags: [OwnerOperations]
       parameters:
         - name: agent_id
@@ -992,7 +1025,7 @@ paths:
     get:
       operationId: listWebhookSubscriptions
       summary: List webhook subscriptions
-      description: List the current developer's webhook subscriptions for marketplace lifecycle events.
+      description: List the current developer's webhook subscriptions for marketplace lifecycle events. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       responses:
         '200':
@@ -1010,7 +1043,7 @@ paths:
     post:
       operationId: createWebhookSubscription
       summary: Create webhook subscription
-      description: Register a signed callback URL for subscription, payment, capability, and execution events.
+      description: Register a signed callback URL for subscription, payment, capability, and execution events. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       requestBody:
         required: true
@@ -1036,6 +1069,7 @@ paths:
     get:
       operationId: getWebhookSubscription
       summary: Get webhook subscription
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1066,6 +1100,7 @@ paths:
     post:
       operationId: rotateWebhookSubscriptionSecret
       summary: Rotate webhook signing secret
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1090,6 +1125,7 @@ paths:
     post:
       operationId: pauseWebhookSubscription
       summary: Pause webhook subscription
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1114,6 +1150,7 @@ paths:
     post:
       operationId: resumeWebhookSubscription
       summary: Resume webhook subscription
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1138,7 +1175,7 @@ paths:
     get:
       operationId: listWebhookDeliveries
       summary: List webhook deliveries
-      description: Inspect recent webhook deliveries, filter by subscription, event type, or delivery status.
+      description: Inspect recent webhook deliveries, filter by subscription, event type, or delivery status. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1171,6 +1208,7 @@ paths:
     post:
       operationId: redeliverWebhookDelivery
       summary: Redeliver webhook event
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: delivery_id
@@ -1195,7 +1233,7 @@ paths:
     post:
       operationId: sendWebhookTestDelivery
       summary: Queue a test webhook delivery
-      description: Queue one of the supported webhook event types to validate your endpoint wiring before going live.
+      description: Queue one of the supported webhook event types to validate your endpoint wiring before going live. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       requestBody:
         required: true
@@ -1400,6 +1438,7 @@ paths:
     get:
       operationId: listUsageEvents
       summary: Query usage events
+      description: Current production auth is a signed-in owner/session bearer. CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       parameters:
         - name: capability_key
           in: query
@@ -1434,7 +1473,7 @@ paths:
     post:
       operationId: recordUsageEvents
       summary: Record usage events
-      description: Usage analytics and metering ingest for usage_based and per_action flows.
+      description: Usage analytics and metering ingest for usage_based and per_action flows. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       requestBody:
         required: true
         content:
@@ -1465,7 +1504,7 @@ paths:
     post:
       operationId: getWeb3SwapQuote
       summary: Get a cross-currency swap quote
-      description: Returns a live 0x quote when the platform is configured, with a deterministic mock fallback in local environments.
+      description: Returns a live 0x quote when the platform is configured, with a deterministic mock fallback in local environments. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Web3]
       requestBody:
         required: true
@@ -1497,6 +1536,7 @@ paths:
     get:
       operationId: listPolygonMandates
       summary: List Polygon payment mandates
+      description: List payment mandates for the signed-in owner account. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Web3]
       parameters:
         - name: status
@@ -1529,6 +1569,7 @@ paths:
     get:
       operationId: listSettlementReceipts
       summary: List Web3 settlement receipts
+      description: List settlement receipts for the signed-in owner account. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Web3]
       parameters:
         - name: receipt_kind
@@ -1719,6 +1760,7 @@ components:
         name: { type: string, minLength: 1, maxLength: 255 }
         description:
           type: string
+          maxLength: 1000
           description: |
             Long-form buyer-facing sales copy shown on the API detail page.
             Complements `short_description` (one-liner) with the full pitch:
@@ -1726,8 +1768,8 @@ components:
             connected accounts, quotas. Plain text. The Tool Manual is
             agent-facing at runtime and is not shown to buyers — put buyer
             copy here.
-        job_to_be_done: { type: string }
-        short_description: { type: string }
+        job_to_be_done: { type: string, maxLength: 240 }
+        short_description: { type: string, maxLength: 60 }
         category: { type: string, enum: [commerce, booking, crm, finance, document, communication, monitoring, creative, productivity, summarization, other] }
         permission_class: { type: string, enum: [read-only, action, payment, recommendation], description: "Supported tiers: read-only / action / payment. `recommendation` is a deprecated alias of read-only kept for backward compatibility; do not use in new manifests." }
         approval_mode: { type: string, enum: [auto, budget-bounded, always-ask, deny] }
@@ -2836,7 +2878,7 @@ components:
         job_to_be_done:
           type: string
           minLength: 10
-          maxLength: 500
+          maxLength: 240
         summary_for_model:
           type: string
           minLength: 10

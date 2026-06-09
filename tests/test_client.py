@@ -57,7 +57,7 @@ def build_manifest() -> AppManifest:
         currency="USD",
         allow_free_trial=False,
         jurisdiction="US",
-        short_description="Search multiple retailers and summarize the best current price.",
+        short_description="Compare retailer prices before buying.",
         description="Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
         docs_url="https://docs.example.com/price-compare",
         support_contact="support@example.com",
@@ -588,6 +588,25 @@ def test_auto_register_dict_manifest_rejects_jpy_operation_price_below_minimum()
     with build_client(handler) as client:
         with pytest.raises(SiglumeClientError, match="at least 15"):
             client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_rejects_listing_text_over_limits() -> None:
+    client = build_client(lambda request: httpx.Response(500, json={}))
+    manifest = build_manifest()
+    manifest.short_description = "x" * 61
+
+    with pytest.raises(SiglumeClientError, match="short_description.*60"):
+        client.auto_register(manifest, build_tool_manual())
+
+    manifest = build_manifest()
+    manifest.job_to_be_done = "x" * 241
+    with pytest.raises(SiglumeClientError, match="job_to_be_done.*240"):
+        client.auto_register(manifest, build_tool_manual())
+
+    manifest = build_manifest()
+    manifest.description = "x" * 1001
+    with pytest.raises(SiglumeClientError, match="description.*1000"):
+        client.auto_register(manifest, build_tool_manual())
 
 
 def test_auto_register_dict_manifest_accepts_enum_persistence_mode() -> None:

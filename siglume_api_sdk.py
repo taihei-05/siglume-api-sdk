@@ -24,6 +24,9 @@ from typing import Any, Mapping
 _JURISDICTION_PATTERN = re.compile(r"^[A-Z]{2}(-[A-Z0-9]{1,3})?$")
 MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
 _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
+LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60
+LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240
+LISTING_DESCRIPTION_MAX_LENGTH = 1000
 _MAX_SAVE_DATA_SCHEMA_BYTES = 8192
 
 
@@ -254,7 +257,7 @@ class AppManifest:
     capability_key: str                    # unique identifier e.g. "amazon-purchase-assistant"
     version: str = "0.1.0"
     name: str = ""                         # display name
-    job_to_be_done: str = ""               # what this app enables the agent to do
+    job_to_be_done: str = ""               # buyer-facing task summary, max 240 chars
     category: AppCategory = AppCategory.OTHER  # e.g. "commerce", "booking", "crm"
     permission_class: PermissionClass = PermissionClass.READ_ONLY
     approval_mode: ApprovalMode = ApprovalMode.AUTO
@@ -279,8 +282,8 @@ class AppManifest:
     # calculation under JP vs US building codes) is the buyer's judgment,
     # not something the platform enforces. The platform surfaces `jurisdiction`
     # as a flag icon so buyers can make informed decisions.
-    short_description: str = ""
-    description: str = ""                  # optional long buyer-facing detail for the API Store page
+    short_description: str = ""            # catalog tagline, max 60 chars
+    description: str = ""                  # optional long buyer-facing detail, max 1000 chars
     docs_url: str = ""                     # public API usage guide; not a seller homepage
     support_contact: str = ""              # real support email address or public support URL
     seller_homepage_url: str = ""          # optional official seller homepage, separate from docs_url
@@ -317,6 +320,14 @@ class AppManifest:
             self.pricing_plan
         ):
             raise ValueError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
+        for field_name, max_length in (
+            ("short_description", LISTING_SHORT_DESCRIPTION_MAX_LENGTH),
+            ("job_to_be_done", LISTING_JOB_TO_BE_DONE_MAX_LENGTH),
+            ("description", LISTING_DESCRIPTION_MAX_LENGTH),
+        ):
+            value = getattr(self, field_name)
+            if value and len(value) > max_length:
+                raise ValueError(f"AppManifest.{field_name} must be at most {max_length} characters.")
 
         if self.allow_free_trial is None:
             raise ValueError(
@@ -623,7 +634,7 @@ class ToolManual:
     """
     # ── Required (all permission classes) ──
     tool_name: str                                      # 3-64 chars, [A-Za-z0-9_]
-    job_to_be_done: str                                 # 10-500 chars
+    job_to_be_done: str                                 # 10-240 chars
     summary_for_model: str                              # 10-300 chars, factual
     trigger_conditions: list[str]                       # 3-8 items, 10-200 chars each
     do_not_use_when: list[str]                          # 1-5 items
@@ -856,7 +867,7 @@ def validate_tool_manual(
 
     # ── string length checks ──
     for fld, mn, mx in [
-        ("job_to_be_done", 10, 500),
+        ("job_to_be_done", 10, 240),
         ("summary_for_model", 10, 300),
     ]:
         v = manual.get(fld)

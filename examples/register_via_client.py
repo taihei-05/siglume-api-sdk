@@ -35,7 +35,7 @@ def build_manifest() -> AppManifest:
             currency="USD",
             allow_free_trial=False,
         jurisdiction="US",
-        short_description="Search multiple retailers and summarize the best current price.",
+        short_description="Compare retailer prices before buying.",
         docs_url="https://github.com/taihei-05/siglume-api-sdk/blob/main/examples/register_via_client.py",
         support_contact="https://github.com/taihei-05/siglume-api-sdk/issues",
         example_prompts=[
@@ -96,19 +96,23 @@ def build_tool_manual() -> ToolManual:
 def build_runtime_validation() -> dict[str, object]:
     """Build the production runtime validation payload from explicit env vars."""
     public_base_url = os.environ.get("SIGLUME_RUNTIME_BASE_URL", "").strip().rstrip("/")
-    review_key = os.environ.get("SIGLUME_REVIEW_KEY", "").strip()
+    runtime_auth_secret = os.environ.get("SIGLUME_RUNTIME_AUTH_SECRET", "").strip()
     if not public_base_url:
         raise SystemExit("SIGLUME_RUNTIME_BASE_URL is required, for example https://api.your-domain.com")
-    if not review_key:
-        raise SystemExit("SIGLUME_REVIEW_KEY is required. Use a dedicated review/test secret, not an owner token.")
+    if not runtime_auth_secret:
+        raise SystemExit(
+            "SIGLUME_RUNTIME_AUTH_SECRET is required. Use a strong, dedicated "
+            "runtime auth secret (Siglume sends it on every invoke_url call, at "
+            "both registration validation and production runtime), not an owner token."
+        )
 
     return {
         "public_base_url": public_base_url,
         "healthcheck_url": os.environ.get("SIGLUME_HEALTHCHECK_URL", urljoin(f"{public_base_url}/", "health")),
         "invoke_url": os.environ.get("SIGLUME_INVOKE_URL", urljoin(f"{public_base_url}/", "v1/price-compare")),
         "invoke_method": "POST",
-        "test_auth_header_name": os.environ.get("SIGLUME_REVIEW_HEADER", "X-Siglume-Review-Key"),
-        "test_auth_header_value": review_key,
+        "runtime_auth_header_name": os.environ.get("SIGLUME_RUNTIME_AUTH_HEADER", "X-Siglume-Auth"),
+        "runtime_auth_header_value": runtime_auth_secret,
         "request_payload": {"query": "Sony WH-1000XM5", "max_results": 5},
         "expected_response_fields": ["summary", "offers", "best_offer"],
         "timeout_seconds": 10,

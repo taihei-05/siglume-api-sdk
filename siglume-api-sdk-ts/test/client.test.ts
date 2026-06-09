@@ -73,7 +73,7 @@ function buildManifest() {
     currency: "USD" as const,
     allow_free_trial: false,
     jurisdiction: "US",
-    short_description: "Search multiple retailers and summarize the best current price.",
+    short_description: "Compare retailer prices before buying.",
     description: "Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
     docs_url: "https://docs.example.com/price-compare",
     support_contact: "support@example.com",
@@ -134,6 +134,23 @@ function buildRuntimeValidation() {
     expected_response_fields: ["summary", "offers"],
   };
 }
+
+it("rejects listing text over public copy limits before auto-register", async () => {
+  const client = new SiglumeClient({
+    api_key: "sig_test_key",
+    fetch: async () => new Response(JSON.stringify(envelope({})), { status: 500 }),
+  });
+
+  await expect(
+    client.auto_register({ ...buildManifest(), short_description: "x".repeat(61) }, buildToolManual()),
+  ).rejects.toThrow("short_description");
+  await expect(
+    client.auto_register({ ...buildManifest(), job_to_be_done: "x".repeat(241) }, buildToolManual()),
+  ).rejects.toThrow("job_to_be_done");
+  await expect(
+    client.auto_register({ ...buildManifest(), description: "x".repeat(1001) }, buildToolManual()),
+  ).rejects.toThrow("description");
+});
 
 describe("SiglumeClient", () => {
   it("rejects JPY operation prices below the platform minimum before transport", async () => {

@@ -1,7 +1,8 @@
 # Partner And Ads Operations
 
 `SiglumeClient` exposes typed wrappers for the Partner and Ads owner-operation
-families that currently ride on the public owner-operation execute route.
+families. These wrappers target the owner-operation execute contract when that
+route is available in the platform environment.
 
 Covered today:
 
@@ -22,12 +23,20 @@ Transport note:
 - The SDK sends the exact registry key through
   `/v1/owner/agents/{agent_id}/operations/execute` and parses the typed result
   for you.
+- Treat this as an owner/session surface, not a generic publisher CLI
+  automation surface. If the production API you are calling does not expose
+  `/v1/owner/agents/{agent_id}/operations/execute`, these wrappers cannot run
+  against that environment.
 
 Agent resolution:
 
 - `agent_id` is optional on the typed wrappers.
 - When omitted, the SDK resolves the current owner agent via `/v1/me/agent` and
   uses that id as the execute-route target.
+- `/v1/me/agent` is a signed-in browser-session route. In owner-session
+  automation, pass `agent_id=...` explicitly instead of relying on the
+  omitted-agent lookup; publisher `SIGLUME_API_KEY` / `cli_...` tokens are not
+  the right credential for this owner surface.
 - If you already know which owned agent should scope the operation, pass
   `agent_id=...` explicitly to avoid the extra lookup.
 

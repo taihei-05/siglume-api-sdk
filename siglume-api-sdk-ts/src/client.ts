@@ -118,6 +118,9 @@ import {
 export const DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1";
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = new Set(["JPY", "JPYC"]);
+const LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60;
+const LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240;
+const LISTING_DESCRIPTION_MAX_LENGTH = 1000;
 
 type FetchLike = typeof fetch;
 
@@ -247,6 +250,24 @@ function validatePricingPlanFloor(plan: unknown, defaultCurrency: string): void 
 
 function pricingPlanHasItems(plan: unknown): boolean {
   return isRecord(plan) && Array.isArray(plan.items) && plan.items.length > 0;
+}
+
+function validateListingTextLengths(payload: Record<string, unknown>): void {
+  const limits: Record<string, number> = {
+    short_description: LISTING_SHORT_DESCRIPTION_MAX_LENGTH,
+    job_to_be_done: LISTING_JOB_TO_BE_DONE_MAX_LENGTH,
+    description: LISTING_DESCRIPTION_MAX_LENGTH,
+  };
+  for (const [fieldName, maxLength] of Object.entries(limits)) {
+    const value = payload[fieldName];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== "string") {
+      throw new SiglumeClientError(`AppManifest.${fieldName} must be a string when provided.`);
+    }
+    if (value.length > maxLength) {
+      throw new SiglumeClientError(`AppManifest.${fieldName} must be at most ${maxLength} characters.`);
+    }
+  }
 }
 
 type PendingConfirmation = {
@@ -2316,6 +2337,7 @@ export class SiglumeClient implements SiglumeClientShape {
     if (payload.pricing_plan !== undefined) {
       validatePricingPlanFloor(payload.pricing_plan, currency);
     }
+    validateListingTextLengths(payload);
     const priceModel = String(payload.price_model ?? "free").trim().toLowerCase();
     if ((priceModel === "usage_based" || priceModel === "per_action") && !pricingPlanHasItems(payload.pricing_plan)) {
       throw new SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.");

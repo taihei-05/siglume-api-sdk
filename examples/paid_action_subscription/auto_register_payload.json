@@ -145,8 +145,8 @@
     "healthcheck_url": "https://api.example.com/health",
     "invoke_url": "https://api.example.com/v1/growpost/draft",
     "invoke_method": "POST",
-    "test_auth_header_name": "X-Siglume-Review-Key",
-    "test_auth_header_value": "replace-with-dedicated-review-key",
+    "runtime_auth_header_name": "X-Siglume-Auth",
+    "runtime_auth_header_value": "replace-with-strong-random-runtime-auth-secret",
     "request_payload": {
       "topic": "Launch note for a new agent workflow",
       "tone": "concise",

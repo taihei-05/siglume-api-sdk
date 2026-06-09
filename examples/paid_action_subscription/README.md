@@ -34,13 +34,13 @@ Before you run the registration curl, replace every placeholder in
 | `runtime_validation.public_base_url` | Your public production API base URL. Do not use localhost, private IPs, or `example.com`. |
 | `runtime_validation.healthcheck_url` | A public `GET` endpoint that returns a healthy 2xx response. |
 | `runtime_validation.invoke_url` | The public endpoint Siglume should call for the validation request. |
-| `runtime_validation.test_auth_header_value` | A dedicated review/test secret accepted only by your validation runtime. |
+| `runtime_validation.runtime_auth_header_value` | The runtime auth header shared secret Siglume sends on every `invoke_url` call (registration validation AND production runtime). Use a strong, dedicated value; legacy alias `test_auth_header_value` is still accepted. |
 | `runtime_validation.request_payload` | The exact dry-run-safe JSON body Siglume should send. |
 | `runtime_validation.expected_response_fields` | Fields that your live JSON response returns and your Tool Manual `output_schema` declares. |
 
 Do not run the curl while `https://api.example.com`,
 `https://docs.example.com`, `support@example.com`, or
-`replace-with-dedicated-review-key` are still present. Also replace the
+`replace-with-strong-random-runtime-auth-secret` are still present. Also replace the
 example GitHub URLs, `growpost-*` keys, `GrowPost` copy, and `["growpost"]`
 connected-account placeholders unless this API really is a GrowPost
 integration.

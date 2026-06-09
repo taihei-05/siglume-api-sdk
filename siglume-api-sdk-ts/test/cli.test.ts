@@ -367,7 +367,7 @@ describe("siglume CLI", () => {
     expect(gitignoreText).toContain("runtime_validation.json");
     expect(readmeText).toContain("Start locally without a Siglume API key");
     expect(docsText).toContain("dedicated public usage guide");
-    expect(readmeText).toContain("Do not commit real review keys or external-provider secrets");
+    expect(readmeText).toContain("Do not commit the real runtime auth secret or external-provider secrets");
     expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(validatePayload.ok).toBe(true);
   });
@@ -497,7 +497,7 @@ describe("siglume CLI", () => {
     expect(readmeText).toContain("Replace `support_contact` with a real support email address");
     expect(readmeText).toContain("Start locally without a Siglume API key");
     expect(docsText).toContain("dedicated public usage guide");
-    expect(readmeText).toContain("Do not commit real review keys or external-provider secrets");
+    expect(readmeText).toContain("Do not commit the real runtime auth secret or external-provider secrets");
     expect(readmeText.indexOf("siglume score . --offline")).toBeLessThan(readmeText.indexOf("siglume validate ."));
     expect(readmeText.indexOf("npm test -- tests/test_adapter.ts")).toBeLessThan(
       readmeText.indexOf("siglume register ."),

@@ -11,10 +11,16 @@ Receipts help owners and operators answer:
 - what external action was taken
 - how to debug failures
 
-To view receipts after a run, use `siglume dev tail`, `siglume dev tail
---listing-id <listing_id>`, or the SDK helpers `list_execution_receipts()` and
-`list_listing_recent_receipts()`. Publisher listing receipts are
-privacy-redacted. See [Developer Observability](./developer-observability.md).
+To view receipts after a run, use the matching surface:
+
+- owner account runs: `siglume dev tail` or SDK `list_execution_receipts()`;
+  the SDK helper reads owner-scoped receipts and currently requires an
+  owner/session bearer, not a publisher CLI token.
+- publisher listing runs: `siglume dev tail --listing-id <listing_id>` or SDK
+  `list_listing_recent_receipts()`; this seller-scoped surface accepts the
+  publisher automation credential and returns privacy-redacted receipts.
+
+See [Developer Observability](./developer-observability.md).
 
 ## Two approaches: legacy and structured
 

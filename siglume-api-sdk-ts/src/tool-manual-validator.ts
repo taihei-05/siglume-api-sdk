@@ -136,7 +136,7 @@ export function validate_tool_manual(manualInput: ManualInput): [boolean, ToolMa
   }
 
   for (const [fieldName, minLength, maxLength] of [
-    ["job_to_be_done", 10, 500],
+    ["job_to_be_done", 10, 240],
     ["summary_for_model", 10, 300],
   ] as const) {
     const value = manual[fieldName];

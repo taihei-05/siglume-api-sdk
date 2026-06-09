@@ -50,7 +50,7 @@ function buildManifest() {
     allow_free_trial: false,
     price_value_minor: 0,
     jurisdiction: "US",
-    short_description: "Search multiple retailers and summarize the best current price.",
+    short_description: "Compare retailer prices before buying.",
     example_prompts: ["Compare prices for Sony WH-1000XM5."],
   };
 }

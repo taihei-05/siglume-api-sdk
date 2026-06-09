@@ -113,6 +113,7 @@ export interface AppManifest {
   capability_key: string;
   version?: string;
   name: string;
+  /** Buyer-facing task summary, max 240 characters. */
   job_to_be_done: string;
   category?: AppCategory;
   permission_class: PermissionClass;
@@ -130,7 +131,9 @@ export interface AppManifest {
   jurisdiction: string;
   applicable_regulations?: string[];
   data_residency?: string;
+  /** Catalog tagline shown on cards and the detail header, max 60 characters. */
   short_description?: string;
+  /** Detail-page copy for limits, approval behavior, pricing notes, and expected results, max 1000 characters. */
   description?: string;
   docs_url?: string;
   support_contact?: string;

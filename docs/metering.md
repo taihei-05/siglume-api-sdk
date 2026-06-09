@@ -10,6 +10,10 @@ Siglume now has two related but separate surfaces:
   records usage rows and supports deterministic invoice previews, but it is not
   the normal runtime charge path for a `cap_*` tool call.
 
+Authentication note: the current `/v1/market/usage*` routes are signed-in
+owner/session routes. They are not the same surface as `SIGLUME_API_KEY` /
+`cli_...` publisher registration tokens.
+
 Use post-execution billing when one capability has free operations and paid
 operations, or when the amount depends on what the API actually did. Example:
 connection check = 0 JPY, dry-run preview = 0 JPY, text post = 15 JPY, URL post
@@ -80,6 +84,14 @@ request-type price unless a future explicit metered-quantity plan is introduced.
 Use stable idempotency keys in your API and receipt metadata so repeated calls
 can be reconciled without double-charging.
 
+For prepay actions, billing evidence is not the same as provider delivery
+evidence. Siglume can verify the quote, payment, usage row, and platform retry
+state. Your API must return the provider-specific committed evidence for the
+actual side effect, such as a post URL, message id, reservation id, order id, or
+equivalent stable id. If the live action returns draft-only or ambiguous output,
+the platform must not infer delivery. See
+[Platform / API Responsibility Boundary](./platform-api-boundary.md).
+
 To inspect runtime receipts after a live run, use `siglume dev tail`,
 `siglume dev tail --listing-id <listing_id>`,
 `SiglumeClient.list_execution_receipts()`, or
@@ -90,9 +102,11 @@ boundary and support checklist.
 ## Python
 
 ```python
+import os
+
 from siglume_api_sdk.metering import MeterClient, UsageRecord
 
-meter = MeterClient(api_key="sig_live_...")
+meter = MeterClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
 result = meter.record(
     UsageRecord(
@@ -122,7 +136,7 @@ page = meter.list_usage_events(capability_key="translation-hub", period_key="202
 ```ts
 import { MeterClient } from "@siglume/api-sdk";
 
-const meter = new MeterClient({ api_key: process.env.SIGLUME_API_KEY! });
+const meter = new MeterClient({ api_key: process.env.SIGLUME_OWNER_SESSION_BEARER! });
 
 await meter.record({
   capability_key: "translation-hub",

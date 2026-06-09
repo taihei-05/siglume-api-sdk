@@ -58,7 +58,7 @@
     "job_to_be_done": {
       "type": "string",
       "minLength": 10,
-      "maxLength": 500,
+      "maxLength": 240,
       "description": "What this tool enables the agent to accomplish."
     },
     "summary_for_model": {

@@ -42,6 +42,9 @@ DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1"
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
 _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
+LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60
+LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240
+LISTING_DESCRIPTION_MAX_LENGTH = 1000
 T = TypeVar("T")
 
 
@@ -1443,6 +1446,7 @@ def _build_auto_register_request(
     payload["currency"] = currency
     if "pricing_plan" in payload:
         _validate_pricing_plan_floor(payload.get("pricing_plan"), default_currency=currency)
+    _validate_listing_text_lengths(payload)
     price_model = str(payload.get("price_model") or "free").strip().lower()
     if price_model in {"usage_based", "per_action"} and not _pricing_plan_has_items(payload.get("pricing_plan")):
         raise SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
@@ -1556,6 +1560,22 @@ def _validate_pricing_plan_floor(plan: Any, *, default_currency: str) -> None:
                 f"AppManifest.pricing_plan.items[{index}].price_minor must be 0 or at least "
                 f"{MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing."
             )
+
+
+def _validate_listing_text_lengths(payload: dict[str, Any]) -> None:
+    limits = {
+        "short_description": LISTING_SHORT_DESCRIPTION_MAX_LENGTH,
+        "job_to_be_done": LISTING_JOB_TO_BE_DONE_MAX_LENGTH,
+        "description": LISTING_DESCRIPTION_MAX_LENGTH,
+    }
+    for field_name, max_length in limits.items():
+        value = payload.get(field_name)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise SiglumeClientError(f"AppManifest.{field_name} must be a string when provided.")
+        if len(value) > max_length:
+            raise SiglumeClientError(f"AppManifest.{field_name} must be at most {max_length} characters.")
 
 
 def _pricing_plan_has_items(plan: Any) -> bool:

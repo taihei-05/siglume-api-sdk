@@ -100,7 +100,7 @@ function sampleValueForSchema(schema: Record<string, unknown>): unknown {
   }
 }
 
-function buildRuntimeValidationTemplate(toolManual: Record<string, unknown>): Record<string, unknown> {
+export function buildRuntimeValidationTemplate(toolManual: Record<string, unknown>): Record<string, unknown> {
   const inputSchema = isRecord(toolManual.input_schema) ? toolManual.input_schema : {};
   const properties = isRecord(inputSchema.properties) ? inputSchema.properties : {};
   const required = Array.isArray(inputSchema.required) ? inputSchema.required : [];
@@ -123,8 +123,12 @@ function buildRuntimeValidationTemplate(toolManual: Record<string, unknown>): Re
     healthcheck_url: "https://api.example.com/health",
     invoke_url: "https://api.example.com/invoke",
     invoke_method: "POST",
-    test_auth_header_name: "X-Siglume-Review-Key",
-    test_auth_header_value: "replace-with-dedicated-review-key",
+    // Shared secret Siglume attaches when it calls invoke_url at both
+    // registration validation and production runtime. Use a strong random
+    // value, keep it in the Git-ignored runtime_validation.json, and rotate it
+    // if it leaks. (legacy aliases: test_auth_header_name/value)
+    runtime_auth_header_name: "X-Siglume-Auth",
+    runtime_auth_header_value: "replace-with-strong-random-runtime-auth-secret",
     request_payload: requestPayload,
     expected_response_fields: expectedFields.length > 0 ? expectedFields : ["summary"],
     timeout_seconds: 10,
@@ -492,14 +496,12 @@ function looksLikeEmail(value: string): boolean {
   return normalized.includes("@") && !normalized.includes(" ") && domain.includes(".") && !normalized.startsWith("@");
 }
 
-function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): string[] {
+export function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): string[] {
   const issues: string[] = [];
   for (const fieldName of [
     "public_base_url",
     "healthcheck_url",
     "invoke_url",
-    "test_auth_header_name",
-    "test_auth_header_value",
     "expected_response_fields",
   ]) {
     if (!runtimeValidation[fieldName]) {
@@ -514,9 +516,24 @@ function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): s
     }
   }
 
-  const authValue = String(runtimeValidation.test_auth_header_value ?? "").trim();
+  // runtime_auth_header_* is the canonical runtime auth header — the shared
+  // secret Siglume sends on every invocation (registration validation AND
+  // production runtime). test_auth_header_* is the accepted legacy alias.
+  // Use `||` (not `??`) so an explicit empty-string new key falls back to a
+  // populated legacy key, matching the Python `or` resolution.
+  const authName = String(
+    runtimeValidation.runtime_auth_header_name || runtimeValidation.test_auth_header_name || "",
+  ).trim();
+  if (!authName) {
+    issues.push("runtime_validation.runtime_auth_header_name is required");
+  }
+  const authValue = String(
+    runtimeValidation.runtime_auth_header_value || runtimeValidation.test_auth_header_value || "",
+  ).trim();
   if (!authValue || authValue.startsWith("replace-with-")) {
-    issues.push("runtime_validation.test_auth_header_value must be a dedicated review secret, not a placeholder");
+    issues.push(
+      "runtime_validation.runtime_auth_header_value must be a strong, dedicated runtime auth secret, not a placeholder",
+    );
   }
 
   const requestPayload =
@@ -539,7 +556,7 @@ function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): s
 function ensureRuntimeValidationReady(project: LoadedProject): void {
   if (!project.runtime_validation) {
     throw new SiglumeProjectError(
-      "runtime_validation.json is required for `siglume register`. Create it with public_base_url, healthcheck_url, invoke_url, dedicated review auth header, request_payload, and expected_response_fields.",
+      "runtime_validation.json is required for `siglume register`. Create it with public_base_url, healthcheck_url, invoke_url, runtime auth header (runtime_auth_header_name/value), request_payload, and expected_response_fields.",
     );
   }
   const issues = runtimePlaceholderIssues(project.runtime_validation);
@@ -1335,19 +1352,19 @@ function operationReadmeTemplate(
     "- `stubs.ts`: mock fallback used when `SIGLUME_API_KEY` is not set",
     "- `manifest.json`: reviewable manifest snapshot",
     "- `tool_manual.json`: machine-generated ToolManual scaffold",
-    "- `runtime_validation.json`: local public endpoint and review-key checks used by auto-register",
+    "- `runtime_validation.json`: local public endpoint + runtime auth header checks used by auto-register",
     "- `docs/api-usage.md`: publishable API usage guide template for `docs_url`",
-    "- `.gitignore`: keeps runtime review keys out of Git",
+    "- `.gitignore`: keeps the runtime auth secret out of Git",
     "- `tests/test_adapter.ts`: smoke test for `AppTestHarness`",
     "",
     "Before registering, replace all generated placeholders:",
     "- In `adapter.ts` and `manifest.json`, replace `docs_url` with a dedicated public API usage guide, not a homepage.",
     "- Replace `support_contact` with a real support email address or public support URL.",
     "- Optional `seller_homepage_url` is the seller's official site and can stay blank.",
-    "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
+    "- In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).",
     "- If the API uses external OAuth, implement that flow in your API runtime and keep user tokens outside Siglume.",
-    "- Do not commit real review keys or external-provider secrets; the generated `.gitignore` excludes local secret files.",
-    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
+    "- Do not commit the real runtime auth secret or external-provider secrets; the generated `.gitignore` excludes local secret files.",
+    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.",
     "",
     "## Commands",
     "",
@@ -1422,7 +1439,7 @@ function apiUsageDocsTemplate(manifest: AppManifest): string {
 
 function generatedGitignore(): string {
   return [
-    "# Local secrets and registration-only runtime checks.",
+    "# Local secrets (incl. the runtime auth shared secret) and runtime checks.",
     ".env",
     ".env.*",
     "!.env.example",
@@ -1971,16 +1988,16 @@ function readmeTemplate(template: TemplateName): string {
     "- `tool_manual.json`: editable ToolManual draft for validation and registration",
     "- `runtime_validation.json`: local live API smoke-test contract used during registration",
     "- `docs/api-usage.md`: publish this page and use its public URL as `docs_url`",
-    "- `.gitignore`: keeps runtime review keys out of Git",
+    "- `.gitignore`: keeps the runtime auth secret out of Git",
     "",
     "Before registering, replace all generated placeholders:",
     "- In `adapter.ts` and `manifest.json`, replace `docs_url` with a dedicated public API usage guide, not a homepage.",
     "- Replace `support_contact` with a real support email address or public support URL.",
     "- Optional `seller_homepage_url` is the seller's official site and can stay blank.",
-    "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
+    "- In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).",
     "- If the API uses external OAuth, implement that flow in your API runtime and keep user tokens outside Siglume.",
-    "- Do not commit real review keys or external-provider secrets; the generated `.gitignore` excludes local secret files.",
-    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
+    "- Do not commit the real runtime auth secret or external-provider secrets; the generated `.gitignore` excludes local secret files.",
+    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.",
     "",
     "Suggested workflow:",
     "",
