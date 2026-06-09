@@ -48,12 +48,14 @@ siglume init \
 
 The Python CLI writes:
 
-- `adapter.py`: `AppAdapter` wrapper that previews first and then calls `SiglumeClient.execute_owner_operation()`
+- `adapter.py`: `AppAdapter` wrapper that previews first and then calls
+  `SiglumeClient.execute_owner_operation()` when the target platform
+  environment exposes the owner-operation execute route
 - `stubs.py`: fallback mock provider for local dry runs
 - `manifest.json`: serialized `AppManifest`
 - `tool_manual.json`: machine-generated `ToolManual`
-- `runtime_validation.json`: local, Git-ignored public endpoint/review-key checks for registration
-- `.gitignore`: excludes local review keys and runtime secrets
+- `runtime_validation.json`: local, Git-ignored public endpoint + runtime auth header checks for registration
+- `.gitignore`: excludes the local runtime auth secret and other runtime secrets
 - `README.md`: generated usage notes
 - `tests/test_adapter.py`: harness smoke test
 
@@ -73,5 +75,7 @@ The committed review samples live under [examples/generated](../examples/generat
 If the live owner-operation catalog is unavailable, the CLI prints a warning
 and uses the bundled fallback metadata. This keeps `siglume init` usable for
 offline work, but live catalog data remains the preferred source of truth for
-new platform operations.
+new platform operations. Generated wrappers are not proof that the current
+production API exposes `/v1/owner/agents/{agent_id}/operations/execute`; verify
+that route before relying on a generated wrapper outside local tests.
 

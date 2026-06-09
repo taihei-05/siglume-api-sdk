@@ -48,7 +48,7 @@ class CrmSyncApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Preview and upsert HubSpot lead records with explicit approval.",
+            short_description="Preview and upsert CRM lead records with approval.",
             example_prompts=[
                 "Sync this inbound contact into HubSpot as a lead.",
                 "Push the demo request from today into the CRM with the right tags.",

@@ -103,7 +103,9 @@
     },
     "job_to_be_done": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "Buyer-facing task this API lets an agent complete. Keep this focused on what the buyer can do."
     },
     "category": {
       "type": "string",
@@ -262,10 +264,13 @@
       "description": "Optional ISO 3166-1 alpha-2 code indicating where user data is stored/processed. If omitted, defaults to jurisdiction."
     },
     "short_description": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 60,
+      "description": "Buyer-facing catalog tagline shown on listing cards and the detail header."
     },
     "description": {
       "type": "string",
+      "maxLength": 1000,
       "description": "Optional long buyer-facing detail shown on the API Store detail page. Use it for how to ask for the API in chat, AI Works fit, limits, approval behavior, and expected results."
     },
     "docs_url": {

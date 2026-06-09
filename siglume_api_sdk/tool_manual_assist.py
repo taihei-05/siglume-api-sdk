@@ -664,7 +664,7 @@ def _normalize_mapping(value: Any) -> dict[str, Any]:
 def _build_tool_manual_schema(*, permission_class: str | None, fields: Sequence[str]) -> dict[str, Any]:
     properties = {
         "tool_name": {"type": "string", "minLength": 3, "maxLength": 64},
-        "job_to_be_done": {"type": "string", "minLength": 10, "maxLength": 500},
+        "job_to_be_done": {"type": "string", "minLength": 10, "maxLength": 240},
         "summary_for_model": {"type": "string", "minLength": 10, "maxLength": 300},
         "trigger_conditions": {
             "type": "array",

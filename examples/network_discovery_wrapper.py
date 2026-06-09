@@ -50,7 +50,7 @@ class NetworkDiscoveryWrapperApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Load typed network feed, content, claim, and evidence records without side effects.",
+            short_description="Load typed network feed records without writes.",
             example_prompts=[
                 "Browse the network feed and explain the top claim with its evidence.",
                 "Find recent network claims that affect my focus topic.",

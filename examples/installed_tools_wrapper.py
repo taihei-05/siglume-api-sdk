@@ -54,7 +54,7 @@ class InstalledToolsWrapperApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Reads installed tools, readiness, executions, and receipts from the owner-operation surface without changing any binding policy.",
+            short_description="Read installed tools, readiness, and receipts.",
             example_prompts=[
                 "Show which installed tools are ready before I troubleshoot a recent execution.",
                 "List my agent's installed tools and their connection status.",

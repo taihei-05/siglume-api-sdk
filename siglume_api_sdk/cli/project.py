@@ -402,8 +402,12 @@ def _build_runtime_validation_template(tool_manual: dict[str, Any]) -> dict[str,
         "healthcheck_url": "https://api.example.com/health",
         "invoke_url": "https://api.example.com/invoke",
         "invoke_method": "POST",
-        "test_auth_header_name": "X-Siglume-Review-Key",
-        "test_auth_header_value": "replace-with-dedicated-review-key",
+        # Shared secret Siglume attaches when it calls invoke_url at both
+        # registration validation and production runtime. Use a strong random
+        # value, keep it in the Git-ignored runtime_validation.json, and rotate
+        # it if it leaks. (legacy aliases: test_auth_header_name/value)
+        "runtime_auth_header_name": "X-Siglume-Auth",
+        "runtime_auth_header_value": "replace-with-strong-random-runtime-auth-secret",
         "request_payload": request_payload,
         "expected_response_fields": expected_fields,
         "timeout_seconds": 10,
@@ -924,19 +928,19 @@ def _operation_readme_template(operation: OperationMetadata, manifest: AppManife
             "- `stubs.py`: mock fallback used when `SIGLUME_API_KEY` is not set",
             "- `manifest.json`: reviewable manifest snapshot",
             "- `tool_manual.json`: machine-generated ToolManual scaffold",
-            "- `runtime_validation.json`: local public endpoint and review-key checks used by auto-register",
+            "- `runtime_validation.json`: local public endpoint + runtime auth header checks used by auto-register",
             "- `docs/api-usage.md`: publishable API usage guide template for `docs_url`",
-            "- `.gitignore`: keeps runtime review keys out of Git",
+            "- `.gitignore`: keeps the runtime auth secret out of Git",
             "- `tests/test_adapter.py`: smoke test for `AppTestHarness`",
             "",
             "Before registering, replace all generated placeholders:",
             "- In `adapter.py` and `manifest.json`, replace `docs_url` with a dedicated public API usage guide, not a homepage.",
             "- Replace `support_contact` with a real support email address or public support URL.",
             "- Optional `seller_homepage_url` is the seller's official site and can stay blank.",
-            "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
+            "- In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).",
             "- If the API uses external OAuth, implement that flow in your API runtime and keep user tokens outside Siglume.",
-            "- Do not commit real review keys or external-provider secrets; the generated `.gitignore` excludes local secret files.",
-            "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
+            "- Do not commit the real runtime auth secret or external-provider secrets; the generated `.gitignore` excludes local secret files.",
+            "- Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.",
             "",
             "## Commands",
             "",
@@ -1037,7 +1041,7 @@ def _api_usage_docs_template(manifest: AppManifest) -> str:
 def _generated_gitignore() -> str:
     return "\n".join(
         [
-            "# Local secrets and registration-only runtime checks.",
+            "# Local secrets (incl. the runtime auth shared secret) and runtime checks.",
             ".env",
             ".env.*",
             "!.env.example",
@@ -1424,8 +1428,6 @@ def _runtime_placeholder_issues(runtime_validation: dict[str, Any]) -> list[str]
         "public_base_url",
         "healthcheck_url",
         "invoke_url",
-        "test_auth_header_name",
-        "test_auth_header_value",
         "expected_response_fields",
     )
     for field_name in required_fields:
@@ -1437,9 +1439,26 @@ def _runtime_placeholder_issues(runtime_validation: dict[str, Any]) -> list[str]
         if _looks_like_placeholder(value):
             issues.append(f"runtime_validation.{field_name} must be replaced with your public production URL")
 
-    auth_value = str(runtime_validation.get("test_auth_header_value") or "").strip()
+    # runtime_auth_header_* is the canonical runtime auth header — the shared
+    # secret Siglume sends on every invocation (registration validation AND
+    # production runtime). test_auth_header_* is the accepted legacy alias.
+    auth_name = str(
+        runtime_validation.get("runtime_auth_header_name")
+        or runtime_validation.get("test_auth_header_name")
+        or ""
+    ).strip()
+    if not auth_name:
+        issues.append("runtime_validation.runtime_auth_header_name is required")
+    auth_value = str(
+        runtime_validation.get("runtime_auth_header_value")
+        or runtime_validation.get("test_auth_header_value")
+        or ""
+    ).strip()
     if not auth_value or auth_value.startswith("replace-with-"):
-        issues.append("runtime_validation.test_auth_header_value must be a dedicated review secret, not a placeholder")
+        issues.append(
+            "runtime_validation.runtime_auth_header_value must be a strong, "
+            "dedicated runtime auth secret, not a placeholder"
+        )
 
     request_payload = runtime_validation.get("request_payload")
     if request_payload is None:
@@ -1464,7 +1483,8 @@ def _ensure_runtime_validation_ready(project: LoadedProject) -> None:
         raise click.ClickException(
             "runtime_validation.json is required for `siglume register`. "
             "Create it with your public_base_url, healthcheck_url, invoke_url, "
-            "dedicated review auth header, request_payload, and expected_response_fields."
+            "runtime auth header (runtime_auth_header_name/value), request_payload, "
+            "and expected_response_fields."
         )
     issues = _runtime_placeholder_issues(project.runtime_validation)
     if issues:
@@ -1952,16 +1972,16 @@ def _readme_template(template: str) -> str:
         - `tool_manual.json`: editable ToolManual draft for validation and registration
         - `runtime_validation.json`: local live API smoke-test contract used during registration
         - `docs/api-usage.md`: publish this page and use its public URL as `docs_url`
-        - `.gitignore`: keeps runtime review keys out of Git
+        - `.gitignore`: keeps the runtime auth secret out of Git
 
         Before registering, replace all generated placeholders:
         - In `adapter.py` and `manifest.json`, replace `docs_url` with a dedicated public API usage guide, not a homepage.
         - Replace `support_contact` with a real support email address or public support URL.
         - Optional `seller_homepage_url` is the seller's official site and can stay blank.
-        - In the local `runtime_validation.json`, replace the public URL and review-key placeholders.
+        - In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).
         - If the API uses external OAuth, implement that flow in your API runtime and keep user tokens outside Siglume.
-        - Do not commit real review keys or external-provider secrets; the generated `.gitignore` excludes local secret files.
-        - Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.
+        - Do not commit the real runtime auth secret or external-provider secrets; the generated `.gitignore` excludes local secret files.
+        - Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.
 
         Suggested workflow:
 

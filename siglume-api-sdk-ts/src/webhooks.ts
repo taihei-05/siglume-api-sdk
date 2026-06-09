@@ -17,6 +17,11 @@ export const WEBHOOK_EVENT_TYPES = [
   "capability.delisted",
   "execution.completed",
   "execution.failed",
+  "reward_payout.created",
+  "reward_payout.provider_pending",
+  "reward_paid",
+  "reward_payout.failed",
+  "reward_payout.cancelled",
 ] as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
@@ -119,6 +124,21 @@ export interface ExecutionFailedEventData extends ExecutionCompletedEventData {
   reason?: string;
 }
 
+export interface RewardPayoutEventData extends Record<string, unknown> {
+  reward_payout_request_id?: string;
+  app_id?: string;
+  developer_id?: string;
+  recipient_subject?: string;
+  amount_minor?: number;
+  display_currency?: string;
+  token_symbol?: string;
+  reward_event_id?: string;
+  status?: string;
+  tx_hash?: string | null;
+  failure_code?: string | null;
+  failure_reason?: string | null;
+}
+
 export interface SubscriptionCreatedEvent extends WebhookEventBase<"subscription.created", SubscriptionLifecycleEventData> {}
 export interface SubscriptionRenewedEvent extends WebhookEventBase<"subscription.renewed", SubscriptionLifecycleEventData> {}
 export interface SubscriptionCancelledEvent extends WebhookEventBase<"subscription.cancelled", SubscriptionLifecycleEventData> {}
@@ -130,6 +150,11 @@ export interface CapabilityPublishedEvent extends WebhookEventBase<"capability.p
 export interface CapabilityDelistedEvent extends WebhookEventBase<"capability.delisted", CapabilityEventData> {}
 export interface ExecutionCompletedEvent extends WebhookEventBase<"execution.completed", ExecutionCompletedEventData> {}
 export interface ExecutionFailedEvent extends WebhookEventBase<"execution.failed", ExecutionFailedEventData> {}
+export interface RewardPayoutCreatedEvent extends WebhookEventBase<"reward_payout.created", RewardPayoutEventData> {}
+export interface RewardPayoutProviderPendingEvent extends WebhookEventBase<"reward_payout.provider_pending", RewardPayoutEventData> {}
+export interface RewardPaidEvent extends WebhookEventBase<"reward_paid", RewardPayoutEventData> {}
+export interface RewardPayoutFailedEvent extends WebhookEventBase<"reward_payout.failed", RewardPayoutEventData> {}
+export interface RewardPayoutCancelledEvent extends WebhookEventBase<"reward_payout.cancelled", RewardPayoutEventData> {}
 
 export type SiglumeWebhookEvent =
   | SubscriptionCreatedEvent
@@ -142,7 +167,12 @@ export type SiglumeWebhookEvent =
   | CapabilityPublishedEvent
   | CapabilityDelistedEvent
   | ExecutionCompletedEvent
-  | ExecutionFailedEvent;
+  | ExecutionFailedEvent
+  | RewardPayoutCreatedEvent
+  | RewardPayoutProviderPendingEvent
+  | RewardPaidEvent
+  | RewardPayoutFailedEvent
+  | RewardPayoutCancelledEvent;
 
 export interface QueuedWebhookEvent {
   queued: boolean;

@@ -67,6 +67,22 @@ flows. See [Pricing And Billing](./pricing-and-billing.md).
 | `pricing_plan` | Buyer-facing operation price table for `usage_based` / `per_action`. |
 | `billing_timing` | `"post"` by default; use `"prepay"` to quote and collect payment before irreversible actions. |
 
+## Platform / API boundary
+
+Siglume owns platform concerns: authorization, scheduled tokens, payment
+requirements, price lookup, charge state, usage rows, idempotency, retry state,
+and reconciliation state. Your API owns product-specific behavior and
+external-provider side effects. The platform does not infer whether an X post,
+email, CRM write, booking, purchase, or other provider-specific action
+happened.
+
+For action/payment APIs, the API response is the delivery contract. Return
+committed evidence only after the live action committed, and make retries with
+the same token or idempotency key return the same provider id/URL without
+duplicating the side effect. Draft-only, preview, ambiguous, failed, or
+`status="ready"` results are not delivered results. See
+[Platform / API Responsibility Boundary](./platform-api-boundary.md).
+
 ## Tool manual
 
 | Component | What it does |
@@ -80,8 +96,8 @@ flows. See [Pricing And Billing](./pricing-and-billing.md).
 
 ### MCP file inputs
 
-If your API needs to receive images or other files from an external MCP agent,
-declare the corresponding `input_schema` property as a Siglume handle:
+If your API needs to receive media or files from an external MCP agent, declare
+the corresponding `input_schema` property as a Siglume handle:
 
 ```json
 {
@@ -157,6 +173,7 @@ your `execute()`; skip it otherwise.
 
 - [Getting Started](../GETTING_STARTED.md) - end-to-end build, validate, and register flow
 - [Pricing And Billing](./pricing-and-billing.md) - free, subscription, operation plans, and prepay billing
+- [Platform / API Responsibility Boundary](./platform-api-boundary.md) - what Siglume owns vs what your API owns
 - [Developer Observability](./developer-observability.md) - logs, receipts, listing activity, and support identifiers
 - [Permission Scopes](./permission-scopes.md) - how to choose the minimum safe tier
 - [Dry Run and Approval](./dry-run-and-approval.md) - safe execution for `ACTION` / `PAYMENT` tiers

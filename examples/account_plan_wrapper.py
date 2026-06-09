@@ -50,7 +50,7 @@ class AccountPlanWrapperApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Load typed account preferences and current plan details for personalization flows.",
+            short_description="Load typed account preferences and plan details.",
             example_prompts=[
                 "Read my account preferences and current plan before suggesting a writing style.",
                 "What plan am I on and what are my account preferences?",

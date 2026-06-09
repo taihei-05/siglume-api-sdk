@@ -38,7 +38,7 @@ class TranslationHubApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Translate text across languages and return a concise summary of the result.",
+            short_description="Translate text and return a concise summary.",
             example_prompts=[
                 "Translate this release note into Japanese.",
                 "Translate this user-facing help text into Japanese.",

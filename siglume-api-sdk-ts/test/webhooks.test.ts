@@ -70,6 +70,29 @@ describe("webhooks", () => {
     expect(parsed.data.subscription_id).toBe("sub_demo_123");
   });
 
+  it("parses reward_paid webhook events", () => {
+    const event = {
+      ...buildEvent("reward_paid"),
+      data: {
+        reward_payout_request_id: "rpr_demo_123",
+        app_id: "x-poster-api",
+        recipient_subject: "siglume_user:user_recipient",
+        amount_minor: 300,
+        display_currency: "JPY",
+        token_symbol: "JPYC",
+        reward_event_id: "reward_evt_001",
+        status: "paid",
+      },
+    };
+
+    const parsed = parse_webhook_event(event);
+
+    expect(parsed.type).toBe("reward_paid");
+    if (parsed.type === "reward_paid") {
+      expect(parsed.data.reward_payout_request_id).toBe("rpr_demo_123");
+    }
+  });
+
   it("dispatches once and marks replayed idempotency keys as duplicate", async () => {
     const event = buildEvent();
     const rawBody = JSON.stringify(event);

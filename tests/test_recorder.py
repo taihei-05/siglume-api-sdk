@@ -53,7 +53,7 @@ def build_manifest() -> dict[str, object]:
         "currency": "USD",
         "allow_free_trial": False,
         "jurisdiction": "US",
-        "short_description": "Search multiple retailers and summarize the best current price.",
+        "short_description": "Compare retailer prices before buying.",
         "example_prompts": ["Compare prices for Sony WH-1000XM5."],
     }
 

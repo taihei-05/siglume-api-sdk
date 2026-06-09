@@ -136,12 +136,17 @@ export function validate_tool_manual(manualInput: ManualInput): [boolean, ToolMa
   }
 
   for (const [fieldName, minLength, maxLength] of [
-    ["job_to_be_done", 10, 500],
+    ["job_to_be_done", 10, 240],
     ["summary_for_model", 10, 300],
   ] as const) {
     const value = manual[fieldName];
-    if (typeof value === "string" && (value.length < minLength || value.length > maxLength)) {
-      pushError("INVALID_TYPE", `${fieldName} must be ${minLength}-${maxLength} characters`, fieldName);
+    if (typeof value === "string") {
+      // Count Unicode code points, not UTF-16 code units, to match the Python
+      // validator / OpenAPI limits for non-BMP text (emoji).
+      const length = Array.from(value).length;
+      if (length < minLength || length > maxLength) {
+        pushError("INVALID_TYPE", `${fieldName} must be ${minLength}-${maxLength} characters`, fieldName);
+      }
     }
   }
 

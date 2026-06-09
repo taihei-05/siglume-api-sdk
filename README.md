@@ -87,6 +87,13 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 > Siglume handle in `input_schema`; the MCP Gateway brokers inline base64 to
 > your API without storing, hosting, scanning, or classifying the file. See
 > [SDK Core Concepts](./docs/sdk-core-concepts.md#mcp-file-inputs).
+> For developer-funded reward or incentive payouts, do not call MCP Gateway
+> with `SIGLUME_API_KEY` / `cli_...` or API-key headers. Reward payout
+> execution uses `https://mcp.siglume.com/` with
+> `Authorization: Bearer mcpsk_...` and
+> `tools/call market_create_reward_payout`; SDK/API keys remain for
+> registration, validation, and listing automation. See
+> [Web3 Settlement](./docs/web3-settlement.md#generic-reward-payouts).
 > To inspect runtime logs, receipts, and seller-side listing evidence, see
 > [docs/developer-observability.md](./docs/developer-observability.md).
 
@@ -260,8 +267,9 @@ No permission needed. No issue to claim. Just build and register.
 - Paid company listings require the company's verified settlement wallet.
   Siglume will not fall back to the registrant's personal payout wallet.
 - Draft creation now requires runtime validation inputs for a live public API:
-  public base URL, healthcheck URL, functional test URL, a dedicated review/test
-  key, a sample request payload, and expected response fields.
+  public base URL, healthcheck URL, functional test URL, the runtime auth header
+  shared secret (`runtime_auth_header_name` / `runtime_auth_header_value`), a
+  sample request payload, and expected response fields.
 - External OAuth APIs must be publisher-managed:
   - declare the provider in `required_connected_accounts` with `managed_by: "api", connect_url: "https://api.example.com/oauth/start"`
   - implement authorization, token storage, refresh, revocation, and user-to-token mapping in the publisher API
@@ -298,7 +306,7 @@ siglume init --template price-compare
 siglume test .
 siglume score . --offline
 
-# deploy the real API, then edit the local runtime_validation.json with your public URL and review/test key
+# deploy the real API, then edit the local runtime_validation.json with your public URL and runtime auth header secret
 # if the API uses external OAuth, implement it in the publisher API and declare managed_by="api" with connect_url
 # issue SIGLUME_API_KEY from Developer Portal -> CLI / API keys, or configure ~/.siglume/credentials.toml
 siglume validate .
@@ -387,6 +395,15 @@ ACTION endpoint with the same token as `commit_token`. If payment fails, the
 ACTION call is never made. Keep the default `billing_timing="post"` only for
 read-only or reversible usage where execute-then-settle is acceptable.
 
+Responsibility boundary: Siglume owns payment, authorization, idempotency,
+scheduled/retry state, usage rows, and reconciliation state. Your API owns the
+product-specific side effect and the provider-specific proof that it committed.
+The platform does not infer whether an X post, email, CRM write, booking, or
+other external action happened. The live action response must return committed
+evidence only after the side effect committed; draft-only, preview, ambiguous,
+or `status="ready"` results are not delivered results. See
+[docs/platform-api-boundary.md](./docs/platform-api-boundary.md).
+
 Use `pricing_plan` to show buyer-facing operation prices in API Store and Game
 API Store. `pricing_plan.items` is required for `usage_based` and `per_action`
 listings:
@@ -440,6 +457,13 @@ description that agents use to decide whether to call your API.
 
 **If your API's functionality is not described in the tool manual,
 agents will never select it — even if the API works perfectly.**
+
+Buyer-facing listing copy is separate from the Tool Manual. Keep the public
+API Store text short and role-specific: `short_description` is a tagline shown
+on cards and the detail header (max 60 characters), `job_to_be_done` explains
+what the buyer can accomplish (max 240 characters), and long-form
+`description` is for limits, approval behavior, pricing notes, and expected
+results (max 1000 characters). Put anything longer in `docs_url`.
 
 Your tool manual is scored 0-100 (grade A-F). **Minimum grade B is required to publish** (C/D/F are blocked and must be improved).
 
@@ -597,7 +621,7 @@ siglume register .
 siglume register . --draft-only
 ```
 
-Or generate a wrapper directly from a first-party owner operation:
+Or generate a local wrapper scaffold from first-party owner-operation metadata:
 
 ```bash
 siglume init --list-operations
@@ -656,8 +680,11 @@ search, synthesized tool metadata, and mock-friendly invocation wiring.
 
 ## Agent behavior operations
 
-Use the owner-operation surface when you need to inspect or tune an agent's
-charter, approval policy, or delegated budget from external tooling.
+Use owner-operation helpers when you need to inspect or tune an agent's
+charter, approval policy, or delegated budget from authenticated owner-session
+tooling. Some generated wrappers depend on
+`/v1/owner/agents/{agent_id}/operations/execute`; verify that route exists in
+the target platform environment before relying on them outside local tests.
 
 - Python example: [examples/agent_behavior_adapter.py](./examples/agent_behavior_adapter.py)
 - TypeScript example: [examples-ts/agent_behavior_adapter.ts](./examples-ts/agent_behavior_adapter.ts)
@@ -763,8 +790,9 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
-| [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
+| [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers from live or bundled owner-operation metadata |
 | [Metering](docs/metering.md) | Implement free-upfront usage/per-action billing and record usage-event analytics |
+| [Platform / API Responsibility Boundary](docs/platform-api-boundary.md) | Understand what Siglume owns vs what your API owns for payment, retries, and side effects |
 | [Developer Observability](docs/developer-observability.md) | Inspect runtime logs, receipts, listing activity, and support identifiers |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |

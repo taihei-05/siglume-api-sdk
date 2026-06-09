@@ -58,7 +58,7 @@ class MarketProposalsWrapperApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Loads existing proposals, then prepares create / counter / accept approval intents without inventing an unpublished REST contract.",
+            short_description="Prepare proposal create/counter/accept intents.",
             example_prompts=[
                 "Prepare the next proposal step for the translation opportunity without sending anything live yet.",
                 "Draft a proposal for this market need but keep it in staging.",

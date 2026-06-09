@@ -100,7 +100,7 @@ def test_package_runtime_versions_match_release_metadata() -> None:
     python_version = str(pyproject["project"]["version"])
     ts_version = str(package_json["version"])
 
-    assert python_version == "1.2.2"
+    assert python_version == "2.0.0"
     assert ts_version == python_version
     assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
     assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
@@ -197,6 +197,28 @@ def test_auto_register_docs_keep_localization_platform_generated() -> None:
     assert "additionalProperties: false" in docs
 
 
+def test_listing_text_limits_are_documented_and_schema_enforced() -> None:
+    docs = "\n".join(
+        [
+            _read("README.md"),
+            _read("GETTING_STARTED.md"),
+            _read("docs/publish-flow.md"),
+            _read("openapi/developer-surface.yaml"),
+        ]
+    )
+    manifest_schema = json.loads(_read("schemas/app-manifest.schema.json"))
+    tool_manual_schema = json.loads(_read("schemas/tool-manual.schema.json"))
+
+    assert "`short_description` is a tagline" in docs
+    assert "max 60 characters" in docs
+    assert "max 240 characters" in docs
+    assert "max 1000 characters" in docs
+    assert manifest_schema["properties"]["short_description"]["maxLength"] == 60
+    assert manifest_schema["properties"]["job_to_be_done"]["maxLength"] == 240
+    assert manifest_schema["properties"]["description"]["maxLength"] == 1000
+    assert tool_manual_schema["properties"]["job_to_be_done"]["maxLength"] == 240
+
+
 def test_docs_do_not_advertise_unsupported_connected_account_families() -> None:
     connected_accounts = _read("docs/connected-accounts.md")
 
@@ -252,7 +274,9 @@ def test_pricing_docs_match_live_operation_billing_contract() -> None:
             _read("docs/dry-run-and-approval.md"),
             _read("docs/execution-receipts.md"),
             _read("docs/metering.md"),
+            _read("docs/platform-api-boundary.md"),
             _read("docs/publish-flow.md"),
+            _read("docs/coding-agent-guide.md"),
             _read("siglume-api-sdk-ts/README.md"),
         ]
     )
@@ -272,6 +296,14 @@ def test_pricing_docs_match_live_operation_billing_contract() -> None:
     assert "draftToken" in docs
     assert "at least `15`" in docs
     assert "does not automatically refund a confirmed payment" in normalized_docs
+    assert "Platform / API Responsibility Boundary" in docs
+    assert "Siglume owns payment, authorization" in docs
+    assert "Your API owns the external" in docs
+    assert "does not inspect or infer product-specific delivery" in docs
+    assert "`status=\"ready\"`" in docs
+    assert "not delivered results" in docs
+    assert "committed provider evidence" in docs
+    assert "same committed provider id" in docs
     assert "Do not describe a `usage_based` or `per_action` listing as free just because" in docs
     assert schema["properties"]["billing_timing"]["enum"] == ["post", "prepay"]
 
@@ -286,6 +318,7 @@ def test_developer_observability_docs_explain_logs_receipts_and_privacy() -> Non
             _read("docs/execution-receipts.md"),
             _read("docs/installed-tools-operations.md"),
             _read("docs/metering.md"),
+            _read("docs/platform-api-boundary.md"),
             _read("docs/publish-flow.md"),
             _read("siglume-api-sdk-ts/README.md"),
         ]
@@ -307,6 +340,9 @@ def test_developer_observability_docs_explain_logs_receipts_and_privacy() -> Non
     assert "privacy-redacted" in docs
     assert "buyer prompts" in docs
     assert "Receipts are evidence, not a second pricing system." in docs
+    assert "provider-side committed evidence" in docs
+    assert "platform support can verify authorization, quote scope, charge state" in docs
+    assert "publisher support must verify provider-specific delivery" in docs
 
     assert "def tail" in cli
     assert "--listing-id" in cli

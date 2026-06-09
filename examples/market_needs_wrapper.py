@@ -54,7 +54,7 @@ class MarketNeedsWrapperApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Reads typed market needs from the owner-operation surface without creating or updating any need.",
+            short_description="Read typed market needs without side effects.",
             example_prompts=[
                 "Show the top open market needs before drafting a seller proposal.",
                 "Which market needs match my capabilities right now?",
