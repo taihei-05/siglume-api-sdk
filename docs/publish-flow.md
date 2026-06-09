@@ -77,7 +77,7 @@ There is no normal human review step in the self-serve publish flow anymore.
    The **Tool Manual quality scorer** (grade A–F, minimum B to publish) used at this step is also published as open source — see [`siglume-agent-core.tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01). The same scoring code runs in this preflight check and locally; you can predict your grade before `auto-register` ever runs.
 4. Runs a mandatory fail-closed LLM legal review on the submitted package.
 5. Verifies the public API is reachable from the internet.
-6. Sends a functional test request using your dedicated review/test key.
+6. Sends a functional test request using your runtime auth header shared secret.
 7. Verifies the runtime sample request / response against the declared
    `input_schema` and `output_schema`.
  8. Checks connected-account requirements, paid pricing rules, operation
@@ -176,7 +176,7 @@ preflight errors before calling `auto-register`.
   - `public_base_url`
   - `healthcheck_url` (Siglume calls this with `GET`)
   - `invoke_url` (Siglume calls this with `invoke_method`, default `POST`)
-  - dedicated review/test auth header name + value
+  - runtime auth header shared secret (`runtime_auth_header_name` / `runtime_auth_header_value`)
   - sample request payload in `request_payload`
   - expected response fields
 - For OAuth-backed APIs:
@@ -187,8 +187,12 @@ preflight errors before calling `auto-register`.
 - Plain provider strings such as `"slack"` mean the API manages that auth path itself.
 - Listing metadata such as:
   - `name`
-  - `job_to_be_done`
-  - `short_description`
+  - `short_description` — buyer-facing catalog tagline, max 60 characters.
+  - `job_to_be_done` — what the buyer can accomplish with this API, max 240
+    characters.
+  - optional `description` — detail-page copy for limits, approval behavior,
+    pricing notes, and expected results, max 1000 characters. Put longer usage
+    guidance in `docs_url`.
   - `category`
   - `docs_url` — a public API usage guide for this listing. It must explain
     what the API does, required inputs, connected-account requirements, limits,
@@ -240,6 +244,10 @@ preflight errors before calling `auto-register`.
     be at least `15` minor units
   - use `billing_timing="prepay"` for irreversible actions that must not run
     before payment succeeds
+  - keep the platform/API responsibility boundary strict: Siglume owns payment,
+    platform idempotency, retry, and reconciliation state; your API owns the
+    provider-specific side effect and committed evidence. See
+    [`platform-api-boundary.md`](./platform-api-boundary.md).
 - For paid APIs, `AppManifest.allow_free_trial` must be explicitly set to
   `true` or `false`. When true, Plus/Pro buyers can start one lifetime trial
   per listing, subject to their monthly trial quota; `free_trial_duration_days`
@@ -272,7 +280,7 @@ The intended advanced flow is:
    - docs
    - manifest hints
    - Tool Manual files
-   - deployment endpoints and review/test key settings
+   - deployment endpoints and runtime auth header secret settings
    - external OAuth `connect_url` metadata when the API requires it
 3. It generates the registration payload.
 4. If only one language is present in the buyer-facing listing text
@@ -375,6 +383,20 @@ In the SDK and CLI today, this value is sent as a bearer token in the
 - `SIGLUME_API_KEY` authenticates the API Store registration flow
 - `X-Ingest-Key` authenticates `/v1/ingest/*` source-ingest endpoints
 - do not use `X-Ingest-Key` for `auto-register`
+
+`SIGLUME_API_KEY` is also **not** an MCP Gateway token.
+
+- `SIGLUME_API_KEY` / `cli_...` is for SDK, CLI, and Developer Surface
+  automation such as registration, validation, and webhook subscription
+  management.
+- MCP Gateway calls such as `initialize`, `tools/list`, and
+  `tools/call market_create_reward_payout` require
+  `Authorization: Bearer mcpsk_...` or an OAuth-issued `mcpoa_...` token.
+- `X-API-Key`, `X-Siglume-API-Key`, and `cli_...` bearer tokens are rejected by
+  `https://mcp.siglume.com/`.
+- An `mcpsk_...` token is issued for a specific agent from the Developer
+  Portal MCP key flow. The `agent_id` is needed at token issuance time, not as
+  a `market_create_reward_payout` argument.
 
 ## What the portal is for now
 

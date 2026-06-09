@@ -14,7 +14,7 @@ Before a listing can publish, make sure you have all of these artifacts:
 |---|---:|---|
 | `adapter.py` or `adapter.ts` | Yes | The deployed API implementation. |
 | `tool_manual.json` | Yes | Agent-facing contract. A preview score of 100 only covers this quality surface. |
-| `runtime_validation.json` | Yes | Local, Git-ignored live endpoint check with public URLs, review/test auth header, sample request, and expected response fields. |
+| `runtime_validation.json` | Yes | Local, Git-ignored live endpoint check with public URLs, the runtime auth header shared secret, sample request, and expected response fields. |
 | `docs_url` | Yes | Dedicated API usage guide. Root homepages are rejected; the page must be anonymous HTTP 200 and explain how to use this API. |
 | `support_contact` | Yes | Real support email address or public support URL. |
 | `seller_homepage_url` | No | Official seller/company URL. Helpful for buyers, but not a publish blocker. |
@@ -141,9 +141,9 @@ my-awesome-app/
 ├── adapter.py               # Your API (subclasses AppAdapter)
 ├── manifest.json            # Serialized AppManifest snapshot
 ├── tool_manual.json         # Editable Tool Manual contract
-├── runtime_validation.json  # Local, Git-ignored public endpoint/review-key checks
+├── runtime_validation.json  # Local, Git-ignored public endpoint + runtime auth header checks
 ├── docs/api-usage.md        # Publish this page and use its URL as docs_url
-├── .gitignore               # Keeps review keys and OAuth client secrets out of Git
+├── .gitignore               # Keeps the runtime auth secret and OAuth client secrets out of Git
 └── README.md                # Generated local workflow
 ```
 
@@ -217,7 +217,9 @@ The manifest is your API's identity card. It controls how your API appears in th
 |---|---|---|
 | `capability_key` | Unique API identifier. **Cannot be changed after publish.** | `"price-compare-helper"` |
 | `name` | Display name in the store | `"Price Compare Helper"` |
-| `job_to_be_done` | One-sentence description of what problem the API solves | `"Find the lowest price for a product"` |
+| `short_description` | Catalog tagline shown on listing cards and the detail header. Max 60 characters. | `"Find better prices"` |
+| `job_to_be_done` | Short buyer-facing description of what the API lets an agent accomplish. Max 240 characters. | `"Find the lowest price for a product"` |
+| `description` | Optional detail-page copy for limits, approval behavior, pricing notes, and expected results. Max 1000 characters. Put longer guidance in `docs_url`. | `"Compares current retailer offers and returns ranked options."` |
 | `category` | API category | `"commerce"`, `"communication"`, `"finance"` |
 | `store_vertical` | **Required.** Explicit store surface. Use `"api"` for normal API Store listings and `"game"` for Game API Store listings. | `"api"`, `"game"` |
 | `permission_class` | Permission level ([see guide](#6-permission-classes-guide)) | `PermissionClass.READ_ONLY` |
@@ -604,7 +606,7 @@ the registration blockers earlier.
   - public base URL
   - public healthcheck URL
   - functional test URL
-  - dedicated review/test auth header name + value
+  - runtime auth header shared secret (`runtime_auth_header_name` / `runtime_auth_header_value`)
   - sample request payload
   - expected response fields present in the JSON response
 - Contract consistency during `auto-register`
@@ -787,6 +789,121 @@ collects the matching direct payment from `pricing_plan`, and only then calls
 the live action with the quoted commit token. Use the default
 `billing_timing="post"` only when execute-then-settle is acceptable.
 
+Keep the responsibility boundary strict. Siglume owns payment, authorization,
+idempotency, scheduled/retry state, usage rows, and reconciliation state. Your
+API owns the provider-specific action and the proof that it committed. The
+platform does not infer whether an X post, email, CRM write, booking, or other
+external action happened. Your live action response must return committed
+evidence only after the side effect committed; draft-only, preview, ambiguous,
+or `status="ready"` responses are not delivered results. Read
+[Platform / API Responsibility Boundary](docs/platform-api-boundary.md) before
+building paid action APIs.
+
+### Generic reward payouts through MCP
+
+MCP Gateway also exposes developer-funded reward payouts as a generic platform
+capability. This is not tied to any one SNS API. Use it when your API has
+already decided a reward recipient and amount, and you want Siglume to transfer
+from the connected developer's Siglume embedded wallet to the recipient
+Siglume user's embedded wallet.
+
+Do not use `SIGLUME_API_KEY`, a `cli_...` token, or `X-API-Key` headers for
+this flow. Those credentials are for the Developer Surface and SDK/CLI
+registration APIs. MCP Gateway only accepts MCP bearer tokens:
+
+| Surface | Credential | Example use |
+|---|---|---|
+| Developer Surface / SDK / CLI | `SIGLUME_API_KEY` / `cli_...` | `siglume register`, listing and validation automation |
+| MCP Gateway | `Authorization: Bearer mcpsk_...` | `initialize`, `tools/list`, `tools/call market_create_reward_payout` |
+| MCP OAuth clients | `Authorization: Bearer mcpoa_...` | OAuth-connected external MCP clients |
+
+`/v1/me/agent` and the Developer Portal's `mcp-tokens` route are
+browser-session Developer Portal routes, not generic CLI-token routes. Create or
+rotate the `mcpsk_...` token from the Developer Portal for the target agent, then
+store that MCP token server-side in your publisher API secret manager.
+
+This is a **platform contract**, not an API-specific connector contract. Your
+API must integrate with the official MCP Gateway reward-payout tool and payload
+shape documented here. Siglume does not create payout connectors, environment
+variable names, wallet-resolution contracts, or authentication conventions for
+individual publisher APIs. If your service uses local names such as
+`PF_BASE_URL`, `PF_API_KEY`, or `state resolver`, those are your adapter names;
+they are not Siglume platform requirements unless Siglume documents them in
+this SDK.
+
+Call `market_create_reward_payout` with:
+
+- `app_id`: your app or capability identifier
+- `recipient_subject`: `siglume_user:<user_id>`, `user:<user_id>`, or the recipient email
+- `amount_minor` or `amount_jpy`: the already-determined reward amount
+- `display_currency`: `JPY` or `USD`
+- `token_symbol`: `JPYC` for JPY rewards or `USDC` for USD rewards
+- `reward_event_id`: your unique reward event id
+- `idempotency_key`: deterministic retry key, usually `<app_id>:<reward_event_id>`
+- `metadata`: optional audit metadata
+
+Do not send source wallet ids, destination wallet ids, wallet addresses, or
+ranking inputs. Siglume resolves both embedded wallets, enforces developer
+scope, executes the transfer, owns idempotency and reconciliation, and emits
+signed webhook state. Your API owns reward calculation, ranking, usefulness
+judgment, event eligibility, and durable recording of the payout request before
+calling MCP.
+
+Treat `reward_paid` as the source of truth for completion. Synchronous MCP
+responses confirm that the payout request was accepted or is in a terminal
+error state; they do not replace the signed webhook.
+
+Minimal MCP call shape:
+
+```http
+POST https://mcp.siglume.com/
+Authorization: Bearer mcpsk_...
+Content-Type: application/json
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": {
+      "name": "publisher-api",
+      "version": "1.0.0"
+    }
+  }
+}
+```
+
+Then call `tools/list` and finally:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "market_create_reward_payout",
+    "arguments": {
+      "app_id": "your-api",
+      "recipient_subject": "siglume_user:<platform_user_id>",
+      "amount_jpy": 1,
+      "display_currency": "JPY",
+      "token_symbol": "JPYC",
+      "reward_event_id": "<reward_event_id>",
+      "idempotency_key": "your-api:<reward_event_id>"
+    }
+  }
+}
+```
+
+If you want a different server-to-server authentication surface for reward
+payouts, treat that as a separate platform feature request. Do not assume the
+platform will widen the reward-payout boundary to match an API-specific
+connector.
+
 Planned feature: your agent will be able to promote your API within Siglume, acting as your salesperson to other agents and their owners.
 
 ### My tests pass but submit fails
@@ -796,7 +913,7 @@ Common causes:
 - `example_prompts` has fewer than 2 distinct non-empty entries (platform requires at least 2 so buyers see how the API is used)
 - `docs_url` points to a homepage instead of a dedicated anonymous API usage guide
 - `support_contact` is a placeholder or malformed email / support URL
-- `runtime_validation.json` still has placeholder URLs, missing expected fields, or a review key that is not dedicated to Siglume
+- `runtime_validation.json` still has placeholder URLs, missing expected fields, or a runtime auth secret that is not a dedicated, strong value
 - OAuth-backed APIs declare a missing or unreachable `connect_url`
 - `ACTION` / `PAYMENT` API has `approval_mode=AUTO`
 - `ACTION` / `PAYMENT` API has `dry_run_supported=False`
@@ -976,8 +1093,8 @@ HTTP request Siglume sends before it creates the draft.
 | `healthcheck_url` | Yes | Called with `GET`; any 2xx response passes. |
 | `invoke_url` | Yes | Called with `invoke_method`; must return JSON and 2xx. |
 | `invoke_method` | No | `POST` by default. `GET` sends `request_payload` as query params. |
-| `test_auth_header_name` | Yes | Header name for a dedicated review/test credential. |
-| `test_auth_header_value` | Yes | Header value; do not use a production owner secret. |
+| `runtime_auth_header_name` | Yes | Name of the runtime auth header Siglume attaches when it calls `invoke_url` (legacy alias: `test_auth_header_name`). |
+| `runtime_auth_header_value` | Yes | The shared secret Siglume sends on that header — used at registration validation **and** at production runtime. Use a strong, dedicated value; never reuse your master API key (legacy alias: `test_auth_header_value`). |
 | `request_payload` | Yes | JSON object Siglume sends to `invoke_url`. Prefer this exact field name. |
 | `expected_response_fields` | Yes | Dot paths that must exist in the JSON response and be declared in `output_schema`. |
 | `timeout_seconds` | No | Clamped to 1-20 seconds. Defaults to 10. |
@@ -986,6 +1103,15 @@ Compatibility aliases accepted for `request_payload`: `test_request_body`,
 `runtime_sample`, `sample_request_payload`, and `runtime_sample_request`. New
 examples should use `request_payload` so the OpenAPI schema and server behavior
 line up.
+
+`runtime_auth_header_name` / `runtime_auth_header_value` are the canonical
+runtime auth header fields; `test_auth_header_name` / `test_auth_header_value`
+are still accepted as legacy aliases. This value is **not** a throwaway test
+key — it is the shared secret Siglume attaches on every call to `invoke_url`,
+both during registration validation and at production runtime. For `ACTION` /
+per-action / prepay APIs it is the trust boundary on live side-effect requests.
+Keep it in the Git-ignored `runtime_validation.json`, use a strong random
+value, never reuse your master API key, and rotate it if it leaks.
 
 `expected_response_fields` connects runtime validation to the Tool Manual. If
 your runtime returns `status`, `postText`, `draftToken`, and `dailyLimit`, then
@@ -1009,7 +1135,7 @@ sequenceDiagram
     Dev->>Sig: auto-register(manifest, tool_manual, runtime_validation)
     Sig->>Run: GET healthcheck_url
     Run-->>Sig: 2xx
-    Sig->>Run: invoke_method invoke_url + review header + request_payload
+    Sig->>Run: invoke_method invoke_url + runtime auth header + request_payload
     Run-->>Sig: JSON matching output_schema and expected_response_fields
     Sig-->>Dev: draft listing + validation_report
     Dev->>Sig: confirm-auto-register(approved=true)
@@ -1113,8 +1239,8 @@ cat > auto-register-free-readonly.json <<'JSON'
     "healthcheck_url": "https://api.acme.dev/weather-faq/health",
     "invoke_url": "https://api.acme.dev/weather-faq/search",
     "invoke_method": "POST",
-    "test_auth_header_name": "X-Siglume-Review-Key",
-    "test_auth_header_value": "replace-with-dedicated-review-key",
+    "runtime_auth_header_name": "X-Siglume-Auth",
+    "runtime_auth_header_value": "replace-with-strong-random-runtime-auth-secret",
     "request_payload": {
       "question": "How often is weather data refreshed?"
     },
@@ -1309,8 +1435,8 @@ cat > auto-register-paid-action.json <<'JSON'
     "healthcheck_url": "https://api.example.com/health",
     "invoke_url": "https://api.example.com/growpost/draft",
     "invoke_method": "POST",
-    "test_auth_header_name": "X-Siglume-Review-Key",
-    "test_auth_header_value": "replace-with-dedicated-review-key",
+    "runtime_auth_header_name": "X-Siglume-Auth",
+    "runtime_auth_header_value": "replace-with-strong-random-runtime-auth-secret",
     "request_payload": {
       "topic": "Launch note for a new agent workflow",
       "tone": "concise",
@@ -1348,7 +1474,7 @@ curl -X POST "https://siglume.com$CONFIRM_PATH" \
 ```
 
 If the runtime call fails, Siglume returns the redacted request it sent and the
-response body it received. The review/test auth header value is redacted in the
+response body it received. The runtime auth header value is redacted in the
 error detail.
 
 ### Advanced example: Slack action with OAuth
@@ -1447,8 +1573,8 @@ response = requests.post(
             "healthcheck_url": "https://api.example.com/health",
             "invoke_url": "https://api.example.com/run",
             "invoke_method": "POST",
-            "test_auth_header_name": "X-Test-Key",
-            "test_auth_header_value": "replace-with-dedicated-review-key",
+            "runtime_auth_header_name": "X-Siglume-Auth",
+            "runtime_auth_header_value": "replace-with-strong-random-runtime-auth-secret",
             "request_payload": {"channel": "#general", "period": "today"},
             "expected_response_fields": ["summary", "posted"],
         }
@@ -1569,6 +1695,46 @@ payment-permission tools: `SettlementMode.POLYGON_MANDATE` and
 [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full phase log
 and the live mainnet contract addresses.
 
+### Generic reward payout flow (developer-funded rewards)
+
+Reward payouts are a separate MCP Gateway feature for API developers who fund
+rewards from their own Siglume embedded wallet. The flow is:
+
+1. Your API observes usage, scoring, attribution, or other domain evidence.
+2. Your API decides the recipient, amount, currency/token, and `reward_event_id`.
+3. Your API durably stores its local `payout_request`.
+4. Your API calls `market_create_reward_payout` through MCP Gateway with
+   `Authorization: Bearer mcpsk_...` and no wallet override fields. Do not use
+   `SIGLUME_API_KEY`, `cli_...`, `X-API-Key`, or `X-Siglume-API-Key` for MCP
+   Gateway.
+5. Siglume resolves the source developer embedded wallet from the authenticated
+   developer/app context and resolves the destination wallet from
+   `recipient_subject`.
+6. Siglume executes or tracks the transfer and emits signed payout webhooks.
+7. Your API marks the local payout as paid only after receiving `reward_paid`.
+
+The `agent_id` is required when issuing the `mcpsk_...` token for the target
+agent. It is not an argument to `market_create_reward_payout`; the Gateway
+resolves the connected developer and bound agent from the MCP token.
+
+Available MCP tools:
+
+- `market_create_reward_payout`
+- `market_list_reward_payouts`
+- `market_get_reward_payout`
+
+This feature does not make Siglume responsible for reward calculation,
+ranking, eligibility, anti-spam scoring, content usefulness decisions, or
+application-specific clawback policy. Those remain API-owned. Siglume owns
+wallet resolution, transfer execution, balance/KYC checks, idempotency,
+transfer status, webhook signing, and platform reconciliation.
+
+Publisher APIs must adapt to this MCP Gateway contract. Do not document or
+ship an API-specific `PF_BASE_URL` / `PF_API_KEY` / connector-state-resolver
+contract as if it were a Siglume platform requirement. Those names may exist in
+your own service configuration, but they must point to the official platform
+surface and must not require Siglume to expose API-specific behavior.
+
 ### Free APIs need no wallet setup
 
 If `price_model="free"`, skip the wallet setup entirely. Your API can be published immediately after the self-serve publish gate passes — this path is unaffected by the migration.
@@ -1591,7 +1757,7 @@ agents will NEVER select it — even if the API works perfectly.**
 | Field | Description | Example |
 |---|---|---|
 | `tool_name` | Stable tool identifier (3-64 chars, alphanumeric + underscore) | `"price_compare"` |
-| `job_to_be_done` | What this tool enables (10-500 chars) | `"Find the lowest price for a product"` |
+| `job_to_be_done` | What this tool enables (10-240 chars) | `"Find the lowest price for a product"` |
 | `summary_for_model` | Concise factual summary for LLM (10-300 chars) | `"Searches retailers and returns sorted prices"` |
 | `trigger_conditions` | When should this tool be used? (3-8 situations) | `"owner asks to compare prices"` |
 | `do_not_use_when` | When should this tool NOT be used? (1-5 conditions) | `"order already placed"` |

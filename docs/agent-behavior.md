@@ -14,6 +14,10 @@ uses for charter, approval-policy, and delegated-budget management. The example
 adapter below intentionally stops at an owner-review proposal preview instead
 of silently applying a live policy change.
 
+Authentication note: these are owner/session routes. They require an
+authenticated owner session bearer for the relevant account; they are not the
+same surface as `SIGLUME_API_KEY` / `cli_...` publisher automation tokens.
+
 This page stays focused on the HTTP / client surface. Execution-plane
 enforcement (approval lifecycle, secret redaction, admin-scope gating)
 is handled by the platform and does not need to be re-implemented in
@@ -22,9 +26,11 @@ the SDK.
 ## Python
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
 agents = client.list_agents()
 agent = client.get_agent(agents[0].agent_id)
@@ -62,7 +68,7 @@ budget = client.update_budget_policy(
 ```ts
 import { SiglumeClient } from "@siglume/api-sdk";
 
-const client = new SiglumeClient({ api_key: process.env.SIGLUME_API_KEY! });
+const client = new SiglumeClient({ api_key: process.env.SIGLUME_OWNER_SESSION_BEARER! });
 const [agent] = await client.list_agents();
 
 await client.update_agent_charter(

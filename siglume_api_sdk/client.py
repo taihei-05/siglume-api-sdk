@@ -42,6 +42,9 @@ DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1"
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
 _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
+LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60
+LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240
+LISTING_DESCRIPTION_MAX_LENGTH = 1000
 T = TypeVar("T")
 
 
@@ -746,133 +749,6 @@ class WorksPosterDashboard:
 
 
 @dataclass
-class PartnerDashboard:
-    partner_id: str
-    company_name: str | None = None
-    plan: str | None = None
-    plan_label: str | None = None
-    month_bytes_used: int = 0
-    month_bytes_limit: int = 0
-    month_usage_pct: float = 0.0
-    total_source_items: int = 0
-    has_billing: bool = False
-    has_subscription: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerUsage:
-    plan: str | None = None
-    month_bytes_used: int = 0
-    month_bytes_limit: int = 0
-    month_bytes_remaining: int = 0
-    month_usage_pct: float = 0.0
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerApiKeyRecord:
-    credential_id: str
-    name: str | None = None
-    key_id: str | None = None
-    allowed_source_types: list[str] = field(default_factory=list)
-    last_used_at: str | None = None
-    created_at: str | None = None
-    revoked: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerApiKeyHandle:
-    credential_id: str
-    name: str | None = None
-    key_id: str | None = None
-    allowed_source_types: list[str] = field(default_factory=list)
-    masked_key_hint: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsBilling:
-    currency: str | None = None
-    billing_mode: str | None = None
-    month_spend_jpy: int = 0
-    month_spend_usd: int = 0
-    all_time_spend_jpy: int = 0
-    all_time_spend_usd: int = 0
-    total_impressions: int = 0
-    total_replies: int = 0
-    has_billing: bool = False
-    has_subscription: bool = False
-    invoices: list[dict[str, Any]] = field(default_factory=list)
-    wallet: dict[str, Any] | None = None
-    balances: list[dict[str, Any]] = field(default_factory=list)
-    supported_tokens: list[dict[str, Any]] = field(default_factory=list)
-    funding_instructions: dict[str, Any] | None = None
-    mandate: PlanWeb3Mandate | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsBillingSettlement:
-    status: str | None = None
-    message: str | None = None
-    settles_automatically: bool | None = None
-    cycle_key: str | None = None
-    settled_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsProfile:
-    has_profile: bool = False
-    company_name: str | None = None
-    ad_currency: str | None = None
-    has_billing: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsCampaignRecord:
-    campaign_id: str
-    name: str | None = None
-    target_url: str | None = None
-    content_brief: str | None = None
-    target_topics: list[str] = field(default_factory=list)
-    posting_interval_minutes: int = 360
-    max_posts_per_day: int = 4
-    currency: str | None = None
-    monthly_budget_jpy: int = 0
-    cpm_jpy: int = 0
-    cpr_jpy: int = 0
-    monthly_budget_usd: int = 0
-    cpm_usd: int = 0
-    cpr_usd: int = 0
-    status: str = "active"
-    month_spend_jpy: int = 0
-    month_spend_usd: int = 0
-    total_posts: int = 0
-    total_impressions: int = 0
-    total_replies: int = 0
-    next_post_at: str | None = None
-    created_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsCampaignPostRecord:
-    post_id: str
-    content_id: str | None = None
-    cost_jpy: int = 0
-    cost_usd: int = 0
-    impressions: int = 0
-    replies: int = 0
-    status: str | None = None
-    created_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
 class MarketProposalRecord:
     proposal_id: str
     parent_proposal_id: str | None = None
@@ -1443,6 +1319,7 @@ def _build_auto_register_request(
     payload["currency"] = currency
     if "pricing_plan" in payload:
         _validate_pricing_plan_floor(payload.get("pricing_plan"), default_currency=currency)
+    _validate_listing_text_lengths(payload)
     price_model = str(payload.get("price_model") or "free").strip().lower()
     if price_model in {"usage_based", "per_action"} and not _pricing_plan_has_items(payload.get("pricing_plan")):
         raise SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
@@ -1556,6 +1433,22 @@ def _validate_pricing_plan_floor(plan: Any, *, default_currency: str) -> None:
                 f"AppManifest.pricing_plan.items[{index}].price_minor must be 0 or at least "
                 f"{MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing."
             )
+
+
+def _validate_listing_text_lengths(payload: dict[str, Any]) -> None:
+    limits = {
+        "short_description": LISTING_SHORT_DESCRIPTION_MAX_LENGTH,
+        "job_to_be_done": LISTING_JOB_TO_BE_DONE_MAX_LENGTH,
+        "description": LISTING_DESCRIPTION_MAX_LENGTH,
+    }
+    for field_name, max_length in limits.items():
+        value = payload.get(field_name)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise SiglumeClientError(f"AppManifest.{field_name} must be a string when provided.")
+        if len(value) > max_length:
+            raise SiglumeClientError(f"AppManifest.{field_name} must be at most {max_length} characters.")
 
 
 def _pricing_plan_has_items(plan: Any) -> bool:
@@ -2333,157 +2226,6 @@ def _parse_works_poster_dashboard(data: Mapping[str, Any]) -> WorksPosterDashboa
         stats=_parse_works_poster_dashboard_stats(data.get("stats")) if isinstance(data.get("stats"), Mapping) else WorksPosterDashboardStats(),
         raw=dict(data),
     )
-
-def _parse_partner_dashboard(data: Mapping[str, Any]) -> PartnerDashboard:
-    return PartnerDashboard(
-        partner_id=str(data.get("partner_id") or data.get("user_id") or ""),
-        company_name=_string_or_none(data.get("company_name")),
-        plan=_string_or_none(data.get("plan")),
-        plan_label=_string_or_none(data.get("plan_label")),
-        month_bytes_used=int(data.get("month_bytes_used") or 0),
-        month_bytes_limit=int(data.get("month_bytes_limit") or 0),
-        month_usage_pct=float(data.get("month_usage_pct") or 0.0),
-        total_source_items=int(data.get("total_source_items") or 0),
-        has_billing=bool(data.get("has_billing") or False),
-        has_subscription=bool(data.get("has_subscription") or False),
-        raw=dict(data),
-    )
-
-
-def _parse_partner_usage(data: Mapping[str, Any]) -> PartnerUsage:
-    return PartnerUsage(
-        plan=_string_or_none(data.get("plan")),
-        month_bytes_used=int(data.get("month_bytes_used") or 0),
-        month_bytes_limit=int(data.get("month_bytes_limit") or 0),
-        month_bytes_remaining=int(data.get("month_bytes_remaining") or 0),
-        month_usage_pct=float(data.get("month_usage_pct") or 0.0),
-        raw=dict(data),
-    )
-
-
-def _parse_partner_api_key(data: Mapping[str, Any]) -> PartnerApiKeyRecord:
-    return PartnerApiKeyRecord(
-        credential_id=str(data.get("credential_id") or data.get("id") or ""),
-        name=_string_or_none(data.get("name")),
-        key_id=_string_or_none(data.get("key_id")),
-        allowed_source_types=_to_string_list(data.get("allowed_source_types")),
-        last_used_at=_string_or_none(data.get("last_used_at")),
-        created_at=_string_or_none(data.get("created_at")),
-        revoked=bool(data.get("revoked") or False),
-        raw=dict(data),
-    )
-
-
-def _parse_partner_api_key_handle(data: Mapping[str, Any]) -> PartnerApiKeyHandle:
-    # `partner.keys.create` is handle-only on the owner-operation bus. Scrub
-    # any unexpected raw-secret fields defensively so wrapper callers do not
-    # accidentally depend on transport regressions that leak `ingest_key`.
-    raw = {
-        str(key): value
-        for key, value in dict(data).items()
-        if str(key) not in {"ingest_key", "full_key"}
-    }
-    return PartnerApiKeyHandle(
-        credential_id=str(raw.get("credential_id") or raw.get("id") or ""),
-        name=_string_or_none(raw.get("name")),
-        key_id=_string_or_none(raw.get("key_id")),
-        allowed_source_types=_to_string_list(raw.get("allowed_source_types")),
-        masked_key_hint=_string_or_none(raw.get("masked_key_hint")),
-        raw=raw,
-    )
-
-
-def _parse_ads_billing(data: Mapping[str, Any]) -> AdsBilling:
-    mandate_payload = data.get("mandate")
-    funding_instructions = _to_dict(data.get("funding_instructions"))
-    wallet = _to_dict(data.get("wallet"))
-    return AdsBilling(
-        currency=_string_or_none(data.get("currency")),
-        billing_mode=_string_or_none(data.get("billing_mode")),
-        month_spend_jpy=int(data.get("month_spend_jpy") or 0),
-        month_spend_usd=int(data.get("month_spend_usd") or 0),
-        all_time_spend_jpy=int(data.get("all_time_spend_jpy") or 0),
-        all_time_spend_usd=int(data.get("all_time_spend_usd") or 0),
-        total_impressions=int(data.get("total_impressions") or 0),
-        total_replies=int(data.get("total_replies") or 0),
-        has_billing=bool(data.get("has_billing") or False),
-        has_subscription=bool(data.get("has_subscription") or False),
-        invoices=_to_record_list(data.get("invoices")),
-        wallet=wallet or None,
-        balances=_to_record_list(data.get("balances")),
-        supported_tokens=_to_record_list(data.get("supported_tokens")),
-        funding_instructions=funding_instructions or None,
-        mandate=_parse_plan_web3_mandate(mandate_payload) if isinstance(mandate_payload, Mapping) else None,
-        raw=dict(data),
-    )
-
-
-def _parse_ads_billing_settlement(data: Mapping[str, Any]) -> AdsBillingSettlement:
-    return AdsBillingSettlement(
-        status=_string_or_none(data.get("status")),
-        message=_string_or_none(data.get("message") or data.get("detail")),
-        settles_automatically=_bool_or_none(
-            data.get("settles_automatically")
-            if data.get("settles_automatically") is not None
-            else data.get("auto_settles")
-        ),
-        cycle_key=_string_or_none(data.get("cycle_key")),
-        settled_at=_string_or_none(data.get("settled_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_ads_profile(data: Mapping[str, Any]) -> AdsProfile:
-    return AdsProfile(
-        has_profile=bool(data.get("has_profile") or False),
-        company_name=_string_or_none(data.get("company_name")),
-        ad_currency=_string_or_none(data.get("ad_currency")),
-        has_billing=bool(data.get("has_billing") or False),
-        raw=dict(data),
-    )
-
-
-def _parse_ads_campaign(data: Mapping[str, Any]) -> AdsCampaignRecord:
-    return AdsCampaignRecord(
-        campaign_id=str(data.get("campaign_id") or data.get("id") or ""),
-        name=_string_or_none(data.get("name")),
-        target_url=_string_or_none(data.get("target_url")),
-        content_brief=_string_or_none(data.get("content_brief")),
-        target_topics=_to_string_list(data.get("target_topics")),
-        posting_interval_minutes=int(data.get("posting_interval_minutes") or 360),
-        max_posts_per_day=int(data.get("max_posts_per_day") or 4),
-        currency=_string_or_none(data.get("currency")),
-        monthly_budget_jpy=int(data.get("monthly_budget_jpy") or 0),
-        cpm_jpy=int(data.get("cpm_jpy") or 0),
-        cpr_jpy=int(data.get("cpr_jpy") or 0),
-        monthly_budget_usd=int(data.get("monthly_budget_usd") or 0),
-        cpm_usd=int(data.get("cpm_usd") or 0),
-        cpr_usd=int(data.get("cpr_usd") or 0),
-        status=str(data.get("status") or "active").strip().lower() or "active",
-        month_spend_jpy=int(data.get("month_spend_jpy") or 0),
-        month_spend_usd=int(data.get("month_spend_usd") or 0),
-        total_posts=int(data.get("total_posts") or 0),
-        total_impressions=int(data.get("total_impressions") or 0),
-        total_replies=int(data.get("total_replies") or 0),
-        next_post_at=_string_or_none(data.get("next_post_at")),
-        created_at=_string_or_none(data.get("created_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_ads_campaign_post(data: Mapping[str, Any]) -> AdsCampaignPostRecord:
-    return AdsCampaignPostRecord(
-        post_id=str(data.get("post_id") or data.get("id") or ""),
-        content_id=_string_or_none(data.get("content_id")),
-        cost_jpy=int(data.get("cost_jpy") or 0),
-        cost_usd=int(data.get("cost_usd") or 0),
-        impressions=int(data.get("impressions") or 0),
-        replies=int(data.get("replies") or 0),
-        status=_string_or_none(data.get("status")),
-        created_at=_string_or_none(data.get("created_at")),
-        raw=dict(data),
-    )
-
 
 def _parse_market_proposal(data: Mapping[str, Any]) -> MarketProposalRecord:
     reason_codes = data.get("reason_codes")
@@ -4756,161 +4498,6 @@ class SiglumeClient:
         )
         items = data.get("result") if isinstance(data.get("result"), list) else []
         return [_parse_installed_tool_receipt_step(item) for item in items if isinstance(item, Mapping)]
-    def get_partner_dashboard(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> PartnerDashboard:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.dashboard.get",
-            {},
-            lang=lang,
-        )
-        return _parse_partner_dashboard(execution.result)
-
-    def get_partner_usage(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> PartnerUsage:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.usage.get",
-            {},
-            lang=lang,
-        )
-        return _parse_partner_usage(execution.result)
-
-    def list_partner_api_keys(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[PartnerApiKeyRecord]:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.keys.list",
-            {},
-            lang=lang,
-        )
-        items = execution.result.get("keys") if isinstance(execution.result.get("keys"), list) else []
-        return [_parse_partner_api_key(item) for item in items if isinstance(item, Mapping)]
-
-    def create_partner_api_key(
-        self,
-        *,
-        agent_id: str | None = None,
-        name: str | None = None,
-        allowed_source_types: list[str] | tuple[str, ...] | None = None,
-        lang: str = "en",
-    ) -> PartnerApiKeyHandle:
-        payload: dict[str, Any] = {}
-        if name is not None:
-            normalized_name = str(name).strip()
-            if not normalized_name:
-                raise SiglumeClientError("name cannot be empty.")
-            payload["name"] = normalized_name
-        if allowed_source_types is not None:
-            if not isinstance(allowed_source_types, (list, tuple)):
-                raise SiglumeClientError("allowed_source_types must be a list of strings.")
-            normalized_source_types: list[str] = []
-            for item in allowed_source_types:
-                if not isinstance(item, str):
-                    raise SiglumeClientError("allowed_source_types must contain only strings.")
-                normalized_item = item.strip()
-                if normalized_item:
-                    normalized_source_types.append(normalized_item)
-            payload["allowed_source_types"] = normalized_source_types
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.keys.create",
-            payload,
-            lang=lang,
-        )
-        return _parse_partner_api_key_handle(execution.result)
-
-    def get_ads_billing(
-        self,
-        *,
-        agent_id: str | None = None,
-        rail: str | None = None,
-        lang: str = "en",
-    ) -> AdsBilling:
-        payload: dict[str, Any] = {}
-        if rail is not None and str(rail).strip():
-            payload["rail"] = str(rail).strip().lower()
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.billing.get",
-            payload,
-            lang=lang,
-        )
-        return _parse_ads_billing(execution.result)
-
-    def settle_ads_billing(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> AdsBillingSettlement:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.billing.settle",
-            {},
-            lang=lang,
-        )
-        return _parse_ads_billing_settlement(execution.result)
-
-    def get_ads_profile(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> AdsProfile:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.profile.get",
-            {},
-            lang=lang,
-        )
-        return _parse_ads_profile(execution.result)
-
-    def list_ads_campaigns(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[AdsCampaignRecord]:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.campaigns.list",
-            {},
-            lang=lang,
-        )
-        items = execution.result.get("campaigns") if isinstance(execution.result.get("campaigns"), list) else []
-        return [_parse_ads_campaign(item) for item in items if isinstance(item, Mapping)]
-
-    def list_ads_campaign_posts(
-        self,
-        campaign_id: str,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[AdsCampaignPostRecord]:
-        normalized_campaign_id = str(campaign_id or "").strip()
-        if not normalized_campaign_id:
-            raise SiglumeClientError("campaign_id is required.")
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.campaign_posts.list",
-            {"campaign_id": normalized_campaign_id},
-            lang=lang,
-        )
-        items = execution.result.get("posts") if isinstance(execution.result.get("posts"), list) else []
-        return [_parse_ads_campaign_post(item) for item in items if isinstance(item, Mapping)]
 
     # `market.proposals.*` uses the public owner-operation execute route.
     # Read operations return typed proposal records; guarded write operations

@@ -181,6 +181,23 @@ provider fails after the paid live action starts. Your API should make the
 quote/dry-run validate connection, policy, idempotency, and provider readiness,
 and should return a failed or zero-priced receipt for known no-op outcomes.
 
+Siglume owns payment, authorization, pricing-plan lookup, idempotency keys,
+slot/retry state, and reconciliation state. Your API owns the external
+side effect and the provider-specific proof that it committed. The platform
+does not inspect or infer product-specific delivery such as whether an X post,
+email, CRM write, booking, or other provider action actually happened. A paid
+live action is treated as delivered only when the API returns a successful
+contract result with committed evidence such as `posted=true`, `post_url`,
+`provider_post_id`, `message_id`, `reservation_id`, or an equivalent stable
+provider-side id for that API.
+
+For prepay actions, `status="ready"`, draft-only output, preview output,
+`accepted=false`, timeouts without a committed provider id, and mismatched
+operation/amount/currency are not delivered results. The platform records the
+platform-owned failure/retry/reconciliation state; the API owner must inspect
+and repair provider-specific delivery. See
+[Platform / API Responsibility Boundary](./platform-api-boundary.md).
+
 ## Choosing Between usage_based And per_action
 
 Use `per_action` when the price is tied to a named operation/request type:
@@ -213,7 +230,10 @@ price; the operation plan may still contain paid items.
 After registration or a live run, use the developer observability surface:
 
 ```bash
+# Owner/session surface.
 siglume dev tail
+
+# Publisher/API-key surface.
 siglume dev tail --listing-id listing_123
 ```
 
@@ -225,7 +245,10 @@ prompts or private agent details.
 Python SDK equivalents:
 
 ```python
+# Owner/session bearer: owner account execution receipts.
 client.list_execution_receipts(status="failed", limit=20)
+
+# SIGLUME_API_KEY / cli_...: publisher listing receipts.
 client.list_listing_recent_receipts("listing_123", limit=20)
 ```
 
@@ -245,4 +268,8 @@ Before publishing operation-based billing:
 - [ ] Irreversible side effects use `billing_timing="prepay"`.
 - [ ] The quote/dry-run path returns `billingPreview.operation` and `draftToken`.
 - [ ] The action path is idempotent and verifies the quoted token before acting.
+- [ ] The action path returns committed provider evidence only after the side
+      effect committed.
+- [ ] Draft-only, preview, ambiguous, or `status="ready"` live-action results
+      are treated as not delivered by your API.
 - [ ] You know how to inspect receipts with `siglume dev tail --listing-id`.

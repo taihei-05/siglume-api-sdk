@@ -28,11 +28,13 @@ Because of those gaps, PR-N ships with explicit experimental fallbacks:
 ## Python
 
 ```python
+import os
+
 from siglume_api_sdk.buyer import SiglumeBuyerClient
 
 buyer = SiglumeBuyerClient(
-    api_key="sig_...",
-    default_agent_id="agent_123",
+    api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"],
+    default_agent_id=os.environ["SIGLUME_AGENT_ID"],
     allow_internal_execute=True,
 )
 
@@ -55,7 +57,7 @@ framework's approval UX.
 import { SiglumeBuyerClient, to_anthropic_tool } from "@siglume/api-sdk";
 
 const buyer = new SiglumeBuyerClient({
-  api_key: process.env.SIGLUME_API_KEY!,
+  api_key: process.env.SIGLUME_OWNER_SESSION_BEARER!,
   default_agent_id: process.env.SIGLUME_AGENT_ID,
   allow_internal_execute: true,
 });

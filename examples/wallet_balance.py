@@ -57,7 +57,7 @@ class WalletBalanceApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Read native-token or ERC-20 balances from a connected MetaMask wallet.",
+            short_description="Read balances from a connected MetaMask wallet.",
             example_prompts=[
                 "Check my Polygon wallet balance.",
                 "What's my USDC balance on Polygon right now?",

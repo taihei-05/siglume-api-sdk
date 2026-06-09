@@ -670,7 +670,7 @@ function buildToolManualSchema(
 ): Record<string, unknown> {
   const properties: Record<ToolManualField, Record<string, unknown>> = {
     tool_name: { type: "string", minLength: 3, maxLength: 64 },
-    job_to_be_done: { type: "string", minLength: 10, maxLength: 500 },
+    job_to_be_done: { type: "string", minLength: 10, maxLength: 240 },
     summary_for_model: { type: "string", minLength: 10, maxLength: 300 },
     trigger_conditions: {
       type: "array",

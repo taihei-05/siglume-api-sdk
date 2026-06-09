@@ -180,7 +180,7 @@ export type SettlementMode =
 export interface ToolManual {
   // Required (all permission classes)
   tool_name: string;                          // 3-64 chars, [A-Za-z0-9_]
-  job_to_be_done: string;                     // 10-500 chars
+  job_to_be_done: string;                     // 10-240 chars
   summary_for_model: string;                  // 10-300 chars, factual
   trigger_conditions: string[];               // 3-8 items, 10-200 chars each
   do_not_use_when: string[];                  // 1-5 items

@@ -27,7 +27,7 @@ Buyer-side discovery and export helpers are also included:
 import { SiglumeBuyerClient, to_anthropic_tool } from "@siglume/api-sdk";
 
 const buyer = new SiglumeBuyerClient({
-  api_key: process.env.SIGLUME_API_KEY ?? "sig_mock_key",
+  api_key: process.env.SIGLUME_OWNER_SESSION_BEARER!,
   default_agent_id: process.env.SIGLUME_AGENT_ID,
 });
 
@@ -73,7 +73,7 @@ siglume register . --company company_123
 
 `siglume register` reads `tool_manual.json`, the local Git-ignored
 `runtime_validation.json`. Generated projects keep runtime validation files
-Git-ignored because they can contain review keys. SDK / HTTP automation can pass
+Git-ignored because they hold the runtime auth header shared secret. SDK / HTTP automation can pass
 `source_url`, `source_context`, and `input_form_spec` directly to
 `auto-register`. The CLI runs preflight by default, then calls the same
 `auto-register` route used by SDK / automation clients and confirms publication
@@ -87,6 +87,14 @@ public-order / morals compliance.
 
 For the canonical pricing reference, see
 [`../docs/pricing-and-billing.md`](../docs/pricing-and-billing.md).
+
+Developer-funded reward or incentive payouts are not normal SDK/API-key calls.
+Do not call MCP Gateway with `SIGLUME_API_KEY`, `cli_...`, `X-API-Key`, or
+`X-Siglume-API-Key`. Reward payout execution uses
+`https://mcp.siglume.com/` with `Authorization: Bearer mcpsk_...` and
+`tools/call market_create_reward_payout`; SDK/API keys remain for
+registration, validation, and listing automation. See
+[`../docs/web3-settlement.md#generic-reward-payouts`](../docs/web3-settlement.md#generic-reward-payouts).
 
 Use `price_model: PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` when the
 API must execute before the final operation is known. These listings are free to
@@ -144,6 +152,15 @@ and `draftToken`, collects the direct payment for that pricing-plan operation,
 then calls the ACTION endpoint with the same token as `commit_token`. If payment
 fails, the ACTION call is never made. Use the default `"post"` timing only for
 read-only or reversible usage.
+
+Responsibility boundary: Siglume owns payment, authorization, platform
+idempotency, retry state, usage rows, and reconciliation state. Your API owns
+the provider-specific action and the proof that it committed. The platform does
+not infer whether an X post, email, CRM write, booking, or other external action
+happened. Return committed evidence only after the side effect committed;
+draft-only, preview, ambiguous, or `status="ready"` live-action results are not
+delivered results. See
+[`../docs/platform-api-boundary.md`](../docs/platform-api-boundary.md).
 
 After live or sandbox execution, inspect receipts with `siglume dev tail`,
 `siglume dev tail --listing-id <listing_id>`, or the SDK receipt helpers. The

@@ -56,7 +56,7 @@ class PolygonMandateAdapterApp(AppAdapter):
             allow_free_trial=False,
             price_value_minor=1480,
             jurisdiction="US",
-            short_description="Simulate mandate creation, quote the recurring cap, and emit a mock embedded-wallet receipt.",
+            short_description="Simulate mandate creation and quote the cap.",
             example_prompts=[
                 "Charge the JPYC-equivalent of the Plus plan through the saved Polygon mandate.",
                 "Charge this month's subscription from the connected Polygon mandate.",

@@ -48,7 +48,7 @@ class AgentBehaviorApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Preview owner-governed behavior changes before creating an approval proposal.",
+            short_description="Preview owner-governed behavior changes safely.",
             example_prompts=[
                 "Propose a stricter approval policy for my travel-buying agent.",
                 "Tighten my owned agent's behavior charter without blocking everyday tasks.",

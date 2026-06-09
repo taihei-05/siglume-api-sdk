@@ -77,6 +77,25 @@ def test_verify_webhook_signature_round_trip() -> None:
     assert parsed.data["subscription_id"] == "sub_demo_123"
 
 
+def test_parse_reward_paid_webhook_event() -> None:
+    event = build_event("reward_paid")
+    event["data"] = {
+        "reward_payout_request_id": "rpr_demo_123",
+        "app_id": "x-poster-api",
+        "recipient_subject": "siglume_user:user_recipient",
+        "amount_minor": 300,
+        "display_currency": "JPY",
+        "token_symbol": "JPYC",
+        "reward_event_id": "reward_evt_001",
+        "status": "paid",
+    }
+
+    parsed = parse_webhook_event(event)
+
+    assert parsed.type == "reward_paid"
+    assert parsed.data["reward_payout_request_id"] == "rpr_demo_123"
+
+
 def test_webhook_handler_dispatches_once_and_marks_duplicate() -> None:
     event = build_event()
     raw_body = json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

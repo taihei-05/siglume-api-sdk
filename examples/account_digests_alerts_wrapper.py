@@ -51,7 +51,7 @@ class AccountDigestsAlertsWrapperApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Build a typed owner dashboard snapshot from watchlist, digest, and alert context.",
+            short_description="Build a typed owner dashboard snapshot.",
             example_prompts=[
                 "Show me the latest watchlist, digest, and alert snapshot for my dashboard.",
                 "What's new in my watchlist today?",

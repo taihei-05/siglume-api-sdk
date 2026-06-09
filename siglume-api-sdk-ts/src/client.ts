@@ -10,11 +10,6 @@
   AccountPlanCancellation,
   AccountPreferences,
   AccountWatchlist,
-  AdsBilling,
-  AdsBillingSettlement,
-  AdsCampaignPostRecord,
-  AdsCampaignRecord,
-  AdsProfile,
   AgentCharter,
   AgentRecord,
   AgentThreadRecord,
@@ -46,10 +41,6 @@
   MarketProposalActionResult,
   MarketProposalRecord,
   MarketNeedRecord,
-  PartnerApiKeyHandle,
-  PartnerApiKeyRecord,
-  PartnerDashboard,
-  PartnerUsage,
   NetworkClaimRecord,
   NetworkContentDetail,
   NetworkContentSummary,
@@ -118,6 +109,9 @@ import {
 export const DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1";
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = new Set(["JPY", "JPYC"]);
+const LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60;
+const LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240;
+const LISTING_DESCRIPTION_MAX_LENGTH = 1000;
 
 type FetchLike = typeof fetch;
 
@@ -247,6 +241,24 @@ function validatePricingPlanFloor(plan: unknown, defaultCurrency: string): void 
 
 function pricingPlanHasItems(plan: unknown): boolean {
   return isRecord(plan) && Array.isArray(plan.items) && plan.items.length > 0;
+}
+
+function validateListingTextLengths(payload: Record<string, unknown>): void {
+  const limits: Record<string, number> = {
+    short_description: LISTING_SHORT_DESCRIPTION_MAX_LENGTH,
+    job_to_be_done: LISTING_JOB_TO_BE_DONE_MAX_LENGTH,
+    description: LISTING_DESCRIPTION_MAX_LENGTH,
+  };
+  for (const [fieldName, maxLength] of Object.entries(limits)) {
+    const value = payload[fieldName];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== "string") {
+      throw new SiglumeClientError(`AppManifest.${fieldName} must be a string when provided.`);
+    }
+    if (value.length > maxLength) {
+      throw new SiglumeClientError(`AppManifest.${fieldName} must be at most ${maxLength} characters.`);
+    }
+  }
 }
 
 type PendingConfirmation = {
@@ -601,45 +613,6 @@ export interface SiglumeClientShape {
     receipt_id: string,
     options?: { agent_id?: string; lang?: string },
   ): Promise<InstalledToolReceiptStepRecord[]>;
-  get_partner_dashboard(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerDashboard>;
-  get_partner_usage(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerUsage>;
-  list_partner_api_keys(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerApiKeyRecord[]>;
-  create_partner_api_key(options?: {
-    agent_id?: string;
-    name?: string;
-    allowed_source_types?: string[];
-    lang?: string;
-  }): Promise<PartnerApiKeyHandle>;
-  get_ads_billing(options?: {
-    agent_id?: string;
-    rail?: string;
-    lang?: string;
-  }): Promise<AdsBilling>;
-  settle_ads_billing(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsBillingSettlement>;
-  get_ads_profile(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsProfile>;
-  list_ads_campaigns(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsCampaignRecord[]>;
-  list_ads_campaign_posts(campaign_id: string, options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsCampaignPostRecord[]>;
   update_agent_charter(
     agent_id: string,
     charter_text: string,
@@ -1443,153 +1416,6 @@ function toRecordList(value: unknown): Array<Record<string, unknown>> {
     : [];
 }
 
-function parsePartnerDashboard(data: Record<string, unknown>): PartnerDashboard {
-  return {
-    partner_id: String(data.partner_id ?? data.user_id ?? ""),
-    company_name: stringOrNull(data.company_name) ?? undefined,
-    plan: stringOrNull(data.plan) ?? undefined,
-    plan_label: stringOrNull(data.plan_label) ?? undefined,
-    month_bytes_used: Math.trunc(Number(data.month_bytes_used ?? 0)),
-    month_bytes_limit: Math.trunc(Number(data.month_bytes_limit ?? 0)),
-    month_usage_pct: Number(data.month_usage_pct ?? 0),
-    total_source_items: Math.trunc(Number(data.total_source_items ?? 0)),
-    has_billing: Boolean(data.has_billing ?? false),
-    has_subscription: Boolean(data.has_subscription ?? false),
-    raw: { ...data },
-  };
-}
-
-function parsePartnerUsage(data: Record<string, unknown>): PartnerUsage {
-  return {
-    plan: stringOrNull(data.plan) ?? undefined,
-    month_bytes_used: Math.trunc(Number(data.month_bytes_used ?? 0)),
-    month_bytes_limit: Math.trunc(Number(data.month_bytes_limit ?? 0)),
-    month_bytes_remaining: Math.trunc(Number(data.month_bytes_remaining ?? 0)),
-    month_usage_pct: Number(data.month_usage_pct ?? 0),
-    raw: { ...data },
-  };
-}
-
-function parsePartnerApiKey(data: Record<string, unknown>): PartnerApiKeyRecord {
-  return {
-    credential_id: String(data.credential_id ?? data.id ?? ""),
-    name: stringOrNull(data.name) ?? undefined,
-    key_id: stringOrNull(data.key_id) ?? undefined,
-    allowed_source_types: Array.isArray(data.allowed_source_types)
-      ? data.allowed_source_types.filter((item): item is string => typeof item === "string")
-      : [],
-    last_used_at: stringOrNull(data.last_used_at) ?? undefined,
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    revoked: Boolean(data.revoked ?? false),
-    raw: { ...data },
-  };
-}
-
-function parsePartnerApiKeyHandle(data: Record<string, unknown>): PartnerApiKeyHandle {
-  const raw = Object.fromEntries(
-    Object.entries(data).filter(([key]) => key !== "ingest_key" && key !== "full_key"),
-  ) as Record<string, unknown>;
-  return {
-    credential_id: String(raw.credential_id ?? raw.id ?? ""),
-    name: stringOrNull(raw.name) ?? undefined,
-    key_id: stringOrNull(raw.key_id) ?? undefined,
-    allowed_source_types: Array.isArray(raw.allowed_source_types)
-      ? raw.allowed_source_types.filter((item): item is string => typeof item === "string")
-      : [],
-    masked_key_hint: stringOrNull(raw.masked_key_hint) ?? undefined,
-    raw,
-  };
-}
-
-function parseAdsBilling(data: Record<string, unknown>): AdsBilling {
-  return {
-    currency: stringOrNull(data.currency) ?? undefined,
-    billing_mode: stringOrNull(data.billing_mode) ?? undefined,
-    month_spend_jpy: Math.trunc(Number(data.month_spend_jpy ?? 0)),
-    month_spend_usd: Math.trunc(Number(data.month_spend_usd ?? 0)),
-    all_time_spend_jpy: Math.trunc(Number(data.all_time_spend_jpy ?? 0)),
-    all_time_spend_usd: Math.trunc(Number(data.all_time_spend_usd ?? 0)),
-    total_impressions: Math.trunc(Number(data.total_impressions ?? 0)),
-    total_replies: Math.trunc(Number(data.total_replies ?? 0)),
-    has_billing: Boolean(data.has_billing ?? false),
-    has_subscription: Boolean(data.has_subscription ?? false),
-    invoices: toRecordList(data.invoices),
-    wallet: isRecord(data.wallet) ? { ...data.wallet } : null,
-    balances: toRecordList(data.balances),
-    supported_tokens: toRecordList(data.supported_tokens),
-    funding_instructions: isRecord(data.funding_instructions) ? { ...data.funding_instructions } : null,
-    mandate: isRecord(data.mandate) ? parsePlanWeb3Mandate(data.mandate) : null,
-    raw: { ...data },
-  };
-}
-
-function parseAdsBillingSettlement(data: Record<string, unknown>): AdsBillingSettlement {
-  return {
-    status: stringOrNull(data.status) ?? undefined,
-    message: stringOrNull(data.message ?? data.detail) ?? undefined,
-    settles_automatically: typeof data.settles_automatically === "boolean"
-      ? data.settles_automatically
-      : (typeof data.auto_settles === "boolean" ? data.auto_settles : undefined),
-    cycle_key: stringOrNull(data.cycle_key) ?? undefined,
-    settled_at: stringOrNull(data.settled_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseAdsProfile(data: Record<string, unknown>): AdsProfile {
-  return {
-    has_profile: Boolean(data.has_profile ?? false),
-    company_name: stringOrNull(data.company_name) ?? undefined,
-    ad_currency: stringOrNull(data.ad_currency) ?? undefined,
-    has_billing: Boolean(data.has_billing ?? false),
-    raw: { ...data },
-  };
-}
-
-function parseAdsCampaign(data: Record<string, unknown>): AdsCampaignRecord {
-  return {
-    campaign_id: String(data.campaign_id ?? data.id ?? ""),
-    name: stringOrNull(data.name) ?? undefined,
-    target_url: stringOrNull(data.target_url) ?? undefined,
-    content_brief: stringOrNull(data.content_brief) ?? undefined,
-    target_topics: Array.isArray(data.target_topics)
-      ? data.target_topics.filter((item): item is string => typeof item === "string")
-      : [],
-    posting_interval_minutes: Math.trunc(Number(data.posting_interval_minutes ?? 360)),
-    max_posts_per_day: Math.trunc(Number(data.max_posts_per_day ?? 4)),
-    currency: stringOrNull(data.currency) ?? undefined,
-    monthly_budget_jpy: Math.trunc(Number(data.monthly_budget_jpy ?? 0)),
-    cpm_jpy: Math.trunc(Number(data.cpm_jpy ?? 0)),
-    cpr_jpy: Math.trunc(Number(data.cpr_jpy ?? 0)),
-    monthly_budget_usd: Math.trunc(Number(data.monthly_budget_usd ?? 0)),
-    cpm_usd: Math.trunc(Number(data.cpm_usd ?? 0)),
-    cpr_usd: Math.trunc(Number(data.cpr_usd ?? 0)),
-    status: String(data.status ?? "active").trim().toLowerCase() || "active",
-    month_spend_jpy: Math.trunc(Number(data.month_spend_jpy ?? 0)),
-    month_spend_usd: Math.trunc(Number(data.month_spend_usd ?? 0)),
-    total_posts: Math.trunc(Number(data.total_posts ?? 0)),
-    total_impressions: Math.trunc(Number(data.total_impressions ?? 0)),
-    total_replies: Math.trunc(Number(data.total_replies ?? 0)),
-    next_post_at: stringOrNull(data.next_post_at) ?? undefined,
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseAdsCampaignPost(data: Record<string, unknown>): AdsCampaignPostRecord {
-  return {
-    post_id: String(data.post_id ?? data.id ?? ""),
-    content_id: stringOrNull(data.content_id) ?? undefined,
-    cost_jpy: Math.trunc(Number(data.cost_jpy ?? 0)),
-    cost_usd: Math.trunc(Number(data.cost_usd ?? 0)),
-    impressions: Math.trunc(Number(data.impressions ?? 0)),
-    replies: Math.trunc(Number(data.replies ?? 0)),
-    status: stringOrNull(data.status) ?? undefined,
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
 function parseWorksCategory(data: Record<string, unknown>): WorksCategoryRecord {
   return {
     key: String(data.key ?? ""),
@@ -2316,6 +2142,7 @@ export class SiglumeClient implements SiglumeClientShape {
     if (payload.pricing_plan !== undefined) {
       validatePricingPlanFloor(payload.pricing_plan, currency);
     }
+    validateListingTextLengths(payload);
     const priceModel = String(payload.price_model ?? "free").trim().toLowerCase();
     if ((priceModel === "usage_based" || priceModel === "per_action") && !pricingPlanHasItems(payload.pricing_plan)) {
       throw new SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.");
@@ -3829,179 +3656,6 @@ export class SiglumeClient implements SiglumeClientShape {
     );
     return Array.isArray(data.result)
       ? data.result.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseInstalledToolReceiptStep(item))
-      : [];
-  }
-
-  async get_partner_dashboard(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<PartnerDashboard> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.dashboard.get",
-      {},
-      { lang: options.lang },
-    );
-    return parsePartnerDashboard(execution.result);
-  }
-
-  async get_partner_usage(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<PartnerUsage> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.usage.get",
-      {},
-      { lang: options.lang },
-    );
-    return parsePartnerUsage(execution.result);
-  }
-
-  async list_partner_api_keys(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<PartnerApiKeyRecord[]> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.keys.list",
-      {},
-      { lang: options.lang },
-    );
-    return Array.isArray(execution.result.keys)
-      ? execution.result.keys.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parsePartnerApiKey(item))
-      : [];
-  }
-
-  async create_partner_api_key(
-    options: {
-      agent_id?: string;
-      name?: string;
-      allowed_source_types?: string[];
-      lang?: string;
-    } = {},
-  ): Promise<PartnerApiKeyHandle> {
-    const payload: Record<string, unknown> = {};
-    if (options.name !== undefined) {
-      const normalizedName = String(options.name).trim();
-      if (!normalizedName) {
-        throw new SiglumeClientError("name cannot be empty.");
-      }
-      payload.name = normalizedName;
-    }
-    if (options.allowed_source_types !== undefined) {
-      if (!Array.isArray(options.allowed_source_types)) {
-        throw new SiglumeClientError("allowed_source_types must be a list of strings.");
-      }
-      payload.allowed_source_types = options.allowed_source_types.flatMap((item) => {
-        if (typeof item !== "string") {
-          throw new SiglumeClientError("allowed_source_types must contain only strings.");
-        }
-        const normalizedItem = item.trim();
-        return normalizedItem ? [normalizedItem] : [];
-      });
-    }
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.keys.create",
-      payload,
-      { lang: options.lang },
-    );
-    return parsePartnerApiKeyHandle(execution.result);
-  }
-
-  async get_ads_billing(
-    options: {
-      agent_id?: string;
-      rail?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsBilling> {
-    const payload: Record<string, unknown> = {};
-    if (options.rail !== undefined && String(options.rail).trim()) {
-      payload.rail = String(options.rail).trim().toLowerCase();
-    }
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.billing.get",
-      payload,
-      { lang: options.lang },
-    );
-    return parseAdsBilling(execution.result);
-  }
-
-  async settle_ads_billing(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsBillingSettlement> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.billing.settle",
-      {},
-      { lang: options.lang },
-    );
-    return parseAdsBillingSettlement(execution.result);
-  }
-
-  async get_ads_profile(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsProfile> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.profile.get",
-      {},
-      { lang: options.lang },
-    );
-    return parseAdsProfile(execution.result);
-  }
-
-  async list_ads_campaigns(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsCampaignRecord[]> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.campaigns.list",
-      {},
-      { lang: options.lang },
-    );
-    return Array.isArray(execution.result.campaigns)
-      ? execution.result.campaigns.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseAdsCampaign(item))
-      : [];
-  }
-
-  async list_ads_campaign_posts(
-    campaign_id: string,
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsCampaignPostRecord[]> {
-    const normalizedCampaignId = String(campaign_id ?? "").trim();
-    if (!normalizedCampaignId) {
-      throw new SiglumeClientError("campaign_id is required.");
-    }
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.campaign_posts.list",
-      { campaign_id: normalizedCampaignId },
-      { lang: options.lang },
-    );
-    return Array.isArray(execution.result.posts)
-      ? execution.result.posts.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseAdsCampaignPost(item))
       : [];
   }
 

@@ -1,8 +1,8 @@
 # Installed Tools Operations
 
 `SiglumeClient` now exposes typed wrappers for the `installed_tools.*`
-owner-operation family that currently rides on the public owner-operation
-execute route.
+owner-operation family. These wrappers target the owner-operation execute
+contract when that route is available in the platform environment.
 
 These wrappers are the owner-side evidence path for installed capabilities. If
 you are a publisher trying to inspect your own listing activity, use
@@ -27,12 +27,20 @@ Transport note:
 - The SDK sends the exact registry key through
   `/v1/owner/agents/{agent_id}/operations/execute` and parses the typed result
   for you.
+- Treat this as an owner/session surface, not a generic publisher CLI
+  automation surface. If the production API you are calling does not expose
+  `/v1/owner/agents/{agent_id}/operations/execute`, these wrappers cannot run
+  against that environment.
 
 Agent resolution:
 
 - `agent_id` is optional on the typed wrappers.
 - When omitted, the SDK resolves the current owner agent via `/v1/me/agent` and
   uses that id as the execute-route target.
+- `/v1/me/agent` is a signed-in browser-session route. In owner-session
+  automation, pass `agent_id=...` explicitly instead of relying on the
+  omitted-agent lookup; publisher `SIGLUME_API_KEY` / `cli_...` tokens are not
+  the right credential for this owner surface.
 - If you already know which owned agent should scope the operation, pass
   `agent_id=...` explicitly to avoid the extra lookup.
 
@@ -89,24 +97,29 @@ raise. Instead:
 ## Example
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
-tools = client.list_installed_tools()
-readiness = client.get_installed_tools_connection_readiness()
-receipts = client.list_installed_tool_receipts(status="completed", limit=5)
+tools = client.list_installed_tools(agent_id="agent_123")
+readiness = client.get_installed_tools_connection_readiness(agent_id="agent_123")
+receipts = client.list_installed_tool_receipts(agent_id="agent_123", status="completed", limit=5)
 
 print(len(tools), readiness.all_ready, receipts[0].receipt_id if receipts else None)
 ```
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
 result = client.update_installed_tool_binding_policy(
     "bind_demo_123",
+    agent_id="agent_123",
     require_owner_approval=True,
     allowed_tasks_jsonb=["seller_search"],
     metadata_jsonb={"source": "sdk-doc"},

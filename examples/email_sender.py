@@ -39,7 +39,7 @@ class EmailSenderApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Preview and send email messages with explicit owner approval.",
+            short_description="Preview and send email with owner approval.",
             example_prompts=[
                 "Send a follow-up email to the customer with the meeting recap.",
                 "Email the team a one-paragraph summary of today's release.",

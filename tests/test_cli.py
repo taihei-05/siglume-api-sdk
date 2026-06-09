@@ -136,7 +136,7 @@ def test_init_command_writes_template_files() -> None:
         docs_text = Path("docs/api-usage.md").read_text(encoding="utf-8")
         assert "dedicated public usage guide" in docs_text
         assert "Start locally without a Siglume API key" in readme_text
-        assert "Do not commit real review keys or external-provider secrets" in readme_text
+        assert "Do not commit the real runtime auth secret or external-provider secrets" in readme_text
         assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
 
 
@@ -929,7 +929,7 @@ def test_init_command_generates_operation_wrapper_with_grade_b_or_better(monkeyp
         assert "replace `docs_url` with a dedicated public API usage guide" in readme_text
         assert "Replace `support_contact` with a real support email address" in readme_text
         assert "Start locally without a Siglume API key" in readme_text
-        assert "Do not commit real review keys or external-provider secrets" in readme_text
+        assert "Do not commit the real runtime auth secret or external-provider secrets" in readme_text
         assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
         assert readme_text.index("pytest tests/test_adapter.py") < readme_text.index("siglume register .")
 

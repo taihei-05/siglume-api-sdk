@@ -28,7 +28,8 @@ The SDK keeps this surface intentionally small: it mirrors the public
 read models, adds a few typed client helpers, and provides local
 simulation helpers for tests and examples.
 
-- reads Polygon mandate, settlement receipt, and 0x quote data from the public API
+- reads Polygon mandate, settlement receipt, and 0x quote data from the
+  authenticated platform API
 - normalizes the public response shapes into `PolygonMandate`, `SettlementReceipt`,
   `EmbeddedWalletCharge`, and `CrossCurrencyQuote`
 - simulates mandates and embedded-wallet charges locally for `AppTestHarness`
@@ -58,12 +59,97 @@ no on-chain payment. JPY/JPYC paid operation amounts must be either `0` or at
 least `15` minor units. The SDK and platform reject positive JPY/JPYC operation
 prices below that floor.
 
+## Generic reward payouts
+
+MCP Gateway exposes reward payouts as a generic developer-funded settlement
+tool. This is for APIs that have already computed a reward and need the
+platform to move funds from the connected developer's Siglume embedded wallet
+to a recipient Siglume user's embedded wallet.
+
+Reward payouts are called through MCP Gateway, not through the SDK's normal
+`SIGLUME_API_KEY` registration surface. Use a bearer token issued for MCP:
+
+| Surface | Credential | What it can do |
+|---|---|---|
+| SDK / CLI / Developer Surface | `SIGLUME_API_KEY` or `cli_...` | registration, validation, listing automation |
+| MCP Gateway | `Authorization: Bearer mcpsk_...` | `initialize`, `tools/list`, `tools/call` for account-level `market_*` tools |
+| OAuth MCP clients | `Authorization: Bearer mcpoa_...` | OAuth-connected MCP clients |
+
+`X-API-Key`, `X-Siglume-API-Key`, and `cli_...` credentials are rejected by
+MCP Gateway. Issue the `mcpsk_...` token for the target agent in the Developer
+Portal, store it in the publisher API's secret manager, and use that token for
+server-side reward payout calls.
+
+Reward payout is a Siglume platform contract. Publisher APIs must adapt to the
+official MCP Gateway tool contract below. Siglume does not define
+API-specific payout connectors, API-specific `PF_BASE_URL` / `PF_API_KEY`
+environment variable contracts, or API-specific wallet/state resolver behavior.
+If a publisher API uses those names internally, they are local adapter
+configuration and must map back to this documented platform surface.
+
+Available MCP tools:
+
+- `market_create_reward_payout`
+- `market_list_reward_payouts`
+- `market_get_reward_payout`
+
+The create request contains only:
+
+- `app_id`
+- `recipient_subject`
+- `amount_minor` or `amount_jpy`
+- `display_currency`
+- `token_symbol`
+- `reward_event_id`
+- `idempotency_key`
+- optional `metadata`
+
+Do not send `source_wallet_id`, `destination_wallet_id`, wallet addresses, or
+private chain instructions. The platform resolves both wallets from the
+authenticated developer/app context and the recipient Siglume subject. The
+platform rejects wallet override fields, enforces developer scope, checks
+wallet/KYC/transfer constraints, executes the transfer, tracks status, and
+emits signed webhook events.
+
+The `agent_id` is used when issuing or rotating the MCP token. Do not pass
+`agent_id` to `market_create_reward_payout`; Gateway resolves the connected
+developer and bound agent from the `mcpsk_...` session.
+
+Minimal call sequence:
+
+1. `POST https://mcp.siglume.com/` with `Authorization: Bearer mcpsk_...`.
+2. Send MCP `initialize`.
+3. Send `tools/list` and confirm `market_create_reward_payout` is present.
+4. Send `tools/call` with name `market_create_reward_payout` and the arguments
+   above.
+
+The API remains responsible for reward math, ranking, usage observation,
+eligibility, fraud scoring, and local durable payout-request records. The
+platform remains responsible for payment execution, wallet resolution,
+idempotency, transfer state, and reconciliation.
+
+Use the signed `reward_paid` webhook as the completion source of truth. A
+synchronous create response only means the platform accepted or resolved the
+request state; it is not a substitute for webhook-confirmed completion.
+
+Do not ask Siglume to change wallet resolution, authentication, or payout
+state semantics for one API. A new server-to-server payout authentication
+surface must be requested and reviewed as a platform feature, with its own
+security, rate-limit, audit, key-rotation, and responsibility-boundary rules.
+
 ## Client helpers
 
+The live `/market/web3/*` helper endpoints are signed-in owner/session
+routes. They read the current user's wallet mandates, receipts, and swap
+quotes; they do not accept `SIGLUME_API_KEY` / `cli_...` registration tokens
+or MCP `mcpsk_...` tokens.
+
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
 mandate = client.get_polygon_mandate("pmd_123")
 receipt = client.get_settlement_receipt("chr_123")
@@ -78,7 +164,7 @@ quote = client.get_cross_currency_quote(
 ```ts
 import { SiglumeClient } from "@siglume/api-sdk";
 
-const client = new SiglumeClient({ api_key: "sig_live_..." });
+const client = new SiglumeClient({ api_key: process.env.SIGLUME_OWNER_SESSION_BEARER! });
 
 const mandate = await client.get_polygon_mandate("pmd_123");
 const receipt = await client.get_settlement_receipt("chr_123");
@@ -90,10 +176,10 @@ const quote = await client.get_cross_currency_quote({
 });
 ```
 
-`get_cross_currency_quote()` calls the public `/market/web3/swap/quote` endpoint. When
-the platform is configured with a 0x API key it returns a live quote; when the
-environment has no 0x credentials the platform falls back to a deterministic
-mock quote for local / beta environments.
+`get_cross_currency_quote()` calls the authenticated `/market/web3/swap/quote`
+endpoint. When the platform is configured with a 0x API key it returns a live
+quote; when the environment has no 0x credentials the platform falls back to a
+deterministic mock quote for local / beta environments.
 
 ## Local simulation
 

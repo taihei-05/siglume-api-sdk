@@ -44,7 +44,7 @@ class NewsDigestApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Collect and summarize public news articles for a requested topic.",
+            short_description="Collect and summarize public news for a topic.",
             example_prompts=[
                 "Give me a 3-day digest of news about AI agents.",
                 "Summarize this week's top stories about robotics startups.",

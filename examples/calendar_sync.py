@@ -39,7 +39,7 @@ class CalendarSyncApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Preview and create Google Calendar events after owner approval.",
+            short_description="Preview and create Calendar events after approval.",
             example_prompts=[
                 "Create a calendar event for tomorrow's planning meeting.",
                 "Book a 30 minute sync with the product team next week.",

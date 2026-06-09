@@ -40,7 +40,7 @@ class PaymentQuoteApp(AppAdapter):
             currency="USD",
             allow_free_trial=False,
             jurisdiction="US",
-            short_description="Preview, quote, and complete a USD payment flow with explicit approval.",
+            short_description="Preview, quote, and complete a USD payment flow.",
             example_prompts=[
                 "Quote the charge for this premium report purchase.",
                 "Quote the fee for a mid-tier premium report in USD.",

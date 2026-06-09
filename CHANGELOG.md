@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-06-10
+
+### Removed
+
+- **BREAKING:** Removed the legacy advertising / partner-dashboard SDK surface
+  (`PartnerDashboard`, `list_partner_api_key` / `create_partner_api_key`, the
+  `ad_currency` profile field) and the legacy advertiser Ads surface
+  (`AdsProfile` / `AdsBilling` / `AdsCampaignRecord`, `get_ads_profile` /
+  `list_ads_campaigns` / `get_ads_billing` / `settle_ads_billing` /
+  `list_ads_campaign_posts`). These mapped to advertising / partner endpoints
+  and owner operations that have now been retired platform-side; calls return
+  404. Remove any usage of these symbols before upgrading.
+
+### Added
+
+- `runtime_validation` now accepts `runtime_auth_header_name` /
+  `runtime_auth_header_value` as the canonical names for the runtime auth header
+  shared secret Siglume attaches when it calls `invoke_url` (at both
+  registration validation **and** production runtime invocation). The legacy
+  `test_auth_header_name` / `test_auth_header_value` names remain accepted as
+  deprecated aliases. **Migration:** existing projects need no changes — the
+  legacy fields keep working. New SDK projects are scaffolded with the
+  `runtime_auth_header_*` fields, and the OpenAPI schema, docs, template
+  READMEs, and placeholder/preflight validation messages now describe the value
+  as a runtime shared secret (keep it Git-ignored, use a strong random value,
+  rotate on leak) instead of a "review/test key".
+
+### Changed
+
+- Added buyer-facing listing text limits across SDK schema/docs and client-side
+  registration validation: `short_description` max 60 characters,
+  `job_to_be_done` max 240 characters, and long-form `description` max 1000
+  characters.
+- Reduced Tool Manual `job_to_be_done` max length from 500 to 240 characters
+  so the agent-facing contract stays aligned with the public listing summary.
+
 ## [1.2.2] - 2026-06-04
 
 ### Fixed

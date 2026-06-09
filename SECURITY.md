@@ -56,7 +56,30 @@ when OIDC is unavailable. If a token is unavoidable:
 3. Revoke it immediately after the fallback upload or if it appears in shell
    history, screenshots, logs, commits, or chat.
 
-Generated developer projects may contain local review keys in
-`runtime_validation.json` and external-provider secrets in the publisher API secret store.
-The SDK templates generate a `.gitignore` that excludes those files; verify
-with `git status --ignored` before publishing your own API source repository.
+## Runtime auth header secret
+
+`runtime_validation.json` carries the runtime auth header shared secret
+(`runtime_auth_header_name` / `runtime_auth_header_value`; legacy aliases
+`test_auth_header_name` / `test_auth_header_value`). This is **not** a
+throwaway test or review key: Siglume attaches the same value when it calls
+your `invoke_url`, both during registration validation and at production
+runtime invocation. For `ACTION` / per-action / prepay APIs it is the trust
+boundary on live side-effect requests.
+
+Handle it accordingly:
+
+- Use a strong, randomly generated value dedicated to Siglume. Never reuse your
+  master / admin API key.
+- Keep `runtime_validation.json` Git-ignored — the generated `.gitignore`
+  already excludes it. Verify with `git status --ignored` before publishing
+  your API source repository.
+- Have your API runtime treat the incoming header as the trust boundary: reject
+  any `invoke_url` request whose header does not match the configured secret.
+- Rotate the secret if it is ever exposed (shell history, screenshots, logs,
+  commits, or chat). Rotating means generating a new value and re-registering /
+  updating the listing so Siglume sends the new secret.
+
+Generated developer projects may also hold external-provider secrets in the
+publisher API secret store (kept outside Siglume). The SDK templates generate a
+`.gitignore` that excludes the local secret files; verify with
+`git status --ignored` before publishing your own API source repository.

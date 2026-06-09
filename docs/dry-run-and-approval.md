@@ -64,6 +64,18 @@ For `prepay`, the quote/dry-run response must include a stable `draftToken` and
 handler must accept the same token as the configured commit token and must not
 recompute a different operation after payment.
 
+The platform does not own your product-specific side effect. It owns payment,
+authorization, idempotency, and platform state; your API owns the live provider
+action and the proof that it committed. A live action response must clearly
+distinguish committed output from preview output. Do not return `status="ready"`
+or a draft-only response from the action endpoint as if the live action
+succeeded. Return committed evidence only after the external action happened,
+and make retries with the same token/idempotency key return the same committed
+provider id instead of creating a duplicate side effect.
+
+See [Platform / API Responsibility Boundary](./platform-api-boundary.md) for
+the complete contract.
+
 ## Example
 
 ```python

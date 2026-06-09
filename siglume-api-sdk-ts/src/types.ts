@@ -113,6 +113,7 @@ export interface AppManifest {
   capability_key: string;
   version?: string;
   name: string;
+  /** Buyer-facing task summary, max 240 characters. */
   job_to_be_done: string;
   category?: AppCategory;
   permission_class: PermissionClass;
@@ -130,7 +131,9 @@ export interface AppManifest {
   jurisdiction: string;
   applicable_regulations?: string[];
   data_residency?: string;
+  /** Catalog tagline shown on cards and the detail header, max 60 characters. */
   short_description?: string;
+  /** Detail-page copy for limits, approval behavior, pricing notes, and expected results, max 1000 characters. */
   description?: string;
   docs_url?: string;
   support_contact?: string;
@@ -920,124 +923,6 @@ export interface WorksPosterDashboard {
   in_progress_orders: WorksPosterDashboardOrder[];
   completed_orders: WorksPosterDashboardOrder[];
   stats: WorksPosterDashboardStats;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerDashboard {
-  partner_id: string;
-  company_name?: string | null;
-  plan?: string | null;
-  plan_label?: string | null;
-  month_bytes_used: number;
-  month_bytes_limit: number;
-  month_usage_pct: number;
-  total_source_items: number;
-  has_billing: boolean;
-  has_subscription: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerUsage {
-  plan?: string | null;
-  month_bytes_used: number;
-  month_bytes_limit: number;
-  month_bytes_remaining: number;
-  month_usage_pct: number;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerApiKeyRecord {
-  credential_id: string;
-  name?: string | null;
-  key_id?: string | null;
-  allowed_source_types: string[];
-  last_used_at?: string | null;
-  created_at?: string | null;
-  revoked: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerApiKeyHandle {
-  credential_id: string;
-  name?: string | null;
-  key_id?: string | null;
-  allowed_source_types: string[];
-  masked_key_hint?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsBilling {
-  currency?: string | null;
-  billing_mode?: string | null;
-  month_spend_jpy: number;
-  month_spend_usd: number;
-  all_time_spend_jpy: number;
-  all_time_spend_usd: number;
-  total_impressions: number;
-  total_replies: number;
-  has_billing: boolean;
-  has_subscription: boolean;
-  invoices: Array<Record<string, unknown>>;
-  wallet?: Record<string, unknown> | null;
-  balances: Array<Record<string, unknown>>;
-  supported_tokens: Array<Record<string, unknown>>;
-  funding_instructions?: Record<string, unknown> | null;
-  mandate?: PlanWeb3Mandate | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsBillingSettlement {
-  status?: string | null;
-  message?: string | null;
-  settles_automatically?: boolean | null;
-  cycle_key?: string | null;
-  settled_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsProfile {
-  has_profile: boolean;
-  company_name?: string | null;
-  ad_currency?: string | null;
-  has_billing: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsCampaignRecord {
-  campaign_id: string;
-  name?: string | null;
-  target_url?: string | null;
-  content_brief?: string | null;
-  target_topics: string[];
-  posting_interval_minutes: number;
-  max_posts_per_day: number;
-  currency?: string | null;
-  monthly_budget_jpy: number;
-  cpm_jpy: number;
-  cpr_jpy: number;
-  monthly_budget_usd: number;
-  cpm_usd: number;
-  cpr_usd: number;
-  status: string;
-  month_spend_jpy: number;
-  month_spend_usd: number;
-  total_posts: number;
-  total_impressions: number;
-  total_replies: number;
-  next_post_at?: string | null;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsCampaignPostRecord {
-  post_id: string;
-  content_id?: string | null;
-  cost_jpy: number;
-  cost_usd: number;
-  impressions: number;
-  replies: number;
-  status?: string | null;
-  created_at?: string | null;
   raw: Record<string, unknown>;
 }
 
