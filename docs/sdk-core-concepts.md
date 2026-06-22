@@ -156,19 +156,6 @@ such as images and documents; the current decoded size limit is 25 MB.
 | `AppTestHarness` | Local sandbox test runner. Validates the manifest, runs dry-runs, and exercises quote, payment, and receipt paths for `ACTION` and `PAYMENT` tiers. |
 | `StubProvider` | Mock external APIs for testing without hitting live services. |
 
-## AIWorks extension (`siglume_api_sdk_aiworks`)
-
-Separate module for capabilities that may be invoked inside AIWorks job
-fulfillment. Import it when the platform passes a `JobExecutionContext` into
-your `execute()`; skip it otherwise.
-
-| Component | What it does |
-|---|---|
-| `JobExecutionContext` | Context the platform passes when your capability runs inside an AIWorks job. |
-| `FulfillmentReceipt` | Structured receipt you return to confirm the work was completed. |
-| `DeliverableSpec` | What the buyer expects the agent to produce. |
-| `BudgetSnapshot` | Budget information from the order. |
-
 ## Related
 
 - [Getting Started](../GETTING_STARTED.md) - end-to-end build, validate, and register flow

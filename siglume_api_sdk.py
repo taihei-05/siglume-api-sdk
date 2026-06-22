@@ -70,12 +70,13 @@ class Environment(str, Enum):
 class PriceModel(str, Enum):
     """Pricing models for agent APIs.
 
-    Live: free, subscription, usage_based, per_action.
+    Live: free, subscription, per_request, usage_based, per_action.
     Planned: one_time, bundle.
     Platform fee: 6.6%. Developer keeps 93.4%.
     """
     FREE = "free"                    # No charge.
     SUBSCRIPTION = "subscription"    # Monthly recurring (USD).
+    PER_REQUEST = "per_request"      # One direct payment requirement per invocation.
     ONE_TIME = "one_time"            # Planned: single purchase.
     BUNDLE = "bundle"                # Planned: bundled package.
     USAGE_BASED = "usage_based"      # Free upfront; execution declares billable usage.
@@ -447,8 +448,8 @@ class ExecutionContext:
 # ── Execution Contract Types ──
 # Structured types for describing what happened during execution.
 # These replace (or complement) the free-form receipt_summary dict
-# so that receipts are machine-readable and can link to AIWorks
-# deliverables, audit trails, and rollback review.
+# so that receipts are machine-readable and can link to artifacts,
+# audit trails, and rollback review.
 
 @dataclass
 class ExecutionArtifact:
@@ -517,7 +518,7 @@ class ReceiptRef:
     """Opaque reference to a CapabilityExecutionReceipt on the platform.
 
     Returned by the runtime after execution completes — not set by the app
-    developer. Use this to link AIWorks JobDeliverables to execution receipts
+    developer. Use this to link platform-side artifacts to execution receipts
     via ``execution_receipt_id``.
 
     Note: the link is a string reference (not a foreign key constraint),

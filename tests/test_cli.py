@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 
 from siglume_api_sdk.cli import main  # noqa: E402
 from siglume_api_sdk.cli import project as project_module  # noqa: E402
+from siglume_api_sdk.cli.commands import mcp_router_cmd as mcp_router_module  # noqa: E402
 from siglume_api_sdk import (  # noqa: E402
     AppCategory,
     AppManifest,
@@ -138,6 +139,136 @@ def test_init_command_writes_template_files() -> None:
         assert "Start locally without a Siglume API key" in readme_text
         assert "Do not commit the real runtime auth secret or external-provider secrets" in readme_text
         assert readme_text.index("siglume score . --offline") < readme_text.index("siglume validate .")
+
+
+def test_mcp_router_register_cli_uses_cli_key_owner_and_hides_secret(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
+            calls["api_key"] = api_key
+            calls["base_url"] = base_url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def get_mcp_router_account(self) -> dict[str, object]:
+            return {
+                "user_id": "usr_provider",
+                "email": "provider@example.com",
+                "display_name": "Provider",
+                "plan": "free",
+                "status": "active",
+            }
+
+        def register_mcp_router_server(self, **payload):
+            calls["register_payload"] = payload
+            return {
+                "id": "srv_provider",
+                "name": payload["name"],
+                "base_url": payload["base_url"],
+                "status": "active",
+                "short_id": "srouter1",
+                "monetization": payload["monetization"],
+            }
+
+    monkeypatch.setattr(mcp_router_module, "SiglumeClient", FakeClient)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "mcp-router",
+            "register",
+            "--expect-owner-email",
+            "provider@example.com",
+            "--name",
+            "Provider MCP",
+            "--mcp-url",
+            "https://provider.example/mcp",
+            "--auth",
+            "bearer",
+            "--bearer-secret-env",
+            "UPSTREAM_MCP_TOKEN",
+            "--billing",
+            "free",
+            "--yes",
+        ],
+        env={"SIGLUME_API_KEY": "cli_test.secret", "UPSTREAM_MCP_TOKEN": "upstream-secret"},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls["api_key"] == "cli_test.secret"
+    assert calls["register_payload"]["base_url"] == "https://provider.example/mcp"
+    assert calls["register_payload"]["bearer_secret"] == "upstream-secret"
+    assert calls["register_payload"]["monetization"] == "free"
+    assert "upstream-secret" not in result.output
+    assert "MCP Router server registered." in result.output
+
+
+def test_mcp_router_register_cli_rejects_owner_mismatch_before_write(monkeypatch) -> None:
+    calls: dict[str, object] = {"registered": False}
+
+    class FakeClient:
+        def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def get_mcp_router_account(self) -> dict[str, object]:
+            return {
+                "user_id": "usr_wrong",
+                "email": "wrong@example.com",
+                "display_name": "Wrong Owner",
+            }
+
+        def register_mcp_router_server(self, **payload):
+            calls["registered"] = True
+            return {}
+
+    monkeypatch.setattr(mcp_router_module, "SiglumeClient", FakeClient)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "mcp-router",
+            "register",
+            "--expect-owner-email",
+            "provider@example.com",
+            "--name",
+            "Provider MCP",
+            "--mcp-url",
+            "https://provider.example/mcp",
+            "--yes",
+        ],
+        env={"SIGLUME_API_KEY": "cli_wrong.secret"},
+    )
+
+    assert result.exit_code != 0
+    assert "Owner mismatch" in result.output
+    assert calls["registered"] is False
+
+
+def test_mcp_router_cli_explains_missing_owner_api_key() -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["mcp-router", "account"],
+        env={"SIGLUME_API_KEY": ""},
+    )
+
+    assert result.exit_code != 0
+    assert "Missing Siglume provider API key" in result.output
+    assert "/owner/publish/advanced" in result.output
+    assert "upstream MCP bearer token" in result.output
 
 
 def test_init_command_merges_existing_gitignore() -> None:

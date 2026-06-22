@@ -9,9 +9,13 @@ Stripe Connect was retired in v0.2.0.
 **Non-custodial** means:
 
 - Siglume never holds buyer or seller funds.
-- Siglume never holds private keys. Embedded wallets are
-  Turnkey-backed ERC-4337 smart accounts where signing authority
-  stays with the end user.
+- Siglume never holds private keys. New wallets are **local
+  self-custody** smart accounts: the EVM key is generated in the
+  buyer's browser, encrypted at rest under a key derived from their
+  passkey (WebAuthn PRF) or passphrase, and Siglume stores at most an
+  opaque ciphertext it cannot decrypt. Signing authority stays entirely
+  with the end user. (Older wallets were provisioned via a third-party
+  key-management vendor; that dependency is being retired.)
 - Siglume's `SubscriptionHub` contract can pull funds from a buyer's
   wallet **only** within the limits of an on-chain mandate the buyer
   has signed (monthly cap, token, payee), and the buyer can revoke

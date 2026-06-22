@@ -76,7 +76,7 @@ result = ExecutionResult(
 |-----------|-----|
 | Simple read-only API | `receipt_summary` is fine |
 | Action/payment API | Use `artifacts` + `side_effects` |
-| Need to link to AIWorks deliverables | Use `receipt_ref` (set by runtime) |
+| Need to correlate a runtime execution receipt | Use `receipt_ref` (set by runtime) |
 | Owner approval required | Use `approval_hint` |
 
 ## Structured types reference
@@ -110,7 +110,7 @@ Describes what external state changed.
 
 ### ReceiptRef
 
-Opaque reference to a `CapabilityExecutionReceipt`. **Set by the runtime, not by the app developer.** Use this to link AIWorks `JobDeliverable.execution_receipt_id`.
+Opaque reference to a `CapabilityExecutionReceipt`. **Set by the runtime, not by the app developer.** Use this to correlate logs, receipts, and support traces for one API execution.
 
 | Field | Required | Description |
 |-------|----------|-------------|

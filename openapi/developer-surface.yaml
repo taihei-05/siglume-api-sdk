@@ -2831,7 +2831,8 @@ components:
       required: [receipt_id]
       description: |
         Opaque reference to a CapabilityExecutionReceipt. Set by the runtime,
-        not by the app developer. Use to link AIWorks JobDeliverables.
+        not by the app developer. Use to correlate logs, receipts, and support
+        traces for one API execution.
       properties:
         receipt_id: { type: string, description: "UUID of CapabilityExecutionReceipt" }
         trace_id: { type: string, nullable: true }

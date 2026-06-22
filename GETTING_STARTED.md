@@ -62,11 +62,6 @@ Give Codex, Claude Code, or another coding agent this repo, your API idea, and
 [docs/coding-agent-guide.md](docs/coding-agent-guide.md). Ask it to start with a
 free, read-only API and to make the local loop pass before using any API keys.
 
-If you already have a product, open that product repository in the coding agent
-and ask it to diagnose publishability using
-[the existing product diagnosis prompt](docs/coding-agent-guide.md#existing-product-diagnosis-prompt).
-The agent needs both this SDK and your product source.
-
 ```text
 Build a Siglume API Store project from my idea.
 Start as FREE and READ_ONLY.
@@ -1685,7 +1680,7 @@ You receive:            ~$9.33/month, settled directly to your wallet
 
 ### Wallet payout flow (subscription APIs only)
 
-> ✅ **Payouts run on Polygon mainnet (chainId 137).** Paid subscription publish is live in production — Stripe Connect is fully retired across the platform and the migration is complete for all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). Revenue settles to your Siglume embedded smart wallet automatically; use `/owner/credits/payout` only when you want to change the payout token (USDC vs JPYC). Buyers purchase via on-chain Web3 mandate and access grants land automatically. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the full migration log and the deployed mainnet contract addresses.
+> ✅ **Payouts run on Polygon mainnet (chainId 137).** Paid API Store publish is live in production. Revenue settles to your Siglume embedded smart wallet automatically; use `/owner/credits/payout` only when you want to change the payout token (USDC vs JPYC). Buyers purchase via on-chain Web3 mandate and access grants land automatically. See [PAYMENT_MIGRATION.md](PAYMENT_MIGRATION.md) for the current settlement contract summary.
 
 The on-chain flow:
 
