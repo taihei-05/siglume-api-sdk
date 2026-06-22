@@ -62,6 +62,11 @@ Give Codex, Claude Code, or another coding agent this repo, your API idea, and
 [docs/coding-agent-guide.md](docs/coding-agent-guide.md). Ask it to start with a
 free, read-only API and to make the local loop pass before using any API keys.
 
+If you already have a product, open that product repository in the coding agent
+and ask it to diagnose publishability using
+[the existing product diagnosis prompt](docs/coding-agent-guide.md#existing-product-diagnosis-prompt).
+The agent needs both this SDK and your product source.
+
 ```text
 Build a Siglume API Store project from my idea.
 Start as FREE and READ_ONLY.

@@ -15,6 +15,12 @@ You do not need to design the whole API by yourself. The recommended beginner
 path is to use Codex, Claude Code, or another coding agent to turn a plain
 language idea into a Siglume API project.
 
+Already have a product? Open that product repository in your coding agent, give
+it this SDK URL, and ask whether the product can become a Siglume Agent API. The
+agent needs both this SDK and your product source; the SDK URL alone is not
+enough. Use the [existing product diagnosis prompt](#existing-product-diagnosis-prompt)
+below.
+
 Start with a **free, read-only API**. Avoid OAuth, posting, wallet actions,
 payments, and other side effects until your first API is published.
 
@@ -166,6 +172,44 @@ TypeScript variant: ask the coding agent to create `adapter.ts`,
 `tool_manual.json`, package scripts, and local tests using `@siglume/api-sdk`,
 while keeping the same FREE, READ_ONLY, no-OAuth, no-payment first-version
 constraints.
+
+### Existing product diagnosis prompt
+
+Open your existing product repository in Codex, Claude Code, Cursor, or another
+coding agent, then paste this prompt:
+
+```text
+Diagnose whether the currently open product can be published as a Siglume Agent
+API Store listing.
+
+Siglume SDK:
+https://github.com/taihei-05/siglume-api-sdk
+
+Read the SDK README.md, GETTING_STARTED.md, docs/coding-agent-guide.md,
+docs/platform-api-boundary.md, and docs/publish-flow.md.
+
+Inspect this product's features, inputs, outputs, external dependencies,
+authentication, side effects, and resale or terms-of-service risks.
+
+Classify the product as one of:
+- publishable as-is
+- publishable with small changes
+- needs major changes
+- not a good fit
+
+If it is a fit, design the smallest Siglume version. Start as FREE, READ_ONLY,
+no OAuth, no payment, and no external side effects unless I explicitly approve
+otherwise. Create or propose adapter.py or adapter.ts, tool_manual.json, a local
+README, and useful local tests.
+
+Aim to make this pass before asking for API keys or production credentials:
+siglume test .
+siglume score . --offline
+
+Do not run plain siglume register ., change production systems, issue API keys,
+set pricing, or publish anything unless I explicitly approve. End with the
+human decisions still needed.
+```
 
 ---
 
