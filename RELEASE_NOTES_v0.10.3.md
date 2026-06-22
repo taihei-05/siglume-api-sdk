@@ -5,13 +5,9 @@ v0.9.0 split.
 
 ## What changed
 
-- README now distinguishes the API Store tool-selection pipeline from the AI
-  Works automated route.
-- The agent-core reading list now includes:
-  - `job_feasibility` for Works `automated` / `manual` /
-    `needs_clarification` / `blocked` routing.
-  - `works_candidate_selector` for Works auto-pitch candidate ranking, stable
-    match fingerprints, and re-check suppression.
+- README now documents the API Store tool-selection pipeline.
+- The agent-core reading list now includes the public API Store selection and
+  orchestration modules.
 
 ## Compatibility
 
@@ -19,8 +15,8 @@ No SDK or CLI behavior changed.
 
 `siglume dev market-vitals --days 7` still calls
 `/v1/seller/analytics/market-vitals` and reports aggregate API Store
-orchestrator traffic. It does not depend on the Works auto-pitch cache table or
-the hosted platform's pitch/proposal/order side effects.
+orchestrator traffic. It does not depend on the retired auto-pitch cache table or
+retired proposal side effects.
 
 ## Quick Start
 

@@ -45,6 +45,8 @@ def test_tracked_text_files_do_not_contain_known_mojibake_markers() -> None:
 
     for relative_path in tracked_files:
         path = SDK_ROOT / relative_path
+        if not path.exists():
+            continue
         data = path.read_bytes()
         if b"\x00" in data:
             continue

@@ -15,12 +15,6 @@ You do not need to design the whole API by yourself. The recommended beginner
 path is to use Codex, Claude Code, or another coding agent to turn a plain
 language idea into a Siglume API project.
 
-Already have a product? Open that product repository in your coding agent, give
-it this SDK URL, and ask whether the product can become a Siglume Agent API. The
-agent needs both this SDK and your product source; the SDK URL alone is not
-enough. Use the [existing product diagnosis prompt](#existing-product-diagnosis-prompt)
-below.
-
 Start with a **free, read-only API**. Avoid OAuth, posting, wallet actions,
 payments, and other side effects until your first API is published.
 
@@ -48,9 +42,9 @@ Use [docs/coding-agent-guide.md](./docs/coding-agent-guide.md) as the file to
 give your coding agent. Use [API_IDEAS.md](./API_IDEAS.md) if you need a safe
 first idea.
 
-> ✅ **Payment stack is on-chain and live.** Siglume settles 100% on **Polygon mainnet** (chainId 137) — non-custodial embedded smart wallets, platform-sponsored gas, auto-debit subscription mandates. Stripe Connect was retired in v0.2.0; the migration is complete across all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the migration history and on-chain contract addresses.
+> ✅ **Payment stack is on-chain and live.** Siglume settles paid API Store revenue on **Polygon mainnet** (chainId 137) through non-custodial embedded smart wallets, platform-sponsored gas, and auto-debit subscription mandates. See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the current settlement contract summary.
 
-Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs for agents to install and call) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store: you publish an API once, any Siglume agent whose owner opts in can use it, and billing follows the listing's price model: free, subscription, or operation-based usage billing. The customers are **autonomous AI agents**, not humans.
+Siglume's public SDK targets the **Agent API Store**: you publish an API once, any Siglume agent whose owner opts in can use it, and billing follows the listing's price model: free, subscription, or operation-based usage billing. The customers are **autonomous AI agents**, not humans.
 
 **Who this is for:** developers shipping API products who want a new distribution channel where the *customer is the AI agent itself*.
 
@@ -172,44 +166,6 @@ TypeScript variant: ask the coding agent to create `adapter.ts`,
 `tool_manual.json`, package scripts, and local tests using `@siglume/api-sdk`,
 while keeping the same FREE, READ_ONLY, no-OAuth, no-payment first-version
 constraints.
-
-### Existing product diagnosis prompt
-
-Open your existing product repository in Codex, Claude Code, Cursor, or another
-coding agent, then paste this prompt:
-
-```text
-Diagnose whether the currently open product can be published as a Siglume Agent
-API Store listing.
-
-Siglume SDK:
-https://github.com/taihei-05/siglume-api-sdk
-
-Read the SDK README.md, GETTING_STARTED.md, docs/coding-agent-guide.md,
-docs/platform-api-boundary.md, and docs/publish-flow.md.
-
-Inspect this product's features, inputs, outputs, external dependencies,
-authentication, side effects, and resale or terms-of-service risks.
-
-Classify the product as one of:
-- publishable as-is
-- publishable with small changes
-- needs major changes
-- not a good fit
-
-If it is a fit, design the smallest Siglume version. Start as FREE, READ_ONLY,
-no OAuth, no payment, and no external side effects unless I explicitly approve
-otherwise. Create or propose adapter.py or adapter.ts, tool_manual.json, a local
-README, and useful local tests.
-
-Aim to make this pass before asking for API keys or production credentials:
-siglume test .
-siglume score . --offline
-
-Do not run plain siglume register ., change production systems, issue API keys,
-set pricing, or publish anything unless I explicitly approve. End with the
-human decisions still needed.
-```
 
 ---
 
@@ -547,8 +503,6 @@ When a buyer's agent receives a request, the platform decides whether to call yo
    └──────────────────────────────────────────────────────────┘
 ```
 
-AI Works has an additional route before an API can be called. A submitted Works job is first classified by `job_feasibility` (`automated`, `manual`, `needs_clarification`, or `blocked`, agent-core v0.8). Automated Works jobs then use `works_candidate_selector` (agent-core v0.9) for deterministic agent-candidate ranking, stable match fingerprints, and re-check suppression. The hosted platform still owns DB rows, LLM fit checks, pitch/proposal/order creation, payments, and notifications.
-
 ### Reading list by question
 
 | If you want to know… | Read this in agent-core |
@@ -560,8 +514,6 @@ AI Works has an additional route before an API can be called. A submitted Works 
 | How the LLM tool-use loop runs end-to-end | [`orchestrate`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) |
 | How buyer-supplied input maps into my API's `input_schema` | [`orchestrate_helpers`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) — `build_orchestrate_system_prompt()` |
 | How to dry-run "would the planner have picked my API for this offer text?" before publishing | [`dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) |
-| How a Works job is first routed as automated/manual/clarification/blocked | [`job_feasibility`](https://github.com/taihei-05/siglume-agent-core#8-job_feasibility-v08) |
-| How Works auto-pitch candidates are ranked and re-checks are suppressed | [`works_candidate_selector`](https://github.com/taihei-05/siglume-agent-core#9-works_candidate_selector-v09) |
 
 ### Pre-publish dry run with agent-core
 
@@ -869,17 +821,6 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | `AppTestHarness` | Local sandbox test runner (incl. quote, payment, receipt validation) |
 | `StubProvider` | Mock external APIs for testing |
 
-### AIWorks extension (`siglume_api_sdk_aiworks`)
-
-Separate module for AIWorks job fulfillment. Import only if your app participates in AIWorks.
-
-| Component | What it does |
-|---|---|
-| `JobExecutionContext` | Context provided when fulfilling an AIWorks job |
-| `FulfillmentReceipt` | Structured receipt for job completion |
-| `DeliverableSpec` | What the buyer expects the agent to produce |
-| `BudgetSnapshot` | Budget information from the order |
-
 ## Acceptance bar
 
 Your API gets listed when it passes these three checks:
@@ -902,8 +843,7 @@ write a strong tool manual, and let the value speak for itself.
 ## Project status
 
 This is **v1.2.2 (beta)** — the platform is launched on Polygon mainnet
-(chainId 137) with all five settlement surfaces (Plan / Partner / API
-Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
+(chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship
 as the platform exposes them. Start with a small read-only API to learn

@@ -85,8 +85,7 @@ drafting, manifest / tool-manual diff, tool-schema exporter
 `SettlementMode` expanded with `polygon_mandate` and
 `embedded_wallet_charge`. The full migration (Stripe Connect → Polygon
 mainnet, chainId 137) shipped server-side across phases 1–47 and is
-now live in production for all five settlement surfaces (Plan /
-Partner / API Store paid / AIWorks Escrow / Ads). See
+now live in production for paid API Store settlement. See
 [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the detail and
 on-chain contract addresses.
 

@@ -145,14 +145,52 @@ class Subscription:
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
+@dataclass
+class DirectPaymentRequirement:
+    requirement_id: str
+    status: str
+    transaction_request: dict[str, Any] = field(default_factory=dict)
+    approve_transaction_request: dict[str, Any] | None = None
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "DirectPaymentRequirement":
+        raw = dict(payload)
+        requirement_id = str(
+            raw.get("requirement_id")
+            or raw.get("direct_payment_requirement_id")
+            or raw.get("id")
+            or ""
+        ).strip()
+        if not requirement_id:
+            raise SiglumeClientError("Direct Payment requirement response did not include requirement_id.")
+        approve_request = _to_dict(raw.get("approve_transaction_request"))
+        return cls(
+            requirement_id=requirement_id,
+            status=str(raw.get("status") or "unknown"),
+            transaction_request=_to_dict(raw.get("transaction_request")),
+            approve_transaction_request=approve_request or None,
+            raw=raw,
+        )
+
+
+@dataclass
+class DirectPaymentInvocation:
+    requirement: DirectPaymentRequirement
+    capability_result: dict[str, Any] | None = None
+    execution_result: Any = None
+    payment_receipt: dict[str, Any] = field(default_factory=dict)
+    allowance_receipt: dict[str, Any] = field(default_factory=dict)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
 class SiglumeBuyerClient:
     """Experimental buyer-side SDK.
 
     Search is implemented client-side because the platform does not expose a
-    public capability search endpoint yet. Invocation is also experimental: the
-    public buyer execute route is not available, so `invoke()` can only run when
-    `allow_internal_execute=True` is explicitly enabled for mocked or privileged
-    environments.
+    public capability search endpoint yet. The generic `invoke()` helper is
+    still limited to mocked or privileged environments. Direct Payment
+    invocation uses the public SDRP Direct Payment requirement endpoints.
     """
 
     def __init__(
@@ -232,13 +270,14 @@ class SiglumeBuyerClient:
         if not lookup:
             raise SiglumeClientError("capability_key is required.")
         lowered = lookup.lower()
-        for listing in self._list_all_capabilities(status="published"):
-            if listing.capability_key.lower() == lowered:
-                self._warn_experimental(
-                    "tool-manual",
-                    "Buyer listings currently synthesize a minimal tool_manual because the public listing surface does not expose the full ToolManual payload yet.",
-                )
-                return CapabilityListing.from_app_listing(listing, experimental=True)
+        for status in ("published", "active"):
+            for listing in self._list_all_capabilities(status=status):
+                if listing.capability_key.lower() == lowered:
+                    self._warn_experimental(
+                        "tool-manual",
+                        "Buyer listings currently synthesize a minimal tool_manual because the public listing surface does not expose the full ToolManual payload yet.",
+                    )
+                    return CapabilityListing.from_app_listing(listing, experimental=True)
         try:
             listing = self._client.get_listing(lookup)
         except SiglumeNotFoundError as exc:
@@ -420,6 +459,154 @@ class SiglumeBuyerClient:
             json_body=payload,
         )
         return _build_execution_result(data, payload=payload)
+
+    def invoke_with_direct_payment(
+        self,
+        *,
+        capability_key: str,
+        input: Mapping[str, Any],
+        agent_id: str | None = None,
+        task_type: str = "default",
+        currency: str | None = None,
+        token_symbol: str | None = None,
+        await_finality: bool = True,
+        idempotency_key: str | None = None,
+        environment: str = "live",
+        metadata: Mapping[str, Any] | None = None,
+        bind_agent: bool = True,
+    ) -> DirectPaymentInvocation:
+        """Pay for a per-request capability and invoke it once.
+
+        The provider input is kept separate from the direct payment control
+        fields so the platform's request-hash check binds the paid requirement
+        to the exact API input.
+        """
+        listing = self.get_listing(capability_key)
+        target_agent_id = _resolve_agent_id(agent_id, self.default_agent_id)
+        if not target_agent_id:
+            raise SiglumeClientError("agent_id is required for invoke_with_direct_payment(); pass it explicitly or set SIGLUME_AGENT_ID.")
+
+        if bind_agent:
+            self._ensure_purchased_and_bound(listing, target_agent_id)
+
+        arguments = dict(input)
+        payment_currency = str(currency or listing.currency or "USD").strip().upper()
+        payment_token = str(token_symbol or ("JPYC" if payment_currency == "JPY" else "USDC")).strip().upper()
+        requirement_payload: dict[str, Any] = {
+            "listing_id": listing.listing_id,
+            "capability_key": listing.capability_key,
+            "agent_id": target_agent_id,
+            "task_type": task_type,
+            "input": arguments,
+            "currency": payment_currency,
+            "token_symbol": payment_token,
+            "metadata": dict(metadata or {}),
+        }
+        data, _meta = self._client._request(  # noqa: SLF001 - internal reuse within the SDK package
+            "POST",
+            "/sdrp/direct-payments/requirements",
+            json_body=requirement_payload,
+        )
+        requirement = DirectPaymentRequirement.from_payload(data)
+
+        allowance_receipt: dict[str, Any] = {}
+        if requirement.approve_transaction_request:
+            allowance_data, _allowance_meta = self._client._request(  # noqa: SLF001
+                "POST",
+                "/market/web3/transactions/execute-prepared",
+                json_body={
+                    "transaction_request": requirement.approve_transaction_request,
+                    "receipt_kind": "sdrp_direct_payment_allowance",
+                    "reference_type": "sdrp_direct_payment_requirement",
+                    "reference_id": requirement.requirement_id,
+                    "metadata": _to_dict(requirement.approve_transaction_request.get("metadata_jsonb")),
+                    "await_finality": bool(await_finality),
+                },
+            )
+            allowance_receipt = _to_dict(allowance_data.get("receipt"))
+
+        payment_data, _payment_meta = self._client._request(  # noqa: SLF001
+            "POST",
+            "/market/web3/transactions/execute-prepared",
+            json_body={
+                "transaction_request": requirement.transaction_request,
+                "receipt_kind": "sdrp_direct_payment",
+                "reference_type": "sdrp_direct_payment_requirement",
+                "reference_id": requirement.requirement_id,
+                "metadata": _to_dict(requirement.transaction_request.get("metadata_jsonb")),
+                "await_finality": bool(await_finality),
+            },
+        )
+        payment_receipt = _to_dict(payment_data.get("receipt"))
+        receipt_id = _string_or_none(payment_receipt.get("receipt_id")) or _string_or_none(payment_receipt.get("id"))
+        verify_body: dict[str, Any] = {"await_finality": False}
+        if receipt_id:
+            verify_body["receipt_id"] = receipt_id
+        verified_data, _verify_meta = self._client._request(  # noqa: SLF001
+            "POST",
+            f"/sdrp/direct-payments/requirements/{requirement.requirement_id}/verify",
+            json_body=verify_body,
+        )
+        requirement = DirectPaymentRequirement.from_payload(verified_data)
+
+        execute_metadata = {
+            **dict(metadata or {}),
+            "direct_payment_requirement_id": requirement.requirement_id,
+        }
+        execute_payload: dict[str, Any] = {
+            "agent_id": target_agent_id,
+            "task_type": task_type,
+            "input": arguments,
+            "metadata": execute_metadata,
+        }
+        if idempotency_key:
+            execute_payload["idempotency_key"] = idempotency_key
+        execution_data, _execution_meta = self._client._request(  # noqa: SLF001
+            "POST",
+            f"/sdrp/direct-payments/requirements/{requirement.requirement_id}/execute",
+            json_body=execute_payload,
+        )
+        capability_result = _to_dict(execution_data.get("capability_result")) or dict(execution_data)
+        refreshed_requirement_payload = _to_dict(execution_data.get("requirement"))
+        if refreshed_requirement_payload:
+            refreshed_requirement = DirectPaymentRequirement.from_payload(refreshed_requirement_payload)
+        elif bool(capability_result.get("accepted")):
+            refreshed_requirement = DirectPaymentRequirement.from_payload({**requirement.raw, "status": "spent"})
+        else:
+            refreshed_requirement = requirement
+
+        return DirectPaymentInvocation(
+            requirement=refreshed_requirement,
+            capability_result=capability_result,
+            execution_result=_build_execution_result(capability_result, payload={"execution_kind": "action", **execute_payload}),
+            payment_receipt=payment_receipt,
+            allowance_receipt=allowance_receipt,
+            raw={
+                "requirement": requirement.raw,
+                "payment": dict(payment_data),
+                "verification": dict(verified_data),
+                "execution": dict(execution_data),
+            },
+        )
+
+    def _ensure_purchased_and_bound(self, listing: CapabilityListing, agent_id: str) -> None:
+        try:
+            data, _meta = self._client._request(  # noqa: SLF001 - internal reuse within the SDK package
+                "POST",
+                f"/market/capabilities/{listing.listing_id}/purchase",
+                json_body={},
+            )
+        except SiglumeClientError:
+            # The direct payment requirement creation below performs the
+            # authoritative active-grant/binding check and returns a typed API
+            # error if the listing is not actually usable.
+            return
+        access_grant = _parse_access_grant(_to_dict(data.get("access_grant")))
+        if access_grant.access_grant_id:
+            try:
+                self._client.bind_agent_to_grant(access_grant.access_grant_id, agent_id=agent_id, binding_status="active")
+            except SiglumeClientError:
+                pass
 
     def _list_all_capabilities(self, *, status: str = "published") -> list[AppListingRecord]:
         return self._client.list_capabilities(status=status, limit=100).all_items()

@@ -32,7 +32,6 @@ first-party catalog (bundles, multipart, external ingest).
   - `market.proposals.*` — the proposal negotiation loop, including
     approval-required surfacing for `create` / `counter` / `accept`
     / `reject`
-  - `works.*` — AIWorks posting / registration / dashboard reads
   - `installed_tools.*` — installed-tool listing, connection
     readiness, binding-policy update (guarded), execution + receipt
     reads

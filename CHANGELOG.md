@@ -155,19 +155,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Docs align with `siglume-agent-core` v0.9.0.** README now distinguishes
-  the API Store tool-selection pipeline used by `siglume dev simulate` and
-  `siglume dev market-vitals` from the AI Works pre-route. It links to the
-  newly public `job_feasibility` and `works_candidate_selector` modules so the
-  Works automated route and re-check suppression policy are no longer implied
-  to be private or absent from agent-core.
+- **Docs align with `siglume-agent-core` v0.9.0.** README now documents the
+  API Store tool-selection pipeline used by `siglume dev simulate` and
+  `siglume dev market-vitals`, with links to the public agent-core selection
+  and orchestration modules.
 
 ### Compatibility
 
 - No CLI or client behavior change. `siglume dev market-vitals` remains a thin
   authenticated wrapper around `/v1/seller/analytics/market-vitals`; it reports
-  aggregate API Store orchestrator traffic and does not depend on the Works
-  auto-pitch cache implementation.
+  aggregate API Store orchestrator traffic.
 
 ## [0.10.2] - 2026-05-05
 
@@ -258,8 +255,7 @@ and [`siglume-api-sdk#199`](https://github.com/taihei-05/siglume-api-sdk/issues/
   copy still framed paid subscriptions as "publishing is open (Phase
   31 Polygon Amoy end-to-end proven)" and the payment stack as
   "migrating," which understated the current state. All five
-  settlement surfaces (Plan / Partner / API Store paid / AIWorks
-  Escrow / Ads) are on-chain.
+  active settlement surfaces are on-chain.
 - README "Current release" callout now points at v0.10.0 instead of
   v0.7.6, and the SDK feature inventory is updated to include
   capability bundles, seller-owned connected-account OAuth,
@@ -271,9 +267,9 @@ and [`siglume-api-sdk#199`](https://github.com/taihei-05/siglume-api-sdk/issues/
   the platform-side decision needed before `USAGE_BASED` /
   `PER_ACTION` open for API Store listings.
 - PAYMENT_MIGRATION header now lists the deployed mainnet contract
-  addresses (SubscriptionHub, AdsBillingHub, WorksEscrowHub, FeeVault,
-  platform relayer) and settlement-token addresses (native USDC,
-  JPYC). The phase-by-phase log is preserved as historical record.
+  addresses for active settlement surfaces and settlement-token addresses
+  (native USDC, JPYC). The phase-by-phase log is preserved as historical
+  record.
 
 ### Changed
 
@@ -667,7 +663,7 @@ methods, with paging, approval-required handling, and secret-hiding baked in.
   / `accept_market_proposal` / `reject_market_proposal`. Approval-required
   envelopes surface as `status: "approval_required"` + `intent_id` instead of
   throwing.
-- **Works**: `list_work_categories` / `register_work` / `get_work_registration`
+- **Market proposals**: `list_work_categories` / `register_work` / `get_work_registration`
   / owner and poster dashboard reads.
 - **Installed tools**: listing, connection readiness, execution + receipt
   reads, binding-policy update (guarded).
@@ -907,9 +903,8 @@ First public alpha of the Siglume API Store SDK.
 - `StubProvider` for mocking external APIs in tests.
 - **Tool Manual** as a first-class SDK type: `ToolManual`, `ToolManualIssue`, `ToolManualQualityReport`, `validate_tool_manual()` (mirrors server validation so you can check grade locally).
 - **Structured execution contract**: `ExecutionArtifact`, `SideEffectRecord`, `ReceiptRef`, `ApprovalRequestHint` (legacy `receipt_summary` retained for backward compatibility).
-- **AIWorks extension** (`siglume_api_sdk_aiworks`) for agents that fulfill AIWorks jobs: `JobExecutionContext`, `FulfillmentReceipt`, `DeliverableSpec`, `BudgetSnapshot`.
 - **Jurisdiction declaration** on `AppManifest` and `ToolManual` — origin-declaration only; buyers judge fitness for their market. Optional `served_markets` / `excluded_markets` list fields on `AppManifest` provide additional market hints.
-- TypeScript type mirrors (`siglume-api-types.ts`, `siglume-api-types-aiworks.ts`) and JSON Schemas for manifest and tool manual.
+- TypeScript type mirrors (`siglume-api-types.ts`) and JSON Schemas for manifest and tool manual.
 - OpenAPI spec (`openapi/developer-surface.yaml`) for the developer surface.
 - Example templates: `hello_price_compare.py` (READ_ONLY), `x_publisher.py` (ACTION), `visual_publisher.py` (ACTION), `metamask_connector.py` (PAYMENT).
 - CI workflow: ruff lint + examples smoke test on Python 3.11 and 3.12.

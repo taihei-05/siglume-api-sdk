@@ -21,43 +21,6 @@ Good first API constraints:
 Avoid `ACTION`, `PAYMENT`, OAuth, and subscription pricing until the first API
 passes the local loop and the human understands the publish flow.
 
-## Existing product diagnosis mode
-
-Use this mode when the human has an existing product repository and asks whether
-it can be published as a Siglume Agent API Store listing.
-
-The coding agent must read both:
-
-- this SDK repository
-- the existing product repository currently open in the workspace
-
-The SDK repository alone is not enough to judge publishability.
-
-First inspect the product:
-
-- core features and the smallest useful API surface
-- inputs, outputs, and error cases
-- external services, quotas, and terms-of-service or resale constraints
-- authentication and secret handling
-- side effects such as posting, sending, deleting, purchasing, or changing data
-- whether a first version can be free, read-only, and no-OAuth
-
-Classify the result as exactly one of:
-
-- publishable as-is
-- publishable with small changes
-- needs major changes
-- not a good fit
-
-Then explain the reason in plain language. If the product is a fit, design the
-smallest Siglume version before implementing anything complex. Prefer a
-read-only query, analysis, conversion, summary, lookup, validation, or preview
-operation over write actions.
-
-Do not run plain `siglume register .`, create production credentials, change
-pricing, modify external production systems, or publish the listing unless the
-human explicitly approves.
-
 If the human explicitly asks for paid pricing, read
 `docs/pricing-and-billing.md` and `docs/platform-api-boundary.md` first. Treat
 the live choices as:
@@ -216,41 +179,4 @@ siglume register . --draft-only
 
 Do not run plain siglume register . unless I explicitly approve immediate
 publish.
-```
-
-## Existing product diagnosis prompt
-
-The human can paste this into a coding agent with their product repository open:
-
-```text
-Diagnose whether the currently open product can be published as a Siglume Agent
-API Store listing.
-
-Siglume SDK:
-https://github.com/taihei-05/siglume-api-sdk
-
-Read the SDK README.md, GETTING_STARTED.md, docs/coding-agent-guide.md,
-docs/platform-api-boundary.md, and docs/publish-flow.md.
-
-Inspect this product's features, inputs, outputs, external dependencies,
-authentication, side effects, and resale or terms-of-service risks.
-
-Classify the product as one of:
-- publishable as-is
-- publishable with small changes
-- needs major changes
-- not a good fit
-
-If it is a fit, design the smallest Siglume version. Start as FREE, READ_ONLY,
-no OAuth, no payment, and no external side effects unless I explicitly approve
-otherwise. Create or propose adapter.py or adapter.ts, tool_manual.json, a local
-README, and useful local tests.
-
-Aim to make this pass before asking for API keys or production credentials:
-siglume test .
-siglume score . --offline
-
-Do not run plain siglume register ., change production systems, issue API keys,
-set pricing, or publish anything unless I explicitly approve. End with the
-human decisions still needed.
 ```
