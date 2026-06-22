@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-06-23
+
+### Removed
+
+- Removed the retired job-fulfillment extension from the public Python and
+  TypeScript SDK packages, including dedicated helper modules, examples, docs,
+  generated types, and wrapper tests.
+
+### Changed
+
+- Updated public settlement and input-form documentation so the SDK package
+  describes only the currently supported API Store, MCP Router, metering,
+  webhook, and Direct Request Payment surfaces.
+
 ## [2.0.0] - 2026-06-10
 
 ### Removed

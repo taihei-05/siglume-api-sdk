@@ -102,7 +102,7 @@ def test_package_runtime_versions_match_release_metadata() -> None:
     python_version = str(pyproject["project"]["version"])
     ts_version = str(package_json["version"])
 
-    assert python_version == "2.0.0"
+    assert python_version == "2.0.1"
     assert ts_version == python_version
     assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
     assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
