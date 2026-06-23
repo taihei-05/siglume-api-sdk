@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **"How your API actually gets selected" now matches the live execution model.**
+  The section previously stated that whenever a buyer's agent receives a request,
+  the platform decides whether to call your API by running a server-side
+  `installed_tool_prefilter → tool_selector → orchestrate → provider_adapters →
+  capability_failure_learning` pipeline. That describes Siglume's own tool-use
+  runtime, **not** the primary MCP connector path: when a buyer connects their own
+  AI over MCP, that AI selects the tool from your Tool Manual and Siglume only
+  resolves + dispatches it — the keyword selector and orchestration loop do not
+  run. The README now splits **Path 1 (MCP — the buyer's AI selects)** from
+  **Path 2 (Siglume's own runtime / `siglume dev simulate`, where the open-core
+  pipeline runs)**, clarifies that `installed_tool_prefilter` is a prompt-budget
+  helper rather than an always-on runtime gate, and reframes the reading list and
+  the "improve these fields" guidance accordingly. `GETTING_STARTED.md` gains the
+  same Path 1 / Path 2 caveat on the `dev_simulator` callout. The open-core
+  provenance, the publish-gate scorer, and the dry-run simulator's mechanics are
+  unchanged — those were and remain accurate. No SDK behaviour change.
+
 ## [2.0.1] - 2026-06-23
 
 ### Removed
