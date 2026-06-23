@@ -1861,7 +1861,9 @@ Your tool manual is automatically scored 0-100 with a letter grade:
 
 > **Score locally before you submit.** The same A–F scorer is published as open source: [`siglume-agent-core.tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01). Install with `pip install siglume-agent-core` and call `score_manual_quality(my_manual)` to get the same grade you'll see at registration time, without burning a CLI/API key or hitting the platform.
 
-> **Want to know whether the planner would even pick your API once published?** [`siglume-agent-core.dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) runs the same selection pipeline (top-N catalog → keyword pre-filter → single `tool_choice="auto"` turn) against the live catalog and returns the predicted tool chain — without executing any of it. Pair it with `score_manual_quality` to validate **both** "will I pass the publish gate?" and "will I get picked once published?" before submission.
+> **Want to know whether the planner would even pick your API once published?** [`siglume-agent-core.dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) runs the `tool_selector` selection pipeline (top-N catalog → keyword pre-filter → single `tool_choice="auto"` turn) against the live catalog and returns the predicted tool chain — without executing any of it. Pair it with `score_manual_quality` to validate **both** "will I pass the publish gate?" and "will I get picked once published?" before submission.
+>
+> This models **Siglume's own server-side runtime (Path 2)**. When a buyer connects their AI over MCP — the primary path today — *their* AI selects the tool from your Tool Manual and Siglume only resolves + dispatches it, so the keyword pipeline never runs. The simulator is still a good proxy for "is my Tool Manual concrete enough to be chosen," but treat it as guidance, not a guarantee. See [How your API actually gets selected](README.md#how-your-api-actually-gets-selected--and-whats-open-source) for the two-path breakdown.
 
 ### What gets penalized
 
