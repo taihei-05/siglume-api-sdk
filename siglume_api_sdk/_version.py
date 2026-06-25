@@ -2,5 +2,5 @@
 from __future__ import annotations
 
 
-SDK_VERSION = "2.0.1"
+SDK_VERSION = "2.0.2"
 SDK_USER_AGENT = f"siglume-api-sdk/{SDK_VERSION}"

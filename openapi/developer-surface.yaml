@@ -2913,6 +2913,16 @@ components:
         usage_hints: { type: array, items: { type: string } }
         result_hints: { type: array, items: { type: string } }
         error_hints: { type: array, items: { type: string } }
+        supports:
+          type: object
+          additionalProperties:
+            type: [boolean, number, string]
+          description: >-
+            Optional structured capability flags (flat boolean/number/string
+            values, e.g. { reply_thread: false, scheduled_one_time: true,
+            images_max: 4 }) surfaced verbatim on the API Store discovery
+            responses so an agent can judge what a capability can/can't do
+            before binding it.
         # Conditional: required for action / payment
         approval_summary_template: { type: string, minLength: 1 }
         preview_schema: { type: object }

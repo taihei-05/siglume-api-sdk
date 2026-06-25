@@ -666,6 +666,17 @@ class ToolManual:
     jurisdiction: str | None = None
     legal_notes: str | None = None                       # optional, surfaced on approval prompt
 
+    # Declared LAST so the dataclass __init__ positional order of every
+    # pre-existing field is preserved — a patch release must not shift positional
+    # args (an action/payment caller passing approval_summary_template
+    # positionally must not land in `supports`). Optional structured capability
+    # flags an agent reads to judge fit BEFORE binding, e.g.
+    # {"reply_thread": False, "scheduled_one_time": True, "images_max": 4}.
+    # Surfaced verbatim on the discovery surface (market_get_capability). Keep
+    # values flat (bool/int/str); express anything richer in usage_hints /
+    # do_not_use_when prose.
+    supports: dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to the dict format expected by the platform API."""
         d: dict[str, Any] = {
@@ -682,6 +693,7 @@ class ToolManual:
             "usage_hints": self.usage_hints,
             "result_hints": self.result_hints,
             "error_hints": self.error_hints,
+            "supports": self.supports,
         }
         if self.permission_class in (
             ToolManualPermissionClass.ACTION,
