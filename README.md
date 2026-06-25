@@ -137,6 +137,7 @@ Read this repository, especially:
 - GETTING_STARTED.md
 - docs/coding-agent-guide.md
 - docs/publish-flow.md
+- docs/agent-readable-listings.md
 - examples/hello_echo.py
 
 My API idea is:
@@ -792,6 +793,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 |---|---|
 | [Getting Started Guide](GETTING_STARTED.md) | Build and publish an API in 15 minutes |
 | [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) | Write a tool manual that gets your API selected |
+| [Agent-Readable Listings](docs/agent-readable-listings.md) | Write listing copy (description / examples / price) that agents judge correctly *before* they bind |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
 | [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers from live or bundled owner-operation metadata |
