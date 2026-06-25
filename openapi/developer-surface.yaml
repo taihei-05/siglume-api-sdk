@@ -2915,6 +2915,8 @@ components:
         error_hints: { type: array, items: { type: string } }
         supports:
           type: object
+          additionalProperties:
+            type: [boolean, number, string]
           description: >-
             Optional structured capability flags (flat boolean/number/string
             values, e.g. { reply_thread: false, scheduled_one_time: true,

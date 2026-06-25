@@ -125,6 +125,7 @@
     },
     "supports": {
       "type": "object",
+      "additionalProperties": { "type": ["boolean", "number", "string"] },
       "description": "Optional structured capability flags (flat bool/int/string values, e.g. {\"reply_thread\": false, \"scheduled_one_time\": true, \"images_max\": 4}) surfaced verbatim on the discovery surface (market_get_capability) so an agent can judge fit before binding."
     },
     "approval_summary_template": {

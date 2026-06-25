@@ -701,7 +701,7 @@ function buildToolManualSchema(
     refund_or_cancellation_note: { type: "string" },
     jurisdiction: { type: "string" },
     legal_notes: { type: "string" },
-    supports: { type: "object" },
+    supports: { type: "object", additionalProperties: { type: ["boolean", "number", "string"] } },
   };
   const selectedFields = [...new Set(fields)];
   let required = [...selectedFields];
