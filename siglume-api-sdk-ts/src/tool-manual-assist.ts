@@ -28,6 +28,7 @@ const ALL_TOOL_MANUAL_FIELDS = [
   "refund_or_cancellation_note",
   "jurisdiction",
   "legal_notes",
+  "supports",
 ] as const;
 const BASE_REQUIRED_FIELDS = [
   "tool_name",
@@ -700,6 +701,7 @@ function buildToolManualSchema(
     refund_or_cancellation_note: { type: "string" },
     jurisdiction: { type: "string" },
     legal_notes: { type: "string" },
+    supports: { type: "object" },
   };
   const selectedFields = [...new Set(fields)];
   let required = [...selectedFields];

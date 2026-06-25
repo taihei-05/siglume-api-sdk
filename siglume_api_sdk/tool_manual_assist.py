@@ -41,6 +41,7 @@ _ALL_TOOL_MANUAL_FIELDS = (
     "refund_or_cancellation_note",
     "jurisdiction",
     "legal_notes",
+    "supports",
 )
 _BASE_REQUIRED_FIELDS = (
     "tool_name",
@@ -694,6 +695,7 @@ def _build_tool_manual_schema(*, permission_class: str | None, fields: Sequence[
         "refund_or_cancellation_note": {"type": "string"},
         "jurisdiction": {"type": "string"},
         "legal_notes": {"type": "string"},
+        "supports": {"type": "object"},
     }
     selected_fields = list(dict.fromkeys(field for field in fields if field in properties))
     required = list(selected_fields)
