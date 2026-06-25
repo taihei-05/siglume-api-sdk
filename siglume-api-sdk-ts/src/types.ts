@@ -248,6 +248,13 @@ export interface ToolManual {
   usage_hints: string[];
   result_hints: string[];
   error_hints: string[];
+  /**
+   * Optional structured capability flags (flat boolean/number/string values,
+   * e.g. `{ reply_thread: false, scheduled_one_time: true, images_max: 4 }`)
+   * surfaced verbatim on the API Store discovery responses so an agent can
+   * judge what a capability can/can't do before binding it.
+   */
+  supports?: Record<string, boolean | number | string>;
   approval_summary_template?: string;
   preview_schema?: Record<string, unknown>;
   idempotency_support?: boolean;

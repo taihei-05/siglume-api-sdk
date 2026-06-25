@@ -91,6 +91,7 @@ function buildToolManual() {
     usage_hints: ["Use this tool after the owner has named a product and wants evidence-backed price comparison."],
     result_hints: ["Lead with the best offer and then summarize notable trade-offs."],
     error_hints: ["If no offers are found, ask for a clearer product name or model number."],
+    supports: {},
   };
 }
 
