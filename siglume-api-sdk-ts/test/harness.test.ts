@@ -17,11 +17,14 @@ class PaymentQuoteApp extends AppAdapter {
       name: "Payment Quote",
       job_to_be_done: "Quote a USD charge and complete the payment only after owner approval.",
       category: AppCategory.FINANCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.PAYMENT,
       approval_mode: ApprovalMode.ALWAYS_ASK,
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Preview, quote, and complete a USD payment flow with explicit approval.",
       example_prompts: ["Quote the charge for this premium report purchase."],
@@ -51,7 +54,7 @@ class PaymentQuoteApp extends AppAdapter {
     return {
       success: true,
       execution_kind: ctx.execution_kind,
-      output: { summary: `Charged USD ${amount_usd.toFixed(2)}.`, amount_usd, currency: "USD", payment_id: "pay_123" },
+      output: { summary: `Charged USD ${amount_usd.toFixed(2)}.`, amount_usd, currency: "USD" as const, payment_id: "pay_123" },
       receipt_summary: { action: "payment_captured", payment_id: "pay_123", amount_usd, currency: "USD" },
     };
   }
@@ -82,13 +85,13 @@ describe("AppTestHarness", () => {
     expect(issues).toContain("Action/payment execution should report side effects");
   });
 
-  it("supports health checks and missing-account simulation", async () => {
+  it("supports health checks and dry-run execution", async () => {
     const harness = new AppTestHarness(new PaymentQuoteApp());
 
     const health = await harness.health();
-    const missing = await harness.simulate_connected_account_missing("quote_payment", { input_params: { amount_usd: 5 } });
+    const dryRun = await harness.dry_run("quote_payment", { input_params: { amount_usd: 5 } });
 
     expect(health.healthy).toBe(true);
-    expect(missing.success).toBe(true);
+    expect(dryRun.success).toBe(true);
   });
 });

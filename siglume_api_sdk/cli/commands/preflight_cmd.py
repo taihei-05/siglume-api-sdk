@@ -23,5 +23,3 @@ def preflight_command(json_output: bool, path: str) -> None:
             click.echo(f"preflight_quality: {quality.get('grade')} ({quality.get('overall_score')}/100)")
     if result.get("runtime_validation_path"):
         click.echo(f"runtime_validation_path: {result['runtime_validation_path']}")
-    if result.get("oauth_credentials_path"):
-        click.echo(f"oauth_credentials_path: {result['oauth_credentials_path']}")

@@ -47,12 +47,21 @@ class MeteredApp(AppAdapter):
             name="Translation Hub",
             job_to_be_done="Translate text and report usage for analytics or future usage-based billing.",
             category=AppCategory.COMMUNICATION,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,
             required_connected_accounts=[],
             price_model=self._price_model,
             price_value_minor=5,
+            pricing_plan={
+                "currency": "USD",
+                "items": [{"key": "tokens_in", "label": "Input tokens", "price_minor": 5}],
+            }
+            if self._price_model in {PriceModel.USAGE_BASED, PriceModel.PER_ACTION}
+            else None,
+            currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             short_description="Translate text while previewing future metering line items.",
             example_prompts=["Translate this release note into Japanese."],
@@ -327,7 +336,7 @@ def test_app_test_harness_simulates_usage_based_metering() -> None:
         )
     )
 
-    assert preview["experimental"] is True
+    assert preview["experimental"] is False
     assert preview["invoice_line_preview"]["subtotal_minor"] == 7615
     assert preview["invoice_line_preview"]["billable_units"] == 1523
 
@@ -368,7 +377,7 @@ def test_app_test_harness_simulate_metering_handles_str_price_model() -> None:
             occurred_at_iso="2026-04-19T10:00:00Z",
         )
     )
-    assert preview["experimental"] is True
+    assert preview["experimental"] is False
     assert preview["invoice_line_preview"] is not None
     assert preview["invoice_line_preview"]["price_model"] == "usage_based"
 

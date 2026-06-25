@@ -41,12 +41,22 @@ class MeteredApp extends AppAdapter {
       name: "Translation Hub",
       job_to_be_done: "Translate text while previewing token-based usage metering.",
       category: AppCategory.COMMUNICATION,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: this.priceModel as typeof PriceModel[keyof typeof PriceModel],
       price_value_minor: 5,
+      pricing_plan:
+        this.priceModel === PriceModel.USAGE_BASED || this.priceModel === PriceModel.PER_ACTION
+          ? {
+              currency: "USD",
+              items: [{ key: "tokens_in", label: "Input tokens", price_minor: 5 }],
+            }
+          : undefined,
+      currency: "USD" as const,
+      allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Translate text and preview token-based usage line items.",
       example_prompts: ["Translate this roadmap update into Japanese."],
@@ -538,7 +548,7 @@ describe("metering", () => {
       occurred_at_iso: "2026-04-19T10:00:00Z",
     });
 
-    expect(preview.experimental).toBe(true);
+    expect(preview.experimental).toBe(false);
     expect(preview.invoice_line_preview?.subtotal_minor).toBe(7615);
     expect(preview.invoice_line_preview?.billable_units).toBe(1523);
   });

@@ -1,5 +1,5 @@
 /*
-API: record usage events for analytics and future usage-based billing previews.
+API: record usage events for analytics and usage-based billing previews.
 Intended user: sellers operating token/call-metered capabilities.
 Connected account: none.
 */
@@ -16,8 +16,8 @@ import {
   type UsageRecord,
 } from "../siglume-api-sdk-ts/src/index";
 
-const EXPERIMENTAL_NOTE =
-  "usage_based / per_action remain planned price models on the public platform. Metering currently confirms receipt of events for analytics and future billing previews.";
+const METERING_NOTE =
+  "usage_based / per_action are live price models. Runtime charges come from ExecutionResult; MeterClient records analytics usage events and previews invoice lines.";
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify({
@@ -37,12 +37,19 @@ export class TranslationHubMeteredApp extends AppAdapter {
       name: "Translation Hub",
       job_to_be_done: "Translate text while previewing token-based usage metering.",
       category: AppCategory.COMMUNICATION,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.USAGE_BASED,
+    currency: "USD" as const,
+    allow_free_trial: false,
       price_value_minor: 5,
+      pricing_plan: {
+        currency: "USD",
+        items: [{ key: "tokens_in", label: "Input tokens", price_minor: 5 }],
+      },
       jurisdiction: "US",
       short_description: "Translate text and preview token-based usage line items.",
       example_prompts: [
@@ -166,7 +173,7 @@ export async function runMeteringRecordExample(): Promise<string[]> {
   const dimensions = listed.items.map((item) => item.dimension ?? "").join(",");
 
   return [
-    `experimental_note: ${EXPERIMENTAL_NOTE}`,
+    `metering_note: ${METERING_NOTE}`,
     `record_status: accepted=${String(recorded.accepted)} replayed=${String(recorded.replayed)} external_id=${recorded.external_id}`,
     `batch_items: ${batched.length} last_period=${batched.at(-1)?.period_key ?? ""}`,
     `preview_subtotal_minor: ${preview.invoice_line_preview?.subtotal_minor ?? 0}`,

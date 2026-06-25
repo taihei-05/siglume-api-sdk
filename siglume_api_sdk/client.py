@@ -7,6 +7,7 @@ import time
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, Mapping, Sequence, TypeVar
+from urllib.parse import quote
 
 import httpx
 
@@ -40,6 +41,11 @@ if TYPE_CHECKING:
 
 DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1"
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
+_MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
+LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60
+LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240
+LISTING_DESCRIPTION_MAX_LENGTH = 1000
 T = TypeVar("T")
 
 
@@ -117,7 +123,11 @@ class AppListingRecord:
     dry_run_supported: bool = False
     price_model: str | None = None
     price_value_minor: int = 0
+    pricing_plan: dict[str, Any] | None = None
+    billing_timing: str = "post"
     currency: str = "USD"
+    allow_free_trial: bool = False
+    free_trial_duration_days: int = 30
     short_description: str | None = None
     description: str | None = None
     docs_url: str | None = None
@@ -125,44 +135,56 @@ class AppListingRecord:
     seller_display_name: str | None = None
     seller_homepage_url: str | None = None
     seller_social_url: str | None = None
+    publisher_type: str | None = None
+    publisher_company_id: str | None = None
+    company_id: str | None = None
+    company_name: str | None = None
+    company_publish_status: str | None = None
+    company_terms_version: str | None = None
     review_status: str | None = None
     review_note: str | None = None
     submission_blockers: list[str] = field(default_factory=list)
+    persistence: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 @dataclass
-class ConnectedAccountOAuthStart:
-    """Result of ``start_connected_account_oauth`` — carries the URL
-    the owner's browser should be pointed at plus the state token
-    the callback must echo back."""
-    authorize_url: str
-    state: str
-    provider_key: str
-    scopes: list[str] = field(default_factory=list)
-    pkce_method: str | None = None
+class CompanyPublisherRecord:
+    company_id: str
+    name: str
+    status: str
+    description: str | None = None
+    is_founder: bool = False
+    membership_role: str | None = None
+    membership_status: str | None = None
+    can_publish: bool = True
+    can_approve: bool = False
+    approval_required: bool = False
+    paid_listing_allowed: bool = False
+    disabled_reasons: list[str] = field(default_factory=list)
+    company_terms_version: str | None = None
+    active_listing_count: int = 0
+    pending_approval_count: int = 0
+    settlement_wallet_ready: bool = False
+    settlement_wallets: list[dict[str, Any]] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 @dataclass
-class ConnectedAccountLifecycleResult:
-    """Return value of ``refresh_connected_account`` / ``revoke_connected_account``.
-
-    Tokens are never returned — only status metadata. ``resolve`` is
-    intentionally NOT exposed in the SDK: capabilities access the
-    runtime handle in-process, not over the wire.
-    """
-    connected_account_id: str
-    provider_key: str
-    # refresh-only
-    expires_at: str | None = None
-    scopes: list[str] = field(default_factory=list)
-    refreshed_at: str | None = None
-    # revoke-only
-    connection_status: str | None = None
-    provider_revoked: bool | None = None
-    revoked_at: str | None = None
+class CapabilitySaveStateRecord:
+    capability_key: str
+    save_key: str
+    schema_version: str = "1"
+    revision: int = 0
+    payload: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    checksum: str | None = None
+    updated_at: str | None = None
+    created_at: str | None = None
+    exists: bool = False
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 @dataclass
@@ -208,7 +230,6 @@ class AutoRegistrationReceipt:
     auto_manifest: dict[str, Any] = field(default_factory=dict)
     confidence: dict[str, Any] = field(default_factory=dict)
     validation_report: dict[str, Any] = field(default_factory=dict)
-    oauth_status: dict[str, Any] = field(default_factory=dict)
     review_url: str | None = None
     trace_id: str | None = None
     request_id: str | None = None
@@ -261,7 +282,6 @@ class SandboxSession:
     dry_run_supported: bool = False
     approval_mode: str | None = None
     required_connected_accounts: list[Any] = field(default_factory=list)
-    connected_accounts: list[dict[str, Any]] = field(default_factory=list)
     stub_providers_enabled: bool = False
     simulated_receipts: bool = False
     approval_simulator: bool = False
@@ -301,21 +321,6 @@ class GrantBindingResult:
     access_grant: AccessGrantRecord
     trace_id: str | None = None
     request_id: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class ConnectedAccountRecord:
-    connected_account_id: str
-    provider_key: str
-    account_role: str
-    display_name: str | None = None
-    environment: str | None = None
-    connection_status: str | None = None
-    scopes: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str | None = None
-    updated_at: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -624,249 +629,6 @@ class InstalledToolReceiptStepRecord:
     error_class: str | None = None
     connected_account_ref: str | None = None
     metadata_jsonb: dict[str, Any] = field(default_factory=dict)
-    created_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksCategoryRecord:
-    key: str
-    name_ja: str | None = None
-    name_en: str | None = None
-    description_ja: str | None = None
-    description_en: str | None = None
-    icon_url: str | None = None
-    open_job_count: int = 0
-    display_order: int = 0
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksRegistrationRecord:
-    agent_id: str
-    works_registered: bool = False
-    tagline: str | None = None
-    categories: list[str] = field(default_factory=list)
-    capabilities: list[str] = field(default_factory=list)
-    description: str | None = None
-    execution_status: str = "completed"
-    approval_required: bool = False
-    intent_id: str | None = None
-    approval_status: str | None = None
-    approval_snapshot_hash: str | None = None
-    approval_preview: dict[str, Any] = field(default_factory=dict)
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksOwnerDashboardAgent:
-    agent_id: str
-    name: str | None = None
-    reputation: dict[str, Any] = field(default_factory=dict)
-    capabilities: list[str] = field(default_factory=list)
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksOwnerDashboardPitch:
-    proposal_id: str
-    need_id: str | None = None
-    title: str | None = None
-    title_en: str | None = None
-    status: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksOwnerDashboardOrder:
-    order_id: str
-    need_id: str | None = None
-    title: str | None = None
-    title_en: str | None = None
-    status: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksOwnerDashboardStats:
-    total_agents: int = 0
-    total_pending: int = 0
-    total_active: int = 0
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksOwnerDashboard:
-    agents: list[WorksOwnerDashboardAgent] = field(default_factory=list)
-    pending_pitches: list[WorksOwnerDashboardPitch] = field(default_factory=list)
-    active_orders: list[WorksOwnerDashboardOrder] = field(default_factory=list)
-    completed_orders: list[WorksOwnerDashboardOrder] = field(default_factory=list)
-    stats: WorksOwnerDashboardStats = field(default_factory=WorksOwnerDashboardStats)
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksPosterDashboardJob:
-    job_id: str
-    title: str | None = None
-    title_en: str | None = None
-    proposal_count: int = 0
-    created_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksPosterDashboardOrder:
-    order_id: str
-    need_id: str | None = None
-    title: str | None = None
-    title_en: str | None = None
-    status: str | None = None
-    has_deliverable: bool = False
-    deliverable_count: int = 0
-    awaiting_buyer_action: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksPosterDashboardStats:
-    total_posted: int = 0
-    total_completed: int = 0
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class WorksPosterDashboard:
-    open_jobs: list[WorksPosterDashboardJob] = field(default_factory=list)
-    in_progress_orders: list[WorksPosterDashboardOrder] = field(default_factory=list)
-    completed_orders: list[WorksPosterDashboardOrder] = field(default_factory=list)
-    stats: WorksPosterDashboardStats = field(default_factory=WorksPosterDashboardStats)
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerDashboard:
-    partner_id: str
-    company_name: str | None = None
-    plan: str | None = None
-    plan_label: str | None = None
-    month_bytes_used: int = 0
-    month_bytes_limit: int = 0
-    month_usage_pct: float = 0.0
-    total_source_items: int = 0
-    has_billing: bool = False
-    has_subscription: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerUsage:
-    plan: str | None = None
-    month_bytes_used: int = 0
-    month_bytes_limit: int = 0
-    month_bytes_remaining: int = 0
-    month_usage_pct: float = 0.0
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerApiKeyRecord:
-    credential_id: str
-    name: str | None = None
-    key_id: str | None = None
-    allowed_source_types: list[str] = field(default_factory=list)
-    last_used_at: str | None = None
-    created_at: str | None = None
-    revoked: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class PartnerApiKeyHandle:
-    credential_id: str
-    name: str | None = None
-    key_id: str | None = None
-    allowed_source_types: list[str] = field(default_factory=list)
-    masked_key_hint: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsBilling:
-    currency: str | None = None
-    billing_mode: str | None = None
-    month_spend_jpy: int = 0
-    month_spend_usd: int = 0
-    all_time_spend_jpy: int = 0
-    all_time_spend_usd: int = 0
-    total_impressions: int = 0
-    total_replies: int = 0
-    has_billing: bool = False
-    has_subscription: bool = False
-    invoices: list[dict[str, Any]] = field(default_factory=list)
-    wallet: dict[str, Any] | None = None
-    balances: list[dict[str, Any]] = field(default_factory=list)
-    supported_tokens: list[dict[str, Any]] = field(default_factory=list)
-    funding_instructions: dict[str, Any] | None = None
-    mandate: PlanWeb3Mandate | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsBillingSettlement:
-    status: str | None = None
-    message: str | None = None
-    settles_automatically: bool | None = None
-    cycle_key: str | None = None
-    settled_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsProfile:
-    has_profile: bool = False
-    company_name: str | None = None
-    ad_currency: str | None = None
-    has_billing: bool = False
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsCampaignRecord:
-    campaign_id: str
-    name: str | None = None
-    target_url: str | None = None
-    content_brief: str | None = None
-    target_topics: list[str] = field(default_factory=list)
-    posting_interval_minutes: int = 360
-    max_posts_per_day: int = 4
-    currency: str | None = None
-    monthly_budget_jpy: int = 0
-    cpm_jpy: int = 0
-    cpr_jpy: int = 0
-    monthly_budget_usd: int = 0
-    cpm_usd: int = 0
-    cpr_usd: int = 0
-    status: str = "active"
-    month_spend_jpy: int = 0
-    month_spend_usd: int = 0
-    total_posts: int = 0
-    total_impressions: int = 0
-    total_replies: int = 0
-    next_post_at: str | None = None
-    created_at: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AdsCampaignPostRecord:
-    post_id: str
-    content_id: str | None = None
-    cost_jpy: int = 0
-    cost_usd: int = 0
-    impressions: int = 0
-    replies: int = 0
-    status: str | None = None
     created_at: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -1347,7 +1109,6 @@ def _build_auto_register_request(
     source_code: str | None,
     source_url: str | None,
     runtime_validation: Mapping[str, Any] | None,
-    oauth_credentials: Mapping[str, Any] | Sequence[Any] | None,
     source_context: Mapping[str, Any] | None,
     input_form_spec: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1370,18 +1131,6 @@ def _build_auto_register_request(
         payload["source_code"] = _build_registration_stub_source(manifest_payload, tool_manual_payload)
     if runtime_validation is not None:
         payload["runtime_validation"] = _coerce_mapping(runtime_validation, "runtime_validation")
-    if oauth_credentials is not None:
-        if isinstance(oauth_credentials, Mapping):
-            payload["oauth_credentials"] = dict(oauth_credentials)
-        elif isinstance(oauth_credentials, Sequence) and not isinstance(oauth_credentials, (str, bytes, bytearray)):
-            payload["oauth_credentials"] = {
-                "items": [
-                    _coerce_mapping(item, f"oauth_credentials[{index}]")
-                    for index, item in enumerate(oauth_credentials)
-                ]
-            }
-        else:
-            raise TypeError("oauth_credentials must be a mapping or a sequence of mappings")
     if source_context is not None:
         payload["source_context"] = _coerce_mapping(source_context, "source_context")
     if input_form_spec_for_request is not None:
@@ -1407,19 +1156,89 @@ def _build_auto_register_request(
         "support_contact",
         "seller_homepage_url",
         "seller_social_url",
+        "publisher_type",
+        "company_id",
+        "publisher_company_id",
+        "store_vertical",
         "jurisdiction",
         "price_model",
         "price_value_minor",
+        "pricing_plan",
+        "billing_timing",
+        "currency",
+        "allow_free_trial",
+        "free_trial_duration_days",
         "permission_class",
         "approval_mode",
         "dry_run_supported",
         "required_connected_accounts",
         "permission_scopes",
         "compatibility_tags",
+        "persistence",
     ):
         value = manifest_payload.get(field_name)
         if value is not None:
             payload[field_name] = _enum_value(value)
+    if "pricing_plan" in payload and not isinstance(payload["pricing_plan"], Mapping):
+        raise SiglumeClientError("AppManifest.pricing_plan must be an object when provided.")
+    if "billing_timing" in payload:
+        billing_timing = str(payload.get("billing_timing") or "post").strip().lower()
+        if billing_timing not in {"post", "prepay"}:
+            raise SiglumeClientError("AppManifest.billing_timing must be 'post' or 'prepay'.")
+        payload["billing_timing"] = billing_timing
+    if "store_vertical" not in payload:
+        raise SiglumeClientError(
+            "AppManifest.store_vertical is required. Choose 'api' for normal "
+            "API Store listings or 'game' for API games."
+        )
+    currency = str(payload.get("currency") or "").strip().upper()
+    if not currency:
+        raise SiglumeClientError(
+            "AppManifest.currency is required. Choose 'USD' for USDC settlement "
+            "or 'JPY' for JPYC settlement."
+        )
+    if currency not in {"USD", "JPY"}:
+        raise SiglumeClientError(
+            f"AppManifest.currency must be 'USD' or 'JPY'. Got {payload.get('currency')!r}."
+        )
+    payload["currency"] = currency
+    if "pricing_plan" in payload:
+        _validate_pricing_plan_floor(payload.get("pricing_plan"), default_currency=currency)
+    _validate_listing_text_lengths(payload)
+    price_model = str(payload.get("price_model") or "free").strip().lower()
+    if price_model in {"usage_based", "per_action"} and not _pricing_plan_has_items(payload.get("pricing_plan")):
+        raise SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
+    if "allow_free_trial" not in payload:
+        raise SiglumeClientError(
+            "AppManifest.allow_free_trial is required. Pass True to offer a Plus/Pro "
+            "buyer free trial or False to disable trials."
+        )
+    if bool(payload.get("allow_free_trial")):
+        duration = payload.get("free_trial_duration_days", 30)
+        if not isinstance(duration, int) or isinstance(duration, bool):
+            raise SiglumeClientError(
+                "AppManifest.free_trial_duration_days must be an int when allow_free_trial=True."
+            )
+        if not 1 <= duration <= 90:
+            raise SiglumeClientError(
+                "AppManifest.free_trial_duration_days must be between 1 and 90 when "
+                f"allow_free_trial=True, got: {duration}."
+            )
+    explicit_publisher_type = payload.get("publisher_type") is not None
+    company_id = str(payload.get("company_id") or payload.get("publisher_company_id") or "").strip()
+    publisher_type = str(payload.get("publisher_type") or "user").strip().lower()
+    if publisher_type not in {"user", "company"}:
+        raise SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.")
+    if publisher_type == "company" and not company_id:
+        raise SiglumeClientError("AppManifest.company_id is required when publisher_type='company'.")
+    if publisher_type == "user" and company_id:
+        raise SiglumeClientError("AppManifest.company_id cannot be combined with publisher_type='user'.")
+    if explicit_publisher_type or company_id:
+        payload["publisher_type"] = publisher_type
+    if company_id:
+        payload["company_id"] = company_id
+        payload["publisher_company_id"] = company_id
+    _validate_manifest_persistence_contract(payload)
 
     # Strip ``version`` from the embedded manifest sub-dict too so the
     # platform's reject-on-manifest-version check cannot trip on the SDK's
@@ -1444,6 +1263,131 @@ def _build_auto_register_request(
     return payload
 
 
+def _validate_pricing_plan_floor(plan: Any, *, default_currency: str) -> None:
+    if plan is None:
+        return
+    if not isinstance(plan, Mapping):
+        raise SiglumeClientError("AppManifest.pricing_plan must be an object when provided.")
+    raw_items = plan.get("items")
+    if raw_items is None:
+        return
+    if not isinstance(raw_items, list):
+        raise SiglumeClientError("AppManifest.pricing_plan.items must be an array when provided.")
+    plan_currency = str(plan.get("currency") or default_currency or "").strip().upper()
+    seen_keys: set[str] = set()
+    for index, item in enumerate(raw_items):
+        if not isinstance(item, Mapping):
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}] must be an object.")
+        item_key = str(
+            item.get("key")
+            or item.get("operation")
+            or item.get("operation_key")
+            or item.get("request_type")
+            or item.get("receipt_code")
+            or item.get("action")
+            or ""
+        ).strip()
+        if not item_key:
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}].key is required.")
+        if item_key in seen_keys:
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}].key duplicates {item_key!r}.")
+        seen_keys.add(item_key)
+        amount_raw = None
+        for key in ("price_minor", "amount_minor", "cost_minor", "value_minor"):
+            if key in item and item.get(key) is not None:
+                amount_raw = item.get(key)
+                break
+        if amount_raw is None:
+            raise SiglumeClientError(f"AppManifest.pricing_plan.items[{index}].price_minor is required.")
+        try:
+            amount_minor = int(amount_raw)
+        except (TypeError, ValueError):
+            raise SiglumeClientError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be an integer."
+            ) from None
+        if amount_minor < 0:
+            raise SiglumeClientError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be zero or positive."
+            )
+        currency = str(item.get("currency") or plan_currency or default_currency or "").strip().upper()
+        if (
+            currency in _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES
+            and 0 < amount_minor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+        ):
+            raise SiglumeClientError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be 0 or at least "
+                f"{MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing."
+            )
+
+
+def _validate_listing_text_lengths(payload: dict[str, Any]) -> None:
+    limits = {
+        "short_description": LISTING_SHORT_DESCRIPTION_MAX_LENGTH,
+        "job_to_be_done": LISTING_JOB_TO_BE_DONE_MAX_LENGTH,
+        "description": LISTING_DESCRIPTION_MAX_LENGTH,
+    }
+    for field_name, max_length in limits.items():
+        value = payload.get(field_name)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise SiglumeClientError(f"AppManifest.{field_name} must be a string when provided.")
+        if len(value) > max_length:
+            raise SiglumeClientError(f"AppManifest.{field_name} must be at most {max_length} characters.")
+
+
+def _pricing_plan_has_items(plan: Any) -> bool:
+    return isinstance(plan, Mapping) and isinstance(plan.get("items"), list) and bool(plan.get("items"))
+
+
+def _validate_manifest_persistence_contract(payload: Mapping[str, Any]) -> None:
+    vertical = str(payload.get("store_vertical") or "").strip().lower()
+    persistence = payload.get("persistence")
+    if persistence is None:
+        return
+    if not isinstance(persistence, Mapping):
+        raise SiglumeClientError("AppManifest.persistence must be an object.")
+    raw_mode = persistence.get("mode") or ("platform" if vertical == "game" else "none")
+    mode = str(getattr(raw_mode, "value", raw_mode)).strip().lower()
+    if mode not in {"none", "local", "platform", "developer_server"}:
+        raise SiglumeClientError(
+            "AppManifest.persistence.mode must be one of: none, local, platform, developer_server."
+        )
+    schema = persistence.get("save_data_schema")
+    if vertical == "game" and mode != "none" and schema is None:
+        raise SiglumeClientError(
+            "AppManifest.persistence.save_data_schema is required when "
+            "store_vertical='game' and persistence.mode is not 'none'."
+        )
+    if schema is not None:
+        _validate_save_data_schema(schema, field_name="AppManifest.persistence.save_data_schema")
+
+
+def _validate_save_data_schema(schema: Any, *, field_name: str) -> None:
+    if not isinstance(schema, Mapping):
+        raise SiglumeClientError(f"{field_name} must be a JSON Schema object.")
+    try:
+        schema_size = len(json.dumps(dict(schema), ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    except (TypeError, ValueError):
+        raise SiglumeClientError(f"{field_name} must be JSON-serializable.") from None
+    if schema_size > 8192:
+        raise SiglumeClientError(f"{field_name} must be at most 8192 bytes.")
+    if schema.get("type") != "object":
+        raise SiglumeClientError(f"{field_name}.type must be 'object'.")
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping) or not properties:
+        raise SiglumeClientError(f"{field_name}.properties must be a non-empty object.")
+    required = schema.get("required")
+    if required is not None:
+        if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
+            raise SiglumeClientError(f"{field_name}.required must be an array of strings when provided.")
+        missing = [item for item in required if item not in properties]
+        if missing:
+            raise SiglumeClientError(
+                f"{field_name}.required references undefined properties: {', '.join(missing)}."
+            )
+
+
 def _parse_retry_after(response: httpx.Response) -> float | None:
     retry_after = response.headers.get("Retry-After")
     if retry_after is None:
@@ -1456,6 +1400,13 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
 
 def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
     listing_id = str(data.get("listing_id") or data.get("id") or "")
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), Mapping) else {}
+    persistence = data.get("persistence")
+    if not isinstance(persistence, Mapping):
+        persistence = metadata.get("persistence") if isinstance(metadata, Mapping) else {}
+    pricing_plan = data.get("pricing_plan")
+    if not isinstance(pricing_plan, Mapping) and isinstance(metadata, Mapping):
+        pricing_plan = metadata.get("pricing_plan")
     return AppListingRecord(
         listing_id=listing_id,
         capability_key=str(data.get("capability_key") or ""),
@@ -1468,7 +1419,11 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         dry_run_supported=bool(data.get("dry_run_supported") or False),
         price_model=_string_or_none(data.get("price_model")),
         price_value_minor=int(data.get("price_value_minor") or 0),
+        pricing_plan=dict(pricing_plan) if isinstance(pricing_plan, Mapping) else None,
+        billing_timing=str(data.get("billing_timing") or metadata.get("billing_timing") or "post"),
         currency=str(data.get("currency") or "USD"),
+        allow_free_trial=bool(data.get("allow_free_trial") or False),
+        free_trial_duration_days=int(data.get("free_trial_duration_days") or 30),
         short_description=_string_or_none(data.get("short_description")),
         description=_string_or_none(data.get("description")),
         docs_url=_string_or_none(data.get("docs_url")),
@@ -1476,27 +1431,62 @@ def _parse_listing(data: Mapping[str, Any]) -> AppListingRecord:
         seller_display_name=_string_or_none(data.get("seller_display_name")),
         seller_homepage_url=_string_or_none(data.get("seller_homepage_url")),
         seller_social_url=_string_or_none(data.get("seller_social_url")),
+        publisher_type=_string_or_none(data.get("publisher_type")),
+        publisher_company_id=_string_or_none(data.get("publisher_company_id")),
+        company_id=_string_or_none(data.get("company_id")),
+        company_name=_string_or_none(data.get("company_name")),
+        company_publish_status=_string_or_none(data.get("company_publish_status")),
+        company_terms_version=_string_or_none(data.get("company_terms_version")),
         review_status=_string_or_none(data.get("review_status")),
         review_note=_string_or_none(data.get("review_note")),
         submission_blockers=[
             str(item) for item in data.get("submission_blockers", []) if isinstance(item, str)
         ],
+        persistence=dict(persistence) if isinstance(persistence, Mapping) else {},
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
         raw=dict(data),
     )
 
 
-def _parse_connected_account_lifecycle(data: Mapping[str, Any]) -> ConnectedAccountLifecycleResult:
-    return ConnectedAccountLifecycleResult(
-        connected_account_id=str(data.get("connected_account_id") or ""),
-        provider_key=str(data.get("provider_key") or ""),
-        expires_at=_string_or_none(data.get("expires_at")),
-        scopes=[str(s) for s in (data.get("scopes") or []) if isinstance(s, str)],
-        refreshed_at=_string_or_none(data.get("refreshed_at")),
-        connection_status=_string_or_none(data.get("connection_status")),
-        provider_revoked=_bool_or_none(data.get("provider_revoked")),
-        revoked_at=_string_or_none(data.get("revoked_at")),
+def _parse_company_publisher(data: Mapping[str, Any]) -> CompanyPublisherRecord:
+    wallets = data.get("settlement_wallets") if isinstance(data.get("settlement_wallets"), list) else []
+    disabled_reasons = data.get("disabled_reasons") if isinstance(data.get("disabled_reasons"), list) else []
+    return CompanyPublisherRecord(
+        company_id=str(data.get("company_id") or data.get("id") or ""),
+        name=str(data.get("name") or ""),
+        status=str(data.get("status") or ""),
+        description=_string_or_none(data.get("description")),
+        is_founder=bool(data.get("is_founder") or False),
+        membership_role=_string_or_none(data.get("membership_role")),
+        membership_status=_string_or_none(data.get("membership_status")),
+        can_publish=bool(data.get("can_publish") if data.get("can_publish") is not None else True),
+        can_approve=bool(data.get("can_approve") or False),
+        approval_required=bool(data.get("approval_required") or False),
+        paid_listing_allowed=bool(data.get("paid_listing_allowed") or False),
+        disabled_reasons=[str(item) for item in disabled_reasons if item],
+        company_terms_version=_string_or_none(data.get("company_terms_version")),
+        active_listing_count=int(data.get("active_listing_count") or 0),
+        pending_approval_count=int(data.get("pending_approval_count") or 0),
+        settlement_wallet_ready=bool(data.get("settlement_wallet_ready") or False),
+        settlement_wallets=[dict(item) for item in wallets if isinstance(item, Mapping)],
+        raw=dict(data),
+    )
+
+
+def _parse_capability_save_state(data: Mapping[str, Any]) -> CapabilitySaveStateRecord:
+    return CapabilitySaveStateRecord(
+        capability_key=str(data.get("capability_key") or ""),
+        save_key=str(data.get("save_key") or ""),
+        schema_version=str(data.get("schema_version") or "1"),
+        revision=int(data.get("revision") or 0),
+        payload=_to_dict(data.get("payload")),
+        metadata=_to_dict(data.get("metadata")),
+        checksum=_string_or_none(data.get("checksum")),
+        updated_at=_string_or_none(data.get("updated_at")),
+        created_at=_string_or_none(data.get("created_at")),
+        exists=bool(data.get("exists") or False),
+        raw=dict(data),
     )
 
 
@@ -1565,7 +1555,6 @@ def _parse_developer_portal(data: Mapping[str, Any], meta: EnvelopeMeta) -> Deve
 
 
 def _parse_sandbox_session(data: Mapping[str, Any], meta: EnvelopeMeta) -> SandboxSession:
-    connected_accounts = data.get("connected_accounts") if isinstance(data.get("connected_accounts"), list) else []
     required_connected_accounts = (
         data.get("required_connected_accounts") if isinstance(data.get("required_connected_accounts"), list) else []
     )
@@ -1578,7 +1567,6 @@ def _parse_sandbox_session(data: Mapping[str, Any], meta: EnvelopeMeta) -> Sandb
         dry_run_supported=bool(data.get("dry_run_supported") or False),
         approval_mode=_string_or_none(data.get("approval_mode")),
         required_connected_accounts=list(required_connected_accounts),
-        connected_accounts=[dict(item) for item in connected_accounts if isinstance(item, Mapping)],
         stub_providers_enabled=bool(data.get("stub_providers_enabled") or False),
         simulated_receipts=bool(data.get("simulated_receipts") or False),
         approval_simulator=bool(data.get("approval_simulator") or False),
@@ -1610,23 +1598,6 @@ def _parse_binding(data: Mapping[str, Any]) -> CapabilityBindingRecord:
         access_grant_id=str(data.get("access_grant_id") or ""),
         agent_id=str(data.get("agent_id") or ""),
         binding_status=str(data.get("binding_status") or ""),
-        created_at=_string_or_none(data.get("created_at")),
-        updated_at=_string_or_none(data.get("updated_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_connected_account(data: Mapping[str, Any]) -> ConnectedAccountRecord:
-    scopes = data.get("scopes") if isinstance(data.get("scopes"), list) else []
-    return ConnectedAccountRecord(
-        connected_account_id=str(data.get("connected_account_id") or data.get("id") or ""),
-        provider_key=str(data.get("provider_key") or ""),
-        account_role=str(data.get("account_role") or ""),
-        display_name=_string_or_none(data.get("display_name")),
-        environment=_string_or_none(data.get("environment")),
-        connection_status=_string_or_none(data.get("connection_status")),
-        scopes=[str(item) for item in scopes if isinstance(item, str)],
-        metadata=_to_dict(data.get("metadata")),
         created_at=_string_or_none(data.get("created_at")),
         updated_at=_string_or_none(data.get("updated_at")),
         raw=dict(data),
@@ -2000,293 +1971,6 @@ def _parse_installed_tool_receipt_step(data: Mapping[str, Any]) -> InstalledTool
         error_class=_string_or_none(data.get("error_class")),
         connected_account_ref=_string_or_none(data.get("connected_account_ref")),
         metadata_jsonb=_to_dict(data.get("metadata_jsonb")),
-        created_at=_string_or_none(data.get("created_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_works_category(data: Mapping[str, Any]) -> WorksCategoryRecord:
-    return WorksCategoryRecord(
-        key=str(data.get("key") or ""),
-        name_ja=_string_or_none(data.get("name_ja")),
-        name_en=_string_or_none(data.get("name_en")),
-        description_ja=_string_or_none(data.get("description_ja")),
-        description_en=_string_or_none(data.get("description_en")),
-        icon_url=_string_or_none(data.get("icon_url")),
-        open_job_count=int(data.get("open_job_count") or 0),
-        display_order=int(data.get("display_order") or 0),
-        raw=dict(data),
-    )
-
-
-def _parse_works_registration(data: Mapping[str, Any]) -> WorksRegistrationRecord:
-    result = data.get("result") if isinstance(data.get("result"), Mapping) else {}
-    status = str(data.get("status") or "completed").strip().lower() or "completed"
-    approval_required = bool(data.get("approval_required")) if data.get("approval_required") is not None else status == "approval_required"
-    return WorksRegistrationRecord(
-        agent_id=str(result.get("agent_id") or data.get("agent_id") or ""),
-        works_registered=bool(result.get("works_registered")) if result.get("works_registered") is not None else False,
-        tagline=_string_or_none(result.get("tagline")),
-        categories=_to_string_list(result.get("categories")),
-        capabilities=_to_string_list(result.get("capabilities")),
-        description=_string_or_none(result.get("description")),
-        execution_status=status,
-        approval_required=approval_required,
-        intent_id=_string_or_none(data.get("intent_id")),
-        approval_status=_string_or_none(data.get("approval_status")),
-        approval_snapshot_hash=_string_or_none(data.get("approval_snapshot_hash")),
-        approval_preview=_to_dict(result.get("preview")),
-        raw=dict(data),
-    )
-
-
-def _parse_works_owner_dashboard_agent(data: Mapping[str, Any]) -> WorksOwnerDashboardAgent:
-    return WorksOwnerDashboardAgent(
-        agent_id=str(data.get("id") or data.get("agent_id") or ""),
-        name=_string_or_none(data.get("name")),
-        reputation=_to_dict(data.get("reputation")),
-        capabilities=_to_string_list(data.get("capabilities")),
-        raw=dict(data),
-    )
-
-
-def _parse_works_owner_dashboard_pitch(data: Mapping[str, Any]) -> WorksOwnerDashboardPitch:
-    return WorksOwnerDashboardPitch(
-        proposal_id=str(data.get("proposal_id") or data.get("id") or ""),
-        need_id=_string_or_none(data.get("need_id")),
-        title=_string_or_none(data.get("title")),
-        title_en=_string_or_none(data.get("title_en")),
-        status=_string_or_none(data.get("status")),
-        raw=dict(data),
-    )
-
-
-def _parse_works_owner_dashboard_order(data: Mapping[str, Any]) -> WorksOwnerDashboardOrder:
-    return WorksOwnerDashboardOrder(
-        order_id=str(data.get("order_id") or data.get("id") or ""),
-        need_id=_string_or_none(data.get("need_id")),
-        title=_string_or_none(data.get("title")),
-        title_en=_string_or_none(data.get("title_en")),
-        status=_string_or_none(data.get("status")),
-        raw=dict(data),
-    )
-
-
-def _parse_works_owner_dashboard_stats(data: Mapping[str, Any]) -> WorksOwnerDashboardStats:
-    return WorksOwnerDashboardStats(
-        total_agents=int(data.get("total_agents") or 0),
-        total_pending=int(data.get("total_pending") or 0),
-        total_active=int(data.get("total_active") or 0),
-        raw=dict(data),
-    )
-
-
-def _parse_works_owner_dashboard(data: Mapping[str, Any]) -> WorksOwnerDashboard:
-    agents = data.get("agents") if isinstance(data.get("agents"), list) else []
-    pending_pitches = data.get("pending_pitches") if isinstance(data.get("pending_pitches"), list) else []
-    active_orders = data.get("active_orders") if isinstance(data.get("active_orders"), list) else []
-    completed_orders = data.get("completed_orders") if isinstance(data.get("completed_orders"), list) else []
-    return WorksOwnerDashboard(
-        agents=[_parse_works_owner_dashboard_agent(item) for item in agents if isinstance(item, Mapping)],
-        pending_pitches=[_parse_works_owner_dashboard_pitch(item) for item in pending_pitches if isinstance(item, Mapping)],
-        active_orders=[_parse_works_owner_dashboard_order(item) for item in active_orders if isinstance(item, Mapping)],
-        completed_orders=[_parse_works_owner_dashboard_order(item) for item in completed_orders if isinstance(item, Mapping)],
-        stats=_parse_works_owner_dashboard_stats(data.get("stats")) if isinstance(data.get("stats"), Mapping) else WorksOwnerDashboardStats(),
-        raw=dict(data),
-    )
-
-
-def _parse_works_poster_dashboard_job(data: Mapping[str, Any]) -> WorksPosterDashboardJob:
-    return WorksPosterDashboardJob(
-        job_id=str(data.get("id") or data.get("job_id") or ""),
-        title=_string_or_none(data.get("title")),
-        title_en=_string_or_none(data.get("title_en")),
-        proposal_count=int(data.get("proposal_count") or 0),
-        created_at=_string_or_none(data.get("created_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_works_poster_dashboard_order(data: Mapping[str, Any]) -> WorksPosterDashboardOrder:
-    return WorksPosterDashboardOrder(
-        order_id=str(data.get("order_id") or data.get("id") or ""),
-        need_id=_string_or_none(data.get("need_id")),
-        title=_string_or_none(data.get("title")),
-        title_en=_string_or_none(data.get("title_en")),
-        status=_string_or_none(data.get("status")),
-        has_deliverable=bool(data.get("has_deliverable")) if data.get("has_deliverable") is not None else False,
-        deliverable_count=int(data.get("deliverable_count") or 0),
-        awaiting_buyer_action=bool(data.get("awaiting_buyer_action")) if data.get("awaiting_buyer_action") is not None else False,
-        raw=dict(data),
-    )
-
-
-def _parse_works_poster_dashboard_stats(data: Mapping[str, Any]) -> WorksPosterDashboardStats:
-    return WorksPosterDashboardStats(
-        total_posted=int(data.get("total_posted") or 0),
-        total_completed=int(data.get("total_completed") or 0),
-        raw=dict(data),
-    )
-
-
-def _parse_works_poster_dashboard(data: Mapping[str, Any]) -> WorksPosterDashboard:
-    open_jobs = data.get("open_jobs") if isinstance(data.get("open_jobs"), list) else []
-    in_progress_orders = data.get("in_progress_orders") if isinstance(data.get("in_progress_orders"), list) else []
-    completed_orders = data.get("completed_orders") if isinstance(data.get("completed_orders"), list) else []
-    return WorksPosterDashboard(
-        open_jobs=[_parse_works_poster_dashboard_job(item) for item in open_jobs if isinstance(item, Mapping)],
-        in_progress_orders=[_parse_works_poster_dashboard_order(item) for item in in_progress_orders if isinstance(item, Mapping)],
-        completed_orders=[_parse_works_poster_dashboard_order(item) for item in completed_orders if isinstance(item, Mapping)],
-        stats=_parse_works_poster_dashboard_stats(data.get("stats")) if isinstance(data.get("stats"), Mapping) else WorksPosterDashboardStats(),
-        raw=dict(data),
-    )
-
-def _parse_partner_dashboard(data: Mapping[str, Any]) -> PartnerDashboard:
-    return PartnerDashboard(
-        partner_id=str(data.get("partner_id") or data.get("user_id") or ""),
-        company_name=_string_or_none(data.get("company_name")),
-        plan=_string_or_none(data.get("plan")),
-        plan_label=_string_or_none(data.get("plan_label")),
-        month_bytes_used=int(data.get("month_bytes_used") or 0),
-        month_bytes_limit=int(data.get("month_bytes_limit") or 0),
-        month_usage_pct=float(data.get("month_usage_pct") or 0.0),
-        total_source_items=int(data.get("total_source_items") or 0),
-        has_billing=bool(data.get("has_billing") or False),
-        has_subscription=bool(data.get("has_subscription") or False),
-        raw=dict(data),
-    )
-
-
-def _parse_partner_usage(data: Mapping[str, Any]) -> PartnerUsage:
-    return PartnerUsage(
-        plan=_string_or_none(data.get("plan")),
-        month_bytes_used=int(data.get("month_bytes_used") or 0),
-        month_bytes_limit=int(data.get("month_bytes_limit") or 0),
-        month_bytes_remaining=int(data.get("month_bytes_remaining") or 0),
-        month_usage_pct=float(data.get("month_usage_pct") or 0.0),
-        raw=dict(data),
-    )
-
-
-def _parse_partner_api_key(data: Mapping[str, Any]) -> PartnerApiKeyRecord:
-    return PartnerApiKeyRecord(
-        credential_id=str(data.get("credential_id") or data.get("id") or ""),
-        name=_string_or_none(data.get("name")),
-        key_id=_string_or_none(data.get("key_id")),
-        allowed_source_types=_to_string_list(data.get("allowed_source_types")),
-        last_used_at=_string_or_none(data.get("last_used_at")),
-        created_at=_string_or_none(data.get("created_at")),
-        revoked=bool(data.get("revoked") or False),
-        raw=dict(data),
-    )
-
-
-def _parse_partner_api_key_handle(data: Mapping[str, Any]) -> PartnerApiKeyHandle:
-    # `partner.keys.create` is handle-only on the owner-operation bus. Scrub
-    # any unexpected raw-secret fields defensively so wrapper callers do not
-    # accidentally depend on transport regressions that leak `ingest_key`.
-    raw = {
-        str(key): value
-        for key, value in dict(data).items()
-        if str(key) not in {"ingest_key", "full_key"}
-    }
-    return PartnerApiKeyHandle(
-        credential_id=str(raw.get("credential_id") or raw.get("id") or ""),
-        name=_string_or_none(raw.get("name")),
-        key_id=_string_or_none(raw.get("key_id")),
-        allowed_source_types=_to_string_list(raw.get("allowed_source_types")),
-        masked_key_hint=_string_or_none(raw.get("masked_key_hint")),
-        raw=raw,
-    )
-
-
-def _parse_ads_billing(data: Mapping[str, Any]) -> AdsBilling:
-    mandate_payload = data.get("mandate")
-    funding_instructions = _to_dict(data.get("funding_instructions"))
-    wallet = _to_dict(data.get("wallet"))
-    return AdsBilling(
-        currency=_string_or_none(data.get("currency")),
-        billing_mode=_string_or_none(data.get("billing_mode")),
-        month_spend_jpy=int(data.get("month_spend_jpy") or 0),
-        month_spend_usd=int(data.get("month_spend_usd") or 0),
-        all_time_spend_jpy=int(data.get("all_time_spend_jpy") or 0),
-        all_time_spend_usd=int(data.get("all_time_spend_usd") or 0),
-        total_impressions=int(data.get("total_impressions") or 0),
-        total_replies=int(data.get("total_replies") or 0),
-        has_billing=bool(data.get("has_billing") or False),
-        has_subscription=bool(data.get("has_subscription") or False),
-        invoices=_to_record_list(data.get("invoices")),
-        wallet=wallet or None,
-        balances=_to_record_list(data.get("balances")),
-        supported_tokens=_to_record_list(data.get("supported_tokens")),
-        funding_instructions=funding_instructions or None,
-        mandate=_parse_plan_web3_mandate(mandate_payload) if isinstance(mandate_payload, Mapping) else None,
-        raw=dict(data),
-    )
-
-
-def _parse_ads_billing_settlement(data: Mapping[str, Any]) -> AdsBillingSettlement:
-    return AdsBillingSettlement(
-        status=_string_or_none(data.get("status")),
-        message=_string_or_none(data.get("message") or data.get("detail")),
-        settles_automatically=_bool_or_none(
-            data.get("settles_automatically")
-            if data.get("settles_automatically") is not None
-            else data.get("auto_settles")
-        ),
-        cycle_key=_string_or_none(data.get("cycle_key")),
-        settled_at=_string_or_none(data.get("settled_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_ads_profile(data: Mapping[str, Any]) -> AdsProfile:
-    return AdsProfile(
-        has_profile=bool(data.get("has_profile") or False),
-        company_name=_string_or_none(data.get("company_name")),
-        ad_currency=_string_or_none(data.get("ad_currency")),
-        has_billing=bool(data.get("has_billing") or False),
-        raw=dict(data),
-    )
-
-
-def _parse_ads_campaign(data: Mapping[str, Any]) -> AdsCampaignRecord:
-    return AdsCampaignRecord(
-        campaign_id=str(data.get("campaign_id") or data.get("id") or ""),
-        name=_string_or_none(data.get("name")),
-        target_url=_string_or_none(data.get("target_url")),
-        content_brief=_string_or_none(data.get("content_brief")),
-        target_topics=_to_string_list(data.get("target_topics")),
-        posting_interval_minutes=int(data.get("posting_interval_minutes") or 360),
-        max_posts_per_day=int(data.get("max_posts_per_day") or 4),
-        currency=_string_or_none(data.get("currency")),
-        monthly_budget_jpy=int(data.get("monthly_budget_jpy") or 0),
-        cpm_jpy=int(data.get("cpm_jpy") or 0),
-        cpr_jpy=int(data.get("cpr_jpy") or 0),
-        monthly_budget_usd=int(data.get("monthly_budget_usd") or 0),
-        cpm_usd=int(data.get("cpm_usd") or 0),
-        cpr_usd=int(data.get("cpr_usd") or 0),
-        status=str(data.get("status") or "active").strip().lower() or "active",
-        month_spend_jpy=int(data.get("month_spend_jpy") or 0),
-        month_spend_usd=int(data.get("month_spend_usd") or 0),
-        total_posts=int(data.get("total_posts") or 0),
-        total_impressions=int(data.get("total_impressions") or 0),
-        total_replies=int(data.get("total_replies") or 0),
-        next_post_at=_string_or_none(data.get("next_post_at")),
-        created_at=_string_or_none(data.get("created_at")),
-        raw=dict(data),
-    )
-
-
-def _parse_ads_campaign_post(data: Mapping[str, Any]) -> AdsCampaignPostRecord:
-    return AdsCampaignPostRecord(
-        post_id=str(data.get("post_id") or data.get("id") or ""),
-        content_id=_string_or_none(data.get("content_id")),
-        cost_jpy=int(data.get("cost_jpy") or 0),
-        cost_usd=int(data.get("cost_usd") or 0),
-        impressions=int(data.get("impressions") or 0),
-        replies=int(data.get("replies") or 0),
-        status=_string_or_none(data.get("status")),
         created_at=_string_or_none(data.get("created_at")),
         raw=dict(data),
     )
@@ -2849,6 +2533,54 @@ class SiglumeClient:
         )
         self._pending_confirmations: dict[str, dict[str, Any]] = {}
 
+    def get_mcp_router_account(self) -> dict[str, Any]:
+        """Return the Siglume account resolved from this API key/session."""
+        data, _ = self._request("GET", "/mcp-router/account")
+        return _to_dict(data)
+
+    def list_mcp_router_servers(self) -> list[dict[str, Any]]:
+        """List MCP Router servers owned by this API key's Siglume account."""
+        data, _ = self._request("GET", "/mcp-router/servers")
+        if not isinstance(data, Mapping):
+            return []
+        return _to_record_list(data.get("items"))
+
+    def register_mcp_router_server(
+        self,
+        *,
+        name: str,
+        base_url: str,
+        description: str | None = None,
+        upstream_auth_mode: str = "none",
+        bearer_secret: str | None = None,
+        monetization: str = "free",
+        currency: str = "USD",
+        jurisdiction: str = "US",
+        payee_address: str | None = None,
+    ) -> dict[str, Any]:
+        """Register an upstream MCP server under this API key's owner account."""
+        payload: dict[str, Any] = {
+            "name": name,
+            "base_url": base_url,
+            "upstream_auth_mode": upstream_auth_mode,
+            "monetization": monetization,
+            "currency": currency,
+            "jurisdiction": jurisdiction,
+        }
+        if description:
+            payload["description"] = description
+        if bearer_secret:
+            payload["bearer_secret"] = bearer_secret
+        if payee_address:
+            payload["payee_address"] = payee_address
+        data, _ = self._request("POST", "/mcp-router/servers", json_body=payload)
+        return _to_dict(data)
+
+    def unregister_mcp_router_server(self, server_id: str) -> dict[str, Any]:
+        """Unregister an MCP Router server owned by this API key's account."""
+        data, _ = self._request("DELETE", f"/mcp-router/servers/{quote(server_id, safe='')}")
+        return _to_dict(data)
+
     def __enter__(self) -> "SiglumeClient":
         return self
 
@@ -2866,7 +2598,6 @@ class SiglumeClient:
         source_code: str | None = None,
         source_url: str | None = None,
         runtime_validation: Mapping[str, Any] | None = None,
-        oauth_credentials: Mapping[str, Any] | Sequence[Any] | None = None,
         source_context: Mapping[str, Any] | None = None,
         input_form_spec: Mapping[str, Any] | None = None,
     ) -> AutoRegistrationReceipt:
@@ -2883,7 +2614,6 @@ class SiglumeClient:
             source_code=source_code,
             source_url=source_url,
             runtime_validation=runtime_validation,
-            oauth_credentials=oauth_credentials,
             source_context=source_context,
             input_form_spec=input_form_spec_payload,
         )
@@ -2904,7 +2634,6 @@ class SiglumeClient:
             auto_manifest=_to_dict(data.get("auto_manifest")),
             confidence=_to_dict(data.get("confidence")),
             validation_report=_to_dict(data.get("validation_report")),
-            oauth_status=_to_dict(data.get("oauth_status")),
             review_url=_string_or_none(data.get("review_url")),
             trace_id=meta.trace_id,
             request_id=meta.request_id,
@@ -3011,6 +2740,75 @@ class SiglumeClient:
     def get_listing(self, listing_id: str) -> AppListingRecord:
         data, _meta = self._request("GET", f"/market/capabilities/{listing_id}")
         return _parse_listing(data)
+
+    def list_company_publishers(self) -> list[CompanyPublisherRecord]:
+        data, _meta = self._request("GET", "/market/company-publishers")
+        items = data.get("items") if isinstance(data.get("items"), list) else []
+        return [_parse_company_publisher(item) for item in items if isinstance(item, Mapping)]
+
+    def request_company_publish_approval(self, listing_id: str, note: str | None = None) -> AppListingRecord:
+        payload = {"note": note} if note else {}
+        data, _meta = self._request(
+            "POST",
+            f"/market/capabilities/{listing_id}/company-publish-approval",
+            json_body=payload,
+        )
+        return _parse_listing(data)
+
+    def decide_company_publish_approval(
+        self,
+        listing_id: str,
+        *,
+        decision: str,
+        reason: str | None = None,
+    ) -> AppListingRecord:
+        data, _meta = self._request(
+            "POST",
+            f"/market/capabilities/{listing_id}/company-publish-approval/decision",
+            json_body={
+                "decision": decision,
+                **({"reason": reason} if reason else {}),
+            },
+        )
+        return _parse_listing(data)
+
+    def get_capability_state(self, capability_key: str, save_key: str = "default") -> CapabilitySaveStateRecord:
+        data, _meta = self._request(
+            "GET",
+            f"/market/capability-state/{capability_key}/{save_key}",
+        )
+        return _parse_capability_save_state(data)
+
+    def put_capability_state(
+        self,
+        capability_key: str,
+        save_key: str = "default",
+        payload: Mapping[str, Any] | None = None,
+        *,
+        schema_version: str = "1",
+        expected_revision: int | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> CapabilitySaveStateRecord:
+        body: dict[str, Any] = {
+            "payload": _coerce_mapping(payload or {}, "payload"),
+            "schema_version": str(schema_version or "1"),
+            "metadata": _coerce_mapping(metadata or {}, "metadata"),
+        }
+        if expected_revision is not None:
+            body["expected_revision"] = int(expected_revision)
+        data, _meta = self._request(
+            "PUT",
+            f"/market/capability-state/{capability_key}/{save_key}",
+            json_body=body,
+        )
+        return _parse_capability_save_state(data)
+
+    def delete_capability_state(self, capability_key: str, save_key: str = "default") -> CapabilitySaveStateRecord:
+        data, _meta = self._request(
+            "DELETE",
+            f"/market/capability-state/{capability_key}/{save_key}",
+        )
+        return _parse_capability_save_state(data)
 
     # ----- Capability bundles (v0.7 track 2) ------------------------------
 
@@ -3149,134 +2947,9 @@ class SiglumeClient:
 
     # ----- end bundles ----------------------------------------------------
 
-    # ----- Connected accounts (v0.7 track 3) -----------------------------
-    # Thin wrapper over the owner-operation bus + /v1/me/connected-accounts
-    # routes. ``resolve`` is NOT exposed: capabilities access the
-    # runtime handle in-process, not over the wire.
-
-    def start_connected_account_oauth(
-        self,
-        *,
-        listing_id: str,
-        redirect_uri: str,
-        scopes: list[str] | None = None,
-        account_role: str | None = None,
-    ) -> ConnectedAccountOAuthStart:
-        """Begin the OAuth dance for a specific listing.
-
-        v0.7.1 responsibility-correction: OAuth client credentials
-        live on the LISTING (the seller registered their own app
-        with the provider). The SDK caller passes the ``listing_id``
-        they're connecting for; the platform resolves the provider
-        + client credentials from that listing.
-        """
-        body: dict[str, Any] = {
-            "listing_id": listing_id,
-            "redirect_uri": redirect_uri,
-        }
-        if scopes is not None:
-            body["scopes"] = list(scopes)
-        if account_role is not None:
-            body["account_role"] = account_role
-        data, _meta = self._request(
-            "POST", "/me/connected-accounts/oauth/authorize", json_body=body,
-        )
-        return ConnectedAccountOAuthStart(
-            authorize_url=str(data.get("authorize_url") or ""),
-            state=str(data.get("state") or ""),
-            provider_key=str(data.get("provider_key") or ""),
-            scopes=[str(s) for s in (data.get("scopes") or []) if isinstance(s, str)],
-            pkce_method=_string_or_none(data.get("pkce_method")),
-        )
-
-    def complete_connected_account_oauth(
-        self,
-        *,
-        state: str,
-        code: str,
-    ) -> dict[str, Any]:
-        """Exchange the authorization code for a persisted token on
-        the platform. Returns the connected-account summary (no raw
-        tokens — those live only on the server)."""
-        data, _meta = self._request(
-            "POST", "/me/connected-accounts/oauth/callback",
-            json_body={"state": state, "code": code},
-        )
-        return dict(data)
-
-    def refresh_connected_account(self, account_id: str) -> ConnectedAccountLifecycleResult:
-        data, _meta = self._request(
-            "POST", f"/me/connected-accounts/{account_id}/refresh",
-        )
-        return _parse_connected_account_lifecycle(data)
-
-    def revoke_connected_account(self, account_id: str) -> ConnectedAccountLifecycleResult:
-        data, _meta = self._request(
-            "POST", f"/me/connected-accounts/{account_id}/revoke",
-        )
-        return _parse_connected_account_lifecycle(data)
-
-    def set_listing_oauth_credentials(
-        self,
-        listing_id: str,
-        *,
-        provider_key: str,
-        client_id: str,
-        client_secret: str,
-        authorize_url: str,
-        token_url: str,
-        revoke_url: str | None = None,
-        display_name: str | None = None,
-        scope_separator: str | None = None,
-        token_endpoint_auth: str | None = None,
-        pkce_required: bool | None = None,
-        refresh_supported: bool | None = None,
-        available_scopes: list[str] | None = None,
-        required_scopes: list[str] | None = None,
-    ) -> dict[str, Any]:
-        """Seller-side: register the OAuth client credentials for
-        your listing. v0.7.1 responsibility-correction — the seller
-        is the OAuth party, not the platform. ``client_secret`` is
-        stored encrypted server-side and is never returned on reads.
-        """
-        body: dict[str, Any] = {
-            "provider_key": provider_key,
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "authorize_url": authorize_url,
-            "token_url": token_url,
-        }
-        if revoke_url is not None:
-            body["revoke_url"] = revoke_url
-        if display_name is not None:
-            body["display_name"] = display_name
-        if scope_separator is not None:
-            body["scope_separator"] = scope_separator
-        if token_endpoint_auth is not None:
-            body["token_endpoint_auth"] = token_endpoint_auth
-        if pkce_required is not None:
-            body["pkce_required"] = bool(pkce_required)
-        if refresh_supported is not None:
-            body["refresh_supported"] = bool(refresh_supported)
-        if available_scopes is not None:
-            body["available_scopes"] = list(available_scopes)
-        if required_scopes is not None:
-            body["required_scopes"] = list(required_scopes)
-        data, _meta = self._request(
-            "PUT", f"/market/capabilities/{listing_id}/oauth-credentials",
-            json_body=body,
-        )
-        return dict(data)
-
-    def get_listing_oauth_credentials_status(self, listing_id: str) -> dict[str, Any]:
-        """Read-only: is OAuth configured on this listing? Never
-        returns the secret values themselves."""
-        data, _meta = self._request(
-            "GET", f"/market/capabilities/{listing_id}/oauth-credentials",
-        )
-        return dict(data)
-
-    # ----- end connected accounts ----------------------------------------
+    # ----- Connected accounts ------------------------------------------------
+    # Architecture B: publisher APIs own external OAuth and token storage.
+    # The SDK no longer exposes platform OAuth or listing credential APIs.
 
     def get_developer_portal(self) -> DeveloperPortalSummary:
         data, meta = self._request("GET", "/market/developer/portal")
@@ -4301,115 +3974,6 @@ class SiglumeClient:
         )
         return _parse_market_need(execution.result)
 
-    # `works.*` also uses the public owner-operation execute route. The
-    # categories list returns a top-level array inside `result`, so these
-    # helpers call the execute endpoint directly instead of relying on
-    # execute_owner_operation()'s object-only `result` parser.
-    def list_works_categories(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[WorksCategoryRecord]:
-        data, _meta = self._request_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "works.categories.list",
-            {},
-            lang=lang,
-        )
-        result = data.get("result")
-        items = result if isinstance(result, list) else []
-        return [_parse_works_category(item) for item in items if isinstance(item, Mapping)]
-
-    def get_works_registration(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> WorksRegistrationRecord:
-        data, _meta = self._request_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "works.registration.get",
-            {},
-            lang=lang,
-        )
-        return _parse_works_registration(data)
-
-    def register_for_works(
-        self,
-        *,
-        agent_id: str | None = None,
-        tagline: str | None = None,
-        description: str | None = None,
-        categories: list[str] | tuple[str, ...] | None = None,
-        capabilities: list[str] | tuple[str, ...] | None = None,
-        lang: str = "en",
-    ) -> WorksRegistrationRecord:
-        payload: dict[str, Any] = {}
-        if tagline is not None:
-            payload["tagline"] = str(tagline).strip()
-        if description is not None:
-            payload["description"] = str(description).strip()
-        if categories is not None:
-            if not isinstance(categories, (list, tuple)):
-                raise SiglumeClientError("categories must be a list of strings.")
-            normalized_categories: list[str] = []
-            for item in categories:
-                if not isinstance(item, str):
-                    raise SiglumeClientError("categories must contain only strings.")
-                normalized = item.strip()
-                if normalized:
-                    normalized_categories.append(normalized)
-            payload["categories"] = normalized_categories
-        if capabilities is not None:
-            if not isinstance(capabilities, (list, tuple)):
-                raise SiglumeClientError("capabilities must be a list of strings.")
-            normalized_capabilities: list[str] = []
-            for item in capabilities:
-                if not isinstance(item, str):
-                    raise SiglumeClientError("capabilities must contain only strings.")
-                normalized = item.strip()
-                if normalized:
-                    normalized_capabilities.append(normalized)
-            payload["capabilities"] = normalized_capabilities
-        data, _meta = self._request_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "works.registration.register",
-            payload,
-            lang=lang,
-        )
-        return _parse_works_registration(data)
-
-    def get_works_owner_dashboard(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> WorksOwnerDashboard:
-        data, _meta = self._request_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "works.owner_dashboard.get",
-            {},
-            lang=lang,
-        )
-        result = data.get("result") if isinstance(data.get("result"), Mapping) else {}
-        return _parse_works_owner_dashboard(result)
-
-    def get_works_poster_dashboard(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> WorksPosterDashboard:
-        data, _meta = self._request_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "works.poster_dashboard.get",
-            {},
-            lang=lang,
-        )
-        result = data.get("result") if isinstance(data.get("result"), Mapping) else {}
-        return _parse_works_poster_dashboard(result)
-
     def list_installed_tools(
         self,
         *,
@@ -4622,161 +4186,6 @@ class SiglumeClient:
         )
         items = data.get("result") if isinstance(data.get("result"), list) else []
         return [_parse_installed_tool_receipt_step(item) for item in items if isinstance(item, Mapping)]
-    def get_partner_dashboard(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> PartnerDashboard:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.dashboard.get",
-            {},
-            lang=lang,
-        )
-        return _parse_partner_dashboard(execution.result)
-
-    def get_partner_usage(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> PartnerUsage:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.usage.get",
-            {},
-            lang=lang,
-        )
-        return _parse_partner_usage(execution.result)
-
-    def list_partner_api_keys(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[PartnerApiKeyRecord]:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.keys.list",
-            {},
-            lang=lang,
-        )
-        items = execution.result.get("keys") if isinstance(execution.result.get("keys"), list) else []
-        return [_parse_partner_api_key(item) for item in items if isinstance(item, Mapping)]
-
-    def create_partner_api_key(
-        self,
-        *,
-        agent_id: str | None = None,
-        name: str | None = None,
-        allowed_source_types: list[str] | tuple[str, ...] | None = None,
-        lang: str = "en",
-    ) -> PartnerApiKeyHandle:
-        payload: dict[str, Any] = {}
-        if name is not None:
-            normalized_name = str(name).strip()
-            if not normalized_name:
-                raise SiglumeClientError("name cannot be empty.")
-            payload["name"] = normalized_name
-        if allowed_source_types is not None:
-            if not isinstance(allowed_source_types, (list, tuple)):
-                raise SiglumeClientError("allowed_source_types must be a list of strings.")
-            normalized_source_types: list[str] = []
-            for item in allowed_source_types:
-                if not isinstance(item, str):
-                    raise SiglumeClientError("allowed_source_types must contain only strings.")
-                normalized_item = item.strip()
-                if normalized_item:
-                    normalized_source_types.append(normalized_item)
-            payload["allowed_source_types"] = normalized_source_types
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "partner.keys.create",
-            payload,
-            lang=lang,
-        )
-        return _parse_partner_api_key_handle(execution.result)
-
-    def get_ads_billing(
-        self,
-        *,
-        agent_id: str | None = None,
-        rail: str | None = None,
-        lang: str = "en",
-    ) -> AdsBilling:
-        payload: dict[str, Any] = {}
-        if rail is not None and str(rail).strip():
-            payload["rail"] = str(rail).strip().lower()
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.billing.get",
-            payload,
-            lang=lang,
-        )
-        return _parse_ads_billing(execution.result)
-
-    def settle_ads_billing(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> AdsBillingSettlement:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.billing.settle",
-            {},
-            lang=lang,
-        )
-        return _parse_ads_billing_settlement(execution.result)
-
-    def get_ads_profile(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> AdsProfile:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.profile.get",
-            {},
-            lang=lang,
-        )
-        return _parse_ads_profile(execution.result)
-
-    def list_ads_campaigns(
-        self,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[AdsCampaignRecord]:
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.campaigns.list",
-            {},
-            lang=lang,
-        )
-        items = execution.result.get("campaigns") if isinstance(execution.result.get("campaigns"), list) else []
-        return [_parse_ads_campaign(item) for item in items if isinstance(item, Mapping)]
-
-    def list_ads_campaign_posts(
-        self,
-        campaign_id: str,
-        *,
-        agent_id: str | None = None,
-        lang: str = "en",
-    ) -> list[AdsCampaignPostRecord]:
-        normalized_campaign_id = str(campaign_id or "").strip()
-        if not normalized_campaign_id:
-            raise SiglumeClientError("campaign_id is required.")
-        execution = self.execute_owner_operation(
-            self._resolve_owner_operation_agent_id(agent_id),
-            "ads.campaign_posts.list",
-            {"campaign_id": normalized_campaign_id},
-            lang=lang,
-        )
-        items = execution.result.get("posts") if isinstance(execution.result.get("posts"), list) else []
-        return [_parse_ads_campaign_post(item) for item in items if isinstance(item, Mapping)]
 
     # `market.proposals.*` uses the public owner-operation execute route.
     # Read operations return typed proposal records; guarded write operations
@@ -5080,40 +4489,6 @@ class SiglumeClient:
             trace_id=meta.trace_id,
             request_id=meta.request_id,
             raw=dict(data),
-        )
-
-    def list_connected_accounts(
-        self,
-        *,
-        provider_key: str | None = None,
-        environment: str | None = None,
-        limit: int = 50,
-        cursor: str | None = None,
-    ) -> CursorPage[ConnectedAccountRecord]:
-        params: dict[str, Any] = {"limit": max(1, min(int(limit), 100))}
-        if provider_key:
-            params["provider_key"] = provider_key
-        if environment:
-            params["environment"] = environment
-        if cursor:
-            params["cursor"] = cursor
-        data, meta = self._request("GET", "/market/connected-accounts", params=params)
-        items = data.get("items") if isinstance(data.get("items"), list) else []
-        next_cursor = _string_or_none(data.get("next_cursor"))
-        return CursorPage(
-            items=[_parse_connected_account(item) for item in items if isinstance(item, Mapping)],
-            next_cursor=next_cursor,
-            limit=int(data["limit"]) if data.get("limit") is not None else params["limit"],
-            offset=int(data["offset"]) if data.get("offset") is not None else None,
-            meta=meta,
-            _fetch_next=(
-                lambda next_value: self.list_connected_accounts(
-                    provider_key=provider_key,
-                    environment=environment,
-                    limit=limit,
-                    cursor=next_value,
-                )
-            ) if next_cursor else None,
         )
 
     def create_support_case(

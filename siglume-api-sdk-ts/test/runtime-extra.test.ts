@@ -20,11 +20,14 @@ class RecordingApp extends AppAdapter {
       name: "Price Compare Helper",
       job_to_be_done: "Compare retailer prices for a product and return the best offer.",
       category: AppCategory.COMMERCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+      currency: "USD" as const,
+      allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Returns a structured offer comparison.",
       example_prompts: ["Compare prices for Sony headphones."],
@@ -47,11 +50,14 @@ class BrokenManifestApp extends AppAdapter {
       name: "",
       job_to_be_done: "",
       category: AppCategory.FINANCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.PAYMENT,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: false,
       required_connected_accounts: [],
       price_model: PriceModel.FREE,
+      currency: "USD" as const,
+      allow_free_trial: false,
       jurisdiction: "US",
       example_prompts: [],
     };
@@ -67,7 +73,7 @@ class BrokenManifestApp extends AppAdapter {
 }
 
 describe("runtime helpers", () => {
-  it("normalizes execution results and injects stub connected accounts", async () => {
+  it("normalizes execution results and preserves identity context", async () => {
     const app = new RecordingApp();
     const harness = new AppTestHarness(app, { stripe: new StubProvider("stripe") });
 
@@ -84,7 +90,6 @@ describe("runtime helpers", () => {
     expect(result.amount_minor).toBe(0);
     expect(result.currency).toBe("USD");
     expect(result.provider_status).toBe("ok");
-    expect(app.lastContext?.connected_accounts?.stripe?.provider_key).toBe("stripe");
     expect(app.lastContext?.metadata).toEqual({ source: "test" });
     expect(app.lastContext?.trace_id).toBe("trc_123");
     expect(app.supported_task_types()).toEqual(["default"]);
@@ -137,9 +142,9 @@ describe("runtime helpers", () => {
 
     const harness = new AppTestHarness(new RecordingApp());
     expect(harness.validate_tool_manual()).toEqual([true, []]);
-    const missing = await harness.simulate_connected_account_missing("lookup_price", {
+    const dryRun = await harness.dry_run("lookup_price", {
       input_params: { query: "headphones" },
     });
-    expect(missing.execution_kind).toBe("dry_run");
+    expect(dryRun.execution_kind).toBe("dry_run");
   });
 });

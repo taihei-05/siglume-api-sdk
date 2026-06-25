@@ -26,6 +26,11 @@ WEBHOOK_EVENT_TYPES: tuple[str, ...] = (
     "capability.delisted",
     "execution.completed",
     "execution.failed",
+    "reward_payout.created",
+    "reward_payout.provider_pending",
+    "reward_paid",
+    "reward_payout.failed",
+    "reward_payout.cancelled",
 )
 _EVENT_TYPE_SET = frozenset(WEBHOOK_EVENT_TYPES)
 
@@ -41,6 +46,11 @@ WebhookEventType: TypeAlias = Literal[
     "capability.delisted",
     "execution.completed",
     "execution.failed",
+    "reward_payout.created",
+    "reward_payout.provider_pending",
+    "reward_paid",
+    "reward_payout.failed",
+    "reward_payout.cancelled",
 ]
 
 
@@ -181,6 +191,31 @@ class ExecutionFailedEvent(BaseWebhookEvent):
     type: Literal["execution.failed"] = "execution.failed"
 
 
+@dataclass(kw_only=True)
+class RewardPayoutCreatedEvent(BaseWebhookEvent):
+    type: Literal["reward_payout.created"] = "reward_payout.created"
+
+
+@dataclass(kw_only=True)
+class RewardPayoutProviderPendingEvent(BaseWebhookEvent):
+    type: Literal["reward_payout.provider_pending"] = "reward_payout.provider_pending"
+
+
+@dataclass(kw_only=True)
+class RewardPaidEvent(BaseWebhookEvent):
+    type: Literal["reward_paid"] = "reward_paid"
+
+
+@dataclass(kw_only=True)
+class RewardPayoutFailedEvent(BaseWebhookEvent):
+    type: Literal["reward_payout.failed"] = "reward_payout.failed"
+
+
+@dataclass(kw_only=True)
+class RewardPayoutCancelledEvent(BaseWebhookEvent):
+    type: Literal["reward_payout.cancelled"] = "reward_payout.cancelled"
+
+
 SiglumeWebhookEvent: TypeAlias = (
     SubscriptionCreatedEvent
     | SubscriptionRenewedEvent
@@ -193,6 +228,11 @@ SiglumeWebhookEvent: TypeAlias = (
     | CapabilityDelistedEvent
     | ExecutionCompletedEvent
     | ExecutionFailedEvent
+    | RewardPayoutCreatedEvent
+    | RewardPayoutProviderPendingEvent
+    | RewardPaidEvent
+    | RewardPayoutFailedEvent
+    | RewardPayoutCancelledEvent
 )
 
 _EVENT_CLASS_BY_TYPE: dict[str, type[BaseWebhookEvent]] = {
@@ -207,6 +247,11 @@ _EVENT_CLASS_BY_TYPE: dict[str, type[BaseWebhookEvent]] = {
     "capability.delisted": CapabilityDelistedEvent,
     "execution.completed": ExecutionCompletedEvent,
     "execution.failed": ExecutionFailedEvent,
+    "reward_payout.created": RewardPayoutCreatedEvent,
+    "reward_payout.provider_pending": RewardPayoutProviderPendingEvent,
+    "reward_paid": RewardPaidEvent,
+    "reward_payout.failed": RewardPayoutFailedEvent,
+    "reward_payout.cancelled": RewardPayoutCancelledEvent,
 }
 
 WebhookCallback: TypeAlias = Callable[[SiglumeWebhookEvent], Any]
@@ -585,6 +630,11 @@ __all__ = [
     "PaymentFailedEvent",
     "PaymentSucceededEvent",
     "QueuedWebhookEvent",
+    "RewardPaidEvent",
+    "RewardPayoutCancelledEvent",
+    "RewardPayoutCreatedEvent",
+    "RewardPayoutFailedEvent",
+    "RewardPayoutProviderPendingEvent",
     "SiglumeWebhookError",
     "SiglumeWebhookEvent",
     "SiglumeWebhookPayloadError",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -18,10 +19,14 @@ from siglume_api_sdk import (  # noqa: E402
     AppManifest,
     ApprovalMode,
     PermissionClass,
+    PersistenceMode,
+    PersistencePolicy,
     PriceModel,
+    ListingCurrency,
     SiglumeAPIError,
     SiglumeClient,
     SiglumeClientError,
+    StoreVertical,
     ToolManual,
     ToolManualPermissionClass,
 )
@@ -43,13 +48,16 @@ def build_manifest() -> AppManifest:
         name="Price Compare Helper",
         job_to_be_done="Compare retailer prices for a product and return the best current offer.",
         category=AppCategory.COMMERCE,
+        store_vertical=StoreVertical.GAME,
         permission_class=PermissionClass.READ_ONLY,
         approval_mode=ApprovalMode.AUTO,
         dry_run_supported=True,
         required_connected_accounts=[],
         price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
         jurisdiction="US",
-        short_description="Search multiple retailers and summarize the best current price.",
+        short_description="Compare retailer prices before buying.",
         description="Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
         docs_url="https://docs.example.com/price-compare",
         support_contact="support@example.com",
@@ -57,6 +65,17 @@ def build_manifest() -> AppManifest:
         seller_social_url="https://x.com/example",
         example_prompts=["Compare prices for Sony WH-1000XM5."],
     )
+
+
+SAVE_DATA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "agent": {"type": "object"},
+        "avatar_config": {"type": "object"},
+        "replays": {"type": "array"},
+    },
+    "required": ["agent"],
+}
 
 
 def build_tool_manual() -> ToolManual:
@@ -160,20 +179,87 @@ def test_client_rejects_explicit_empty_api_key_even_with_environment(monkeypatch
         )
 
 
+def test_mcp_router_client_methods_use_owner_api_routes() -> None:
+    requests: list[tuple[str, str, dict[str, object]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        requests.append((request.method, request.url.path, body))
+        assert request.headers["Authorization"] == "Bearer sig_test_key"
+        if request.method == "GET" and request.url.path == "/v1/mcp-router/account":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "user_id": "usr_provider",
+                        "email": "provider@example.com",
+                        "display_name": "Provider",
+                        "plan": "free",
+                        "status": "active",
+                    }
+                ),
+            )
+        if request.method == "GET" and request.url.path == "/v1/mcp-router/servers":
+            return httpx.Response(
+                200,
+                json=envelope({"items": [{"id": "srv_1", "name": "Provider MCP"}]}),
+            )
+        if request.method == "POST" and request.url.path == "/v1/mcp-router/servers":
+            assert body == {
+                "name": "Provider MCP",
+                "base_url": "https://provider.example/mcp",
+                "upstream_auth_mode": "bearer",
+                "monetization": "free",
+                "currency": "USD",
+                "jurisdiction": "US",
+                "bearer_secret": "upstream-secret",
+            }
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "id": "srv_1",
+                        "name": "Provider MCP",
+                        "base_url": "https://provider.example/mcp",
+                        "status": "active",
+                    }
+                ),
+            )
+        if request.method == "DELETE" and request.url.path == "/v1/mcp-router/servers/srv_1":
+            return httpx.Response(200, json=envelope({"id": "srv_1", "status": "disabled"}))
+        return httpx.Response(404, json=envelope({"path": request.url.path}))
+
+    with build_client(handler) as client:
+        account = client.get_mcp_router_account()
+        assert account["email"] == "provider@example.com"
+
+        servers = client.list_mcp_router_servers()
+        assert servers == [{"id": "srv_1", "name": "Provider MCP"}]
+
+        registered = client.register_mcp_router_server(
+            name="Provider MCP",
+            base_url="https://provider.example/mcp",
+            upstream_auth_mode="bearer",
+            bearer_secret="upstream-secret",
+        )
+        assert registered["id"] == "srv_1"
+        assert "bearer_secret" not in registered
+
+        unregistered = client.unregister_mcp_router_server("srv_1")
+        assert unregistered["status"] == "disabled"
+
+    assert [item[:2] for item in requests] == [
+        ("GET", "/v1/mcp-router/account"),
+        ("GET", "/v1/mcp-router/servers"),
+        ("POST", "/v1/mcp-router/servers"),
+        ("DELETE", "/v1/mcp-router/servers/srv_1"),
+    ]
+
+
 def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: Path) -> None:
     manifest = build_manifest()
     tool_manual = build_tool_manual()
     runtime_validation = build_runtime_validation()
-    oauth_credentials = {
-        "items": [
-            {
-                "provider_key": "twitter",
-                "client_id": "client-id",
-                "client_secret": "client-secret",
-                "required_scopes": ["tweet.write", "users.read"],
-            }
-        ]
-    }
     requests: list[tuple[str, str, dict[str, object]]] = []
     cassette_path = tmp_path / "auto_register_recorded.json"
 
@@ -190,12 +276,14 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
             assert body["description"] == manifest.description
             assert body["tool_manual"]["tool_name"] == tool_manual.tool_name
             assert body["runtime_validation"]["invoke_url"] == runtime_validation["invoke_url"]
-            assert body["oauth_credentials"]["items"][0]["provider_key"] == "twitter"
+            assert "oauth_credentials" not in body
             assert body["publisher_identity"]["documentation_url"] == manifest.docs_url
             assert body["legal"]["publisher_identity"]["support_contact"] == manifest.support_contact
             assert body["publisher_identity"]["seller_homepage_url"] == manifest.seller_homepage_url
             assert body["publisher_identity"]["seller_social_url"] == manifest.seller_social_url
             assert body["jurisdiction"] == manifest.jurisdiction
+            assert body["store_vertical"] == "game"
+            assert body["currency"] == "USD"
             assert "Registration bootstrap generated by SiglumeClient." in body["source_code"]
             return httpx.Response(
                 201,
@@ -208,7 +296,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                         "auto_manifest": {"capability_key": manifest.capability_key},
                         "confidence": {"overall": 0.94},
                         "validation_report": {"checks": []},
-                        "oauth_status": {"configured": True, "missing_providers": []},
                         "review_url": "/owner/publish?listing=lst_123",
                     }
                 ),
@@ -245,7 +332,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                 manifest,
                 tool_manual,
                 runtime_validation=runtime_validation,
-                oauth_credentials=oauth_credentials,
             )
             confirmation = client.confirm_registration(receipt.listing_id)
 
@@ -258,7 +344,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                 manifest,
                 tool_manual,
                 runtime_validation=runtime_validation,
-                oauth_credentials=oauth_credentials,
             )
             replay_confirmation = client.confirm_registration(replay_receipt.listing_id)
 
@@ -266,7 +351,6 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
     assert receipt.trace_id == "trc_test"
     assert receipt.registration_mode == "upgrade"
     assert receipt.listing_status == "active"
-    assert receipt.oauth_status["configured"] is True
     assert confirmation.listing_id == "lst_123"
     assert confirmation.status == "active"
     assert confirmation.message.startswith("Listing published automatically")
@@ -289,48 +373,387 @@ def test_confirm_registration_rejects_non_string_version_bump() -> None:
             client.confirm_registration("lst_123", version_bump=[])  # type: ignore[arg-type]
 
 
-def test_auto_register_accepts_oauth_credentials_sequence() -> None:
-    manifest = build_manifest()
-    tool_manual = build_tool_manual()
-    runtime_validation = build_runtime_validation()
-    oauth_credentials = [
-        {
-            "provider_key": "twitter",
-            "client_id": "client-id",
-            "client_secret": "client-secret",
-            "required_scopes": ["tweet.write"],
-        }
-    ]
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content.decode("utf-8")) if request.content else {}
-        assert body["oauth_credentials"]["items"][0]["provider_key"] == "twitter"
-        assert body["oauth_credentials"]["items"][0]["required_scopes"] == ["tweet.write"]
-        return httpx.Response(
-            201,
-            json=envelope(
-                {
-                    "listing_id": "lst_seq",
-                    "status": "draft",
-                    "auto_manifest": {"capability_key": manifest.capability_key},
-                    "confidence": {"overall": 0.92},
-                    "validation_report": {"checks": []},
-                    "review_url": "/owner/publish?listing=lst_seq",
-                }
-            ),
+def test_app_manifest_requires_explicit_listing_currency() -> None:
+    with pytest.raises(ValueError, match="AppManifest.currency is REQUIRED"):
+        AppManifest(
+            capability_key="price-compare-helper",
+            name="Price Compare Helper",
+            job_to_be_done="Compare prices.",
+            category=AppCategory.COMMERCE,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            jurisdiction="US",
         )
+
+
+def test_app_manifest_normalizes_jpy_listing_currency() -> None:
+    manifest = AppManifest(
+        capability_key="price-compare-helper",
+        name="Price Compare Helper",
+        job_to_be_done="Compare prices.",
+        category=AppCategory.COMMERCE,
+        store_vertical=StoreVertical.API,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.SUBSCRIPTION,
+        price_value_minor=1200,
+        currency="jpy",
+        allow_free_trial=False,
+        jurisdiction="JP",
+    )
+
+    assert manifest.currency == ListingCurrency.JPY
+
+
+def test_app_manifest_rejects_jpy_operation_price_below_minimum() -> None:
+    with pytest.raises(ValueError, match="at least 15"):
+        AppManifest(
+            capability_key="x-poster",
+            name="X Poster",
+            job_to_be_done="Post approved social updates.",
+            category=AppCategory.COMMUNICATION,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.ACTION,
+            approval_mode=ApprovalMode.ALWAYS_ASK,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.PER_ACTION,
+            price_value_minor=0,
+            pricing_plan={
+                "currency": "JPY",
+                "items": [{"key": "text_post", "label": "Text post", "price_minor": 5}],
+            },
+            currency="JPY",
+            allow_free_trial=False,
+            jurisdiction="JP",
+        )
+
+
+def test_app_manifest_accepts_free_and_minimum_jpy_operation_prices() -> None:
+    manifest = AppManifest(
+        capability_key="x-poster",
+        name="X Poster",
+        job_to_be_done="Post approved social updates.",
+        category=AppCategory.COMMUNICATION,
+        store_vertical=StoreVertical.API,
+        permission_class=PermissionClass.ACTION,
+        approval_mode=ApprovalMode.ALWAYS_ASK,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.PER_ACTION,
+        price_value_minor=0,
+        pricing_plan={
+            "currency": "JPY",
+            "items": [
+                {"key": "dry_run", "label": "Dry run", "price_minor": 0},
+                {"key": "text_post", "label": "Text post", "price_minor": 15},
+            ],
+        },
+        currency="JPY",
+        allow_free_trial=False,
+        jurisdiction="JP",
+    )
+
+    assert manifest.pricing_plan["items"][1]["price_minor"] == 15
+
+
+def test_game_manifest_with_save_persistence_requires_save_data_schema() -> None:
+    with pytest.raises(ValueError, match="persistence.save_data_schema is REQUIRED"):
+        AppManifest(
+            capability_key="arena-game",
+            name="Arena Game",
+            job_to_be_done="Play a persistent API game.",
+            category=AppCategory.OTHER,
+            store_vertical=StoreVertical.GAME,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            currency="USD",
+            allow_free_trial=False,
+            jurisdiction="US",
+            persistence=PersistencePolicy(mode="platform"),
+        )
+
+
+def test_game_manifest_accepts_save_data_schema_for_save_persistence() -> None:
+    manifest = AppManifest(
+        capability_key="arena-game",
+        name="Arena Game",
+        job_to_be_done="Play a persistent API game.",
+        category=AppCategory.OTHER,
+        store_vertical=StoreVertical.GAME,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
+        jurisdiction="US",
+        persistence=PersistencePolicy(mode="platform", save_data_schema=SAVE_DATA_SCHEMA),
+    )
+
+    assert manifest.persistence["save_data_schema"] == SAVE_DATA_SCHEMA
+
+
+def test_game_manifest_rejects_oversized_save_data_schema() -> None:
+    oversized_schema = {
+        "type": "object",
+        "properties": {
+            "agent": {"type": "object", "description": "x" * 8200},
+        },
+        "required": ["agent"],
+    }
+
+    with pytest.raises(ValueError, match="save_data_schema must be at most 8192 bytes"):
+        AppManifest(
+            capability_key="arena-game",
+            name="Arena Game",
+            job_to_be_done="Play a persistent API game.",
+            category=AppCategory.OTHER,
+            store_vertical=StoreVertical.GAME,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            currency="USD",
+            allow_free_trial=False,
+            jurisdiction="US",
+            persistence=PersistencePolicy(mode="platform", save_data_schema=oversized_schema),
+        )
+
+
+def test_api_manifest_does_not_require_save_data_schema() -> None:
+    manifest = AppManifest(
+        capability_key="normal-api",
+        name="Normal API",
+        job_to_be_done="Return non-game data.",
+        category=AppCategory.OTHER,
+        store_vertical=StoreVertical.API,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
+        jurisdiction="US",
+        persistence=PersistencePolicy(mode="platform"),
+    )
+
+    assert manifest.persistence["mode"] == "platform"
+
+
+def test_mapping_persistence_accepts_enum_mode() -> None:
+    manifest = AppManifest(
+        capability_key="arena-game",
+        name="Arena Game",
+        job_to_be_done="Play a persistent API game.",
+        category=AppCategory.OTHER,
+        store_vertical=StoreVertical.GAME,
+        permission_class=PermissionClass.READ_ONLY,
+        approval_mode=ApprovalMode.AUTO,
+        dry_run_supported=True,
+        required_connected_accounts=[],
+        price_model=PriceModel.FREE,
+        currency="USD",
+        allow_free_trial=False,
+        jurisdiction="US",
+        persistence={"mode": PersistenceMode.PLATFORM, "save_data_schema": SAVE_DATA_SCHEMA},
+    )
+
+    assert manifest.persistence["mode"] == "platform"
+
+
+def test_auto_register_dict_manifest_requires_game_save_data_schema() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    manifest = {
+        "capability_key": "arena-game",
+        "name": "Arena Game",
+        "job_to_be_done": "Play a persistent API game.",
+        "category": "other",
+        "store_vertical": "game",
+        "permission_class": "read-only",
+        "approval_mode": "auto",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "free",
+        "currency": "USD",
+        "allow_free_trial": False,
+        "jurisdiction": "US",
+        "example_prompts": ["Start a run.", "Load my save."],
+    }
+    manifest["persistence"] = {"mode": "platform"}
 
     with build_client(handler) as client:
-        receipt = client.auto_register(
-            manifest,
-            tool_manual,
-            runtime_validation=runtime_validation,
-            oauth_credentials=oauth_credentials,
+        with pytest.raises(SiglumeClientError, match="persistence.save_data_schema is required"):
+            client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_dict_manifest_rejects_oversized_save_data_schema() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    manifest = {
+        "capability_key": "arena-game",
+        "name": "Arena Game",
+        "job_to_be_done": "Play a persistent API game.",
+        "category": "other",
+        "store_vertical": "game",
+        "permission_class": "read-only",
+        "approval_mode": "auto",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "free",
+        "currency": "USD",
+        "allow_free_trial": False,
+        "jurisdiction": "US",
+        "example_prompts": ["Start a run.", "Load my save."],
+        "persistence": {
+            "mode": "platform",
+            "save_data_schema": {
+                "type": "object",
+                "properties": {"agent": {"type": "object", "description": "x" * 8200}},
+                "required": ["agent"],
+            },
+        },
+    }
+
+    with build_client(handler) as client:
+        with pytest.raises(SiglumeClientError, match="save_data_schema must be at most 8192 bytes"):
+            client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_dict_manifest_rejects_jpy_operation_price_below_minimum() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    manifest = {
+        "capability_key": "x-poster",
+        "name": "X Poster",
+        "job_to_be_done": "Post approved social updates.",
+        "category": "communication",
+        "store_vertical": "api",
+        "permission_class": "action",
+        "approval_mode": "always-ask",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "per_action",
+        "price_value_minor": 0,
+        "pricing_plan": {
+            "currency": "JPY",
+            "items": [{"key": "text_post", "label": "Text post", "price_minor": 5}],
+        },
+        "currency": "JPY",
+        "allow_free_trial": False,
+        "jurisdiction": "JP",
+        "example_prompts": ["Post this approved draft.", "Create a dry-run preview."],
+    }
+
+    with build_client(handler) as client:
+        with pytest.raises(SiglumeClientError, match="at least 15"):
+            client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_rejects_listing_text_over_limits() -> None:
+    client = build_client(lambda request: httpx.Response(500, json={}))
+    manifest = build_manifest()
+    manifest.short_description = "x" * 61
+
+    with pytest.raises(SiglumeClientError, match="short_description.*60"):
+        client.auto_register(manifest, build_tool_manual())
+
+    manifest = build_manifest()
+    manifest.job_to_be_done = "x" * 241
+    with pytest.raises(SiglumeClientError, match="job_to_be_done.*240"):
+        client.auto_register(manifest, build_tool_manual())
+
+    manifest = build_manifest()
+    manifest.description = "x" * 1001
+    with pytest.raises(SiglumeClientError, match="description.*1000"):
+        client.auto_register(manifest, build_tool_manual())
+
+
+def test_auto_register_dict_manifest_accepts_enum_persistence_mode() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content.decode()))
+        return httpx.Response(201, json=envelope({"listing_id": "lst_game", "status": "draft"}))
+
+    manifest = {
+        "capability_key": "arena-game",
+        "name": "Arena Game",
+        "job_to_be_done": "Play a persistent API game.",
+        "category": "other",
+        "store_vertical": "game",
+        "permission_class": "read-only",
+        "approval_mode": "auto",
+        "dry_run_supported": True,
+        "required_connected_accounts": [],
+        "price_model": "free",
+        "currency": "USD",
+        "allow_free_trial": False,
+        "jurisdiction": "US",
+        "example_prompts": ["Start a run.", "Load my save."],
+        "persistence": {"mode": PersistenceMode.PLATFORM, "save_data_schema": SAVE_DATA_SCHEMA},
+    }
+
+    with build_client(handler) as client:
+        client.auto_register(manifest, build_tool_manual())
+
+    assert captured["persistence"]["mode"] == "platform"
+
+
+def test_app_manifest_requires_explicit_free_trial_choice() -> None:
+    with pytest.raises(ValueError, match="AppManifest.allow_free_trial is REQUIRED"):
+        AppManifest(
+            capability_key="price-compare-helper",
+            name="Price Compare Helper",
+            job_to_be_done="Compare prices.",
+            category=AppCategory.COMMERCE,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.FREE,
+            currency="USD",
+            jurisdiction="US",
         )
 
-    assert receipt.listing_id == "lst_seq"
 
-
+def test_app_manifest_rejects_out_of_range_free_trial_duration() -> None:
+    with pytest.raises(ValueError, match="free_trial_duration_days must be between 1 and 90"):
+        AppManifest(
+            capability_key="price-compare-helper",
+            name="Price Compare Helper",
+            job_to_be_done="Compare prices.",
+            category=AppCategory.COMMERCE,
+            store_vertical=StoreVertical.API,
+            permission_class=PermissionClass.READ_ONLY,
+            approval_mode=ApprovalMode.AUTO,
+            dry_run_supported=True,
+            required_connected_accounts=[],
+            price_model=PriceModel.SUBSCRIPTION,
+            price_value_minor=1200,
+            currency="USD",
+            allow_free_trial=True,
+            free_trial_duration_days=200,
+            jurisdiction="US",
+        )
 def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
     manifest = build_manifest()
     tool_manual = build_tool_manual().to_dict()
@@ -374,6 +797,67 @@ def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
         )
 
     assert receipt.listing_id == "lst_form"
+
+
+def test_auto_register_forwards_company_publisher_identifiers() -> None:
+    manifest = asdict(build_manifest())
+    manifest["publisher_type"] = "company"
+    manifest["publisher_company_id"] = "co_123"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/market/capabilities/auto-register"
+        payload = json.loads(request.content.decode("utf-8"))
+        assert payload["publisher_type"] == "company"
+        assert payload["company_id"] == "co_123"
+        assert payload["publisher_company_id"] == "co_123"
+        return httpx.Response(
+            201,
+            json=envelope(
+                {
+                    "listing_id": "lst_company",
+                    "status": "draft",
+                    "auto_manifest": {"capability_key": manifest["capability_key"]},
+                    "confidence": {},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        receipt = client.auto_register(
+            manifest,
+            build_tool_manual(),
+            runtime_validation=build_runtime_validation(),
+        )
+
+    assert receipt.listing_id == "lst_company"
+
+
+def test_auto_register_rejects_company_identifiers_without_company_publisher_type() -> None:
+    manifest = asdict(build_manifest())
+    manifest.pop("publisher_type", None)
+    manifest["company_id"] = "co_123"
+
+    with build_client(lambda request: pytest.fail("auto_register should fail before transport")) as client:
+        with pytest.raises(SiglumeClientError, match="cannot be combined with publisher_type='user'"):
+            client.auto_register(
+                manifest,
+                build_tool_manual(),
+                runtime_validation=build_runtime_validation(),
+            )
+
+
+def test_auto_register_rejects_user_publisher_with_company_identifiers() -> None:
+    manifest = asdict(build_manifest())
+    manifest["publisher_type"] = "user"
+    manifest["company_id"] = "co_123"
+
+    with build_client(lambda request: pytest.fail("auto_register should fail before transport")) as client:
+        with pytest.raises(SiglumeClientError, match="cannot be combined with publisher_type='user'"):
+            client.auto_register(
+                manifest,
+                build_tool_manual(),
+                runtime_validation=build_runtime_validation(),
+            )
 
 
 def test_cursor_pages_follow_next_cursor_for_listings_and_usage() -> None:
@@ -1618,28 +2102,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
                     }
                 ),
             )
-        if request.url.path == "/v1/market/connected-accounts":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "items": [
-                            {
-                                "id": "ca_123",
-                                "provider_key": "slack",
-                                "account_role": "publisher",
-                                "display_name": "Team Slack",
-                                "environment": "live",
-                                "connection_status": "connected",
-                                "scopes": ["chat:write"],
-                            }
-                        ],
-                        "next_cursor": None,
-                        "limit": 50,
-                        "offset": 0,
-                    }
-                ),
-            )
         if request.url.path == "/v1/market/support-cases" and request.method == "POST":
             body = json.loads(request.content.decode("utf-8"))
             assert body["summary"] == "Missing receipt\n\nPlease investigate the missing receipt."
@@ -1699,7 +2161,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
         sandbox = client.create_sandbox_session(agent_id="agt_123", capability_key="price-compare-helper")
         grants = client.list_access_grants()
         binding = client.bind_agent_to_grant("grt_123", agent_id="agt_123")
-        accounts = client.list_connected_accounts()
         support_case = client.create_support_case("Missing receipt", "Please investigate the missing receipt.", trace_id="trc_support")
         support_cases = client.list_support_cases()
         review = client.submit_review("lst_1")
@@ -1708,7 +2169,6 @@ def test_portal_grants_accounts_support_and_submit_review_are_typed() -> None:
     assert sandbox.session_id == "ses_123"
     assert grants.items[0].grant_status == "active"
     assert binding.binding.binding_status == "active"
-    assert accounts.items[0].provider_key == "slack"
     assert support_case.trace_id == "trc_support"
     assert support_cases.items[0].support_case_id == "sup_123"
     assert review.status == "active"
@@ -3045,844 +3505,6 @@ def test_market_proposal_wrappers_resolve_default_agent_and_surface_guarded_appr
     assert accepted.intent_id == "intent_market_proposals_accept"
     assert rejected.intent_id == "intent_market_proposals_reject"
     assert f"/v1/owner/agents/{expected_agent_id}/operations/execute" in seen_paths
-
-
-def test_partner_and_ads_wrappers_round_trip_through_recorder(tmp_path: Path) -> None:
-    requests: list[tuple[str, str, dict[str, object]]] = []
-    cassette_path = tmp_path / "partner_and_ads_wrappers.json"
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content.decode("utf-8")) if request.content else {}
-        requests.append((request.method, request.url.path, body))
-        if request.url.path != f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
-            raise AssertionError(f"Unexpected request: {request.method} {request.url}")
-        operation = body.get("operation")
-        params = body.get("params") if isinstance(body.get("params"), dict) else {}
-        if operation == "partner.dashboard.get":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Partner dashboard loaded.",
-                        "action": "partner_dashboard_get",
-                        "result": {
-                            "partner_id": "usr_partner_demo",
-                            "company_name": "Demo Feeds",
-                            "plan": "starter",
-                            "plan_label": "Starter",
-                            "month_bytes_used": 1048576,
-                            "month_bytes_limit": 10485760,
-                            "month_usage_pct": 10.0,
-                            "total_source_items": 3,
-                            "has_billing": True,
-                            "has_subscription": True,
-                        },
-                    },
-                    trace_id="trc_partner_dashboard",
-                    request_id="req_partner_dashboard",
-                ),
-            )
-        if operation == "partner.usage.get":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Partner usage loaded.",
-                        "action": "partner_usage_get",
-                        "result": {
-                            "plan": "starter",
-                            "month_bytes_used": 1048576,
-                            "month_bytes_limit": 10485760,
-                            "month_bytes_remaining": 9437184,
-                            "month_usage_pct": 10.0,
-                        },
-                    },
-                    trace_id="trc_partner_usage",
-                    request_id="req_partner_usage",
-                ),
-            )
-        if operation == "partner.keys.list":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Partner API keys loaded.",
-                        "action": "partner_keys_list",
-                        "result": {
-                            "keys": [
-                                {
-                                    "credential_id": "cred_partner_1",
-                                    "name": "Primary Feed",
-                                    "key_id": "src_partner_1",
-                                    "allowed_source_types": ["partner_api", "rss"],
-                                    "last_used_at": "2026-04-20T08:40:00Z",
-                                    "created_at": "2026-04-19T23:10:00Z",
-                                    "revoked": False,
-                                }
-                            ]
-                        },
-                    },
-                    trace_id="trc_partner_keys_list",
-                    request_id="req_partner_keys_list",
-                ),
-            )
-        if operation == "partner.keys.create":
-            assert params == {"name": "SDK Feed", "allowed_source_types": ["rss", "partner_api"]}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Partner API key created.",
-                        "action": "partner_keys_create",
-                        "result": {
-                            "credential_id": "cred_partner_2",
-                            "name": "SDK Feed",
-                            "key_id": "src_partner_2",
-                            "allowed_source_types": ["rss", "partner_api"],
-                            "masked_key_hint": "src_partner_2.********",
-                        },
-                    },
-                    trace_id="trc_partner_keys_create",
-                    request_id="req_partner_keys_create",
-                ),
-            )
-        if operation == "ads.billing.get":
-            assert params == {"rail": "web3"}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Ads billing loaded.",
-                        "action": "ads_billing_get",
-                        "result": {
-                            "currency": "usd",
-                            "billing_mode": "web3",
-                            "month_spend_jpy": 0,
-                            "month_spend_usd": 12000,
-                            "all_time_spend_jpy": 0,
-                            "all_time_spend_usd": 54000,
-                            "total_impressions": 18300,
-                            "total_replies": 37,
-                            "has_billing": True,
-                            "has_subscription": True,
-                            "balances": [{"symbol": "USDC", "amount_minor": 700000}],
-                            "supported_tokens": [{"symbol": "USDC", "decimals": 6}],
-                            "funding_instructions": {"network": "polygon", "memo": "fund-usdc"},
-                            "wallet": {"user_wallet_id": "uw_ads_1", "smart_account_address": "0xabc"},
-                            "mandate": {
-                                "mandate_id": "mdt_ads_1",
-                                "purpose": "ad_spend",
-                                "display_currency": "USD",
-                                "token_symbol": "USDC",
-                                "max_amount_minor": 30000,
-                                "status": "active",
-                            },
-                            "invoices": [{"invoice_id": "inv_ads_1", "amount_due_minor": 12000}],
-                        },
-                    },
-                    trace_id="trc_ads_billing",
-                    request_id="req_ads_billing",
-                ),
-            )
-        if operation == "ads.billing.settle":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Ads billing settlement status loaded.",
-                        "action": "ads_billing_settle",
-                        "result": {
-                            "status": "auto_settles",
-                            "message": "Ads Web3 billing settles automatically at month end.",
-                            "settles_automatically": True,
-                        },
-                    },
-                    trace_id="trc_ads_settle",
-                    request_id="req_ads_settle",
-                ),
-            )
-        if operation == "ads.profile.get":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Ads profile loaded.",
-                        "action": "ads_profile_get",
-                        "result": {
-                            "has_profile": True,
-                            "company_name": "Demo Ads",
-                            "ad_currency": "usd",
-                            "has_billing": True,
-                        },
-                    },
-                    trace_id="trc_ads_profile",
-                    request_id="req_ads_profile",
-                ),
-            )
-        if operation == "ads.campaigns.list":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Ad campaigns loaded.",
-                        "action": "ads_campaigns_list",
-                        "result": {
-                            "campaigns": [
-                                {
-                                    "campaign_id": "cmp_ads_1",
-                                    "name": "Spring Launch",
-                                    "target_url": "https://example.com/spring-launch",
-                                    "content_brief": "Promote the launch announcement.",
-                                    "target_topics": ["ai", "launch"],
-                                    "posting_interval_minutes": 720,
-                                    "max_posts_per_day": 2,
-                                    "currency": "usd",
-                                    "monthly_budget_jpy": 30000,
-                                    "cpm_jpy": 250,
-                                    "cpr_jpy": 30,
-                                    "monthly_budget_usd": 30000,
-                                    "cpm_usd": 250,
-                                    "cpr_usd": 30,
-                                    "status": "active",
-                                    "month_spend_jpy": 0,
-                                    "month_spend_usd": 12000,
-                                    "total_posts": 4,
-                                    "total_impressions": 18300,
-                                    "total_replies": 37,
-                                    "next_post_at": "2026-04-20T16:00:00Z",
-                                    "created_at": "2026-04-19T09:00:00Z",
-                                }
-                            ]
-                        },
-                    },
-                    trace_id="trc_ads_campaigns",
-                    request_id="req_ads_campaigns",
-                ),
-            )
-        if operation == "ads.campaign_posts.list":
-            assert params == {"campaign_id": "cmp_ads_1"}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "message": "Ad campaign posts loaded.",
-                        "action": "ads_campaign_posts_list",
-                        "result": {
-                            "posts": [
-                                {
-                                    "post_id": "pst_ads_1",
-                                    "content_id": "cnt_ads_1",
-                                    "cost_jpy": 0,
-                                    "cost_usd": 1200,
-                                    "impressions": 5000,
-                                    "replies": 11,
-                                    "status": "served",
-                                    "created_at": "2026-04-20T07:00:00Z",
-                                }
-                            ]
-                        },
-                    },
-                    trace_id="trc_ads_posts",
-                    request_id="req_ads_posts",
-                ),
-            )
-        raise AssertionError(f"Unexpected operation payload: {body}")
-
-    with Recorder(cassette_path, mode=RecordMode.RECORD) as recorder:
-        with recorder.wrap(build_client(handler)) as client:
-            dashboard = client.get_partner_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            usage = client.get_partner_usage(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            keys = client.list_partner_api_keys(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            created_key = client.create_partner_api_key(
-                agent_id=DEFAULT_OPERATION_AGENT_ID,
-                name="SDK Feed",
-                allowed_source_types=["rss", "partner_api"],
-            )
-            billing = client.get_ads_billing(agent_id=DEFAULT_OPERATION_AGENT_ID, rail="web3")
-            settlement = client.settle_ads_billing(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            profile = client.get_ads_profile(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            campaigns = client.list_ads_campaigns(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            posts = client.list_ads_campaign_posts("cmp_ads_1", agent_id=DEFAULT_OPERATION_AGENT_ID)
-
-    assert dashboard.plan == "starter"
-    assert dashboard.total_source_items == 3
-    assert usage.month_bytes_remaining == 9437184
-    assert keys[0].key_id == "src_partner_1"
-    assert keys[0].allowed_source_types == ["partner_api", "rss"]
-    assert created_key.masked_key_hint == "src_partner_2.********"
-    assert billing.billing_mode == "web3"
-    assert billing.mandate is not None
-    assert billing.mandate.mandate_id == "mdt_ads_1"
-    assert billing.supported_tokens[0]["symbol"] == "USDC"
-    assert settlement.settles_automatically is True
-    assert profile.company_name == "Demo Ads"
-    assert campaigns[0].campaign_id == "cmp_ads_1"
-    assert campaigns[0].total_impressions == 18300
-    assert posts[0].post_id == "pst_ads_1"
-    assert posts[0].cost_usd == 1200
-
-    with Recorder(cassette_path, mode=RecordMode.REPLAY) as recorder:
-        with recorder.wrap(build_client(lambda request: (_ for _ in ()).throw(AssertionError(f"Replay should not hit transport: {request.method} {request.url}")))) as client:
-            replay_dashboard = client.get_partner_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_usage = client.get_partner_usage(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_keys = client.list_partner_api_keys(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_created_key = client.create_partner_api_key(
-                agent_id=DEFAULT_OPERATION_AGENT_ID,
-                name="SDK Feed",
-                allowed_source_types=["rss", "partner_api"],
-            )
-            replay_billing = client.get_ads_billing(agent_id=DEFAULT_OPERATION_AGENT_ID, rail="web3")
-            replay_settlement = client.settle_ads_billing(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_profile = client.get_ads_profile(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_campaigns = client.list_ads_campaigns(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_posts = client.list_ads_campaign_posts("cmp_ads_1", agent_id=DEFAULT_OPERATION_AGENT_ID)
-
-    assert replay_dashboard.partner_id == "usr_partner_demo"
-    assert replay_usage.plan == "starter"
-    assert replay_keys[0].created_at == "2026-04-19T23:10:00Z"
-    assert replay_created_key.key_id == "src_partner_2"
-    assert replay_billing.wallet == {"user_wallet_id": "uw_ads_1", "smart_account_address": "0xabc"}
-    assert replay_settlement.status == "auto_settles"
-    assert replay_profile.has_profile is True
-    assert replay_campaigns[0].target_topics == ["ai", "launch"]
-    assert replay_posts[0].status == "served"
-    assert [item[2]["operation"] for item in requests] == [
-        "partner.dashboard.get",
-        "partner.usage.get",
-        "partner.keys.list",
-        "partner.keys.create",
-        "ads.billing.get",
-        "ads.billing.settle",
-        "ads.profile.get",
-        "ads.campaigns.list",
-        "ads.campaign_posts.list",
-    ]
-
-
-def test_partner_and_ads_wrappers_validate_inputs_and_scrub_handle_only_key_payload() -> None:
-    with build_client(lambda request: (_ for _ in ()).throw(AssertionError(f"Unexpected request: {request.method} {request.url}"))) as client:
-        with pytest.raises(SiglumeClientError, match="name cannot be empty."):
-            client.create_partner_api_key(agent_id=DEFAULT_OPERATION_AGENT_ID, name="  ")
-        with pytest.raises(SiglumeClientError, match="allowed_source_types must be a list of strings."):
-            client.create_partner_api_key(agent_id=DEFAULT_OPERATION_AGENT_ID, allowed_source_types="rss")  # type: ignore[arg-type]
-        with pytest.raises(SiglumeClientError, match="allowed_source_types must contain only strings."):
-            client.create_partner_api_key(agent_id=DEFAULT_OPERATION_AGENT_ID, allowed_source_types=["rss", 7])  # type: ignore[list-item]
-        with pytest.raises(SiglumeClientError, match="campaign_id is required."):
-            client.list_ads_campaign_posts("")
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content.decode("utf-8")) if request.content else {}
-        assert request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"
-        assert body["operation"] == "partner.keys.create"
-        return httpx.Response(
-            200,
-            json=envelope(
-                {
-                    "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                    "message": "Partner API key created.",
-                    "action": "partner_keys_create",
-                    "result": {
-                        "credential_id": "cred_partner_scrubbed",
-                        "name": "Leak Test",
-                        "key_id": "src_partner_scrubbed",
-                        "allowed_source_types": ["rss"],
-                        "masked_key_hint": "src_partner_scrubbed.********",
-                        "ingest_key": "src_partner_scrubbed.super_secret",
-                        "full_key": "src_partner_scrubbed.super_secret",
-                    },
-                }
-            ),
-        )
-
-    with build_client(handler) as client:
-        created = client.create_partner_api_key(
-            agent_id=DEFAULT_OPERATION_AGENT_ID,
-            name="Leak Test",
-            allowed_source_types=["rss"],
-        )
-
-    assert created.credential_id == "cred_partner_scrubbed"
-    assert created.allowed_source_types == ["rss"]
-    assert created.masked_key_hint == "src_partner_scrubbed.********"
-    assert not hasattr(created, "ingest_key")
-    assert "ingest_key" not in created.raw
-    assert "full_key" not in created.raw
-
-
-def test_partner_and_ads_wrappers_resolve_default_agent_and_parse_sparse_payloads() -> None:
-    requests: list[tuple[str, str, dict[str, object]]] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content.decode("utf-8")) if request.content else {}
-        requests.append((request.method, request.url.path, body))
-        if request.url.path == "/v1/me/agent":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "id": DEFAULT_OPERATION_AGENT_ID,
-                        "agent_type": "personal",
-                        "name": "Owner Demo",
-                    }
-                ),
-            )
-        if request.url.path != f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
-            raise AssertionError(f"Unexpected request: {request.method} {request.url}")
-        operation = body.get("operation")
-        if operation == "partner.dashboard.get":
-            return httpx.Response(200, json=envelope({"result": {"partner_id": "usr_sparse", "has_billing": 1, "has_subscription": 0}}))
-        if operation == "partner.usage.get":
-            return httpx.Response(200, json=envelope({"result": {"month_bytes_used": None, "month_bytes_limit": "1024"}}))
-        if operation == "partner.keys.list":
-            return httpx.Response(200, json=envelope({"result": {"keys": [None, {"credential_id": "cred_sparse"}]}}))
-        if operation == "partner.keys.create":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "result": {
-                            "credential_id": "cred_sparse_created",
-                            "key_id": "src_sparse",
-                            "masked_key_hint": "src_sparse.********",
-                            "ingest_key": "src_sparse.secret",
-                        }
-                    }
-                ),
-            )
-        if operation == "ads.billing.get":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "result": {
-                            "billing_mode": "web3",
-                            "balances": "skip",
-                            "supported_tokens": "skip",
-                            "funding_instructions": "skip",
-                            "wallet": "skip",
-                            "mandate": "skip",
-                        }
-                    }
-                ),
-            )
-        if operation == "ads.billing.settle":
-            return httpx.Response(200, json=envelope({"result": {"detail": "auto"}}))
-        if operation == "ads.profile.get":
-            return httpx.Response(200, json=envelope({"result": {"company_name": None}}))
-        if operation == "ads.campaigns.list":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "result": {
-                            "campaigns": [None, {"campaign_id": "cmp_sparse", "total_posts": None, "status": None}]
-                        }
-                    }
-                ),
-            )
-        if operation == "ads.campaign_posts.list":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "result": {
-                            "posts": [None, {"post_id": "pst_sparse", "impressions": None, "cost_usd": "1500"}]
-                        }
-                    }
-                ),
-            )
-        raise AssertionError(f"Unexpected operation payload: {body}")
-
-    with build_client(handler) as client:
-        dashboard = client.get_partner_dashboard()
-        usage = client.get_partner_usage(agent_id=DEFAULT_OPERATION_AGENT_ID)
-        keys = client.list_partner_api_keys()
-        created = client.create_partner_api_key(agent_id=DEFAULT_OPERATION_AGENT_ID)
-        billing = client.get_ads_billing()
-        settlement = client.settle_ads_billing(agent_id=DEFAULT_OPERATION_AGENT_ID)
-        profile = client.get_ads_profile(agent_id=DEFAULT_OPERATION_AGENT_ID)
-        campaigns = client.list_ads_campaigns(agent_id=DEFAULT_OPERATION_AGENT_ID)
-        posts = client.list_ads_campaign_posts("cmp_sparse")
-
-    assert dashboard.partner_id == "usr_sparse"
-    assert dashboard.has_billing is True
-    assert dashboard.has_subscription is False
-    assert usage.month_bytes_used == 0
-    assert usage.month_bytes_limit == 1024
-    assert usage.plan is None
-    assert keys[0].credential_id == "cred_sparse"
-    assert keys[0].allowed_source_types == []
-    assert created.key_id == "src_sparse"
-    assert "ingest_key" not in created.raw
-    assert billing.billing_mode == "web3"
-    assert billing.wallet is None
-    assert billing.balances == []
-    assert billing.mandate is None
-    assert settlement.message == "auto"
-    assert settlement.settles_automatically is None
-    assert profile.has_profile is False
-    assert profile.ad_currency is None
-    assert campaigns[0].campaign_id == "cmp_sparse"
-    assert campaigns[0].total_posts == 0
-    assert campaigns[0].status == "active"
-    assert posts[0].post_id == "pst_sparse"
-    assert posts[0].impressions == 0
-    assert posts[0].cost_usd == 1500
-    assert [request[1] for request in requests].count("/v1/me/agent") == 4
-
-
-def test_works_wrappers_round_trip_through_owner_operation_cassette(tmp_path: Path) -> None:
-    cassette_path = tmp_path / "works-roundtrip.json"
-    requests: list[tuple[str, str, dict[str, object]]] = []
-
-    categories = [
-        {
-            "key": "design",
-            "name_ja": "デザイン",
-            "name_en": "Design",
-            "description_ja": "UI とブランドの制作。",
-            "description_en": "UI and brand design work.",
-            "icon_url": "https://cdn.example.test/works/design.png",
-            "open_job_count": 5,
-            "display_order": 1,
-        },
-        {
-            "key": "frontend",
-            "name_ja": "フロントエンド",
-            "name_en": "Frontend",
-            "description_ja": "Web アプリ実装。",
-            "description_en": "Web app implementation.",
-            "icon_url": "https://cdn.example.test/works/frontend.png",
-            "open_job_count": 3,
-            "display_order": 2,
-        },
-    ]
-    registration = {
-        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-        "works_registered": True,
-        "tagline": "Fast prototype builder",
-        "categories": ["design", "frontend"],
-        "capabilities": ["prototype", "react"],
-        "description": "I build and ship product prototypes quickly.",
-    }
-    owner_dashboard = {
-        "agents": [
-            {
-                "id": DEFAULT_OPERATION_AGENT_ID,
-                "name": "Owner Demo",
-                "reputation": {"works_registered": True, "works_completed": 12},
-                "capabilities": ["prototype", "react"],
-            }
-        ],
-        "pending_pitches": [
-            {
-                "proposal_id": "prop_works_1",
-                "need_id": "need_works_1",
-                "title": "Landing page redesign",
-                "title_en": "Landing page redesign",
-                "status": "proposed",
-            }
-        ],
-        "active_orders": [
-            {
-                "order_id": "ord_works_active_1",
-                "need_id": "need_works_2",
-                "title": "Build waitlist page",
-                "title_en": "Build waitlist page",
-                "status": "funds_locked",
-            }
-        ],
-        "completed_orders": [
-            {
-                "order_id": "ord_works_done_1",
-                "need_id": "need_works_3",
-                "title": "Summarize invoices",
-                "title_en": "Summarize invoices",
-                "status": "settled",
-            }
-        ],
-        "stats": {"total_agents": 1, "total_pending": 1, "total_active": 1},
-    }
-    poster_dashboard = {
-        "open_jobs": [
-            {
-                "id": "need_open_1",
-                "title": "Translate product docs",
-                "title_en": "Translate product docs",
-                "proposal_count": 4,
-                "created_at": "2026-04-20T08:00:00Z",
-            }
-        ],
-        "in_progress_orders": [
-            {
-                "order_id": "ord_poster_1",
-                "need_id": "need_active_1",
-                "title": "Prototype onboarding flow",
-                "title_en": "Prototype onboarding flow",
-                "status": "fulfillment_submitted",
-                "has_deliverable": True,
-                "deliverable_count": 2,
-                "awaiting_buyer_action": True,
-            }
-        ],
-        "completed_orders": [
-            {
-                "order_id": "ord_poster_done_1",
-                "need_id": "need_done_1",
-                "title": "Summarize invoices",
-                "title_en": "Summarize invoices",
-                "status": "settled",
-                "has_deliverable": True,
-                "deliverable_count": 1,
-                "awaiting_buyer_action": False,
-            }
-        ],
-        "stats": {"total_posted": 3, "total_completed": 1},
-    }
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path != f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
-            raise AssertionError(f"Unexpected request: {request.method} {request.url}")
-        body = json.loads(request.content.decode("utf-8")) if request.content else {}
-        requests.append((request.method, request.url.path, body))
-        operation = body.get("operation")
-        params = body.get("params") if isinstance(body.get("params"), dict) else {}
-        if operation == "works.categories.list":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "status": "completed",
-                        "message": "AI Works categories loaded.",
-                        "action": {"operation": "works.categories.list", "status": "completed"},
-                        "result": categories,
-                    },
-                    trace_id="trc_works_categories_list",
-                    request_id="req_works_categories_list",
-                ),
-            )
-        if operation == "works.registration.get":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "status": "completed",
-                        "message": "AI Works registration loaded.",
-                        "action": {"operation": "works.registration.get", "status": "completed"},
-                        "result": registration,
-                    },
-                    trace_id="trc_works_registration_get",
-                    request_id="req_works_registration_get",
-                ),
-            )
-        if operation == "works.registration.register":
-            assert params == {
-                "tagline": "Fast prototype builder",
-                "description": "I build and ship product prototypes quickly.",
-                "categories": ["design", "frontend"],
-                "capabilities": ["prototype", "react"],
-            }
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "status": "completed",
-                        "message": "AI Works registration updated.",
-                        "action": {"operation": "works.registration.register", "status": "completed"},
-                        "result": {
-                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                            "works_registered": True,
-                        },
-                    },
-                    trace_id="trc_works_registration_register",
-                    request_id="req_works_registration_register",
-                ),
-            )
-        if operation == "works.owner_dashboard.get":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "status": "completed",
-                        "message": "AI Works owner dashboard loaded.",
-                        "action": {"operation": "works.owner_dashboard.get", "status": "completed"},
-                        "result": owner_dashboard,
-                    },
-                    trace_id="trc_works_owner_dashboard_get",
-                    request_id="req_works_owner_dashboard_get",
-                ),
-            )
-        if operation == "works.poster_dashboard.get":
-            assert params == {}
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                        "status": "completed",
-                        "message": "AI Works poster dashboard loaded.",
-                        "action": {"operation": "works.poster_dashboard.get", "status": "completed"},
-                        "result": poster_dashboard,
-                    },
-                    trace_id="trc_works_poster_dashboard_get",
-                    request_id="req_works_poster_dashboard_get",
-                ),
-            )
-        raise AssertionError(f"Unexpected operation payload: {body}")
-
-    with Recorder(cassette_path, mode=RecordMode.RECORD) as recorder:
-        with recorder.wrap(build_client(handler)) as client:
-            listed_categories = client.list_works_categories(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            current_registration = client.get_works_registration(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            registered = client.register_for_works(
-                agent_id=DEFAULT_OPERATION_AGENT_ID,
-                tagline="Fast prototype builder",
-                description="I build and ship product prototypes quickly.",
-                categories=["design", "frontend"],
-                capabilities=["prototype", "react"],
-            )
-            owner_view = client.get_works_owner_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            poster_view = client.get_works_poster_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
-
-    with Recorder(cassette_path, mode=RecordMode.REPLAY) as recorder:
-        with recorder.wrap(build_client(lambda request: (_ for _ in ()).throw(AssertionError(f"Replay should not hit transport: {request.method} {request.url}")))) as client:
-            replay_categories = client.list_works_categories(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_registration = client.get_works_registration(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_registered = client.register_for_works(
-                agent_id=DEFAULT_OPERATION_AGENT_ID,
-                tagline="Fast prototype builder",
-                description="I build and ship product prototypes quickly.",
-                categories=["design", "frontend"],
-                capabilities=["prototype", "react"],
-            )
-            replay_owner_view = client.get_works_owner_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
-            replay_poster_view = client.get_works_poster_dashboard(agent_id=DEFAULT_OPERATION_AGENT_ID)
-
-    assert [item.key for item in listed_categories] == ["design", "frontend"]
-    assert listed_categories[0].open_job_count == 5
-    assert current_registration.tagline == "Fast prototype builder"
-    assert current_registration.categories == ["design", "frontend"]
-    assert registered.works_registered is True
-    assert registered.execution_status == "completed"
-    assert owner_view.agents[0].agent_id == DEFAULT_OPERATION_AGENT_ID
-    assert owner_view.pending_pitches[0].proposal_id == "prop_works_1"
-    assert poster_view.in_progress_orders[0].awaiting_buyer_action is True
-    assert poster_view.stats.total_posted == 3
-    assert replay_categories[1].name_en == "Frontend"
-    assert replay_registration.description == current_registration.description
-    assert replay_registered.works_registered is True
-    assert replay_owner_view.completed_orders[0].order_id == "ord_works_done_1"
-    assert replay_poster_view.open_jobs[0].job_id == "need_open_1"
-    assert [item[2]["operation"] for item in requests] == [
-        "works.categories.list",
-        "works.registration.get",
-        "works.registration.register",
-        "works.owner_dashboard.get",
-        "works.poster_dashboard.get",
-    ]
-
-
-def test_works_wrappers_resolve_default_agent_and_surface_approval_metadata() -> None:
-    requests: list[tuple[str, str]] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append((request.method, request.url.path))
-        if request.url.path == "/v1/me/agent":
-            return httpx.Response(
-                200,
-                json=envelope(
-                    {
-                        "id": DEFAULT_OPERATION_AGENT_ID,
-                        "agent_type": "personal",
-                        "name": "Owner Demo",
-                    }
-                ),
-            )
-        if request.url.path == f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute":
-            body = json.loads(request.content.decode("utf-8")) if request.content else {}
-            operation = body.get("operation")
-            params = body.get("params") if isinstance(body.get("params"), dict) else {}
-            if operation == "works.categories.list":
-                assert params == {}
-                return httpx.Response(
-                    200,
-                    json=envelope(
-                        {
-                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                            "status": "completed",
-                            "message": "AI Works categories loaded.",
-                            "action": {"operation": "works.categories.list", "status": "completed"},
-                            "result": [{"key": "design", "open_job_count": 0}],
-                        }
-                    ),
-                )
-            if operation == "works.registration.register":
-                assert params == {"tagline": "Nimble design partner"}
-                return httpx.Response(
-                    200,
-                    json=envelope(
-                        {
-                            "agent_id": DEFAULT_OPERATION_AGENT_ID,
-                            "status": "approval_required",
-                            "approval_required": True,
-                            "intent_id": "int_works_register",
-                            "approval_status": "pending_owner",
-                            "approval_snapshot_hash": "sha_works_register",
-                            "message": "Operation works.registration.register requires approval before live execution.",
-                            "action": {"operation": "works.registration.register", "status": "approval_required"},
-                            "result": {
-                                "preview": {
-                                    "operation_name": "works.registration.register",
-                                    "params": {"tagline": "Nimble design partner"},
-                                }
-                            },
-                        }
-                    ),
-                )
-        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
-
-    with build_client(handler) as client:
-        categories = client.list_works_categories()
-        pending = client.register_for_works(tagline="Nimble design partner")
-        with pytest.raises(SiglumeClientError, match="categories must contain only strings."):
-            client.register_for_works(categories=["design", 1])  # type: ignore[list-item]
-        with pytest.raises(SiglumeClientError, match="capabilities must be a list of strings."):
-            client.register_for_works(capabilities="prototype")  # type: ignore[arg-type]
-
-    assert categories[0].key == "design"
-    assert pending.agent_id == DEFAULT_OPERATION_AGENT_ID
-    assert pending.execution_status == "approval_required"
-    assert pending.approval_required is True
-    assert pending.intent_id == "int_works_register"
-    assert pending.approval_preview["operation_name"] == "works.registration.register"
-    assert requests == [
-        ("GET", "/v1/me/agent"),
-        ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
-        ("GET", "/v1/me/agent"),
-        ("POST", f"/v1/owner/agents/{DEFAULT_OPERATION_AGENT_ID}/operations/execute"),
-    ]
 
 
 def test_installed_tool_wrappers_round_trip_owner_operation_results() -> None:

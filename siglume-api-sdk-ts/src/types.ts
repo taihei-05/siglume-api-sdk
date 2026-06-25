@@ -58,6 +58,7 @@ export const PriceModel = {
   PER_ACTION: "per_action",
 } as const;
 export type PriceModel = (typeof PriceModel)[keyof typeof PriceModel];
+export type BillingTiming = "post" | "prepay";
 
 export const AppCategory = {
   COMMERCE: "commerce",
@@ -71,17 +72,48 @@ export const AppCategory = {
 } as const;
 export type AppCategory = (typeof AppCategory)[keyof typeof AppCategory];
 
-export interface ConnectedAccountRef {
-  provider_key: string;
-  session_token: string;
-  scopes?: string[];
-  environment?: Environment;
+export const StoreVertical = {
+  API: "api",
+  GAME: "game",
+} as const;
+export type StoreVertical = (typeof StoreVertical)[keyof typeof StoreVertical];
+
+export const ListingCurrency = {
+  USD: "USD",
+  JPY: "JPY",
+} as const;
+export type ListingCurrency = (typeof ListingCurrency)[keyof typeof ListingCurrency];
+
+export const MINIMUM_JPY_OPERATION_PRICE_MINOR = 15;
+
+export const PersistenceMode = {
+  NONE: "none",
+  LOCAL: "local",
+  PLATFORM: "platform",
+  DEVELOPER_SERVER: "developer_server",
+} as const;
+export type PersistenceMode = (typeof PersistenceMode)[keyof typeof PersistenceMode];
+
+export interface CapabilityPersistencePolicy {
+  mode: PersistenceMode;
+  schema_version?: string;
+  scope?: string;
+  restore_required?: boolean;
+  max_bytes?: number;
+  endpoint?: string | null;
+  description?: string;
+  /**
+   * JSON Schema for persisted game save data.
+   * Required when store_vertical is "game" and mode is not "none".
+   */
+  save_data_schema?: Record<string, unknown>;
 }
 
 export interface AppManifest {
   capability_key: string;
   version?: string;
   name: string;
+  /** Buyer-facing task summary, max 240 characters. */
   job_to_be_done: string;
   category?: AppCategory;
   permission_class: PermissionClass;
@@ -91,19 +123,30 @@ export interface AppManifest {
   permission_scopes?: string[];
   price_model?: PriceModel;
   price_value_minor?: number;
-  currency?: "USD";
+  pricing_plan?: PricingPlan;
+  billing_timing?: BillingTiming;
+  currency: ListingCurrency;
+  allow_free_trial: boolean;
+  free_trial_duration_days?: number;
   jurisdiction: string;
   applicable_regulations?: string[];
   data_residency?: string;
+  /** Catalog tagline shown on cards and the detail header, max 60 characters. */
   short_description?: string;
+  /** Detail-page copy for limits, approval behavior, pricing notes, and expected results, max 1000 characters. */
   description?: string;
   docs_url?: string;
   support_contact?: string;
   seller_homepage_url?: string;
   seller_social_url?: string;
+  publisher_type?: "user" | "company";
+  company_id?: string;
+  publisher_company_id?: string;
+  store_vertical: StoreVertical;
   compatibility_tags?: string[];
   example_prompts?: string[];
   latency_tier?: string;
+  persistence?: CapabilityPersistencePolicy;
 }
 
 export interface ExecutionContext {
@@ -114,7 +157,6 @@ export interface ExecutionContext {
   source_type?: string;
   environment?: Environment;
   execution_kind?: ExecutionKind;
-  connected_accounts?: Record<string, ConnectedAccountRef>;
   budget_remaining_minor?: number | null;
   trace_id?: string;
   idempotency_key?: string;
@@ -252,6 +294,30 @@ export interface EnvelopeMeta {
   trace_id?: string | null;
 }
 
+export interface PricingPlanItem {
+  key?: string | null;
+  label?: string | null;
+  price_minor?: number | null;
+  amount_minor?: number | null;
+  currency?: string | null;
+  unit_label?: string | null;
+  description?: string | null;
+  conditions?: unknown;
+  receipt_code?: string | null;
+}
+
+export interface PricingPlan {
+  billing_model?: string | null;
+  display_name?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  currency?: string | null;
+  unit_label?: string | null;
+  free_upfront_invocation?: boolean | null;
+  fallback_note?: string | null;
+  items?: PricingPlanItem[];
+}
+
 export interface CursorPage<T> {
   items: T[];
   next_cursor?: string | null;
@@ -274,7 +340,11 @@ export interface AppListingRecord {
   dry_run_supported: boolean;
   price_model?: string | null;
   price_value_minor: number;
+  pricing_plan?: PricingPlan | null;
+  billing_timing?: BillingTiming | string | null;
   currency: string;
+  allow_free_trial: boolean;
+  free_trial_duration_days: number;
   short_description?: string | null;
   description?: string | null;
   docs_url?: string | null;
@@ -282,31 +352,54 @@ export interface AppListingRecord {
   seller_display_name?: string | null;
   seller_homepage_url?: string | null;
   seller_social_url?: string | null;
+  publisher_type?: string | null;
+  publisher_company_id?: string | null;
+  company_id?: string | null;
+  company_name?: string | null;
+  company_publish_status?: string | null;
+  company_terms_version?: string | null;
   review_status?: string | null;
   review_note?: string | null;
   submission_blockers: string[];
+  persistence: Record<string, unknown>;
   created_at?: string | null;
   updated_at?: string | null;
   raw: Record<string, unknown>;
 }
 
-export interface ConnectedAccountOAuthStart {
-  authorize_url: string;
-  state: string;
-  provider_key: string;
-  scopes: string[];
-  pkce_method?: string | null;
+export interface CompanyPublisherRecord {
+  company_id: string;
+  name: string;
+  status: string;
+  description?: string | null;
+  is_founder: boolean;
+  membership_role?: string | null;
+  membership_status?: string | null;
+  can_publish: boolean;
+  can_approve: boolean;
+  approval_required: boolean;
+  paid_listing_allowed: boolean;
+  disabled_reasons: string[];
+  company_terms_version?: string | null;
+  active_listing_count: number;
+  pending_approval_count: number;
+  settlement_wallet_ready: boolean;
+  settlement_wallets: Array<Record<string, unknown>>;
+  raw: Record<string, unknown>;
 }
 
-export interface ConnectedAccountLifecycleResult {
-  connected_account_id: string;
-  provider_key: string;
-  expires_at?: string | null;
-  scopes: string[];
-  refreshed_at?: string | null;
-  connection_status?: string | null;
-  provider_revoked?: boolean | null;
-  revoked_at?: string | null;
+export interface CapabilitySaveStateRecord {
+  capability_key: string;
+  save_key: string;
+  schema_version: string;
+  revision: number;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  checksum?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  exists: boolean;
+  raw: Record<string, unknown>;
 }
 
 export interface BundleMember {
@@ -346,7 +439,6 @@ export interface AutoRegistrationReceipt {
   auto_manifest: Record<string, unknown>;
   confidence: Record<string, unknown>;
   validation_report?: Record<string, unknown>;
-  oauth_status?: Record<string, unknown>;
   review_url?: string | null;
   trace_id?: string | null;
   request_id?: string | null;
@@ -395,7 +487,6 @@ export interface SandboxSession {
   dry_run_supported: boolean;
   approval_mode?: string | null;
   required_connected_accounts: unknown[];
-  connected_accounts: Array<Record<string, unknown>>;
   stub_providers_enabled: boolean;
   simulated_receipts: boolean;
   approval_simulator: boolean;
@@ -432,20 +523,6 @@ export interface GrantBindingResult {
   access_grant: AccessGrantRecord;
   trace_id?: string | null;
   request_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface ConnectedAccountRecord {
-  connected_account_id: string;
-  provider_key: string;
-  account_role: string;
-  display_name?: string | null;
-  environment?: string | null;
-  connection_status?: string | null;
-  scopes: string[];
-  metadata: Record<string, unknown>;
-  created_at?: string | null;
-  updated_at?: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -740,229 +817,6 @@ export interface InstalledToolReceiptStepRecord {
   error_class?: string | null;
   connected_account_ref?: string | null;
   metadata_jsonb: Record<string, unknown>;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksCategoryRecord {
-  key: string;
-  name_ja?: string | null;
-  name_en?: string | null;
-  description_ja?: string | null;
-  description_en?: string | null;
-  icon_url?: string | null;
-  open_job_count: number;
-  display_order: number;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksRegistrationRecord {
-  agent_id: string;
-  works_registered: boolean;
-  tagline?: string | null;
-  categories: string[];
-  capabilities: string[];
-  description?: string | null;
-  execution_status: string;
-  approval_required: boolean;
-  intent_id?: string | null;
-  approval_status?: string | null;
-  approval_snapshot_hash?: string | null;
-  approval_preview: Record<string, unknown>;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksOwnerDashboardAgent {
-  agent_id: string;
-  name?: string | null;
-  reputation: Record<string, unknown>;
-  capabilities: string[];
-  raw: Record<string, unknown>;
-}
-
-export interface WorksOwnerDashboardPitch {
-  proposal_id: string;
-  need_id?: string | null;
-  title?: string | null;
-  title_en?: string | null;
-  status?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksOwnerDashboardOrder {
-  order_id: string;
-  need_id?: string | null;
-  title?: string | null;
-  title_en?: string | null;
-  status?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksOwnerDashboardStats {
-  total_agents: number;
-  total_pending: number;
-  total_active: number;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksOwnerDashboard {
-  agents: WorksOwnerDashboardAgent[];
-  pending_pitches: WorksOwnerDashboardPitch[];
-  active_orders: WorksOwnerDashboardOrder[];
-  completed_orders: WorksOwnerDashboardOrder[];
-  stats: WorksOwnerDashboardStats;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksPosterDashboardJob {
-  job_id: string;
-  title?: string | null;
-  title_en?: string | null;
-  proposal_count: number;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksPosterDashboardOrder {
-  order_id: string;
-  need_id?: string | null;
-  title?: string | null;
-  title_en?: string | null;
-  status?: string | null;
-  has_deliverable: boolean;
-  deliverable_count: number;
-  awaiting_buyer_action: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksPosterDashboardStats {
-  total_posted: number;
-  total_completed: number;
-  raw: Record<string, unknown>;
-}
-
-export interface WorksPosterDashboard {
-  open_jobs: WorksPosterDashboardJob[];
-  in_progress_orders: WorksPosterDashboardOrder[];
-  completed_orders: WorksPosterDashboardOrder[];
-  stats: WorksPosterDashboardStats;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerDashboard {
-  partner_id: string;
-  company_name?: string | null;
-  plan?: string | null;
-  plan_label?: string | null;
-  month_bytes_used: number;
-  month_bytes_limit: number;
-  month_usage_pct: number;
-  total_source_items: number;
-  has_billing: boolean;
-  has_subscription: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerUsage {
-  plan?: string | null;
-  month_bytes_used: number;
-  month_bytes_limit: number;
-  month_bytes_remaining: number;
-  month_usage_pct: number;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerApiKeyRecord {
-  credential_id: string;
-  name?: string | null;
-  key_id?: string | null;
-  allowed_source_types: string[];
-  last_used_at?: string | null;
-  created_at?: string | null;
-  revoked: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerApiKeyHandle {
-  credential_id: string;
-  name?: string | null;
-  key_id?: string | null;
-  allowed_source_types: string[];
-  masked_key_hint?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsBilling {
-  currency?: string | null;
-  billing_mode?: string | null;
-  month_spend_jpy: number;
-  month_spend_usd: number;
-  all_time_spend_jpy: number;
-  all_time_spend_usd: number;
-  total_impressions: number;
-  total_replies: number;
-  has_billing: boolean;
-  has_subscription: boolean;
-  invoices: Array<Record<string, unknown>>;
-  wallet?: Record<string, unknown> | null;
-  balances: Array<Record<string, unknown>>;
-  supported_tokens: Array<Record<string, unknown>>;
-  funding_instructions?: Record<string, unknown> | null;
-  mandate?: PlanWeb3Mandate | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsBillingSettlement {
-  status?: string | null;
-  message?: string | null;
-  settles_automatically?: boolean | null;
-  cycle_key?: string | null;
-  settled_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsProfile {
-  has_profile: boolean;
-  company_name?: string | null;
-  ad_currency?: string | null;
-  has_billing: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsCampaignRecord {
-  campaign_id: string;
-  name?: string | null;
-  target_url?: string | null;
-  content_brief?: string | null;
-  target_topics: string[];
-  posting_interval_minutes: number;
-  max_posts_per_day: number;
-  currency?: string | null;
-  monthly_budget_jpy: number;
-  cpm_jpy: number;
-  cpr_jpy: number;
-  monthly_budget_usd: number;
-  cpm_usd: number;
-  cpr_usd: number;
-  status: string;
-  month_spend_jpy: number;
-  month_spend_usd: number;
-  total_posts: number;
-  total_impressions: number;
-  total_replies: number;
-  next_post_at?: string | null;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsCampaignPostRecord {
-  post_id: string;
-  content_id?: string | null;
-  cost_jpy: number;
-  cost_usd: number;
-  impressions: number;
-  replies: number;
-  status?: string | null;
   created_at?: string | null;
   raw: Record<string, unknown>;
 }

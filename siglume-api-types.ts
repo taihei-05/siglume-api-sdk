@@ -10,52 +10,20 @@ export type ExecutionKind = "dry_run" | "quote" | "action" | "payment";
 export type Environment = "sandbox" | "live";
 export type PriceModel = "free" | "subscription" | "one_time" | "bundle" | "usage_based" | "per_action";
 export type AppCategory = "commerce" | "booking" | "crm" | "finance" | "document" | "communication" | "monitoring" | "other";
+export type StoreVertical = "api" | "game";
+export type ListingCurrency = "USD" | "JPY";
+export type PersistenceMode = "none" | "local" | "platform" | "developer_server";
 
-export interface ConnectedAccountRef {
-  provider_key: string;
-  session_token: string; // short-lived, scoped token managed by Siglume
-  scopes: string[];
-  environment: Environment;
-}
-
-export interface AppManifest {
-  capability_key: string;
-  version: string;
-  name: string;
-  job_to_be_done: string;
-  category: AppCategory;
-  permission_class: PermissionClass;
-  approval_mode: ApprovalMode;
-  dry_run_supported: boolean;
-  required_connected_accounts: unknown[];
-  permission_scopes: string[];
-  price_model: PriceModel;
-  price_value_minor: number;
-  /**
-   * The API Store is USD-unified. All listings price in US dollars
-   * regardless of the developer's jurisdiction. Non-USD submissions are
-   * rejected by the platform.
-   */
-  currency: "USD";
-  /**
-   * ISO 3166-1 alpha-2 country code (optionally with sub-region, e.g. "US-CA")
-   * declaring the governing law this API is designed to comply with.
-   * Required. Default market is "US".
-   */
-  jurisdiction: string;
-  /**
-   * Optional list of specific regulatory frameworks the API claims compliance
-   * with (e.g. "GDPR", "CCPA", "PCI-DSS", "資金決済法"). Advisory only.
-   */
-  applicable_regulations?: string[];
-  /** Optional data-residency ISO code. Defaults to `jurisdiction`. */
-  data_residency?: string;
-  short_description: string;
-  docs_url: string;
-  support_contact: string;
-  compatibility_tags: string[];
-  example_prompts: string[];
-  latency_tier?: string;
+export interface CapabilityPersistencePolicy {
+  mode: PersistenceMode;
+  schema_version?: string;
+  scope?: string;
+  restore_required?: boolean;
+  max_bytes?: number;
+  endpoint?: string | null;
+  description?: string;
+  /** Required for Game API Store listings when mode is not "none". */
+  save_data_schema?: Record<string, unknown>;
 }
 
 export interface ExecutionContext {
@@ -66,7 +34,6 @@ export interface ExecutionContext {
   source_type?: string;
   environment: Environment;
   execution_kind: ExecutionKind;
-  connected_accounts: Record<string, ConnectedAccountRef>;
   budget_remaining_minor?: number;
   trace_id?: string;
   idempotency_key?: string;
@@ -133,6 +100,30 @@ export interface ExecutionResult {
   approval_hint?: ApprovalRequestHint;
 }
 
+export interface PricingPlanItem {
+  key?: string;
+  label?: string;
+  price_minor?: number;
+  amount_minor?: number;
+  currency?: string;
+  unit_label?: string;
+  description?: string;
+  conditions?: unknown;
+  receipt_code?: string;
+}
+
+export interface PricingPlan {
+  billing_model?: string;
+  display_name?: string;
+  summary?: string;
+  description?: string;
+  currency?: string;
+  unit_label?: string;
+  free_upfront_invocation?: boolean;
+  fallback_note?: string;
+  items?: PricingPlanItem[];
+}
+
 export interface CapabilityListing {
   id: string;
   capability_key: string;
@@ -144,6 +135,7 @@ export interface CapabilityListing {
   dry_run_supported: boolean;
   price_model: PriceModel;
   price_value_minor: number;
+  pricing_plan?: PricingPlan;
   currency: string;
   status: string;
   short_description?: string;
@@ -188,7 +180,7 @@ export type SettlementMode =
 export interface ToolManual {
   // Required (all permission classes)
   tool_name: string;                          // 3-64 chars, [A-Za-z0-9_]
-  job_to_be_done: string;                     // 10-500 chars
+  job_to_be_done: string;                     // 10-240 chars
   summary_for_model: string;                  // 10-300 chars, factual
   trigger_conditions: string[];               // 3-8 items, 10-200 chars each
   do_not_use_when: string[];                  // 1-5 items

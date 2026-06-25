@@ -34,7 +34,10 @@
             "price_model": "free",
             "price_value_minor": 0,
             "required_connected_accounts": [],
-            "short_description": "Search multiple retailers and summarize the best current price."
+            "short_description": "Compare retailer prices before buying.",
+            "store_vertical": "api",
+            "currency": "USD",
+            "allow_free_trial": false
           },
           "name": "Price Compare Helper",
           "permission_class": "read-only",
@@ -56,7 +59,7 @@
             "test_auth_header_name": "X-Siglume-Review-Key",
             "test_auth_header_value": "review-secret"
           },
-          "short_description": "Search multiple retailers and summarize the best current price.",
+          "short_description": "Compare retailer prices before buying.",
           "source_code": "# shared registration stub",
           "tool_manual": {
             "do_not_use_when": [
@@ -116,7 +119,10 @@
             "usage_hints": [
               "Use this tool after the owner has named a product and wants evidence-backed price comparison."
             ]
-          }
+          },
+          "store_vertical": "api",
+          "currency": "USD",
+          "allow_free_trial": false
         }
       },
       "response": {

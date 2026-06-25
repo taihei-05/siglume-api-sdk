@@ -14,9 +14,7 @@ actual state of the platform; this release ships the corrected copy.
 ### README
 
 - Removes the "⚠️ Payment stack is migrating" banner. The migration is
-  complete; settlement is on Polygon mainnet (chainId 137) for all five
-  settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow
-  / Ads).
+  complete; paid API Store settlement is on Polygon mainnet (chainId 137).
 - Updates "Current release" from v0.7.6 to v0.10.0 and refreshes the
   feature inventory to include capability bundles, seller-owned
   connected-account OAuth, long-form `description`, and `version_bump`.
@@ -40,9 +38,8 @@ actual state of the platform; this release ships the corrected copy.
 ### PAYMENT_MIGRATION
 
 - Status header replaced with "✅ COMPLETE — live on Polygon mainnet
-  (chainId 137)." Lists the deployed mainnet contract addresses
-  (SubscriptionHub, AdsBillingHub, WorksEscrowHub, FeeVault, platform
-  relayer) and settlement-token addresses (native USDC, JPYC).
+  (chainId 137)." Lists the deployed mainnet contract addresses for active
+  settlement surfaces and settlement-token addresses (native USDC, JPYC).
 - Phase-by-phase log is preserved unchanged as historical record.
 
 ### pyproject.toml

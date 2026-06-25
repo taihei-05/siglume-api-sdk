@@ -11,7 +11,6 @@ This is the first public alpha of the Siglume API Store SDK. The SDK lets you pu
 - **`AppAdapter` + `AppManifest`** — implement two methods and you have an API an agent can call.
 - **Tool Manual as first-class type** — `validate_tool_manual()` mirrors server-side scoring so you can check your grade (A–F) before registering. Minimum grade B is required to publish (C/D/F are blocked).
 - **Structured execution contract** — `ExecutionArtifact`, `SideEffectRecord`, `ReceiptRef`, `ApprovalRequestHint` for auditable, disputable execution.
-- **AIWorks extension** — opt-in module (`siglume_api_sdk_aiworks`) for agents fulfilling AIWorks jobs.
 - **Jurisdiction declaration** — publishers declare their API's origin jurisdiction (USD-enforced), with optional `served_markets` / `excluded_markets` hints. Buyers judge fitness for their market.
 - **`AppTestHarness`** — local sandbox runner: manifest validation, health check, dry run, quote, payment, receipt validation, connected-account simulation.
 - **TypeScript mirrors + JSON Schemas + OpenAPI spec** for polyglot teams.
@@ -45,7 +44,6 @@ Then read [GETTING_STARTED.md](https://github.com/taihei-05/siglume-api-sdk/blob
 
 - **Developer Portal**: [siglume.com/owner/publish](https://siglume.com/owner/publish) (create / edit / submit your APIs)
 - **API Store (buyer view)**: [siglume.com/owner/apps](https://siglume.com/owner/apps) (how owners discover and install your API)
-- **AIWorks**: [siglume.com/works](https://siglume.com/works) (for the AIWorks extension)
 
 ## What's next
 

@@ -1,4 +1,4 @@
-# Publish Flow
+﻿# Publish Flow
 
 This document explains the current Siglume Agent API Store publish flow as of
 2026-04-29.
@@ -22,7 +22,7 @@ The browser portal does **not** run registration directly. The portal is for:
 - inspecting blockers and live status
 - confirming embedded-wallet payout-token readiness
 - confirming the draft for immediate publish
-- rotating or repairing seller OAuth app credentials after registration
+- reviewing external OAuth `connect_url` metadata when required
 
 Submitted listing content is read-only in the portal. To change a submitted
 API, edit the source-side registration inputs and rerun `siglume register` /
@@ -39,26 +39,27 @@ There is no normal human review step in the self-serve publish flow anymore.
    engine.
 4. The engine reads your source, docs, manifest hints, Tool Manual files, and
    runtime validation inputs.
-5. If the API uses seller-side OAuth, the engine also includes the local,
-   Git-ignored `oauth_credentials.json`.
-6. Run the no-key local loop first:
+5. Run the no-key local loop first:
    - `siglume test .`
    - `siglume score . --offline`
-7. After deployment and `SIGLUME_API_KEY` setup, run CLI production preflight:
+6. After deployment and `SIGLUME_API_KEY` setup, run CLI production preflight:
    - `siglume validate .`
    - `siglume score . --remote`
    - `siglume preflight .`
-8. The engine calls `siglume register .` or `auto-register` to create or
+7. The engine calls `siglume register .` or `auto-register` to create or
    refresh the immutable submitted record.
-9. Siglume runs runtime, contract, pricing, payout, seller OAuth, and
+8. Siglume runs runtime, contract, pricing, payout, external OAuth declaration, and
    mandatory LLM legal checks.
-10. If the checks pass, `siglume register .` confirms and publishes the listing
+9. If the checks pass, `siglume register .` confirms and publishes the listing
     or non-material update immediately. Material contract changes to a live
     listing are blocked and must be submitted as a new API.
-11. Use `siglume register . --draft-only` when a coding agent or developer
+10. Use `siglume register . --draft-only` when a coding agent or developer
     intentionally needs an immutable draft for explicit human review.
-12. The draft can then be published by rerunning plain `siglume register .` or
+11. The draft can then be published by rerunning plain `siglume register .` or
     calling `confirm-auto-register`.
+12. After live or sandbox execution, use `siglume dev tail` or
+    `siglume dev tail --listing-id <listing_id>` to inspect execution receipts
+    and support identifiers. See [Developer Observability](developer-observability.md).
 
 ## What auto-register does
 
@@ -69,17 +70,18 @@ There is no normal human review step in the self-serve publish flow anymore.
 2. Accepts explicit registration contract inputs:
    - manifest fields
    - Tool Manual
-   - optional seller OAuth app credentials in `oauth_credentials`
+   - external OAuth declaration with `managed_by: "api"` and `connect_url` when required
    - optional `input_form_spec` ([authoring guide](input-form-spec.md))
-3. Runs contract, pricing, payout, seller OAuth, and runtime validation preflight checks.
+3. Runs contract, pricing, payout, external OAuth declaration, and runtime validation preflight checks.
 
    The **Tool Manual quality scorer** (grade A–F, minimum B to publish) used at this step is also published as open source — see [`siglume-agent-core.tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01). The same scoring code runs in this preflight check and locally; you can predict your grade before `auto-register` ever runs.
 4. Runs a mandatory fail-closed LLM legal review on the submitted package.
 5. Verifies the public API is reachable from the internet.
-6. Sends a functional test request using your dedicated review/test key.
+6. Sends a functional test request using your runtime auth header shared secret.
 7. Verifies the runtime sample request / response against the declared
    `input_schema` and `output_schema`.
-8. Checks connected-account requirements and paid pricing rules.
+ 8. Checks connected-account requirements, paid pricing rules, operation
+    pricing plans, and billing timing.
 9. Persists a private draft only if those checks pass. The CLI then confirms it
    by default unless `--draft-only` was requested.
 10. On confirmation, reruns the LLM legal review against the immutable stored
@@ -98,6 +100,7 @@ The following live-listing changes are material and are rejected with
 
 - `price_model`
 - `price_value_minor`
+- `pricing_plan`
 - `currency`
 - `price_value_minor_jpy`
 - `dual_currency`
@@ -111,6 +114,11 @@ The following live-listing changes are material and are rejected with
 When a material term changes, create a new API listing with a new
 `capability_key`. Siglume does not silently migrate existing buyers or grants to
 new commercial or authorization terms.
+
+One exception is allowed: an existing operation-priced listing may move from
+the default `billing_timing="post"` to `billing_timing="prepay"` in place. That
+change makes irreversible actions safer because payment is confirmed before the
+live side effect. Other billing timing changes may still be treated as material.
 
 ## The mandatory LLM legal review
 
@@ -143,10 +151,6 @@ By default, the CLI expects:
 - `tool_manual.json`
 - local, Git-ignored `runtime_validation.json`
 
-It also uses these when present:
-
-- local, Git-ignored `oauth_credentials.json` for seller-side OAuth app credentials
-
 SDK / HTTP automation can pass `source_url`, `source_context`, and
 `input_form_spec` directly to `auto-register`, but the current CLI project
 loader does not read those values from sidecar files.
@@ -157,7 +161,7 @@ Before draft creation, `siglume register` runs:
 - remote Tool Manual quality preview
 
 `siglume preflight` runs the same checks without creating a draft. Use it when
-you want to catch `docs_url`, runtime validation, seller OAuth, payout, and
+you want to catch `docs_url`, runtime validation, external OAuth declaration, payout, and
 Tool Manual blockers before `auto-register`.
 
 The CLI intentionally does not expose a bypass flag for these checks. Fix
@@ -172,20 +176,23 @@ preflight errors before calling `auto-register`.
   - `public_base_url`
   - `healthcheck_url` (Siglume calls this with `GET`)
   - `invoke_url` (Siglume calls this with `invoke_method`, default `POST`)
-  - dedicated review/test auth header name + value
+  - runtime auth header shared secret (`runtime_auth_header_name` / `runtime_auth_header_value`)
   - sample request payload in `request_payload`
   - expected response fields
-- For OAuth-backed APIs that use seller-owned OAuth apps:
-  - declare the provider in `required_connected_accounts` with `platform_managed: true`
-  - include the seller OAuth app credentials in the local Git-ignored `oauth_credentials.json`
+- For OAuth-backed APIs:
+  - declare the provider in `required_connected_accounts` with `managed_by: "api", connect_url: "https://api.example.com/oauth/start"`
+  - implement authorization, token storage, refresh, revocation, and user-to-token mapping in the publisher API
   - a live API cannot add provider requirements through a same-key update; use
     a new `capability_key` for that material contract change
-- Plain provider strings such as `"slack"` mean the API manages that auth path
-  itself; the CLI does not require `oauth_credentials.json` for those entries.
+- Plain provider strings such as `"slack"` mean the API manages that auth path itself.
 - Listing metadata such as:
   - `name`
-  - `job_to_be_done`
-  - `short_description`
+  - `short_description` — buyer-facing catalog tagline, max 60 characters.
+  - `job_to_be_done` — what the buyer can accomplish with this API, max 240
+    characters.
+  - optional `description` — detail-page copy for limits, approval behavior,
+    pricing notes, and expected results, max 1000 characters. Put longer usage
+    guidance in `docs_url`.
   - `category`
   - `docs_url` — a public API usage guide for this listing. It must explain
     what the API does, required inputs, connected-account requirements, limits,
@@ -202,6 +209,15 @@ preflight errors before calling `auto-register`.
     so an A-grade manual does not prevent an agent from misjudging your API. See
     [agent-readable-listings.md](./agent-readable-listings.md) for the
     capability-first checklist.
+  - optional `compatibility_tags`. For game APIs, include explicit game
+    placement tags such as `game`, `unity`, `unreal`, `godot`, `npc`,
+    `matchmaking`, `multiplayer`, `realtime`, `ugc`, or `narrative`. These
+    tags are the public SDK path for eligibility in the dedicated Game API
+    Store entry point; do not send arbitrary `metadata` for placement.
+  - optional `persistence`. For game APIs that save progress,
+    `persistence.save_data_schema` is required when `persistence.mode` is
+    `local`, `platform`, or `developer_server`. Normal API listings and games
+    with `persistence.mode="none"` do not need a save schema.
 - A Tool Manual / agent contract that scores **A** or **B**
   - canonical schema: `schemas/tool-manual.schema.json`
   - required core fields include `input_schema`, `output_schema`,
@@ -213,10 +229,35 @@ preflight errors before calling `auto-register`.
   - the live response must satisfy `output_schema`
   - runtime-checked response fields must be declared in `output_schema`
   - `requires_connected_accounts` must match between listing data and the Tool Manual
+  - if your API accepts files from external MCP agents, declare each file input
+    as a Siglume handle in `input_schema` (`"$ref": "#/$defs/handle"` or
+    `"format": "siglume-handle"`). The MCP Gateway brokers caller-supplied
+    `filename`, `mime_type`, and `content_base64` to your API as an inline
+    handle for that call only. Siglume does not store, host, scan, or classify
+    the file; MIME trust and content safety remain the publisher API's
+    responsibility.
 - Optional UI contract layer:
   - `input_form_spec` can be seeded during `auto-register`
   - confirmation does not edit the submitted UI contract
 - For paid APIs: minimum price and an active embedded Polygon wallet before publish
+- For `usage_based` / `per_action` APIs:
+  - the capability is free to invoke up front and must declare the actual charge
+    in `ExecutionResult.units_consumed`, `amount_minor`, `currency`, and
+    `receipt_summary`
+  - use `pricing_plan` to expose buyer-facing operation prices in API Store and
+    Game API Store
+  - `0` is valid for free operations; positive JPY/JPYC operation prices must
+    be at least `15` minor units
+  - use `billing_timing="prepay"` for irreversible actions that must not run
+    before payment succeeds
+  - keep the platform/API responsibility boundary strict: Siglume owns payment,
+    platform idempotency, retry, and reconciliation state; your API owns the
+    provider-specific side effect and committed evidence. See
+    [`platform-api-boundary.md`](./platform-api-boundary.md).
+- For paid APIs, `AppManifest.allow_free_trial` must be explicitly set to
+  `true` or `false`. When true, Plus/Pro buyers can start one lifetime trial
+  per listing, subject to their monthly trial quota; `free_trial_duration_days`
+  defaults to 30 and must be between 1 and 90.
 
 `request_payload` is the canonical runtime sample field. The server accepts
 `test_request_body`, `runtime_sample`, `sample_request_payload`, and
@@ -245,8 +286,8 @@ The intended advanced flow is:
    - docs
    - manifest hints
    - Tool Manual files
-   - deployment endpoints and review/test key settings
-   - seller OAuth app credentials when the API requires them
+   - deployment endpoints and runtime auth header secret settings
+   - external OAuth `connect_url` metadata when the API requires it
 3. It generates the registration payload.
 4. If only one language is present in the buyer-facing listing text
    (`job_to_be_done`, `short_description`, or long-form `description`), Siglume
@@ -260,7 +301,7 @@ The intended advanced flow is:
    - `manifest`
    - `tool_manual`
    - `runtime_validation`
-   - optional `oauth_credentials`
+   - external OAuth `connect_url` metadata when required
    - optional `input_form_spec`
 6. `siglume register .` confirms and publishes by default when immediate
    publish is approved.
@@ -285,7 +326,7 @@ otherwise. Do not add OAuth, payment, wallet, posting, or write actions unless I
 explicitly request them.
 
 Create adapter.py, tool_manual.json, a local README, and useful local tests.
-Keep runtime_validation.json and oauth_credentials.json local and Git-ignored.
+Keep runtime_validation.json local and Git-ignored; store external-provider secrets in the publisher API secret store.
 
 First make this pass:
 siglume test .
@@ -349,6 +390,20 @@ In the SDK and CLI today, this value is sent as a bearer token in the
 - `X-Ingest-Key` authenticates `/v1/ingest/*` source-ingest endpoints
 - do not use `X-Ingest-Key` for `auto-register`
 
+`SIGLUME_API_KEY` is also **not** an MCP Gateway token.
+
+- `SIGLUME_API_KEY` / `cli_...` is for SDK, CLI, and Developer Surface
+  automation such as registration, validation, and webhook subscription
+  management.
+- MCP Gateway calls such as `initialize`, `tools/list`, and
+  `tools/call market_create_reward_payout` require
+  `Authorization: Bearer mcpsk_...` or an OAuth-issued `mcpoa_...` token.
+- `X-API-Key`, `X-Siglume-API-Key`, and `cli_...` bearer tokens are rejected by
+  `https://mcp.siglume.com/`.
+- An `mcpsk_...` token is issued for a specific agent from the Developer
+  Portal MCP key flow. The `agent_id` is needed at token issuance time, not as
+  a `market_create_reward_payout` argument.
+
 ## What the portal is for now
 
 Use the portal to:
@@ -357,5 +412,5 @@ Use the portal to:
 - inspect publish blockers
 - confirm the draft and verify live status
 - confirm embedded-wallet payout-token readiness
-- rotate or repair seller OAuth app credentials after registration
+- inspect external OAuth `connect_url` metadata when required
 - issue, delete, or rotate CLI tokens when needed

@@ -1,4 +1,4 @@
-# Roadmap
+﻿# Roadmap
 
 What is shipped today on the public SDK, what is scheduled next, and
 what is explicitly out of scope. For the per-release changelog, see
@@ -41,11 +41,9 @@ Both v0.7 platform tracks landed:
   Python and TypeScript. One listing exposes multiple capability
   listings under one subscription; same-seller, 10-member cap, and
   grade-B-per-member gates are enforced platform-side.
-- **Connected-account OAuth (seller-owned)** — sellers register their
-  own OAuth app credentials per listing via
-  `set_listing_oauth_credentials()`; buyers initiate OAuth against the
-  seller's app rather than a platform-shared one. The
-  `client_secret` never leaves the SDK on the wire.
+- **Connected-account OAuth (publisher-owned)** — publisher APIs own OAuth,
+  token storage, refresh, revocation, and user-to-token mapping. Siglume passes
+  identity context only and does not expose token-broker SDK APIs.
 
 Plus production-onboarding hardening across v0.7.2 → v0.7.6:
 auto-register payload alignment, runtime-validation contract checks,
@@ -54,18 +52,25 @@ fallback. See
 [RELEASE_NOTES_v0.7.0.md](./RELEASE_NOTES_v0.7.0.md) through
 [RELEASE_NOTES_v0.7.6.md](./RELEASE_NOTES_v0.7.6.md).
 
-### v0.6.0 — first-party operation surface parity
+### v0.6.0 — first-party operation wrapper parity
 
-Every first-party operation on the Siglume platform is reachable
-from Python and TypeScript as a typed method, with paging,
-approval-required handling, and handle-only secret hiding. See
-[RELEASE_NOTES_v0.6.0.md](./RELEASE_NOTES_v0.6.0.md).
+The SDK ships typed wrappers and generator metadata for the first-party
+operation families, with paging, approval-required handling, and handle-only
+secret hiding in the SDK contract. Production availability still depends on the
+target platform exposing the owner-operation execute route; generated wrappers
+are not a guarantee that `/v1/owner/agents/{agent_id}/operations/execute` is
+enabled in every environment. See [RELEASE_NOTES_v0.6.0.md](./RELEASE_NOTES_v0.6.0.md).
 
-### v0.5.0 — platform-integration release
+### v0.5.0 and later — platform integration, metering, and operation billing
 
-Webhook handling, experimental usage metering, and Web3 settlement
-helpers. See
-[RELEASE_NOTES_v0.5.0.md](./RELEASE_NOTES_v0.5.0.md).
+Webhook handling, usage-event ingest, Web3 settlement helpers, and the live
+API Store / Game API Store operation-billing models. `usage_based` and
+`per_action` listings are supported when they include `pricing_plan.items`;
+free operations use `0`, positive JPY/JPYC operation prices must be at least
+15 minor units, and runtime billing selects the matching plan item from the
+execution receipt. See [RELEASE_NOTES_v0.5.0.md](./RELEASE_NOTES_v0.5.0.md),
+[RELEASE_NOTES_v1.2.1.md](./RELEASE_NOTES_v1.2.1.md), and
+[docs/pricing-and-billing.md](./docs/pricing-and-billing.md).
 
 ### v0.4.0 — multi-runtime + quality + ecosystem
 
@@ -80,8 +85,7 @@ drafting, manifest / tool-manual diff, tool-schema exporter
 `SettlementMode` expanded with `polygon_mandate` and
 `embedded_wallet_charge`. The full migration (Stripe Connect → Polygon
 mainnet, chainId 137) shipped server-side across phases 1–47 and is
-now live in production for all five settlement surfaces (Plan /
-Partner / API Store paid / AIWorks Escrow / Ads). See
+now live in production for paid API Store settlement. See
 [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the detail and
 on-chain contract addresses.
 
@@ -144,15 +148,6 @@ Platform prerequisites:
 
 - Listing-declared OAuth contracts for external credential issuance.
 - Decision on contract-scoped redaction and audit requirements.
-
-### Usage-based / per-action billing on `PriceModel`
-
-The SDK enum reserves `ONE_TIME`, `BUNDLE`, `USAGE_BASED`, and
-`PER_ACTION`, and the `MeterClient` surface ships today as
-experimental ingest-only. Platform-side, `AdsBillingHub` already
-implements metered settlement on Polygon for ad spend; opening the
-same axis for API Store listings is a platform decision, not an
-SDK gap.
 
 ## Not planned
 

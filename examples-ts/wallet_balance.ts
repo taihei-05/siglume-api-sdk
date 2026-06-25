@@ -36,11 +36,14 @@ export class WalletBalanceApp extends AppAdapter {
       name: "Wallet Balance",
       job_to_be_done: "Read the owner's connected wallet balance on Ethereum or Polygon without moving funds.",
       category: AppCategory.FINANCE,
+      store_vertical: "api" as const,
       permission_class: PermissionClass.READ_ONLY,
       approval_mode: ApprovalMode.AUTO,
       dry_run_supported: true,
       required_connected_accounts: ["metamask"],
       price_model: PriceModel.FREE,
+    currency: "USD" as const,
+    allow_free_trial: false,
       jurisdiction: "US",
       short_description: "Read native-token or ERC-20 balances from a connected MetaMask wallet.",
       example_prompts: [
@@ -57,7 +60,7 @@ export class WalletBalanceApp extends AppAdapter {
     const token_symbol = String(ctx.input_params?.token_symbol ?? defaultSymbol).toUpperCase();
     const balance = token_symbol === defaultSymbol ? defaultBalance : token_symbol === "USDC" ? 250.0 : 18.75;
     const usd_equivalent = Math.round(balance * (TOKEN_PRICES[token_symbol] ?? defaultPrice) * 100) / 100;
-    const provider = ctx.connected_accounts?.metamask?.provider_key ?? "metamask";
+    const provider = "metamask"; // Publisher resolves the owner wallet from ctx.owner_user_id.
     return {
       success: true,
       execution_kind: ctx.execution_kind,

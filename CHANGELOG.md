@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -7,23 +7,197 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **"How your API actually gets selected" now matches the live execution model.**
+  The section previously stated that whenever a buyer's agent receives a request,
+  the platform decides whether to call your API by running a server-side
+  `installed_tool_prefilter → tool_selector → orchestrate → provider_adapters →
+  capability_failure_learning` pipeline. That describes Siglume's own tool-use
+  runtime, **not** the primary MCP connector path: when a buyer connects their own
+  AI over MCP, that AI selects the tool from your Tool Manual and Siglume only
+  resolves + dispatches it — the keyword selector and orchestration loop do not
+  run. The README now splits **Path 1 (MCP — the buyer's AI selects)** from
+  **Path 2 (Siglume's own runtime / `siglume dev simulate`, where the open-core
+  pipeline runs)**, clarifies that `installed_tool_prefilter` is a prompt-budget
+  helper rather than an always-on runtime gate, and reframes the reading list and
+  the "improve these fields" guidance accordingly. `GETTING_STARTED.md` gains the
+  same Path 1 / Path 2 caveat on the `dev_simulator` callout. The open-core
+  provenance, the publish-gate scorer, and the dry-run simulator's mechanics are
+  unchanged — those were and remain accurate. No SDK behaviour change.
+
+## [2.0.1] - 2026-06-23
+
+### Removed
+
+- Removed the retired job-fulfillment extension from the public Python and
+  TypeScript SDK packages, including dedicated helper modules, examples, docs,
+  generated types, and wrapper tests.
+
+### Changed
+
+- Updated public settlement and input-form documentation so the SDK package
+  describes only the currently supported API Store, MCP Router, metering,
+  webhook, and Direct Request Payment surfaces.
+
+## [2.0.0] - 2026-06-10
+
+### Removed
+
+- **BREAKING:** Removed the legacy advertising / partner-dashboard SDK surface
+  (`PartnerDashboard`, `list_partner_api_key` / `create_partner_api_key`, the
+  `ad_currency` profile field) and the legacy advertiser Ads surface
+  (`AdsProfile` / `AdsBilling` / `AdsCampaignRecord`, `get_ads_profile` /
+  `list_ads_campaigns` / `get_ads_billing` / `settle_ads_billing` /
+  `list_ads_campaign_posts`). These mapped to advertising / partner endpoints
+  and owner operations that have now been retired platform-side; calls return
+  404. Remove any usage of these symbols before upgrading.
+
+### Added
+
+- `runtime_validation` now accepts `runtime_auth_header_name` /
+  `runtime_auth_header_value` as the canonical names for the runtime auth header
+  shared secret Siglume attaches when it calls `invoke_url` (at both
+  registration validation **and** production runtime invocation). The legacy
+  `test_auth_header_name` / `test_auth_header_value` names remain accepted as
+  deprecated aliases. **Migration:** existing projects need no changes — the
+  legacy fields keep working. New SDK projects are scaffolded with the
+  `runtime_auth_header_*` fields, and the OpenAPI schema, docs, template
+  READMEs, and placeholder/preflight validation messages now describe the value
+  as a runtime shared secret (keep it Git-ignored, use a strong random value,
+  rotate on leak) instead of a "review/test key".
+
+### Changed
+
+- Added buyer-facing listing text limits across SDK schema/docs and client-side
+  registration validation: `short_description` max 60 characters,
+  `job_to_be_done` max 240 characters, and long-form `description` max 1000
+  characters.
+- Reduced Tool Manual `job_to_be_done` max length from 500 to 240 characters
+  so the agent-facing contract stays aligned with the public listing summary.
+
+## [1.2.2] - 2026-06-04
+
+### Fixed
+
+- Added [Developer Observability](docs/developer-observability.md) so new
+  developers can find `siglume dev tail`, seller listing receipts, owner
+  installed-tool receipts, support identifiers, and the privacy boundary.
+- Cross-linked receipt/log inspection from pricing, metering, publish, Getting
+  Started, execution receipt, TypeScript, and installed-tool docs.
+- Removed stale jurisdiction guidance that still described the payment stack as
+  migrating and incorrectly said Japan-based listings could not price in JPY.
+
+## [1.2.1] - 2026-06-04
+
+### Fixed
+
+- Added the canonical [Pricing And Billing](docs/pricing-and-billing.md)
+  developer guide covering free APIs, subscriptions, operation-based
+  `usage_based` / `per_action` plans, JPY/JPYC minimum operation pricing, and
+  `billing_timing="prepay"`.
+- Updated SDK docs that still described `usage_based` / `per_action` as future
+  values, and added a regression test so docs stay aligned with the live
+  operation billing contract.
+- Added `billing_timing` to `schemas/app-manifest.schema.json` so schema-driven
+  editors and validation tools see the same manifest field as Python and
+  TypeScript SDKs.
+
+## [1.2.0] - 2026-06-04
+
+### Added
+
+- Added `AppManifest.billing_timing` (`"post"` or `"prepay"`) to support
+  quote-first direct payment for irreversible per-action APIs.
+
+## [1.1.0] - 2026-06-04
+
+### Changed
+
+- Made `usage_based` and `per_action` live API Store / Game API Store pricing
+  models. These capabilities are free to invoke up front and charge only the
+  positive amount declared by the execution result.
+- Added buyer-facing `pricing_plan` support to Python/TypeScript SDK listing
+  records, manifest forwarding, OpenAPI, schema, diff detection, and docs.
+- Enforced a JPY/JPYC operation billing floor: free operations may use `0`, but
+  positive operation prices must be at least `15` minor units.
+
+## [1.0.0] - 2026-06-03
+
+### Breaking
+
+- Retired Architecture A connected-account OAuth from the public SDK surface.
+- Removed platform OAuth authorize/callback/refresh/revoke helpers and listing OAuth credential helpers from Python and TypeScript clients.
+- Removed auto-register OAuth credential seed payload support.
+- Project preflight now rejects platform-managed connected-account requirements; publishers must use API-managed `connect_url` and own token storage.
+
+## [0.10.8] - 2026-05-28
+
+### Fixed
+
+- Restored UTF-8 punctuation, emoji, box-drawing characters, yen signs, and
+  Japanese legal terms that were committed as mojibake in public SDK docs,
+  examples, comments, and docstrings.
+- Added a repository-wide regression test that scans tracked UTF-8 text files
+  for known mojibake marker sequences.
+
+## [0.10.7] - 2026-05-13
+
+### Changed
+
+- `AppManifest.allow_free_trial` is now required for publishing. Developers
+  must explicitly pass `True` / `False` (or `true` / `false` in TypeScript)
+  so trial availability is an intentional monetization choice rather than an
+  SDK default.
+- Python and TypeScript `auto_register` now forward `allow_free_trial` and
+  `free_trial_duration_days`; buyer SDKs expose `start_trial()` and
+  `get_trial_quota()`.
+
+## [0.10.6] - 2026-05-13
+
+### Changed
+
+- `AppManifest.currency` is now required for publishing. Developers must
+  choose `"USD"` for USDC settlement or `"JPY"` for JPYC settlement, and
+  `price_value_minor` is interpreted in the selected currency's minor unit.
+- Python and TypeScript `auto_register` now fail fast when `currency` is
+  missing or invalid, and forward the normalized value to the platform.
+- CLI templates, examples, schema, docs, and recorder fixtures now include
+  explicit listing currency.
+
+## [0.10.5] - 2026-05-13
+
+### Fixed
+
+- Superseded by 0.10.6 after CI caught source encoding and duplicate example keyword issues in the tag build.
+
+## [0.10.4] - 2026-05-13
+
+### Changed
+
+- `AppManifest.store_vertical` is now required for publishing. Developers must
+  choose `"api"` for normal API Store listings or `"game"` for Game API Store
+  listings instead of relying on compatibility tags or arbitrary metadata for
+  store placement.
+- Python and TypeScript `auto_register` now fail fast when `store_vertical` is
+  missing, and forward the explicit value when present.
+- CLI templates, examples, schema, OpenAPI docs, and shared recorder fixtures
+  now include `store_vertical`.
+
 ## [0.10.3] - 2026-05-05
 
 ### Changed
 
-- **Docs align with `siglume-agent-core` v0.9.0.** README now distinguishes
-  the API Store tool-selection pipeline used by `siglume dev simulate` and
-  `siglume dev market-vitals` from the AI Works pre-route. It links to the
-  newly public `job_feasibility` and `works_candidate_selector` modules so the
-  Works automated route and re-check suppression policy are no longer implied
-  to be private or absent from agent-core.
+- **Docs align with `siglume-agent-core` v0.9.0.** README now documents the
+  API Store tool-selection pipeline used by `siglume dev simulate` and
+  `siglume dev market-vitals`, with links to the public agent-core selection
+  and orchestration modules.
 
 ### Compatibility
 
 - No CLI or client behavior change. `siglume dev market-vitals` remains a thin
   authenticated wrapper around `/v1/seller/analytics/market-vitals`; it reports
-  aggregate API Store orchestrator traffic and does not depend on the Works
-  auto-pitch cache implementation.
+  aggregate API Store orchestrator traffic.
 
 ## [0.10.2] - 2026-05-05
 
@@ -114,8 +288,7 @@ and [`siglume-api-sdk#199`](https://github.com/taihei-05/siglume-api-sdk/issues/
   copy still framed paid subscriptions as "publishing is open (Phase
   31 Polygon Amoy end-to-end proven)" and the payment stack as
   "migrating," which understated the current state. All five
-  settlement surfaces (Plan / Partner / API Store paid / AIWorks
-  Escrow / Ads) are on-chain.
+  active settlement surfaces are on-chain.
 - README "Current release" callout now points at v0.10.0 instead of
   v0.7.6, and the SDK feature inventory is updated to include
   capability bundles, seller-owned connected-account OAuth,
@@ -127,9 +300,9 @@ and [`siglume-api-sdk#199`](https://github.com/taihei-05/siglume-api-sdk/issues/
   the platform-side decision needed before `USAGE_BASED` /
   `PER_ACTION` open for API Store listings.
 - PAYMENT_MIGRATION header now lists the deployed mainnet contract
-  addresses (SubscriptionHub, AdsBillingHub, WorksEscrowHub, FeeVault,
-  platform relayer) and settlement-token addresses (native USDC,
-  JPYC). The phase-by-phase log is preserved as historical record.
+  addresses for active settlement surfaces and settlement-token addresses
+  (native USDC, JPYC). The phase-by-phase log is preserved as historical
+  record.
 
 ### Changed
 
@@ -424,20 +597,14 @@ v0.7.1 is a responsibility-correction release over v0.7.0.
 
 ### Breaking
 
-- `start_connected_account_oauth(...)` now takes **`listing_id`**
-  instead of `provider_key`. OAuth client credentials
-  (`client_id` / `client_secret`) are registered by the **seller**
-  against their listing, not by the platform in env vars. The
-  platform resolves the seller's credentials from the listing
-  when the buyer initiates OAuth. This applies to both Python
-  and TypeScript.
+- Historical note: v0.7.1 corrected the v0.7 connected-account ownership
+  model from platform environment credentials to seller-owned OAuth app
+  credentials per listing. That Architecture A surface is retired in v1.0.0.
 
 ### Added
 
-- Seller-side: `set_listing_oauth_credentials(listing_id, ...)` +
-  `get_listing_oauth_credentials_status(listing_id)` in both
-  bindings. The setter encrypts `client_secret` at rest; the
-  reader never returns the secret values.
+- Historical note: v0.7.1 added listing-level OAuth credential management
+  helpers in both bindings. Those helpers are retired in v1.0.0.
 
 ### Migration guide (v0.7.0 → v0.7.1)
 
@@ -445,8 +612,8 @@ v0.7.1 is a responsibility-correction release over v0.7.0.
   `AGENT_SNS_PROVIDER_<KEY>_CLIENT_{ID,SECRET}` env vars on the
   platform. v0.7.1 removes that path entirely — each seller
   registers their own OAuth app and calls
-  `set_listing_oauth_credentials()` once per listing.
-- Existing v0.7.0 `ConnectedAccount` rows have no
+  listing-level credential management once per listing.
+- Existing v0.7.0 platform OAuth account rows have no
   `source_listing_id`. They remain usable for resolve / revoke
   but **cannot be refreshed** and **do not satisfy** the new
   subscribe-time scope gate. Reconnect to regenerate them under
@@ -475,11 +642,11 @@ contract is pinned by regression tests in both language bindings.
   same-seller, 10-member cap, and grade-B-per-member gates.
 - **Connected accounts** (track 3): Python + TypeScript wrap over
   `/v1/me/connected-accounts` — `list_connected_account_providers` /
-  `start_connected_account_oauth` /
-  `complete_connected_account_oauth` / `refresh_connected_account` /
-  `revoke_connected_account`. New types
-  `ConnectedAccountProvider`, `ConnectedAccountOAuthStart`,
-  `ConnectedAccountLifecycleResult`.
+  the historical OAuth authorize helper /
+  the historical OAuth callback, refresh, and
+  revoke helpers. Historical types
+  platform OAuth provider and related OAuth response
+  records.
 
 ### Security
 
@@ -529,7 +696,7 @@ methods, with paging, approval-required handling, and secret-hiding baked in.
   / `accept_market_proposal` / `reject_market_proposal`. Approval-required
   envelopes surface as `status: "approval_required"` + `intent_id` instead of
   throwing.
-- **Works**: `list_work_categories` / `register_work` / `get_work_registration`
+- **Market proposals**: `list_work_categories` / `register_work` / `get_work_registration`
   / owner and poster dashboard reads.
 - **Installed tools**: listing, connection readiness, execution + receipt
   reads, binding-policy update (guarded).
@@ -765,13 +932,12 @@ First public alpha of the Siglume API Store SDK.
 
 - `AppAdapter` base class and `AppManifest` / `ExecutionContext` / `ExecutionResult` types for building agent-callable APIs.
 - `PermissionClass` scopes (`READ_ONLY`, `RECOMMENDATION`, `ACTION`, `PAYMENT`) and `ApprovalMode` (`AUTO`, `ALWAYS_ASK`, `BUDGET_BOUNDED`).
-- `AppTestHarness` for local sandbox testing — manifest validation, health check, dry run, quote/payment/receipt validation, `simulate_connected_account_missing`.
+- `AppTestHarness` for local sandbox testing — manifest validation, health check, dry run, quote/payment/receipt validation.
 - `StubProvider` for mocking external APIs in tests.
 - **Tool Manual** as a first-class SDK type: `ToolManual`, `ToolManualIssue`, `ToolManualQualityReport`, `validate_tool_manual()` (mirrors server validation so you can check grade locally).
 - **Structured execution contract**: `ExecutionArtifact`, `SideEffectRecord`, `ReceiptRef`, `ApprovalRequestHint` (legacy `receipt_summary` retained for backward compatibility).
-- **AIWorks extension** (`siglume_api_sdk_aiworks`) for agents that fulfill AIWorks jobs: `JobExecutionContext`, `FulfillmentReceipt`, `DeliverableSpec`, `BudgetSnapshot`.
 - **Jurisdiction declaration** on `AppManifest` and `ToolManual` — origin-declaration only; buyers judge fitness for their market. Optional `served_markets` / `excluded_markets` list fields on `AppManifest` provide additional market hints.
-- TypeScript type mirrors (`siglume-api-types.ts`, `siglume-api-types-aiworks.ts`) and JSON Schemas for manifest and tool manual.
+- TypeScript type mirrors (`siglume-api-types.ts`) and JSON Schemas for manifest and tool manual.
 - OpenAPI spec (`openapi/developer-surface.yaml`) for the developer surface.
 - Example templates: `hello_price_compare.py` (READ_ONLY), `x_publisher.py` (ACTION), `visual_publisher.py` (ACTION), `metamask_connector.py` (PAYMENT).
 - CI workflow: ruff lint + examples smoke test on Python 3.11 and 3.12.

@@ -55,8 +55,6 @@ export interface LoadedProject {
   tool_manual: Record<string, unknown>;
   runtime_validation_path?: string;
   runtime_validation?: Record<string, unknown>;
-  oauth_credentials_path?: string;
-  oauth_credentials?: Record<string, unknown> | unknown[];
 }
 
 export interface CliProjectDependencies {
@@ -102,7 +100,7 @@ function sampleValueForSchema(schema: Record<string, unknown>): unknown {
   }
 }
 
-function buildRuntimeValidationTemplate(toolManual: Record<string, unknown>): Record<string, unknown> {
+export function buildRuntimeValidationTemplate(toolManual: Record<string, unknown>): Record<string, unknown> {
   const inputSchema = isRecord(toolManual.input_schema) ? toolManual.input_schema : {};
   const properties = isRecord(inputSchema.properties) ? inputSchema.properties : {};
   const required = Array.isArray(inputSchema.required) ? inputSchema.required : [];
@@ -125,8 +123,12 @@ function buildRuntimeValidationTemplate(toolManual: Record<string, unknown>): Re
     healthcheck_url: "https://api.example.com/health",
     invoke_url: "https://api.example.com/invoke",
     invoke_method: "POST",
-    test_auth_header_name: "X-Siglume-Review-Key",
-    test_auth_header_value: "replace-with-dedicated-review-key",
+    // Shared secret Siglume attaches when it calls invoke_url at both
+    // registration validation and production runtime. Use a strong random
+    // value, keep it in the Git-ignored runtime_validation.json, and rotate it
+    // if it leaks. (legacy aliases: test_auth_header_name/value)
+    runtime_auth_header_name: "X-Siglume-Auth",
+    runtime_auth_header_value: "replace-with-strong-random-runtime-auth-secret",
     request_payload: requestPayload,
     expected_response_fields: expectedFields.length > 0 ? expectedFields : ["summary"],
     timeout_seconds: 10,
@@ -272,16 +274,6 @@ export async function loadProject(path = "."): Promise<LoadedProject> {
   const runtime_validation = runtime_validation_path
     ? await loadJsonObject(runtime_validation_path, "runtime_validation")
     : undefined;
-  const oauth_credentials_path = await findOauthCredentialsPath(root_dir);
-  let oauth_credentials: Record<string, unknown> | unknown[] | undefined;
-  if (oauth_credentials_path) {
-    const parsed = JSON.parse(await readFile(oauth_credentials_path, "utf8")) as unknown;
-    if (!isRecord(parsed) && !Array.isArray(parsed)) {
-      throw new SiglumeProjectError("oauth_credentials must be a JSON object or array");
-    }
-    oauth_credentials = parsed;
-  }
-
   return {
     root_dir,
     adapter_path,
@@ -291,8 +283,6 @@ export async function loadProject(path = "."): Promise<LoadedProject> {
     tool_manual,
     runtime_validation_path: runtime_validation_path ?? undefined,
     runtime_validation,
-    oauth_credentials_path: oauth_credentials_path ?? undefined,
-    oauth_credentials,
   };
 }
 
@@ -355,6 +345,22 @@ function requiredOauthProviders(requirements: unknown[] | undefined): string[] {
   return providers;
 }
 
+function apiManagedRequirementsMissingConnectUrl(requirements: unknown[] | undefined): string[] {
+  const missing: string[] = [];
+  for (const item of requirements ?? []) {
+    if (!isRecord(item)) continue;
+    const managedBy = String(item.managed_by ?? "").trim().toLowerCase().replaceAll("_", "-");
+    if (managedBy !== "api") continue;
+    const connectUrl = String(item.connect_url ?? "").trim();
+    if (connectUrl) continue;
+    const label = oauthProviderKeyFromRequirement(item) ?? "(missing provider_key)";
+    if (!missing.includes(label)) {
+      missing.push(label);
+    }
+  }
+  return missing;
+}
+
 function connectedAccountRequirementLabel(value: unknown): string {
   if (isRecord(value)) {
     for (const key of ["provider_key", "provider", "account_type", "name"]) {
@@ -364,111 +370,6 @@ function connectedAccountRequirementLabel(value: unknown): string {
     return "";
   }
   return String(value ?? "").trim();
-}
-
-function oauthProviderRecordsMap(payload: Record<string, unknown> | unknown[] | undefined): Record<string, Record<string, unknown>> {
-  if (!payload) {
-    return {};
-  }
-  const items = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload.items)
-      ? payload.items
-      : [payload];
-  const resolved: Record<string, Record<string, unknown>> = {};
-  for (const [index, item] of items.entries()) {
-    if (!isRecord(item)) {
-      throw new SiglumeProjectError(`oauth_credentials[${index}] must be a JSON object.`);
-    }
-    const providerKey = oauthProviderKeyFromRequirement(item.provider_key ?? item.provider);
-    if (!providerKey) {
-      throw new SiglumeProjectError(`oauth_credentials[${index}].provider_key is required.`);
-    }
-    const authorizeUrl = String(item.authorize_url ?? item.authorization_url ?? item.auth_url ?? "").trim();
-    const tokenUrl = String(item.token_url ?? "").trim();
-    if (!authorizeUrl || !tokenUrl) {
-      throw new SiglumeProjectError(
-        `oauth_credentials[${index}] must include authorize_url and token_url.`,
-      );
-    }
-    for (const [urlKey, urlValue] of Object.entries({
-      authorize_url: authorizeUrl,
-      token_url: tokenUrl,
-      revoke_url: String(item.revoke_url ?? "").trim(),
-    })) {
-      if (urlValue && !urlValue.startsWith("https://")) {
-        throw new SiglumeProjectError(`oauth_credentials[${index}].${urlKey} must be an https URL.`);
-      }
-    }
-    const clientId = String(item.client_id ?? "").trim();
-    const clientSecret = String(item.client_secret ?? "").trim();
-    if (!clientId || !clientSecret) {
-      throw new SiglumeProjectError(`oauth_credentials[${index}] must include client_id and client_secret.`);
-    }
-    const rawScopes = item.required_scopes ?? item.scopes;
-    let scopes: string[] = [];
-    if (rawScopes == null) {
-      scopes = [];
-    } else if (!Array.isArray(rawScopes)) {
-      throw new SiglumeProjectError(`oauth_credentials[${index}].required_scopes must be a JSON array.`);
-    } else {
-      scopes = rawScopes.map((scope) => String(scope ?? "").trim()).filter(Boolean);
-    }
-    const record: Record<string, unknown> = {
-      provider_key: providerKey,
-      client_id: clientId,
-      client_secret: clientSecret,
-      required_scopes: scopes,
-    };
-    for (const [key, value] of Object.entries({
-      authorize_url: authorizeUrl,
-      token_url: tokenUrl,
-      revoke_url: String(item.revoke_url ?? "").trim(),
-      display_name: String(item.display_name ?? "").trim(),
-      scope_separator: String(item.scope_separator ?? "").trim(),
-      token_endpoint_auth: String(item.token_endpoint_auth ?? "").trim(),
-    })) {
-      if (value) record[key] = value;
-    }
-    for (const key of ["pkce_required", "refresh_supported"]) {
-      if (typeof item[key] === "boolean") record[key] = item[key];
-    }
-    if (Array.isArray(item.available_scopes)) {
-      const availableScopes = item.available_scopes.map((scope) => String(scope ?? "").trim()).filter(Boolean);
-      if (availableScopes.length > 0) record.available_scopes = availableScopes;
-    }
-    resolved[providerKey] = record;
-  }
-  return resolved;
-}
-
-function canonicalOauthCredentialsPayload(
-  payload: Record<string, unknown> | unknown[] | undefined,
-): Record<string, unknown> | undefined {
-  const records = oauthProviderRecordsMap(payload);
-  const providerKeys = Object.keys(records).sort();
-  if (providerKeys.length === 0) {
-    return undefined;
-  }
-  return {
-    items: providerKeys.map((providerKey) => records[providerKey]),
-  };
-}
-
-function ensureRequiredOauthCredentials(project: LoadedProject): void {
-  const requiredProviders = requiredOauthProviders(project.manifest.required_connected_accounts ?? []);
-  if (requiredProviders.length === 0) {
-    return;
-  }
-  const provided = new Set(Object.keys(oauthProviderRecordsMap(project.oauth_credentials)));
-  const missing = requiredProviders.filter((provider) => !provided.has(provider));
-  if (missing.length === 0) {
-    return;
-  }
-  const path = project.oauth_credentials_path ?? join(project.root_dir, "oauth_credentials.json");
-  throw new SiglumeProjectError(
-    `${path} is required for platform-managed OAuth APIs. Missing provider seeds: ${missing.join(", ")}`,
-  );
 }
 
 export async function validateProject(path = ".", deps: CliProjectDependencies = {}): Promise<Record<string, unknown>> {
@@ -521,7 +422,13 @@ function ensureManifestPublisherIdentity(project: LoadedProject): void {
   const sellerHomepageUrl = String(manifestPayload.seller_homepage_url ?? "").trim();
   const sellerSocialUrl = String(manifestPayload.seller_social_url ?? "").trim();
   const jurisdiction = String(manifestPayload.jurisdiction ?? "").trim();
+  const companyId = String(manifestPayload.company_id ?? "").trim()
+    || String(manifestPayload.publisher_company_id ?? "").trim();
+  const publisherType = String(manifestPayload.publisher_type ?? "user").trim().toLowerCase();
   const issues: string[] = [];
+  if (companyId && publisherType !== "company") {
+    issues.push("manifest.company_id requires manifest.publisher_type to be \"company\"");
+  }
   if (!docsUrl) {
     issues.push("manifest.docs_url is required");
   } else if (looksLikePlaceholder(docsUrl)) {
@@ -589,14 +496,12 @@ function looksLikeEmail(value: string): boolean {
   return normalized.includes("@") && !normalized.includes(" ") && domain.includes(".") && !normalized.startsWith("@");
 }
 
-function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): string[] {
+export function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): string[] {
   const issues: string[] = [];
   for (const fieldName of [
     "public_base_url",
     "healthcheck_url",
     "invoke_url",
-    "test_auth_header_name",
-    "test_auth_header_value",
     "expected_response_fields",
   ]) {
     if (!runtimeValidation[fieldName]) {
@@ -611,9 +516,24 @@ function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): s
     }
   }
 
-  const authValue = String(runtimeValidation.test_auth_header_value ?? "").trim();
+  // runtime_auth_header_* is the canonical runtime auth header — the shared
+  // secret Siglume sends on every invocation (registration validation AND
+  // production runtime). test_auth_header_* is the accepted legacy alias.
+  // Use `||` (not `??`) so an explicit empty-string new key falls back to a
+  // populated legacy key, matching the Python `or` resolution.
+  const authName = String(
+    runtimeValidation.runtime_auth_header_name || runtimeValidation.test_auth_header_name || "",
+  ).trim();
+  if (!authName) {
+    issues.push("runtime_validation.runtime_auth_header_name is required");
+  }
+  const authValue = String(
+    runtimeValidation.runtime_auth_header_value || runtimeValidation.test_auth_header_value || "",
+  ).trim();
   if (!authValue || authValue.startsWith("replace-with-")) {
-    issues.push("runtime_validation.test_auth_header_value must be a dedicated review secret, not a placeholder");
+    issues.push(
+      "runtime_validation.runtime_auth_header_value must be a strong, dedicated runtime auth secret, not a placeholder",
+    );
   }
 
   const requestPayload =
@@ -636,7 +556,7 @@ function runtimePlaceholderIssues(runtimeValidation: Record<string, unknown>): s
 function ensureRuntimeValidationReady(project: LoadedProject): void {
   if (!project.runtime_validation) {
     throw new SiglumeProjectError(
-      "runtime_validation.json is required for `siglume register`. Create it with public_base_url, healthcheck_url, invoke_url, dedicated review auth header, request_payload, and expected_response_fields.",
+      "runtime_validation.json is required for `siglume register`. Create it with public_base_url, healthcheck_url, invoke_url, runtime auth header (runtime_auth_header_name/value), request_payload, and expected_response_fields.",
     );
   }
   const issues = runtimePlaceholderIssues(project.runtime_validation);
@@ -657,10 +577,19 @@ function ensureExplicitToolManual(project: LoadedProject): void {
 async function registrationPreflight(project: LoadedProject, client: SiglumeClientShape): Promise<Record<string, unknown>> {
   const manifestIssues = await projectValidationIssues(project);
   const [toolManualValid, toolManualIssues] = validate_tool_manual(project.tool_manual);
+  const retiredPlatformOauthProviders = requiredOauthProviders(project.manifest.required_connected_accounts ?? []);
+  if (retiredPlatformOauthProviders.length > 0) {
+    throw new SiglumeProjectError(
+      `Registration preflight failed. Fix these before calling auto-register:\n- platform-managed OAuth is retired. Use managed_by="api" with connect_url: ${retiredPlatformOauthProviders.join(", ")}`,
+    );
+  }
+  const apiManagedMissingConnectUrl = apiManagedRequirementsMissingConnectUrl(project.manifest.required_connected_accounts ?? []);
+  if (apiManagedMissingConnectUrl.length > 0) {
+    throw new SiglumeProjectError(
+      `Registration preflight failed. Fix these before calling auto-register:\n- API-managed OAuth requirements must include connect_url: ${apiManagedMissingConnectUrl.join(", ")}`,
+    );
+  }
   const remoteQuality = await client.preview_quality_score(project.tool_manual);
-  const requiredOauthProvidersList = requiredOauthProviders(project.manifest.required_connected_accounts ?? []);
-  const oauthProviderRecords = oauthProviderRecordsMap(project.oauth_credentials);
-  const missingOauthProviders = requiredOauthProvidersList.filter((provider) => !oauthProviderRecords[provider]);
   const blockingToolManualIssues = toolManualIssues.filter((issue) => issue.severity === "error");
   const errors = [
     ...manifestIssues.map((issue) => String(issue)),
@@ -672,17 +601,12 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
   if (!remoteQualityOk(remoteQuality)) {
     errors.push(`remote Tool Manual quality is not publishable: ${remoteQuality.grade} (${remoteQuality.overall_score}/100)`);
   }
-  if (missingOauthProviders.length > 0) {
-    errors.push(`oauth_credentials.json is required for platform-managed OAuth APIs: ${missingOauthProviders.join(", ")}`);
-  }
   const preflight = {
     manifest_issues: manifestIssues,
     tool_manual_valid: toolManualValid,
     tool_manual_issues: toolManualIssues.map((issue) => toJsonable(issue)),
     remote_quality: toJsonable(remoteQuality),
-    required_oauth_providers: requiredOauthProvidersList,
-    oauth_credentials_path: project.oauth_credentials_path ?? null,
-    oauth_missing_providers: missingOauthProviders,
+    retired_platform_oauth_providers: retiredPlatformOauthProviders,
     ok: errors.length === 0,
   };
   if (errors.length > 0) {
@@ -693,39 +617,132 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
   return preflight;
 }
 
+function companyNameSlug(value: string): string {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export async function runRegistration(
   path = ".",
-  options: { confirm?: boolean; draft_only?: boolean; submit_review?: boolean } = {},
+  options: { confirm?: boolean; draft_only?: boolean; submit_review?: boolean; company_id?: string; company_slug?: string } = {},
   deps: CliProjectDependencies = {},
 ): Promise<Record<string, unknown>> {
   const project = await loadProject(path);
+  let requestedCompanyId = String(options.company_id ?? "").trim();
+  const requestedCompanySlug = String(options.company_slug ?? "").trim();
+  let companyPublisherCandidates: Array<{ company_id: string; name: string; settlement_wallet_ready?: boolean; can_publish?: boolean; disabled_reasons?: string[] }> | null = null;
+  if (requestedCompanySlug) {
+    if (requestedCompanyId) {
+      throw new SiglumeProjectError("--company and --company-slug cannot be combined.");
+    }
+    const slug = companyNameSlug(requestedCompanySlug);
+    if (!slug && requestedCompanySlug !== requestedCompanyId) {
+      throw new SiglumeProjectError(`Company slug ${requestedCompanySlug} is not slug-compatible; use --company <company_id> instead.`);
+    }
+  }
+  if (requestedCompanyId) {
+    project.manifest = {
+      ...project.manifest,
+      publisher_type: "company",
+      company_id: requestedCompanyId,
+      publisher_company_id: requestedCompanyId,
+    };
+  }
   ensureExplicitToolManual(project);
   ensureManifestPublisherIdentity(project);
   ensureRuntimeValidationReady(project);
-  ensureRequiredOauthCredentials(project);
-  const canonicalOauthCredentials = canonicalOauthCredentialsPayload(project.oauth_credentials);
   const client = await createClient(deps);
+  if (requestedCompanySlug) {
+    const slug = companyNameSlug(requestedCompanySlug);
+    companyPublisherCandidates = await client.list_company_publishers();
+    const matches = companyPublisherCandidates.filter(
+      (item) => companyNameSlug(item.name || item.company_id) === slug || item.company_id === requestedCompanySlug,
+    );
+    if (matches.length === 0) {
+      throw new SiglumeProjectError(`Company slug ${requestedCompanySlug} is not available to this API key.`);
+    }
+    if (matches.length > 1) {
+      throw new SiglumeProjectError(`Company slug ${requestedCompanySlug} is ambiguous; use --company <company_id> instead.`);
+    }
+    const match = matches[0];
+    if (!match) {
+      throw new SiglumeProjectError(`Company slug ${requestedCompanySlug} is not available to this API key.`);
+    }
+    if (match.can_publish === false) {
+      const disabledReasons = match.disabled_reasons ?? [];
+      const reasons = disabledReasons.length > 0 ? disabledReasons.join(", ") : "company publisher is disabled";
+      throw new SiglumeProjectError(`Company ${match.company_id} cannot publish: ${reasons}.`);
+    }
+    requestedCompanyId = match.company_id;
+    project.manifest = {
+      ...project.manifest,
+      publisher_type: "company",
+      company_id: requestedCompanyId,
+      publisher_company_id: requestedCompanyId,
+    };
+  }
   const preflight = await registrationPreflight(project, client);
+  let companyPublisherPreflight: {
+    company_id: string;
+    name: string;
+    settlement_wallet_ready?: boolean;
+    can_publish?: boolean;
+    disabled_reasons?: string[];
+  } | null = null;
+  const companyId = String(project.manifest.company_id ?? "").trim()
+    || String(project.manifest.publisher_company_id ?? "").trim();
+  const publisherType = String(project.manifest.publisher_type ?? "user").toLowerCase();
+  if (publisherType === "company") {
+    if (!companyId) {
+      throw new SiglumeProjectError("Company registration requires --company <company_id> or manifest.company_id.");
+    }
+    const companies = companyPublisherCandidates ?? await client.list_company_publishers();
+    companyPublisherCandidates = companies;
+    const company = companies.find((item) => item.company_id === companyId);
+    if (!company) {
+      throw new SiglumeProjectError(`Company ${companyId} is not available to this API key.`);
+    }
+    if (company.can_publish === false) {
+      const disabledReasons = company.disabled_reasons ?? [];
+      const reasons = disabledReasons.length > 0 ? disabledReasons.join(", ") : "company publisher is disabled";
+      throw new SiglumeProjectError(`Company ${companyId} cannot publish: ${reasons}.`);
+    }
+    companyPublisherPreflight = company;
+  }
   let developerPortalPreflight: unknown = null;
   if (String(project.manifest.price_model ?? "free").toLowerCase() !== "free") {
-    const portal = await client.get_developer_portal();
-    const verifiedDestination = portal.payout_readiness?.verified_destination;
-    if (verifiedDestination !== true) {
-      throw new SiglumeProjectError(
-        "Paid API registration requires a verified Polygon payout destination. Open https://siglume.com/owner/credits/payout and confirm the embedded-wallet payout token, or call GET /v1/market/developer/portal until payout_readiness.verified_destination is true.",
-      );
+    if (publisherType === "company") {
+      const company = companyPublisherPreflight;
+      if (!company) {
+        throw new SiglumeProjectError(`Company ${companyId} is not available to this API key.`);
+      }
+      if (company.settlement_wallet_ready !== true) {
+        throw new SiglumeProjectError(
+          `Paid company registration requires a verified company settlement wallet for ${company.name}. Open the company settings and complete settlement readiness before registering.`,
+        );
+      }
+      developerPortalPreflight = { company_publisher: toJsonable(company) };
+    } else {
+      const portal = await client.get_developer_portal();
+      const verifiedDestination = portal.payout_readiness?.verified_destination;
+      if (verifiedDestination !== true) {
+        throw new SiglumeProjectError(
+          "Paid API registration requires a verified Polygon payout destination. Open https://siglume.com/owner/credits/payout and confirm the embedded-wallet payout token, or call GET /v1/market/developer/portal until payout_readiness.verified_destination is true.",
+        );
+      }
+      developerPortalPreflight = toJsonable(portal);
     }
-    developerPortalPreflight = toJsonable(portal);
   }
   const receipt = await client.auto_register(project.manifest, project.tool_manual, {
     runtime_validation: project.runtime_validation,
-    oauth_credentials: canonicalOauthCredentials,
   });
   const result: Record<string, unknown> = {
     receipt: toJsonable(receipt),
     registration_preflight: preflight,
     runtime_validation_path: project.runtime_validation_path ?? null,
-    oauth_credentials_path: project.oauth_credentials_path ?? null,
   };
   if (developerPortalPreflight) {
     result.developer_portal_preflight = developerPortalPreflight;
@@ -750,7 +767,6 @@ export async function runPreflight(
   ensureExplicitToolManual(project);
   ensureManifestPublisherIdentity(project);
   ensureRuntimeValidationReady(project);
-  ensureRequiredOauthCredentials(project);
   const client = await createClient(deps);
   const preflight = await registrationPreflight(project, client);
   let developerPortalPreflight: unknown = null;
@@ -769,7 +785,6 @@ export async function runPreflight(
     adapter_path: project.adapter_path,
     registration_preflight: preflight,
     runtime_validation_path: project.runtime_validation_path ?? null,
-    oauth_credentials_path: project.oauth_credentials_path ?? null,
   };
   if (developerPortalPreflight) {
     result.developer_portal_preflight = developerPortalPreflight;
@@ -798,6 +813,17 @@ export async function getUsageReport(
     capability_key: options.capability_key ?? null,
     items: items.map((item) => toJsonable(item)),
     count: items.length,
+  };
+}
+
+export async function listCompanyPublishersReport(
+  deps: CliProjectDependencies = {},
+): Promise<Record<string, unknown>> {
+  const client = await createClient(deps);
+  const companies = await client.list_company_publishers();
+  return {
+    companies: companies.map((item) => toJsonable(item)),
+    count: companies.length,
   };
 }
 
@@ -1039,11 +1065,14 @@ function buildOperationManifest(
     name: operationDisplayName(operation),
     job_to_be_done: `Wrap the Siglume first-party operation \`${operation.operation_key}\` for owned agents.`,
     category: AppCategory.OTHER,
+    store_vertical: "api" as const,
     permission_class: permissionClassFromOperation(operation),
     approval_mode: approvalModeFromOperation(operation),
     dry_run_supported: true,
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
+    currency: "USD",
+    allow_free_trial: false,
     jurisdiction: "US",
     short_description: operation.summary,
     docs_url: "https://example.com/docs",
@@ -1133,11 +1162,14 @@ function operationAdapterSource(operation: OperationMetadata, manifest: AppManif
     `      name: ${JSON.stringify(manifest.name)},`,
     `      job_to_be_done: ${JSON.stringify(manifest.job_to_be_done)},`,
     "      category: AppCategory.OTHER,",
+    "      store_vertical: 'api' as const,",
     `      permission_class: PermissionClass.${permissionEnumName},`,
     `      approval_mode: ApprovalMode.${approvalEnumName},`,
     "      dry_run_supported: true,",
     "      required_connected_accounts: [],",
     "      price_model: PriceModel.FREE,",
+    "      currency: 'USD' as const,",
+    "      allow_free_trial: false,",
     `      jurisdiction: ${JSON.stringify(manifest.jurisdiction)},`,
     `      short_description: ${JSON.stringify(manifest.short_description ?? "")},`,
     `      support_contact: ${JSON.stringify(manifest.support_contact ?? "")},`,
@@ -1320,19 +1352,19 @@ function operationReadmeTemplate(
     "- `stubs.ts`: mock fallback used when `SIGLUME_API_KEY` is not set",
     "- `manifest.json`: reviewable manifest snapshot",
     "- `tool_manual.json`: machine-generated ToolManual scaffold",
-    "- `runtime_validation.json`: local public endpoint and review-key checks used by auto-register",
+    "- `runtime_validation.json`: local public endpoint + runtime auth header checks used by auto-register",
     "- `docs/api-usage.md`: publishable API usage guide template for `docs_url`",
-    "- `.gitignore`: keeps runtime review keys and OAuth client secrets out of Git",
+    "- `.gitignore`: keeps the runtime auth secret out of Git",
     "- `tests/test_adapter.ts`: smoke test for `AppTestHarness`",
     "",
     "Before registering, replace all generated placeholders:",
     "- In `adapter.ts` and `manifest.json`, replace `docs_url` with a dedicated public API usage guide, not a homepage.",
     "- Replace `support_contact` with a real support email address or public support URL.",
     "- Optional `seller_homepage_url` is the seller's official site and can stay blank.",
-    "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
-    "- If the API uses seller-side OAuth, create a local `oauth_credentials.json` next to the adapter.",
-    "- Do not commit real review keys or OAuth client secrets; the generated `.gitignore` excludes those files.",
-    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
+    "- In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).",
+    "- If the API uses external OAuth, implement that flow in your API runtime and keep user tokens outside Siglume.",
+    "- Do not commit the real runtime auth secret or external-provider secrets; the generated `.gitignore` excludes local secret files.",
+    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.",
     "",
     "## Commands",
     "",
@@ -1407,14 +1439,12 @@ function apiUsageDocsTemplate(manifest: AppManifest): string {
 
 function generatedGitignore(): string {
   return [
-    "# Local secrets and registration-only runtime checks.",
+    "# Local secrets (incl. the runtime auth shared secret) and runtime checks.",
     ".env",
     ".env.*",
     "!.env.example",
     "runtime_validation.json",
     "runtime-validation.json",
-    "oauth_credentials.json",
-    "oauth-credentials.json",
     "",
     "# Python / test artifacts.",
     "__pycache__/",
@@ -1569,14 +1599,6 @@ async function runHarnessForProject(project: LoadedProject): Promise<Record<stri
     checks.push(executionCheck("quote", await harness.execute_quote(task_type, { input_params: sample_input }), harness));
     checks.push(executionCheck("payment", await harness.execute_payment(task_type, { input_params: sample_input }), harness));
   }
-  checks.push(
-    executionCheck(
-      "missing_account_simulation",
-      await harness.simulate_connected_account_missing(task_type, { input_params: sample_input }),
-      harness,
-    ),
-  );
-
   return {
     adapter_path: project.adapter_path,
     task_type,
@@ -1704,16 +1726,6 @@ async function findToolManualPath(root_dir: string): Promise<string | null> {
 
 async function findRuntimeValidationPath(root_dir: string): Promise<string | null> {
   for (const name of ["runtime_validation.json", "runtime-validation.json"]) {
-    const candidate = join(root_dir, name);
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-async function findOauthCredentialsPath(root_dir: string): Promise<string | null> {
-  for (const name of ["oauth_credentials.json", "oauth-credentials.json"]) {
     const candidate = join(root_dir, name);
     if (existsSync(candidate)) {
       return candidate;
@@ -1891,11 +1903,14 @@ function fallbackTemplateSource(template: TemplateName): string {
     `      name: \"${className}\",`,
     "      job_to_be_done: \"Describe what this starter API should do.\",",
     "      category: AppCategory.OTHER,",
+    "      store_vertical: 'api' as const,",
     `      permission_class: ${permissionClass},`,
     `      approval_mode: ${approvalMode},`,
     "      dry_run_supported: true,",
     "      required_connected_accounts: [],",
     "      price_model: PriceModel.FREE,",
+    "      currency: 'USD' as const,",
+    "      allow_free_trial: false,",
     "      jurisdiction: \"US\",",
     "      short_description: \"Starter template generated by siglume init.\",",
     "      support_contact: \"support@example.com\",",
@@ -1944,11 +1959,14 @@ function starterManifest(template: TemplateName): AppManifest {
     name: className,
     job_to_be_done: "Describe what this starter API should do.",
     category: "other",
+    store_vertical: "api" as const,
     permission_class,
     approval_mode: approval_mode[template],
     dry_run_supported: true,
     required_connected_accounts: [],
     price_model: "free",
+    currency: "USD",
+    allow_free_trial: false,
     jurisdiction: "US",
     short_description: "Starter template generated by siglume init.",
     support_contact: "support@example.com",
@@ -1970,16 +1988,16 @@ function readmeTemplate(template: TemplateName): string {
     "- `tool_manual.json`: editable ToolManual draft for validation and registration",
     "- `runtime_validation.json`: local live API smoke-test contract used during registration",
     "- `docs/api-usage.md`: publish this page and use its public URL as `docs_url`",
-    "- `.gitignore`: keeps runtime review keys and OAuth client secrets out of Git",
+    "- `.gitignore`: keeps the runtime auth secret out of Git",
     "",
     "Before registering, replace all generated placeholders:",
     "- In `adapter.ts` and `manifest.json`, replace `docs_url` with a dedicated public API usage guide, not a homepage.",
     "- Replace `support_contact` with a real support email address or public support URL.",
     "- Optional `seller_homepage_url` is the seller's official site and can stay blank.",
-    "- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.",
-    "- If the API uses seller-side OAuth, create a local `oauth_credentials.json` next to the adapter.",
-    "- Do not commit real review keys or OAuth client secrets; the generated `.gitignore` excludes those files.",
-    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.",
+    "- In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).",
+    "- If the API uses external OAuth, implement that flow in your API runtime and keep user tokens outside Siglume.",
+    "- Do not commit the real runtime auth secret or external-provider secrets; the generated `.gitignore` excludes local secret files.",
+    "- Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.",
     "",
     "Suggested workflow:",
     "",

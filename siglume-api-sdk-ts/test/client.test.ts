@@ -8,6 +8,7 @@ import {
   AppCategory,
   ApprovalMode,
   PermissionClass,
+  PersistenceMode,
   PriceModel,
   RecordMode,
   Recorder,
@@ -17,6 +18,16 @@ import {
 } from "../src/index";
 
 const tempDirs: string[] = [];
+
+const SAVE_DATA_SCHEMA = {
+  type: "object",
+  properties: {
+    agent: { type: "object" },
+    avatar_config: { type: "object" },
+    replays: { type: "array" },
+  },
+  required: ["agent"],
+};
 
 function requestUrl(input: RequestInfo | URL): URL {
   if (input instanceof Request) {
@@ -53,13 +64,16 @@ function buildManifest() {
     name: "Price Compare Helper",
     job_to_be_done: "Compare retailer prices for a product and return the best current offer.",
     category: AppCategory.COMMERCE,
+    store_vertical: "api" as const,
     permission_class: PermissionClass.READ_ONLY,
     approval_mode: ApprovalMode.AUTO,
     dry_run_supported: true,
     required_connected_accounts: [],
     price_model: PriceModel.FREE,
+    currency: "USD" as const,
+    allow_free_trial: false,
     jurisdiction: "US",
-    short_description: "Search multiple retailers and summarize the best current price.",
+    short_description: "Compare retailer prices before buying.",
     description: "Compare current retailer offers, return ranked trade-offs, and help the owner decide where to buy.",
     docs_url: "https://docs.example.com/price-compare",
     support_contact: "support@example.com",
@@ -121,22 +135,63 @@ function buildRuntimeValidation() {
   };
 }
 
+it("rejects listing text over public copy limits before auto-register", async () => {
+  const client = new SiglumeClient({
+    api_key: "sig_test_key",
+    fetch: async () => new Response(JSON.stringify(envelope({})), { status: 500 }),
+  });
+
+  await expect(
+    client.auto_register({ ...buildManifest(), short_description: "x".repeat(61) }, buildToolManual()),
+  ).rejects.toThrow("short_description");
+  await expect(
+    client.auto_register({ ...buildManifest(), job_to_be_done: "x".repeat(241) }, buildToolManual()),
+  ).rejects.toThrow("job_to_be_done");
+  await expect(
+    client.auto_register({ ...buildManifest(), description: "x".repeat(1001) }, buildToolManual()),
+  ).rejects.toThrow("description");
+});
+
 describe("SiglumeClient", () => {
+  it("rejects JPY operation prices below the platform minimum before transport", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        throw new Error(`Validation should fail before transport: ${requestUrl(input).pathname}`);
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          capability_key: "x-poster",
+          name: "X Poster",
+          job_to_be_done: "Post approved social updates.",
+          category: AppCategory.COMMUNICATION,
+          permission_class: PermissionClass.ACTION,
+          approval_mode: ApprovalMode.ALWAYS_ASK,
+          dry_run_supported: true,
+          price_model: PriceModel.PER_ACTION,
+          price_value_minor: 0,
+          pricing_plan: {
+            currency: "JPY",
+            items: [{ key: "text_post", label: "Text post", price_minor: 5 }],
+          },
+          currency: "JPY",
+          jurisdiction: "JP",
+        },
+        buildToolManual(),
+      ),
+    ).rejects.toThrow("at least 15");
+  });
+
   it("returns typed objects for auto-register and confirm-registration", async () => {
     const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
     const manifest = buildManifest();
     const toolManual = buildToolManual();
     const runtimeValidation = buildRuntimeValidation();
-    const oauthCredentials = {
-      items: [
-        {
-          provider_key: "twitter",
-          client_id: "client-id",
-          client_secret: "client-secret",
-          required_scopes: ["tweet.write", "users.read"],
-        },
-      ],
-    };
     const client = new SiglumeClient({
       api_key: "sig_test_key",
       base_url: "https://api.example.test/v1",
@@ -149,7 +204,7 @@ describe("SiglumeClient", () => {
           expect(body.description).toBe(manifest.description);
           expect(body.tool_manual).toMatchObject({ tool_name: toolManual.tool_name });
           expect(body.runtime_validation).toMatchObject({ invoke_url: runtimeValidation.invoke_url });
-          expect((body.oauth_credentials as { items?: Array<{ provider_key?: string }> }).items?.[0]?.provider_key).toBe("twitter");
+          expect(body).not.toHaveProperty("oauth_credentials");
           expect(body.publisher_identity).toMatchObject({ documentation_url: manifest.docs_url });
           expect(body.legal).toMatchObject({
             publisher_identity: {
@@ -159,6 +214,7 @@ describe("SiglumeClient", () => {
             },
           });
           expect(body.jurisdiction).toBe(manifest.jurisdiction);
+          expect(body.currency).toBe("USD");
           return new Response(
             JSON.stringify(
               envelope({
@@ -169,7 +225,6 @@ describe("SiglumeClient", () => {
                 auto_manifest: { capability_key: "price-compare-helper" },
                 confidence: { overall: 0.94 },
                 validation_report: { checks: [] },
-                oauth_status: { configured: true, missing_providers: [] },
                 review_url: "/owner/publish?listing=lst_123",
               }),
             ),
@@ -202,7 +257,6 @@ describe("SiglumeClient", () => {
 
     const receipt = await client.auto_register(manifest, toolManual, {
       runtime_validation: runtimeValidation,
-      oauth_credentials: oauthCredentials,
     });
     const confirmation = await client.confirm_registration(receipt.listing_id);
 
@@ -210,7 +264,6 @@ describe("SiglumeClient", () => {
     expect(receipt.trace_id).toBe("trc_test");
     expect(receipt.registration_mode).toBe("upgrade");
     expect(receipt.listing_status).toBe("active");
-    expect(receipt.oauth_status).toEqual({ configured: true, missing_providers: [] });
     expect(confirmation.listing_id).toBe("lst_123");
     expect(confirmation.status).toBe("active");
     expect(confirmation.message).toBe("Listing published automatically after the self-serve checks passed.");
@@ -222,7 +275,221 @@ describe("SiglumeClient", () => {
     expect(requests[1]?.path).toBe("/v1/market/capabilities/lst_123/confirm-auto-register");
   });
 
-  it("wraps oauth_credentials arrays in the canonical items envelope", async () => {
+  it("requires an explicit listing currency before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+    const manifest = { ...buildManifest() };
+    delete (manifest as Record<string, unknown>).currency;
+
+    await expect(
+      client.auto_register(manifest, buildToolManual(), {
+        runtime_validation: buildRuntimeValidation(),
+      }),
+    ).rejects.toThrow("AppManifest.currency is required");
+  });
+
+  it("requires an explicit free-trial opt-in before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+    const manifest = { ...buildManifest() };
+    delete (manifest as Record<string, unknown>).allow_free_trial;
+
+    await expect(
+      client.auto_register(manifest, buildToolManual(), {
+        runtime_validation: buildRuntimeValidation(),
+      }),
+    ).rejects.toThrow("AppManifest.allow_free_trial is required");
+  });
+
+  it("rejects out-of-range free-trial duration before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        { ...buildManifest(), allow_free_trial: true, free_trial_duration_days: 200 },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("free_trial_duration_days must be between 1 and 90");
+  });
+
+  it("requires save_data_schema for game manifests with save persistence", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("persistence.save_data_schema is required");
+  });
+
+  it("rejects invalid persistence contracts before auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        { ...buildManifest(), persistence: { mode: "remote" } },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("persistence.mode must be one of");
+
+    await expect(
+      client.auto_register(
+        { ...buildManifest(), persistence: "platform" },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("persistence must be an object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: "agent" },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema must be a JSON Schema object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: null },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema must be a JSON Schema object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: { type: "array", properties: {} } },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.type must be 'object'");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: { type: "object", properties: {} } },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.properties must be a non-empty object");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: { type: "object", properties: { agent: { type: "object" } }, required: "agent" },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.required must be an array of strings");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: {
+              type: "object",
+              properties: { agent: { type: "object", description: "x".repeat(8200) } },
+              required: ["agent"],
+            },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema must be at most 8192 bytes");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: { type: "object", properties: { agent: { type: "object" } }, required: ["agent", 3] },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("save_data_schema.required must be an array of strings");
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          store_vertical: "game",
+          persistence: {
+            mode: PersistenceMode.PLATFORM,
+            save_data_schema: { type: "object", properties: { agent: { type: "object" } }, required: ["missing"] },
+          },
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("required references undefined properties");
+  });
+
+  it("accepts save_data_schema for game manifests with save persistence", async () => {
     const client = new SiglumeClient({
       api_key: "sig_test_key",
       base_url: "https://api.example.test/v1",
@@ -230,16 +497,9 @@ describe("SiglumeClient", () => {
         const url = requestUrl(input);
         if (url.pathname === "/v1/market/capabilities/auto-register") {
           const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
-          expect((body.oauth_credentials as { items?: Array<{ provider_key?: string }> }).items?.[0]?.provider_key).toBe("twitter");
+          expect(body.persistence).toMatchObject({ mode: "platform", save_data_schema: SAVE_DATA_SCHEMA });
           return new Response(
-            JSON.stringify(
-              envelope({
-                listing_id: "lst_seq",
-                status: "draft",
-                auto_manifest: {},
-                confidence: {},
-              }),
-            ),
+            JSON.stringify(envelope({ listing_id: "lst_game", status: "draft", auto_manifest: {}, confidence: {} })),
             { status: 201 },
           );
         }
@@ -247,21 +507,222 @@ describe("SiglumeClient", () => {
       },
     });
 
-    const receipt = await client.auto_register(buildManifest(), buildToolManual(), {
-      runtime_validation: buildRuntimeValidation(),
-      oauth_credentials: [
-        {
-          provider_key: "twitter",
-          client_id: "client-id",
-          client_secret: "client-secret",
-          required_scopes: ["tweet.write"],
-        },
-      ],
-    });
-
-    expect(receipt.listing_id).toBe("lst_seq");
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        store_vertical: "game",
+        persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: SAVE_DATA_SCHEMA },
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
   });
 
+  it("allows game manifests without save schema when persistence is none", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.persistence).toMatchObject({ mode: "none" });
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_game_none", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        store_vertical: "game",
+        persistence: { mode: PersistenceMode.NONE },
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
+
+  it("allows non-game manifests to carry an optional save schema", async () => {
+    const schemaWithoutRequired = {
+      type: "object",
+      properties: { state: { type: "object" } },
+    };
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.persistence).toMatchObject({ mode: "platform", save_data_schema: schemaWithoutRequired });
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_api_state", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      {
+        ...buildManifest(),
+        persistence: { mode: PersistenceMode.PLATFORM, save_data_schema: schemaWithoutRequired },
+      },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
+
+  it("forwards company publisher identifiers when publisher_type is company", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.publisher_type).toBe("company");
+          expect(body.company_id).toBe("co_123");
+          expect(body.publisher_company_id).toBe("co_123");
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_company", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+        {
+          ...buildManifest(),
+          publisher_type: "company",
+          publisher_company_id: "co_123",
+        },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
+
+  it("rejects company identifiers without explicit company publisher_type", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          company_id: "co_123",
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("AppManifest.company_id cannot be combined with publisher_type='user'.");
+  });
+
+  it("parses disabled company publisher candidate metadata", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/company-publishers") {
+          return new Response(
+            JSON.stringify(envelope({
+              items: [
+                {
+                  company_id: "co_pending",
+                  name: "Pending Labs",
+                  status: "active",
+                  is_founder: false,
+                  membership_role: "member",
+                  membership_status: "pending",
+                  can_publish: false,
+                  can_approve: false,
+                  approval_required: false,
+                  paid_listing_allowed: false,
+                  disabled_reasons: ["membership_pending"],
+                  settlement_wallet_ready: false,
+                  settlement_wallets: [],
+                },
+              ],
+            })),
+            { status: 200 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    const companies = await client.list_company_publishers();
+    const company = companies[0];
+    if (!company) {
+      throw new Error("expected company publisher");
+    }
+    expect(company.company_id).toBe("co_pending");
+    expect(company.membership_status).toBe("pending");
+    expect(company.can_publish).toBe(false);
+    expect(company.disabled_reasons).toEqual(["membership_pending"]);
+  });
+
+  it("rejects user publisher manifests with company identifiers", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("auto_register should fail before transport");
+      },
+    });
+
+    await expect(
+      client.auto_register(
+        {
+          ...buildManifest(),
+          publisher_type: "user",
+          company_id: "co_123",
+        },
+        buildToolManual(),
+        { runtime_validation: buildRuntimeValidation() },
+      ),
+    ).rejects.toThrow("AppManifest.company_id cannot be combined with publisher_type='user'.");
+  });
+
+  it("forwards JPY as the listing currency for auto_register", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        if (url.pathname === "/v1/market/capabilities/auto-register") {
+          const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+          expect(body.currency).toBe("JPY");
+          expect(body.price_value_minor).toBe(1200);
+          return new Response(
+            JSON.stringify(envelope({ listing_id: "lst_jpy", status: "draft", auto_manifest: {}, confidence: {} })),
+            { status: 201 },
+          );
+        }
+        return new Response("{}", { status: 500 });
+      },
+    });
+
+    await client.auto_register(
+      { ...buildManifest(), currency: "JPY" as const, price_value_minor: 1200 },
+      buildToolManual(),
+      { runtime_validation: buildRuntimeValidation() },
+    );
+  });
   it("hoists input_form_spec from tool_manual before auto_register", async () => {
     const inputFormSpec = {
       version: "1.0",
@@ -312,20 +773,6 @@ describe("SiglumeClient", () => {
     expect(receipt.listing_id).toBe("lst_form");
   });
 
-  it("rejects non-object oauth_credentials sequence entries before sending the request", async () => {
-    const client = new SiglumeClient({
-      api_key: "sig_test_key",
-      base_url: "https://api.example.test/v1",
-      fetch: async () => new Response("{}", { status: 500 }),
-    });
-
-    await expect(
-      client.auto_register(buildManifest(), buildToolManual(), {
-        runtime_validation: buildRuntimeValidation(),
-        oauth_credentials: [123 as unknown as Record<string, unknown>],
-      }),
-    ).rejects.toThrow("oauth_credentials[0] must be a mapping-like object");
-  });
 
   it("follows cursor pagination for capabilities and usage", async () => {
     const counts = { listings: 0, usage: 0 };
@@ -432,7 +879,7 @@ describe("SiglumeClient", () => {
             dry_run_supported: true,
             price_model: "free",
             price_value_minor: 0,
-            currency: "USD",
+            currency: "USD" as const,
           })), { status: 200 });
         }
         if (url.pathname === "/v1/market/developer/portal") {
@@ -481,20 +928,6 @@ describe("SiglumeClient", () => {
             access_grant: { id: "grant_1", capability_listing_id: "lst_1", grant_status: "active", bindings: [], metadata: {} },
           })), { status: 200 });
         }
-        if (url.pathname === "/v1/market/connected-accounts") {
-          return new Response(JSON.stringify(envelope({
-            items: [{
-              id: "conn_1",
-              provider_key: "stripe",
-              account_role: "seller",
-              scopes: ["charges:read"],
-              metadata: {},
-            }],
-            next_cursor: null,
-            limit: 50,
-            offset: 0,
-          })), { status: 200 });
-        }
         if (url.pathname === "/v1/market/support-cases" && init?.method === "POST") {
           return new Response(JSON.stringify(envelope({
             id: "case_1",
@@ -527,7 +960,6 @@ describe("SiglumeClient", () => {
     const sandbox = await client.create_sandbox_session({ agent_id: "agt_123", capability_key: "price-compare-helper" });
     const grants = await client.list_access_grants();
     const binding = await client.bind_agent_to_grant("grant_1", { agent_id: "agt_123" });
-    const accounts = await client.list_connected_accounts();
     const supportCase = await client.create_support_case("subject", "body", { trace_id: "trc_123" });
     const supportCases = await client.list_support_cases();
 
@@ -537,7 +969,6 @@ describe("SiglumeClient", () => {
     expect(sandbox.session_id).toBe("sns_123");
     expect((await grants.all_items()).map((item) => item.access_grant_id)).toEqual(["grant_1"]);
     expect(binding.binding.binding_id).toBe("bind_1");
-    expect((await accounts.all_items()).map((item) => item.connected_account_id)).toEqual(["conn_1"]);
     expect(supportCase.support_case_id).toBe("case_1");
     expect((await supportCases.all_items()).map((item) => item.support_case_id)).toEqual(["case_1"]);
   });
@@ -668,7 +1099,7 @@ describe("SiglumeClient", () => {
             purpose: "subscription",
             cadence: "monthly",
             token_symbol: "JPYC",
-            display_currency: "JPY",
+            display_currency: "JPY" as const,
             max_amount_minor: 4980,
             status: "active",
             retry_count: 0,
@@ -694,7 +1125,7 @@ describe("SiglumeClient", () => {
             purpose: "subscription",
             cadence: "monthly",
             token_symbol: "JPYC",
-            display_currency: "JPY",
+            display_currency: "JPY" as const,
             max_amount_minor: 4980,
             status: "cancelled",
             retry_count: 1,
@@ -771,6 +1202,13 @@ describe("SiglumeClient", () => {
     });
 
     await expect(client.create_plan_web3_mandate({ target_tier: "" })).rejects.toThrow("target_tier is required.");
+  });
+
+  it("keeps default API error details empty when omitted", () => {
+    const error = new SiglumeAPIError("failed", { status_code: 500 });
+
+    expect(error.details).toEqual({});
+    expect(error.response_body).toBeUndefined();
   });
 
   it("parses sparse account preference and plan payloads", async () => {
@@ -1734,7 +2172,7 @@ describe("SiglumeClient", () => {
             budget_id: "bdg_demo_2",
             agent_id: "agt_owner_demo",
             principal_user_id: "usr_owner_demo",
-            currency: "JPY",
+            currency: "JPY" as const,
             period_start: "2026-04-01T00:00:00Z",
             period_end: "2026-05-01T00:00:00Z",
             period_limit_minor: 50000,
@@ -1770,7 +2208,7 @@ describe("SiglumeClient", () => {
       "agt_owner_demo",
       {
         budget_id: "bdg_ignore_me",
-        currency: "JPY",
+        currency: "JPY" as const,
         period_limit_minor: 50000,
         per_order_limit_minor: 12000,
         auto_approve_below_minor: 3000,
@@ -1791,7 +2229,7 @@ describe("SiglumeClient", () => {
     expect(requests[1]).toEqual({
       path: "/v1/owner/agents/agt_owner_demo/budget",
       body: {
-        currency: "JPY",
+        currency: "JPY" as const,
         period_limit_minor: 50000,
         per_order_limit_minor: 12000,
         auto_approve_below_minor: 3000,
@@ -1813,7 +2251,7 @@ describe("SiglumeClient", () => {
         expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/budget");
         const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
         expect(body).toEqual({
-          currency: "JPY",
+          currency: "JPY" as const,
           period_start: null,
           period_end: null,
           period_limit_minor: 9000,
@@ -1821,7 +2259,7 @@ describe("SiglumeClient", () => {
         return new Response(JSON.stringify(envelope({
           budget_id: "bdg_nullable",
           agent_id: "agt_owner_demo",
-          currency: "JPY",
+          currency: "JPY" as const,
           period_start: null,
           period_end: null,
           period_limit_minor: 9000,
@@ -1836,7 +2274,7 @@ describe("SiglumeClient", () => {
     });
 
     const budget = await client.update_budget_policy("agt_owner_demo", {
-      currency: "JPY",
+      currency: "JPY" as const,
       period_start: null,
       period_end: null,
       period_limit_minor: 9000,
@@ -1883,7 +2321,7 @@ describe("SiglumeClient", () => {
           return new Response(JSON.stringify(envelope({
             id: "bdg_sparse",
             agent_id: "agt_owner_demo",
-            currency: "USD",
+            currency: "USD" as const,
             period_limit_minor: 9000,
             per_order_limit_minor: 1500,
             auto_approve_below_minor: 500,
@@ -1898,7 +2336,7 @@ describe("SiglumeClient", () => {
       auto_approve_below: { JPY: 2500 },
     });
     const budget = await client.update_budget_policy("agt_owner_demo", {
-      currency: "USD",
+      currency: "USD" as const,
       period_limit_minor: 9000,
       per_order_limit_minor: 1500,
       auto_approve_below_minor: 500,
@@ -1926,7 +2364,7 @@ describe("SiglumeClient", () => {
         return new Response(JSON.stringify(envelope({
           id: "bdg_clear_dates",
           agent_id: "agt_owner_demo",
-          currency: "JPY",
+          currency: "JPY" as const,
           period_start: null,
           period_end: null,
           period_limit_minor: 50000,
@@ -1954,7 +2392,7 @@ describe("SiglumeClient", () => {
         return new Response(JSON.stringify(envelope({
           id: "bdg_strip",
           agent_id: "agt_owner_demo",
-          currency: "USD",
+          currency: "USD" as const,
           period_limit_minor: 1000,
         })), { status: 200 });
       },
@@ -2076,6 +2514,30 @@ describe("SiglumeClient", () => {
         },
       },
     ]);
+  });
+
+  it("rejects blank owner operation keys before transport", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => {
+        throw new Error("execute_owner_operation should fail before transport");
+      },
+    });
+
+    await expect(client.execute_owner_operation("agt_owner_demo", " ")).rejects.toThrow("operation_key is required.");
+  });
+
+  it("rejects object-only API methods when the response body is an array", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async () => new Response(JSON.stringify([]), { status: 200 }),
+    });
+
+    await expect(client.get_account_preferences()).rejects.toThrow(
+      "Expected the Siglume API response body to be an object.",
+    );
   });
 
   it("falls back to the bundled owner operation catalog when the route is unavailable", async () => {
@@ -2400,325 +2862,6 @@ describe("SiglumeClient", () => {
     ]);
   });
 
-  it("round-trips works wrappers through the owner-operation recorder path", async () => {
-    const cassettePath = await makeTempCassette("works-roundtrip.json");
-    const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
-    const categories = [
-      {
-        key: "design",
-        name_ja: "デザイン",
-        name_en: "Design",
-        description_ja: "UI とブランドの制作。",
-        description_en: "UI and brand design work.",
-        icon_url: "https://cdn.example.test/works/design.png",
-        open_job_count: 5,
-        display_order: 1,
-      },
-      {
-        key: "frontend",
-        name_ja: "フロントエンド",
-        name_en: "Frontend",
-        description_ja: "Web アプリ実装。",
-        description_en: "Web app implementation.",
-        icon_url: "https://cdn.example.test/works/frontend.png",
-        open_job_count: 3,
-        display_order: 2,
-      },
-    ];
-    const registration = {
-      agent_id: "agt_owner_demo",
-      works_registered: true,
-      tagline: "Fast prototype builder",
-      categories: ["design", "frontend"],
-      capabilities: ["prototype", "react"],
-      description: "I build and ship product prototypes quickly.",
-    };
-    const ownerDashboard = {
-      agents: [
-        {
-          id: "agt_owner_demo",
-          name: "Owner Demo",
-          reputation: { works_registered: true, works_completed: 12 },
-          capabilities: ["prototype", "react"],
-        },
-      ],
-      pending_pitches: [
-        {
-          proposal_id: "prop_works_1",
-          need_id: "need_works_1",
-          title: "Landing page redesign",
-          title_en: "Landing page redesign",
-          status: "proposed",
-        },
-      ],
-      active_orders: [
-        {
-          order_id: "ord_works_active_1",
-          need_id: "need_works_2",
-          title: "Build waitlist page",
-          title_en: "Build waitlist page",
-          status: "funds_locked",
-        },
-      ],
-      completed_orders: [
-        {
-          order_id: "ord_works_done_1",
-          need_id: "need_works_3",
-          title: "Summarize invoices",
-          title_en: "Summarize invoices",
-          status: "settled",
-        },
-      ],
-      stats: { total_agents: 1, total_pending: 1, total_active: 1 },
-    };
-    const posterDashboard = {
-      open_jobs: [
-        {
-          id: "need_open_1",
-          title: "Translate product docs",
-          title_en: "Translate product docs",
-          proposal_count: 4,
-          created_at: "2026-04-20T08:00:00Z",
-        },
-      ],
-      in_progress_orders: [
-        {
-          order_id: "ord_poster_1",
-          need_id: "need_active_1",
-          title: "Prototype onboarding flow",
-          title_en: "Prototype onboarding flow",
-          status: "fulfillment_submitted",
-          has_deliverable: true,
-          deliverable_count: 2,
-          awaiting_buyer_action: true,
-        },
-      ],
-      completed_orders: [
-        {
-          order_id: "ord_poster_done_1",
-          need_id: "need_done_1",
-          title: "Summarize invoices",
-          title_en: "Summarize invoices",
-          status: "settled",
-          has_deliverable: true,
-          deliverable_count: 1,
-          awaiting_buyer_action: false,
-        },
-      ],
-      stats: { total_posted: 3, total_completed: 1 },
-    };
-
-    const recorder = await Recorder.open(cassettePath, { mode: RecordMode.RECORD });
-    try {
-      const client = recorder.wrap(new SiglumeClient({
-        api_key: "sig_test_key",
-        base_url: "https://api.example.test/v1",
-        fetch: async (input, init) => {
-          const url = requestUrl(input);
-          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
-          requests.push({ method: String(init?.method ?? "GET"), path: url.pathname, body });
-          if (url.pathname !== "/v1/owner/agents/agt_owner_demo/operations/execute") {
-            return new Response("{}", { status: 500 });
-          }
-          const params = typeof body.params === "object" && body.params !== null
-            ? body.params as Record<string, unknown>
-            : {};
-          if (body.operation === "works.categories.list") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "completed",
-              message: "AI Works categories loaded.",
-              action: { operation: "works.categories.list", status: "completed" },
-              result: categories,
-            }, { request_id: "req_works_categories_list", trace_id: "trc_works_categories_list" })), { status: 200 });
-          }
-          if (body.operation === "works.registration.get") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "completed",
-              message: "AI Works registration loaded.",
-              action: { operation: "works.registration.get", status: "completed" },
-              result: registration,
-            }, { request_id: "req_works_registration_get", trace_id: "trc_works_registration_get" })), { status: 200 });
-          }
-          if (body.operation === "works.registration.register") {
-            expect(params).toEqual({
-              tagline: "Fast prototype builder",
-              description: "I build and ship product prototypes quickly.",
-              categories: ["design", "frontend"],
-              capabilities: ["prototype", "react"],
-            });
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "completed",
-              message: "AI Works registration updated.",
-              action: { operation: "works.registration.register", status: "completed" },
-              result: { agent_id: "agt_owner_demo", works_registered: true },
-            }, { request_id: "req_works_registration_register", trace_id: "trc_works_registration_register" })), { status: 200 });
-          }
-          if (body.operation === "works.owner_dashboard.get") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "completed",
-              message: "AI Works owner dashboard loaded.",
-              action: { operation: "works.owner_dashboard.get", status: "completed" },
-              result: ownerDashboard,
-            }, { request_id: "req_works_owner_dashboard_get", trace_id: "trc_works_owner_dashboard_get" })), { status: 200 });
-          }
-          if (body.operation === "works.poster_dashboard.get") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "completed",
-              message: "AI Works poster dashboard loaded.",
-              action: { operation: "works.poster_dashboard.get", status: "completed" },
-              result: posterDashboard,
-            }, { request_id: "req_works_poster_dashboard_get", trace_id: "trc_works_poster_dashboard_get" })), { status: 200 });
-          }
-          return new Response("{}", { status: 500 });
-        },
-      }));
-
-      const listedCategories = await client.list_works_categories({ agent_id: "agt_owner_demo" });
-      const currentRegistration = await client.get_works_registration({ agent_id: "agt_owner_demo" });
-      const registered = await client.register_for_works({
-        agent_id: "agt_owner_demo",
-        tagline: "Fast prototype builder",
-        description: "I build and ship product prototypes quickly.",
-        categories: ["design", "frontend"],
-        capabilities: ["prototype", "react"],
-      });
-      const ownerView = await client.get_works_owner_dashboard({ agent_id: "agt_owner_demo" });
-      const posterView = await client.get_works_poster_dashboard({ agent_id: "agt_owner_demo" });
-
-      expect(listedCategories.map((item) => item.key)).toEqual(["design", "frontend"]);
-      expect(currentRegistration.tagline).toBe("Fast prototype builder");
-      expect(registered.works_registered).toBe(true);
-      expect(registered.execution_status).toBe("completed");
-      expect(ownerView.agents[0]?.agent_id).toBe("agt_owner_demo");
-      expect(ownerView.pending_pitches[0]?.proposal_id).toBe("prop_works_1");
-      expect(posterView.in_progress_orders[0]?.awaiting_buyer_action).toBe(true);
-      expect(posterView.stats.total_posted).toBe(3);
-    } finally {
-      await recorder.close();
-    }
-
-    const replayRecorder = await Recorder.open(cassettePath, { mode: RecordMode.REPLAY });
-    try {
-      const replayClient = replayRecorder.wrap(new SiglumeClient({
-        api_key: "sig_ignored",
-        base_url: "https://api.example.test/v1",
-        fetch: async () => {
-          throw new Error("Replay should not hit fetch");
-        },
-      }));
-
-      expect((await replayClient.list_works_categories({ agent_id: "agt_owner_demo" }))[1]?.name_en).toBe("Frontend");
-      expect((await replayClient.get_works_registration({ agent_id: "agt_owner_demo" })).description)
-        .toBe("I build and ship product prototypes quickly.");
-      expect((await replayClient.register_for_works({
-        agent_id: "agt_owner_demo",
-        tagline: "Fast prototype builder",
-        description: "I build and ship product prototypes quickly.",
-        categories: ["design", "frontend"],
-        capabilities: ["prototype", "react"],
-      })).works_registered).toBe(true);
-      expect((await replayClient.get_works_owner_dashboard({ agent_id: "agt_owner_demo" })).completed_orders[0]?.order_id)
-        .toBe("ord_works_done_1");
-      expect((await replayClient.get_works_poster_dashboard({ agent_id: "agt_owner_demo" })).open_jobs[0]?.job_id)
-        .toBe("need_open_1");
-    } finally {
-      await replayRecorder.close();
-    }
-
-    expect(requests.map((request) => request.body.operation)).toEqual([
-      "works.categories.list",
-      "works.registration.get",
-      "works.registration.register",
-      "works.owner_dashboard.get",
-      "works.poster_dashboard.get",
-    ]);
-  });
-
-  it("resolves the default owner agent for works wrappers and surfaces approval metadata", async () => {
-    const requests: Array<{ method: string; path: string }> = [];
-    const client = new SiglumeClient({
-      api_key: "sig_test_key",
-      base_url: "https://api.example.test/v1",
-      fetch: async (input, init) => {
-        const url = requestUrl(input);
-        requests.push({ method: String(init?.method ?? "GET"), path: url.pathname });
-        if (url.pathname === "/v1/me/agent") {
-          return new Response(JSON.stringify(envelope({
-            id: "agt_owner_demo",
-            agent_type: "personal",
-            name: "Owner Demo",
-          })), { status: 200 });
-        }
-        if (url.pathname === "/v1/owner/agents/agt_owner_demo/operations/execute") {
-          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
-          const params = typeof body.params === "object" && body.params !== null
-            ? body.params as Record<string, unknown>
-            : {};
-          if (body.operation === "works.categories.list") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "completed",
-              message: "AI Works categories loaded.",
-              action: { operation: "works.categories.list", status: "completed" },
-              result: [{ key: "design", open_job_count: 0 }],
-            })), { status: 200 });
-          }
-          if (body.operation === "works.registration.register") {
-            expect(params).toEqual({ tagline: "Nimble design partner" });
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              status: "approval_required",
-              approval_required: true,
-              intent_id: "int_works_register",
-              approval_status: "pending_owner",
-              approval_snapshot_hash: "sha_works_register",
-              message: "Operation works.registration.register requires approval before live execution.",
-              action: { operation: "works.registration.register", status: "approval_required" },
-              result: {
-                preview: {
-                  operation_name: "works.registration.register",
-                  params: { tagline: "Nimble design partner" },
-                },
-              },
-            })), { status: 200 });
-          }
-        }
-        return new Response("{}", { status: 500 });
-      },
-    });
-
-    const categories = await client.list_works_categories();
-    const pending = await client.register_for_works({ tagline: "Nimble design partner" });
-
-    expect(categories[0]?.key).toBe("design");
-    expect(pending.agent_id).toBe("agt_owner_demo");
-    expect(pending.execution_status).toBe("approval_required");
-    expect(pending.approval_required).toBe(true);
-    expect(pending.intent_id).toBe("int_works_register");
-    expect(pending.approval_preview.operation_name).toBe("works.registration.register");
-    expect(requests).toEqual([
-      { method: "GET", path: "/v1/me/agent" },
-      { method: "POST", path: "/v1/owner/agents/agt_owner_demo/operations/execute" },
-      { method: "GET", path: "/v1/me/agent" },
-      { method: "POST", path: "/v1/owner/agents/agt_owner_demo/operations/execute" },
-    ]);
-
-    await expect(client.register_for_works({ categories: ["design", 1 as unknown as string] }))
-      .rejects.toThrow("categories must contain only strings.");
-    await expect(client.register_for_works({ capabilities: "prototype" as unknown as string[] }))
-      .rejects.toThrow("capabilities must be a list of strings.");
-  });
-
   it("round-trips installed tool wrappers and surfaces guarded policy updates cleanly", async () => {
     const cassettePath = await makeTempCassette("installed-tool-wrappers.json");
     const requests: Array<{ method: string; path: string; body: Record<string, unknown> }> = [];
@@ -2731,7 +2874,7 @@ describe("SiglumeClient", () => {
       binding_status: "active",
       account_readiness: "ready",
       settlement_mode: "embedded_wallet_charge",
-      settlement_currency: "USD",
+      settlement_currency: "USD" as const,
       settlement_network: "polygon",
       accepted_payment_tokens: ["USDC"],
       last_used_at: "2026-04-20T08:30:00Z",
@@ -3284,7 +3427,7 @@ describe("SiglumeClient", () => {
         agent_id: "agt_owner_demo",
         opportunity_id: "opp_demo_1",
         proposal_kind: "proposal",
-        currency: "USD",
+        currency: "USD" as const,
         amount_minor: 25000,
         proposed_terms_jsonb: { delivery_days: 7 },
       });
@@ -3334,7 +3477,7 @@ describe("SiglumeClient", () => {
         agent_id: "agt_owner_demo",
         opportunity_id: "opp_demo_1",
         proposal_kind: "proposal",
-        currency: "USD",
+        currency: "USD" as const,
         amount_minor: 25000,
         proposed_terms_jsonb: { delivery_days: 7 },
       });
@@ -3462,460 +3605,6 @@ describe("SiglumeClient", () => {
     expect(accepted.intent_id).toBe("intent_market_proposals_accept");
     expect(rejected.intent_id).toBe("intent_market_proposals_reject");
     expect(seenPaths).toContain(`/v1/owner/agents/${expectedAgentId}/operations/execute`);
-  });
-
-  it("round-trips partner and ads wrappers through the owner-operation recorder path", async () => {
-    const cassettePath = await makeTempCassette("partner-and-ads-roundtrip.json");
-    const requests: Array<{ method: string; path: string; operation?: string | null }> = [];
-
-    const recorder = await Recorder.open(cassettePath, { mode: RecordMode.RECORD });
-    try {
-      const client = recorder.wrap(new SiglumeClient({
-        api_key: "sig_test_key",
-        base_url: "https://api.example.test/v1",
-        fetch: async (input, init) => {
-          const url = requestUrl(input);
-          const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
-          requests.push({
-            method: String(init?.method ?? "GET"),
-            path: url.pathname,
-            operation: typeof body.operation === "string" ? body.operation : null,
-          });
-          if (url.pathname !== "/v1/owner/agents/agt_owner_demo/operations/execute") {
-            return new Response("{}", { status: 500 });
-          }
-          const params = typeof body.params === "object" && body.params !== null
-            ? body.params as Record<string, unknown>
-            : {};
-          if (body.operation === "partner.dashboard.get") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Partner dashboard loaded.",
-              action: "partner_dashboard_get",
-              result: {
-                partner_id: "usr_partner_demo",
-                company_name: "Demo Feeds",
-                plan: "starter",
-                plan_label: "Starter",
-                month_bytes_used: 1048576,
-                month_bytes_limit: 10485760,
-                month_usage_pct: 10,
-                total_source_items: 3,
-                has_billing: true,
-                has_subscription: true,
-              },
-            }, { trace_id: "trc_partner_dashboard", request_id: "req_partner_dashboard" })), { status: 200 });
-          }
-          if (body.operation === "partner.usage.get") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Partner usage loaded.",
-              action: "partner_usage_get",
-              result: {
-                plan: "starter",
-                month_bytes_used: 1048576,
-                month_bytes_limit: 10485760,
-                month_bytes_remaining: 9437184,
-                month_usage_pct: 10,
-              },
-            }, { trace_id: "trc_partner_usage", request_id: "req_partner_usage" })), { status: 200 });
-          }
-          if (body.operation === "partner.keys.list") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Partner API keys loaded.",
-              action: "partner_keys_list",
-              result: {
-                keys: [{
-                  credential_id: "cred_partner_1",
-                  name: "Primary Feed",
-                  key_id: "src_partner_1",
-                  allowed_source_types: ["partner_api", "rss"],
-                  last_used_at: "2026-04-20T08:40:00Z",
-                  created_at: "2026-04-19T23:10:00Z",
-                  revoked: false,
-                }],
-              },
-            }, { trace_id: "trc_partner_keys_list", request_id: "req_partner_keys_list" })), { status: 200 });
-          }
-          if (body.operation === "partner.keys.create") {
-            expect(params).toEqual({ name: "SDK Feed", allowed_source_types: ["rss", "partner_api"] });
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Partner API key created.",
-              action: "partner_keys_create",
-              result: {
-                credential_id: "cred_partner_2",
-                name: "SDK Feed",
-                key_id: "src_partner_2",
-                allowed_source_types: ["rss", "partner_api"],
-                masked_key_hint: "src_partner_2.********",
-              },
-            }, { trace_id: "trc_partner_keys_create", request_id: "req_partner_keys_create" })), { status: 200 });
-          }
-          if (body.operation === "ads.billing.get") {
-            expect(params).toEqual({ rail: "web3" });
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Ads billing loaded.",
-              action: "ads_billing_get",
-              result: {
-                currency: "usd",
-                billing_mode: "web3",
-                month_spend_jpy: 0,
-                month_spend_usd: 12000,
-                all_time_spend_jpy: 0,
-                all_time_spend_usd: 54000,
-                total_impressions: 18300,
-                total_replies: 37,
-                has_billing: true,
-                has_subscription: true,
-                balances: [{ symbol: "USDC", amount_minor: 700000 }],
-                supported_tokens: [{ symbol: "USDC", decimals: 6 }],
-                funding_instructions: { network: "polygon", memo: "fund-usdc" },
-                wallet: { user_wallet_id: "uw_ads_1", smart_account_address: "0xabc" },
-                mandate: {
-                  mandate_id: "mdt_ads_1",
-                  purpose: "ad_spend",
-                  display_currency: "USD",
-                  token_symbol: "USDC",
-                  max_amount_minor: 30000,
-                  status: "active",
-                },
-                invoices: [{ invoice_id: "inv_ads_1", amount_due_minor: 12000 }],
-              },
-            }, { trace_id: "trc_ads_billing", request_id: "req_ads_billing" })), { status: 200 });
-          }
-          if (body.operation === "ads.billing.settle") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Ads billing settlement status loaded.",
-              action: "ads_billing_settle",
-              result: {
-                status: "auto_settles",
-                message: "Ads Web3 billing settles automatically at month end.",
-                settles_automatically: true,
-              },
-            }, { trace_id: "trc_ads_settle", request_id: "req_ads_settle" })), { status: 200 });
-          }
-          if (body.operation === "ads.profile.get") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Ads profile loaded.",
-              action: "ads_profile_get",
-              result: {
-                has_profile: true,
-                company_name: "Demo Ads",
-                ad_currency: "usd",
-                has_billing: true,
-              },
-            }, { trace_id: "trc_ads_profile", request_id: "req_ads_profile" })), { status: 200 });
-          }
-          if (body.operation === "ads.campaigns.list") {
-            expect(params).toEqual({});
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Ad campaigns loaded.",
-              action: "ads_campaigns_list",
-              result: {
-                campaigns: [{
-                  campaign_id: "cmp_ads_1",
-                  name: "Spring Launch",
-                  target_url: "https://example.com/spring-launch",
-                  content_brief: "Promote the launch announcement.",
-                  target_topics: ["ai", "launch"],
-                  posting_interval_minutes: 720,
-                  max_posts_per_day: 2,
-                  currency: "usd",
-                  monthly_budget_jpy: 30000,
-                  cpm_jpy: 250,
-                  cpr_jpy: 30,
-                  monthly_budget_usd: 30000,
-                  cpm_usd: 250,
-                  cpr_usd: 30,
-                  status: "active",
-                  month_spend_jpy: 0,
-                  month_spend_usd: 12000,
-                  total_posts: 4,
-                  total_impressions: 18300,
-                  total_replies: 37,
-                  next_post_at: "2026-04-20T16:00:00Z",
-                  created_at: "2026-04-19T09:00:00Z",
-                }],
-              },
-            }, { trace_id: "trc_ads_campaigns", request_id: "req_ads_campaigns" })), { status: 200 });
-          }
-          if (body.operation === "ads.campaign_posts.list") {
-            expect(params).toEqual({ campaign_id: "cmp_ads_1" });
-            return new Response(JSON.stringify(envelope({
-              agent_id: "agt_owner_demo",
-              message: "Ad campaign posts loaded.",
-              action: "ads_campaign_posts_list",
-              result: {
-                posts: [{
-                  post_id: "pst_ads_1",
-                  content_id: "cnt_ads_1",
-                  cost_jpy: 0,
-                  cost_usd: 1200,
-                  impressions: 5000,
-                  replies: 11,
-                  status: "served",
-                  created_at: "2026-04-20T07:00:00Z",
-                }],
-              },
-            }, { trace_id: "trc_ads_posts", request_id: "req_ads_posts" })), { status: 200 });
-          }
-          return new Response("{}", { status: 500 });
-        },
-      }));
-
-      const dashboard = await client.get_partner_dashboard({ agent_id: "agt_owner_demo" });
-      const usage = await client.get_partner_usage({ agent_id: "agt_owner_demo" });
-      const keys = await client.list_partner_api_keys({ agent_id: "agt_owner_demo" });
-      const createdKey = await client.create_partner_api_key({
-        agent_id: "agt_owner_demo",
-        name: "SDK Feed",
-        allowed_source_types: ["rss", "partner_api"],
-      });
-      const billing = await client.get_ads_billing({ agent_id: "agt_owner_demo", rail: "web3" });
-      const settlement = await client.settle_ads_billing({ agent_id: "agt_owner_demo" });
-      const profile = await client.get_ads_profile({ agent_id: "agt_owner_demo" });
-      const campaigns = await client.list_ads_campaigns({ agent_id: "agt_owner_demo" });
-      const posts = await client.list_ads_campaign_posts("cmp_ads_1", { agent_id: "agt_owner_demo" });
-
-      expect(dashboard.plan).toBe("starter");
-      expect(dashboard.total_source_items).toBe(3);
-      expect(usage.month_bytes_remaining).toBe(9437184);
-      expect(keys[0]?.key_id).toBe("src_partner_1");
-      expect(keys[0]?.allowed_source_types).toEqual(["partner_api", "rss"]);
-      expect(createdKey.masked_key_hint).toBe("src_partner_2.********");
-      expect(billing.billing_mode).toBe("web3");
-      expect(billing.mandate?.mandate_id).toBe("mdt_ads_1");
-      expect(billing.supported_tokens[0]?.symbol).toBe("USDC");
-      expect(settlement.settles_automatically).toBe(true);
-      expect(profile.company_name).toBe("Demo Ads");
-      expect(campaigns[0]?.campaign_id).toBe("cmp_ads_1");
-      expect(campaigns[0]?.total_impressions).toBe(18300);
-      expect(posts[0]?.post_id).toBe("pst_ads_1");
-      expect(posts[0]?.cost_usd).toBe(1200);
-    } finally {
-      await recorder.close();
-    }
-
-    const replayRecorder = await Recorder.open(cassettePath, { mode: RecordMode.REPLAY });
-    try {
-      const replayClient = replayRecorder.wrap(new SiglumeClient({
-        api_key: "sig_ignored",
-        base_url: "https://api.example.test/v1",
-        fetch: async () => {
-          throw new Error("Replay should not hit fetch");
-        },
-      }));
-
-      expect((await replayClient.get_partner_dashboard({ agent_id: "agt_owner_demo" })).partner_id).toBe("usr_partner_demo");
-      expect((await replayClient.get_partner_usage({ agent_id: "agt_owner_demo" })).plan).toBe("starter");
-      expect((await replayClient.list_partner_api_keys({ agent_id: "agt_owner_demo" }))[0]?.created_at).toBe("2026-04-19T23:10:00Z");
-      expect((await replayClient.create_partner_api_key({
-        agent_id: "agt_owner_demo",
-        name: "SDK Feed",
-        allowed_source_types: ["rss", "partner_api"],
-      })).key_id).toBe("src_partner_2");
-      expect((await replayClient.get_ads_billing({ agent_id: "agt_owner_demo", rail: "web3" })).wallet).toEqual({
-        user_wallet_id: "uw_ads_1",
-        smart_account_address: "0xabc",
-      });
-      expect((await replayClient.settle_ads_billing({ agent_id: "agt_owner_demo" })).status).toBe("auto_settles");
-      expect((await replayClient.get_ads_profile({ agent_id: "agt_owner_demo" })).has_profile).toBe(true);
-      expect((await replayClient.list_ads_campaigns({ agent_id: "agt_owner_demo" }))[0]?.target_topics).toEqual(["ai", "launch"]);
-      expect((await replayClient.list_ads_campaign_posts("cmp_ads_1", { agent_id: "agt_owner_demo" }))[0]?.status).toBe("served");
-    } finally {
-      await replayRecorder.close();
-    }
-
-    expect(requests.map((request) => request.operation)).toEqual([
-      "partner.dashboard.get",
-      "partner.usage.get",
-      "partner.keys.list",
-      "partner.keys.create",
-      "ads.billing.get",
-      "ads.billing.settle",
-      "ads.profile.get",
-      "ads.campaigns.list",
-      "ads.campaign_posts.list",
-    ]);
-  });
-
-  it("validates partner and ads wrapper inputs and scrubs handle-only key payloads", async () => {
-    const client = new SiglumeClient({
-      api_key: "sig_test_key",
-      base_url: "https://api.example.test/v1",
-      fetch: async () => new Response("{}", { status: 500 }),
-    });
-
-    await expect(client.create_partner_api_key({ agent_id: "agt_owner_demo", name: "  " })).rejects.toThrow("name cannot be empty.");
-    await expect(client.create_partner_api_key({
-      agent_id: "agt_owner_demo",
-      allowed_source_types: "rss" as unknown as string[],
-    })).rejects.toThrow("allowed_source_types must be a list of strings.");
-    await expect(client.create_partner_api_key({
-      agent_id: "agt_owner_demo",
-      allowed_source_types: ["rss", 7 as unknown as string],
-    })).rejects.toThrow("allowed_source_types must contain only strings.");
-    await expect(client.list_ads_campaign_posts("")).rejects.toThrow("campaign_id is required.");
-
-    const scrubClient = new SiglumeClient({
-      api_key: "sig_test_key",
-      base_url: "https://api.example.test/v1",
-      fetch: async (input, init) => {
-        const url = requestUrl(input);
-        const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
-        expect(url.pathname).toBe("/v1/owner/agents/agt_owner_demo/operations/execute");
-        expect(body.operation).toBe("partner.keys.create");
-        return new Response(JSON.stringify(envelope({
-          agent_id: "agt_owner_demo",
-          message: "Partner API key created.",
-          action: "partner_keys_create",
-          result: {
-            credential_id: "cred_partner_scrubbed",
-            name: "Leak Test",
-            key_id: "src_partner_scrubbed",
-            allowed_source_types: ["rss"],
-            masked_key_hint: "src_partner_scrubbed.********",
-            ingest_key: "src_partner_scrubbed.super_secret",
-            full_key: "src_partner_scrubbed.super_secret",
-          },
-        })), { status: 200 });
-      },
-    });
-
-    const created = await scrubClient.create_partner_api_key({
-      agent_id: "agt_owner_demo",
-      name: "Leak Test",
-      allowed_source_types: ["rss"],
-    });
-
-    expect(created.credential_id).toBe("cred_partner_scrubbed");
-    expect(created.allowed_source_types).toEqual(["rss"]);
-    expect(created.masked_key_hint).toBe("src_partner_scrubbed.********");
-    expect("ingest_key" in created).toBe(false);
-    expect("ingest_key" in created.raw).toBe(false);
-    expect("full_key" in created.raw).toBe(false);
-  });
-
-  it("resolves default agents for partner and ads wrappers and parses sparse payloads", async () => {
-    const requests: Array<{ method: string; path: string; operation?: string | null }> = [];
-    const client = new SiglumeClient({
-      api_key: "sig_test_key",
-      base_url: "https://api.example.test/v1",
-      fetch: async (input, init) => {
-        const url = requestUrl(input);
-        const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
-        requests.push({ method: String(init?.method ?? "GET"), path: url.pathname, operation: typeof body.operation === "string" ? body.operation : null });
-        if (url.pathname === "/v1/me/agent") {
-          return new Response(JSON.stringify(envelope({
-            id: "agt_owner_demo",
-            agent_type: "personal",
-            name: "Owner Demo",
-          })), { status: 200 });
-        }
-        if (url.pathname !== "/v1/owner/agents/agt_owner_demo/operations/execute") {
-          return new Response("{}", { status: 500 });
-        }
-        if (body.operation === "partner.dashboard.get") {
-          return new Response(JSON.stringify(envelope({ result: { partner_id: "usr_sparse", has_billing: 1, has_subscription: 0 } })), { status: 200 });
-        }
-        if (body.operation === "partner.usage.get") {
-          return new Response(JSON.stringify(envelope({ result: { month_bytes_used: null, month_bytes_limit: "1024" } })), { status: 200 });
-        }
-        if (body.operation === "partner.keys.list") {
-          return new Response(JSON.stringify(envelope({ result: { keys: [null, { credential_id: "cred_sparse" }] } })), { status: 200 });
-        }
-        if (body.operation === "partner.keys.create") {
-          return new Response(JSON.stringify(envelope({
-            result: {
-              credential_id: "cred_sparse_created",
-              key_id: "src_sparse",
-              masked_key_hint: "src_sparse.********",
-              ingest_key: "src_sparse.secret",
-            },
-          })), { status: 200 });
-        }
-        if (body.operation === "ads.billing.get") {
-          return new Response(JSON.stringify(envelope({
-            result: {
-              billing_mode: "web3",
-              balances: "skip",
-              supported_tokens: "skip",
-              funding_instructions: "skip",
-              wallet: "skip",
-              mandate: "skip",
-            },
-          })), { status: 200 });
-        }
-        if (body.operation === "ads.billing.settle") {
-          return new Response(JSON.stringify(envelope({ result: { detail: "auto" } })), { status: 200 });
-        }
-        if (body.operation === "ads.profile.get") {
-          return new Response(JSON.stringify(envelope({ result: { company_name: null } })), { status: 200 });
-        }
-        if (body.operation === "ads.campaigns.list") {
-          return new Response(JSON.stringify(envelope({
-            result: {
-              campaigns: [null, { campaign_id: "cmp_sparse", total_posts: null, status: null }],
-            },
-          })), { status: 200 });
-        }
-        if (body.operation === "ads.campaign_posts.list") {
-          return new Response(JSON.stringify(envelope({
-            result: {
-              posts: [null, { post_id: "pst_sparse", impressions: null, cost_usd: "1500" }],
-            },
-          })), { status: 200 });
-        }
-        return new Response("{}", { status: 500 });
-      },
-    });
-
-    const dashboard = await client.get_partner_dashboard();
-    const usage = await client.get_partner_usage({ agent_id: "agt_owner_demo" });
-    const keys = await client.list_partner_api_keys();
-    const created = await client.create_partner_api_key({ agent_id: "agt_owner_demo" });
-    const billing = await client.get_ads_billing();
-    const settlement = await client.settle_ads_billing({ agent_id: "agt_owner_demo" });
-    const profile = await client.get_ads_profile({ agent_id: "agt_owner_demo" });
-    const campaigns = await client.list_ads_campaigns({ agent_id: "agt_owner_demo" });
-    const posts = await client.list_ads_campaign_posts("cmp_sparse");
-
-    expect(dashboard.partner_id).toBe("usr_sparse");
-    expect(dashboard.has_billing).toBe(true);
-    expect(dashboard.has_subscription).toBe(false);
-    expect(usage.month_bytes_used).toBe(0);
-    expect(usage.month_bytes_limit).toBe(1024);
-    expect(usage.plan).toBeUndefined();
-    expect(keys[0]?.credential_id).toBe("cred_sparse");
-    expect(keys[0]?.allowed_source_types).toEqual([]);
-    expect(created.key_id).toBe("src_sparse");
-    expect("ingest_key" in created.raw).toBe(false);
-    expect(billing.billing_mode).toBe("web3");
-    expect(billing.wallet).toBeNull();
-    expect(billing.balances).toEqual([]);
-    expect(billing.mandate).toBeNull();
-    expect(settlement.message).toBe("auto");
-    expect(settlement.settles_automatically).toBeUndefined();
-    expect(profile.has_profile).toBe(false);
-    expect(profile.ad_currency).toBeUndefined();
-    expect(campaigns[0]?.campaign_id).toBe("cmp_sparse");
-    expect(campaigns[0]?.total_posts).toBe(0);
-    expect(campaigns[0]?.status).toBe("active");
-    expect(posts[0]?.post_id).toBe("pst_sparse");
-    expect(posts[0]?.impressions).toBe(0);
-    expect(posts[0]?.cost_usd).toBe(1500);
-    expect(requests.filter((request) => request.path === "/v1/me/agent")).toHaveLength(4);
   });
 
   it("wraps non-Error transport failures as SiglumeClientError", async () => {

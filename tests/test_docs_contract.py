@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -13,6 +14,54 @@ def _read(relative_path: str) -> str:
 def _read_optional(relative_path: str) -> str:
     path = SDK_ROOT / relative_path
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def test_tracked_text_files_do_not_contain_known_mojibake_markers() -> None:
+    markers = (
+        "\u7ab6",  # mojibake for UTF-8 punctuation such as em dash / bullet / ellipsis
+        "\u7aca",  # mojibake for arrows
+        "\u7b28",  # mojibake for check marks
+        "\u7b0f",  # mojibake for box-drawing characters
+        "\ue05e",  # mojibake prefix for emoji
+        "\u2001E",  # mojibake for an em dash followed by ASCII text
+        "\u96c9\u30fb\u2261\u8c4e",  # mojibake for Japanese legal text
+        "\u8fda\uff79\u87b3",
+        "\u86df\u5036\uff7a\uff7a",
+        "\u87d2\uff7a\u907d",
+        "\uff82\uff65",  # mojibake for yen sign
+    )
+    try:
+        tracked_files = subprocess.check_output(["git", "ls-files"], cwd=SDK_ROOT, text=True).splitlines()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        tracked_files = [
+            str(path.relative_to(SDK_ROOT))
+            for path in SDK_ROOT.rglob("*")
+            if path.is_file()
+            and ".git" not in path.parts
+            and "node_modules" not in path.parts
+            and ".pytest_cache" not in path.parts
+        ]
+    offenders: list[str] = []
+
+    for relative_path in tracked_files:
+        path = SDK_ROOT / relative_path
+        if not path.exists():
+            continue
+        data = path.read_bytes()
+        if b"\x00" in data:
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            for marker in markers:
+                if marker in line:
+                    escaped_marker = marker.encode("unicode_escape").decode("ascii")
+                    offenders.append(f"{relative_path}:{line_no}: {escaped_marker}")
+
+    assert offenders == []
 
 
 def test_readme_keeps_coding_agent_prompt() -> None:
@@ -53,7 +102,7 @@ def test_package_runtime_versions_match_release_metadata() -> None:
     python_version = str(pyproject["project"]["version"])
     ts_version = str(package_json["version"])
 
-    assert python_version == "0.10.3"
+    assert python_version == "2.0.1"
     assert ts_version == python_version
     assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
     assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
@@ -68,7 +117,7 @@ def test_onboarding_docs_match_generated_scaffold_and_no_key_first_loop() -> Non
 
     assert "v0.5.0 is out" not in readme
     assert "current v0.5 release line" not in ts_readme
-    assert "This is **v0.10.3 (beta)**" in readme
+    assert "This is **v1.2.2 (beta)**" in readme
     assert "Production releases are published by GitHub Actions with PyPI Trusted" in security
     assert "Do not create a PyPI API token or local `.pypirc` for the normal release path." in normalized_security
     assert "Rotate after every release" not in security
@@ -111,7 +160,7 @@ def test_cli_docs_match_current_sidecar_inputs() -> None:
     assert "The CLI does not infer these fields from git." in docs
     assert "`tool_manual.json`" in docs
     assert "`runtime_validation.json`" in docs
-    assert "`oauth_credentials.json`" in docs
+    assert "`oauth_credentials.json`" not in docs
 
 
 def test_public_docs_keep_submitted_registration_content_immutable() -> None:
@@ -150,6 +199,28 @@ def test_auto_register_docs_keep_localization_platform_generated() -> None:
     assert "additionalProperties: false" in docs
 
 
+def test_listing_text_limits_are_documented_and_schema_enforced() -> None:
+    docs = "\n".join(
+        [
+            _read("README.md"),
+            _read("GETTING_STARTED.md"),
+            _read("docs/publish-flow.md"),
+            _read("openapi/developer-surface.yaml"),
+        ]
+    )
+    manifest_schema = json.loads(_read("schemas/app-manifest.schema.json"))
+    tool_manual_schema = json.loads(_read("schemas/tool-manual.schema.json"))
+
+    assert "`short_description` is a tagline" in docs
+    assert "max 60 characters" in docs
+    assert "max 240 characters" in docs
+    assert "max 1000 characters" in docs
+    assert manifest_schema["properties"]["short_description"]["maxLength"] == 60
+    assert manifest_schema["properties"]["job_to_be_done"]["maxLength"] == 240
+    assert manifest_schema["properties"]["description"]["maxLength"] == 1000
+    assert tool_manual_schema["properties"]["job_to_be_done"]["maxLength"] == 240
+
+
 def test_docs_do_not_advertise_unsupported_connected_account_families() -> None:
     connected_accounts = _read("docs/connected-accounts.md")
 
@@ -157,7 +228,7 @@ def test_docs_do_not_advertise_unsupported_connected_account_families() -> None:
     assert "MetaMask" not in connected_accounts
     assert '["slack", "openai"]' not in connected_accounts
     assert 'provider_key="x-twitter"' not in connected_accounts
-    assert 'provider_key="twitter"' in connected_accounts
+    assert '"provider_key": "slack"' in connected_accounts
 
 
 def test_payment_docs_match_current_polygon_settlement_language() -> None:
@@ -189,3 +260,94 @@ def test_payment_docs_match_current_polygon_settlement_language() -> None:
     assert "bank account or wallet address" not in docs
     assert "Wallet at `/owner/credits/payout`" in docs
     assert "external payout wallets are not supported" in docs
+    assert "platform is transitioning to\n> on-chain embedded-wallet settlement" not in docs
+    assert "pricing is USD. Convert" not in docs
+    assert "currency=\"JPY\"" in docs
+    assert "settle in JPYC" in docs
+
+
+def test_pricing_docs_match_live_operation_billing_contract() -> None:
+    docs = "\n".join(
+        [
+            _read("README.md"),
+            _read("GETTING_STARTED.md"),
+            _read("docs/pricing-and-billing.md"),
+            _read("docs/sdk-core-concepts.md"),
+            _read("docs/dry-run-and-approval.md"),
+            _read("docs/execution-receipts.md"),
+            _read("docs/metering.md"),
+            _read("docs/platform-api-boundary.md"),
+            _read("docs/publish-flow.md"),
+            _read("docs/coding-agent-guide.md"),
+            _read("siglume-api-sdk-ts/README.md"),
+        ]
+    )
+    normalized_docs = " ".join(docs.split())
+    schema = json.loads(_read("schemas/app-manifest.schema.json"))
+
+    assert "Reserved for future phases (not accepted by the platform" not in docs
+    assert "`USAGE_BASED` - operation-based billing" in docs
+    assert "`PER_ACTION` - action/request-type billing" in docs
+    assert "price_model=\"free\"" in docs
+    assert "price_model=\"subscription\"" in docs
+    assert "price_model=\"usage_based\"" in docs
+    assert "price_model=\"per_action\"" in docs
+    assert "pricing_plan.items" in docs
+    assert "billing_timing=\"prepay\"" in docs
+    assert "priceMinorIfActionSucceeds" in docs
+    assert "draftToken" in docs
+    assert "at least `15`" in docs
+    assert "does not automatically refund a confirmed payment" in normalized_docs
+    assert "Platform / API Responsibility Boundary" in docs
+    assert "Siglume owns payment, authorization" in docs
+    assert "Your API owns the external" in docs
+    assert "does not inspect or infer product-specific delivery" in docs
+    assert "`status=\"ready\"`" in docs
+    assert "not delivered results" in docs
+    assert "committed provider evidence" in docs
+    assert "same committed provider id" in docs
+    assert "Do not describe a `usage_based` or `per_action` listing as free just because" in docs
+    assert schema["properties"]["billing_timing"]["enum"] == ["post", "prepay"]
+
+
+def test_developer_observability_docs_explain_logs_receipts_and_privacy() -> None:
+    docs = "\n".join(
+        [
+            _read("README.md"),
+            _read("GETTING_STARTED.md"),
+            _read("docs/developer-observability.md"),
+            _read("docs/pricing-and-billing.md"),
+            _read("docs/execution-receipts.md"),
+            _read("docs/installed-tools-operations.md"),
+            _read("docs/metering.md"),
+            _read("docs/platform-api-boundary.md"),
+            _read("docs/publish-flow.md"),
+            _read("siglume-api-sdk-ts/README.md"),
+        ]
+    )
+    cli = _read("siglume_api_sdk/cli/commands/dev_cmd.py")
+    client = _read("siglume_api_sdk/client.py")
+    ts_client = _read("siglume-api-sdk-ts/src/client.ts")
+
+    assert "docs/developer-observability.md" in docs
+    assert "siglume dev tail" in docs
+    assert "siglume dev tail --listing-id" in docs
+    assert "--follow" in docs
+    assert "list_execution_receipts" in docs
+    assert "list_listing_recent_receipts" in docs
+    assert "list_installed_tool_receipts" in docs
+    assert "get_installed_tool_receipt_steps" in docs
+    assert "trace_id" in docs
+    assert "request_id" in docs
+    assert "privacy-redacted" in docs
+    assert "buyer prompts" in docs
+    assert "Receipts are evidence, not a second pricing system." in docs
+    assert "provider-side committed evidence" in docs
+    assert "platform support can verify authorization, quote scope, charge state" in docs
+    assert "publisher support must verify provider-specific delivery" in docs
+
+    assert "def tail" in cli
+    assert "--listing-id" in cli
+    assert "def list_execution_receipts" in client
+    assert "def list_listing_recent_receipts" in client
+    assert "list_installed_tool_receipts" in ts_client

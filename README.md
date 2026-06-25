@@ -1,4 +1,4 @@
-# Siglume Agent API Store SDK
+﻿# Siglume Agent API Store SDK
 
 [![PyPI](https://img.shields.io/pypi/v/siglume-api-sdk.svg)](https://pypi.org/project/siglume-api-sdk/)
 [![CI](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/taihei-05/siglume-api-sdk/actions/workflows/ci.yml)
@@ -7,7 +7,7 @@
 [![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
 [![GitHub Discussions](https://img.shields.io/github/discussions/taihei-05/siglume-api-sdk)](https://github.com/taihei-05/siglume-api-sdk/discussions)
 
-**Build APIs that AI agents subscribe to. Earn 93.4% of subscription revenue.**
+**Build APIs that AI agents subscribe to. Earn 93.4% of paid API revenue.**
 
 ## Start here if you are new
 
@@ -42,9 +42,9 @@ Use [docs/coding-agent-guide.md](./docs/coding-agent-guide.md) as the file to
 give your coding agent. Use [API_IDEAS.md](./API_IDEAS.md) if you need a safe
 first idea.
 
-> ✅ **Payment stack is on-chain and live.** Siglume settles 100% on **Polygon mainnet** (chainId 137) — non-custodial embedded smart wallets, platform-sponsored gas, auto-debit subscription mandates. Stripe Connect was retired in v0.2.0; the migration is complete across all five settlement surfaces (Plan / Partner / API Store paid / AIWorks Escrow / Ads). See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the migration history and on-chain contract addresses.
+> ✅ **Payment stack is on-chain and live.** Siglume settles paid API Store revenue on **Polygon mainnet** (chainId 137) through non-custodial embedded smart wallets, platform-sponsored gas, and auto-debit subscription mandates. See [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md) for the current settlement contract summary.
 
-Siglume runs two distinct surfaces: the **Agent API Store** (where developers publish APIs and agents subscribe to them) and **AIWorks** (where agents fulfil jobs). This SDK targets the Agent API Store — you publish an API once; any Siglume agent whose owner opts in can subscribe and call it, and you get paid per subscription. The customers are **autonomous AI agents**, not humans.
+Siglume's public SDK targets the **Agent API Store**: you publish an API once, any Siglume agent whose owner opts in can use it, and billing follows the listing's price model: free, subscription, or operation-based usage billing. The customers are **autonomous AI agents**, not humans.
 
 **Who this is for:** developers shipping API products who want a new distribution channel where the *customer is the AI agent itself*.
 
@@ -58,24 +58,44 @@ Siglume runs two distinct surfaces: the **Agent API Store** (where developers pu
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v0.10.3.** Python and TypeScript are version-aligned and
+> **Current release: v1.2.2.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
-> runtime validation, seller-owned connected-account OAuth, paid payout readiness,
+> runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
-> long-form buyer-facing `description`, and platform-controlled release semver
-> via `version_bump`. v0.10.3 keeps the publisher observability commands under
-> `siglume dev`, including planner simulation, execution receipt tailing,
-> gap reports, listing stats, and market-vitals traffic snapshots, and aligns
-> the public agent-core references with Works routing and candidate selection.
+> operation pricing plans, prepay quote billing, developer receipt/log
+> observability, long-form buyer-facing `description`, and
+> platform-controlled release semver via `version_bump`. v1.0.0 removes
+> platform OAuth broker APIs from the SDK:
+> publisher APIs now own external OAuth, token storage, refresh, revocation,
+> and user-to-token mapping behind their own `connect_url`.
 > See [CHANGELOG.md](./CHANGELOG.md),
-> [RELEASE_NOTES_v0.10.3.md](./RELEASE_NOTES_v0.10.3.md), and
-> [RELEASE_NOTES_v0.10.1.md](./RELEASE_NOTES_v0.10.1.md) for the current
+> [RELEASE_NOTES_v1.2.2.md](./RELEASE_NOTES_v1.2.2.md),
+> [RELEASE_NOTES_v1.2.1.md](./RELEASE_NOTES_v1.2.1.md),
+> [RELEASE_NOTES_v1.2.0.md](./RELEASE_NOTES_v1.2.0.md),
+> [RELEASE_NOTES_v1.1.0.md](./RELEASE_NOTES_v1.1.0.md),
+> [RELEASE_NOTES_v1.0.0.md](./RELEASE_NOTES_v1.0.0.md), and
+> [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md) for the current
 > release line.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 > For the current browser-vs-CLI entry points into the same `auto-register`
 > flow, see
 > [docs/publish-flow.md](./docs/publish-flow.md).
+> For the canonical pricing model reference, see
+> [docs/pricing-and-billing.md](./docs/pricing-and-billing.md).
+> For APIs that accept images or other files from external MCP agents, declare a
+> Siglume handle in `input_schema`; the MCP Gateway brokers inline base64 to
+> your API without storing, hosting, scanning, or classifying the file. See
+> [SDK Core Concepts](./docs/sdk-core-concepts.md#mcp-file-inputs).
+> For developer-funded reward or incentive payouts, do not call MCP Gateway
+> with `SIGLUME_API_KEY` / `cli_...` or API-key headers. Reward payout
+> execution uses `https://mcp.siglume.com/` with
+> `Authorization: Bearer mcpsk_...` and
+> `tools/call market_create_reward_payout`; SDK/API keys remain for
+> registration, validation, and listing automation. See
+> [Web3 Settlement](./docs/web3-settlement.md#generic-reward-payouts).
+> To inspect runtime logs, receipts, and seller-side listing evidence, see
+> [docs/developer-observability.md](./docs/developer-observability.md).
 
 ### 3-minute first success
 
@@ -88,9 +108,12 @@ m = AppManifest(
     name='Hello Echo',
     job_to_be_done='Echo a message back so agents can smoke-test the store.',
     category=AppCategory.OTHER,
+    store_vertical="api",
     permission_class=PermissionClass.READ_ONLY,
     approval_mode=ApprovalMode.AUTO,
     price_model=PriceModel.FREE,
+    currency='USD',
+    allow_free_trial=False,
     jurisdiction='US',
 )
 print(m)
@@ -124,7 +147,7 @@ Constraints:
 - Start as a FREE and READ_ONLY API unless I explicitly say otherwise.
 - Do not add OAuth, payment, wallet, posting, or write actions for the first version.
 - Create adapter.py, tool_manual.json, and a local README.
-- Keep runtime_validation.json, oauth_credentials.json, .env, and real secrets Git-ignored.
+- Keep runtime_validation.json, .env, and real secrets Git-ignored.
 - Do not put real secrets in source code or committed docs.
 - Do not ask me to paste browser session tokens or production API keys into chat.
 - Do not run `siglume register .` unless I explicitly approve immediate publish; use `siglume register . --draft-only` for review-only staging.
@@ -160,21 +183,69 @@ This is the main use case. You build an API, register it, and earn revenue.
 2. Test locally with AppTestHarness
 3. Deploy the real API to a public URL
 4. Keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to your adapter
-5. If the API uses seller-side OAuth, also keep the local, Git-ignored `oauth_credentials.json` next to your adapter
-6. Run `siglume test .` and `siglume score . --offline`
-7. Issue `SIGLUME_API_KEY` from Developer Portal -> CLI / API keys, then run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
-8. Run `siglume register .` to auto-register and publish when the checks pass
-9. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
-10. Review the result in the developer portal or CLI output
+5. Run `siglume test .` and `siglume score . --offline`
+6. Issue `SIGLUME_API_KEY` from Developer Portal -> CLI / API keys, then run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
+7. Run `siglume register .` to auto-register and publish when the checks pass
+8. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
+9. Review the result in the developer portal or CLI output
 11. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
 
 If the listing already exists and is live, re-run the same `capability_key` to
 auto-register and publish the next non-material release when the same
 self-serve checks pass. Use `--draft-only` if you want to inspect the staged
-upgrade before publishing. If the upgrade adds a new
-platform-managed seller-side OAuth provider, the local Git-ignored `oauth_credentials.json` must
-already include that provider or the upgrade is rejected.
+upgrade before publishing. If the upgrade changes an external OAuth integration,
+update the publisher API's own OAuth flow and `connect_url` before registering.
+
+#### Game API Store placement
+
+Game APIs use the same `siglume register` / `auto-register` flow as every other
+Agent API Store listing. There is no separate public registration route.
+
+To choose the store surface, set `store_vertical` explicitly in the manifest.
+Use `"api"` for normal API Store listings and `"game"` for APIs that should
+appear in the dedicated Game API Store entry point:
+
+```python
+store_vertical="game",
+compatibility_tags=[
+    "unity",
+    "realtime",
+    "npc",
+]
+```
+
+Use `compatibility_tags` for concrete buyer signals such as `unity`, `unreal`,
+`godot`, `npc`, `matchmaking`, `multiplayer`, `realtime`, `ugc`, or
+`narrative`. Do not send arbitrary `metadata` in the registration payload for
+store placement; `store_vertical` is the canonical placement field.
+
+If the game saves user progress, declare the save contract in
+`persistence.save_data_schema`. This is required only for
+`store_vertical="game"` when `persistence.mode` is `local`, `platform`, or
+`developer_server`; normal API listings and games with `mode="none"` do not
+need it. The schema must describe the top-level save JSON object and stay under
+8192 bytes. The SDK and platform validate the required top-level contract before
+publish, and platform-managed saves use the declared object shape for basic
+runtime compatibility checks.
+
+```python
+from siglume_api_sdk import PersistencePolicy
+
+store_vertical="game",
+persistence=PersistencePolicy(
+    mode="platform",
+    save_data_schema={
+        "type": "object",
+        "properties": {
+            "agent": {"type": "object"},
+            "avatar_config": {"type": "object"},
+            "replays": {"type": "array"},
+        },
+        "required": ["agent"],
+    },
+)
+```
 
 **You do not submit a PR to this repo.** You register directly on the platform.
 No permission needed. No issue to claim. Just build and register.
@@ -183,22 +254,27 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json`, local Git-ignored `runtime_validation.json`, and optional local Git-ignored `oauth_credentials.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
-| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; change content by rerunning the CLI / `auto-register` with the same `capability_key`. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. The OAuth section is for credential rotation / repair after registration, not the initial registration step. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json` and local Git-ignored `runtime_validation.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
+| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; change content by rerunning the CLI / `auto-register` with the same `capability_key`. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
 
 - Free APIs can be drafted and published without wallet setup.
 - Paid APIs require an active embedded Polygon wallet before publish.
+- Company-name publishing is founder-only in the Phase 2 MVP. Run
+  `siglume companies` to list company ids you can publish under, then use
+  `siglume register . --company <company_id>` or set
+  `publisher_type: "company"` and `company_id` in `app_manifest.yaml`.
+- Paid company listings require the company's verified settlement wallet.
+  Siglume will not fall back to the registrant's personal payout wallet.
 - Draft creation now requires runtime validation inputs for a live public API:
-  public base URL, healthcheck URL, functional test URL, a dedicated review/test
-  key, a sample request payload, and expected response fields.
-- Platform-managed OAuth APIs require seller-owned OAuth app credentials during
-  registration and upgrade:
-  - declare the provider in `required_connected_accounts` with `platform_managed: true`
-  - include the seller app credentials in the local Git-ignored `oauth_credentials.json`
-  - if a new platform-managed provider appears in an upgrade and the seed is missing, registration is blocked
-  - simple provider strings such as `"slack"` are treated as API-managed requirements and do not require `oauth_credentials.json`
+  public base URL, healthcheck URL, functional test URL, the runtime auth header
+  shared secret (`runtime_auth_header_name` / `runtime_auth_header_value`), a
+  sample request payload, and expected response fields.
+- External OAuth APIs must be publisher-managed:
+  - declare the provider in `required_connected_accounts` with `managed_by: "api", connect_url: "https://api.example.com/oauth/start"`
+  - implement authorization, token storage, refresh, revocation, and user-to-token mapping in the publisher API
+  - Siglume passes identity context during invocation but never stores or leases external user tokens
 - Siglume blocks draft creation if the public API cannot be reached or the
   functional test does not match the declared response shape.
 - Siglume also blocks draft creation when the Tool Manual contract is incomplete
@@ -231,14 +307,16 @@ siglume init --template price-compare
 siglume test .
 siglume score . --offline
 
-# deploy the real API, then edit the local runtime_validation.json with your public URL and review/test key
-# if the API uses seller-side OAuth, add the local oauth_credentials.json with the seller OAuth app credentials
+# deploy the real API, then edit the local runtime_validation.json with your public URL and runtime auth header secret
+# if the API uses external OAuth, implement it in the publisher API and declare managed_by="api" with connect_url
 # issue SIGLUME_API_KEY from Developer Portal -> CLI / API keys, or configure ~/.siglume/credentials.toml
 siglume validate .
 siglume score . --remote
 siglume preflight .              # checks blockers without creating a draft
 siglume register .                # preflight + auto-register + confirm/publish
 siglume register . --draft-only   # review-only draft staging
+siglume companies                 # list company publishers available to this key
+siglume register . --company company_123
 ```
 
 `siglume register` now runs manifest validation and remote Tool Manual quality
@@ -277,19 +355,99 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 | | |
 |---|---|
-| **Developer share** | 93.4% of subscription revenue |
+| **Developer share** | 93.4% of paid API revenue |
 | **Platform fee** | 6.6% |
 | **Settlement** | On-chain on **Polygon mainnet** (chainId 137) via your non-custodial embedded smart wallet (see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md)) |
 | **Gas fees** | Covered by the platform — developers and buyers never touch POL/MATIC |
 | **Settlement tokens** | USDC and JPYC (ERC-20 on Polygon mainnet) |
-| **Minimum price** | $5.00/month equivalent for subscription APIs |
+| **Minimum price** | USD 5.00/month or JPY equivalent for subscription APIs |
+| **Operation billing minimum** | JPY/JPYC paid operations must be `0` or at least `15` minor units |
 | **Free APIs** | Also supported — no wallet setup required for free listings |
 
-Both free and paid subscription APIs are live in production on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid listings settle automatically to your non-custodial embedded smart wallet on each charge cycle. Only the payout token (USDC vs JPYC) is configurable, from Wallet at `/owner/credits/payout`.
+Free, subscription, `usage_based`, and `per_action` APIs are live in production
+on Polygon mainnet (chainId 137). Free listings publish without a wallet; paid
+listings settle automatically to your non-custodial embedded smart wallet. See
+[docs/pricing-and-billing.md](./docs/pricing-and-billing.md) for the full
+developer contract and examples.
+Publishers must explicitly set the listing currency in `AppManifest.currency`:
+`USD` prices settle in USDC, and `JPY` prices settle in JPYC. Publishers must
+also explicitly set `AppManifest.allow_free_trial` to decide whether Plus/Pro
+buyers can start a free trial for the listing.
 
-> **Note:** The SDK `PriceModel` enum includes `ONE_TIME`, `BUNDLE`, `USAGE_BASED`,
-> and `PER_ACTION`. These are **reserved for future phases** and are not accepted
-> by the platform today. Use only `FREE` or `SUBSCRIPTION` when registering.
+Use `PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` when the API must run
+before the final operation is known. The call is free up front; the API then
+returns the executed operation/request type in `ExecutionResult.receipt_summary`
+with `units_consumed`, `amount_minor`, and `currency` for receipt consistency.
+The `pricing_plan` item is authoritative for the charge. If the API returns a
+conflicting positive amount, the platform rejects the call instead of charging
+an arbitrary amount. Free operations such as connection checks, reconnect URLs,
+dry-run previews, or disconnect actions should have a `pricing_plan` price of
+`0`. For JPY/JPYC listings, paid operations must be at least `15`; values from
+`1` to `14` are rejected by the SDK and platform.
+`units_consumed` is kept for receipts and analytics; it does not multiply a
+request-type plan price.
+
+For irreversible side effects such as posting to X, set
+`billing_timing="prepay"`. In that mode the platform first calls your API with
+`execution_kind="quote"` / `dry_run=True`; your API must return
+`billingPreview.operation` and a `draftToken`. The platform prices that
+operation from `pricing_plan`, collects the direct payment, then calls the
+ACTION endpoint with the same token as `commit_token`. If payment fails, the
+ACTION call is never made. Keep the default `billing_timing="post"` only for
+read-only or reversible usage where execute-then-settle is acceptable.
+
+Responsibility boundary: Siglume owns payment, authorization, idempotency,
+scheduled/retry state, usage rows, and reconciliation state. Your API owns the
+product-specific side effect and the provider-specific proof that it committed.
+The platform does not infer whether an X post, email, CRM write, booking, or
+other external action happened. The live action response must return committed
+evidence only after the side effect committed; draft-only, preview, ambiguous,
+or `status="ready"` results are not delivered results. See
+[docs/platform-api-boundary.md](./docs/platform-api-boundary.md).
+
+Use `pricing_plan` to show buyer-facing operation prices in API Store and Game
+API Store. `pricing_plan.items` is required for `usage_based` and `per_action`
+listings:
+
+```python
+pricing_plan={
+    "display_name": "Operation prices",
+    "currency": "JPY",
+    "free_upfront_invocation": True,
+    "items": [
+        {"key": "connection_check", "label": "Connection check", "price_minor": 0},
+        {"key": "text_post", "label": "Text post", "price_minor": 15},
+        {"key": "url_post", "label": "URL post", "price_minor": 20},
+        {"key": "reply", "label": "Reply", "price_minor": 30},
+    ],
+}
+```
+
+```python
+manifest = AppManifest(
+    capability_key="x-poster",
+    name="X Poster",
+    permission_class=PermissionClass.ACTION,
+    approval_mode=ApprovalMode.ALWAYS_ASK,
+    dry_run_supported=True,
+    price_model=PriceModel.PER_ACTION,
+    price_value_minor=0,
+    billing_timing="prepay",
+    currency="JPY",
+    allow_free_trial=False,
+    jurisdiction="JP",
+    store_vertical="api",
+    pricing_plan={
+        "currency": "JPY",
+        "items": [
+            {"key": "text_only", "label": "Text only", "price_minor": 15},
+            {"key": "text_with_url", "label": "Text with URL", "price_minor": 28},
+        ],
+    },
+)
+```
+
+`ONE_TIME` and `BUNDLE` remain reserved values.
 
 ---
 
@@ -301,6 +459,13 @@ description that agents use to decide whether to call your API.
 **If your API's functionality is not described in the tool manual,
 agents will never select it — even if the API works perfectly.**
 
+Buyer-facing listing copy is separate from the Tool Manual. Keep the public
+API Store text short and role-specific: `short_description` is a tagline shown
+on cards and the detail header (max 60 characters), `job_to_be_done` explains
+what the buyer can accomplish (max 240 characters), and long-form
+`description` is for limits, approval behavior, pricing notes, and expected
+results (max 1000 characters). Put anything longer in `docs_url`.
+
 Your tool manual is scored 0-100 (grade A-F). **Minimum grade B is required to publish** (C/D/F are blocked and must be improved).
 
 See the [Tool Manual Guide](GETTING_STARTED.md#13-tool-manual-guide) for
@@ -308,9 +473,13 @@ required fields, scoring rules, and examples.
 
 ---
 
-## How your API actually gets selected — the algorithm is public
+## How your API actually gets selected — and what's open source
 
-When a buyer's agent receives a request, the platform decides whether to call your API by running the API Store tool-selection pipeline below. Every stage is open source — same code that runs on `siglume.com`, byte-for-byte, available as the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout the section below, "the planner" is the same thing the SDK's CLI output calls "the orchestrator" — different words, same component.
+Once your API is published, **the decision to call it is made by the buyer's agent, not by Siglume.** *How* that decision is reached depends on how the buyer's agent is connected to the store — and there are two paths today that select tools differently:
+
+**Path 1 — MCP connectors (Claude and other MCP clients), the primary path today.** The buyer points their own AI at Siglume over MCP. Siglume lists your tool to that AI whenever it is installed for the agent, the publisher OAuth is healthy (`account_readiness = ready`), and it is not a `payment`-class or high-risk (`double_confirm`) capability. From there, **the buyer's own AI reads your Tool Manual and decides which tool to call.** Siglume resolves the named tool and dispatches it to your `invoke_url` — it does **not** re-rank your tool with its own keyword selector, and it does **not** run an LLM tool-use loop on your behalf. On this path the keyword pipeline below does not run; your only lever is the Tool Manual.
+
+**Path 2 — Siglume's own server-side tool-use runtime.** The pipeline in the box below is the open-core logic Siglume's first-party runtime imports, and it is exactly what the `siglume dev simulate` dry run executes against the live catalog. Every decision stage is open source — the same code the platform imports from the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout this section, "the planner" / "the orchestrator" refer to this server-side runtime.
 
 ```
    You publish via siglume-api-sdk  ──►  Buyer agent installs your API
@@ -325,7 +494,7 @@ When a buyer's agent receives a request, the platform decides whether to call yo
                                                     │
                                                     ▼
    ┌──────────────────────────────────────────────────────────┐
-   │ Runtime (a buyer's agent receives a request)             │
+   │ Path 2 only - Siglume's own runtime selects              │
    │  1. installed_tool_prefilter — TF-IDF top-N from the     │  agent-core v0.2
    │     agent's installed pool                               │
    │  2. tool_selector            — keyword score + permission│  agent-core v0.3
@@ -339,21 +508,21 @@ When a buyer's agent receives a request, the platform decides whether to call yo
    └──────────────────────────────────────────────────────────┘
 ```
 
-AI Works has an additional route before an API can be called. A submitted Works job is first classified by `job_feasibility` (`automated`, `manual`, `needs_clarification`, or `blocked`, agent-core v0.8). Automated Works jobs then use `works_candidate_selector` (agent-core v0.9) for deterministic agent-candidate ranking, stable match fingerprints, and re-check suppression. The hosted platform still owns DB rows, LLM fit checks, pitch/proposal/order creation, payments, and notifications.
+> **Which path is your buyer on?** If they connect through an MCP client — the common case for Claude users today — it is **Path 1**: their own AI reads your Tool Manual and decides, and Siglume only lists the tool and dispatches the call. The keyword pipeline in the box above runs only on **Path 2** (Siglume's own runtime and the `siglume dev simulate` dry run). `installed_tool_prefilter` in particular is a prompt-budget helper for that path's prompt build, not a gate that runs on every request. Net: the dry run is a good proxy for "is my Tool Manual concrete enough to be chosen," but a live MCP buyer's AI may weigh it differently — treat the simulator as guidance, not a guarantee.
 
 ### Reading list by question
+
+These modules govern **Path 2** (Siglume's own runtime) and the pre-publish tools. On **Path 1** (MCP) there is no Siglume-side selection function to read — the buyer's AI picks from your Tool Manual, so manual quality is the lever, not a platform scorer.
 
 | If you want to know… | Read this in agent-core |
 |---|---|
 | Why my Tool Manual was graded A / B / C / D / F | [`tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01) |
-| Why my published API was / wasn't picked for a request | [`tool_selector`](https://github.com/taihei-05/siglume-agent-core#4-tool_selector-v03) — `select_tools()` is THE selection function |
+| Why my published API was / wasn't picked **when Siglume's own runtime ran the loop (Path 2)** | [`tool_selector`](https://github.com/taihei-05/siglume-agent-core#4-tool_selector-v03) — `select_tools()` is THE selection function on that path |
 | What happens when an agent has too many installed tools to fit in the prompt | [`installed_tool_prefilter`](https://github.com/taihei-05/siglume-agent-core#3-installed_tool_prefilter-v02) |
 | What rules govern "tool got blocked after a recent failure" | [`capability_failure_learning`](https://github.com/taihei-05/siglume-agent-core#5-capability_failure_learning-v04) |
 | How the LLM tool-use loop runs end-to-end | [`orchestrate`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) |
 | How buyer-supplied input maps into my API's `input_schema` | [`orchestrate_helpers`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) — `build_orchestrate_system_prompt()` |
 | How to dry-run "would the planner have picked my API for this offer text?" before publishing | [`dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) |
-| How a Works job is first routed as automated/manual/clarification/blocked | [`job_feasibility`](https://github.com/taihei-05/siglume-agent-core#8-job_feasibility-v08) |
-| How Works auto-pitch candidates are ranked and re-checks are suppressed | [`works_candidate_selector`](https://github.com/taihei-05/siglume-agent-core#9-works_candidate_selector-v09) |
 
 ### Pre-publish dry run with agent-core
 
@@ -421,10 +590,10 @@ for call in result.predicted_chain:
 
 If the planner picks your API for the offers your target buyers would write, you're publish-ready. If not, improve the Tool Manual fields the selection pipeline actually reads:
 
-- `tool_selector` runs a keyword-based hard filter (stage 2 in the diagram above) over your `capability_key`, `display_name`, `description`, and `usage_hints`. If none of those overlap the buyer's request, the LLM never even sees your API as a candidate. Make these four fields concrete and request-shaped.
+- `tool_selector` runs a keyword-based hard filter (the `tool_selector` step above, Path 2) over your `capability_key`, `display_name`, `description`, and `usage_hints`. If none of those overlap the buyer's request, the LLM never even sees your API as a candidate. Make these four fields concrete and request-shaped.
 - Once your API *is* in the candidate set, the LLM reads a short tool-description string while picking between candidates. That string is sourced from your manual via the fallback chain `tool_prompt_compact` → `compact_prompt` → `description` → `summary_for_model` → listing description / title / `capability_key`. In practice the LLM almost always sees `tool_prompt_compact` (or `compact_prompt`), so polish that field first; `summary_for_model` and the others are only fallbacks if the earlier sources are empty. `trigger_conditions` is captured in the schema for the publish gate's quality check but is not threaded into the LLM-visible tool description today — keep it accurate, but don't expect it to move the planner directly.
 
-This pipeline is the substrate behind both the [Acceptance bar](#acceptance-bar) (the scorer at stage "pre-publish") and the [Important: revenue is not guaranteed](#important-revenue-is-not-guaranteed) reality (stages 1–5 at runtime). The acceptance bar tells you whether you can list; the runtime pipeline decides whether you actually get *picked* once listed.
+These same Tool Manual fields feed both gates that matter to you: the [Acceptance bar](#acceptance-bar) (the pre-publish scorer that decides whether you can *list*) and the selection step that decides whether you actually get *picked* once listed — your buyer's own AI on Path 1, or `tool_selector` on Path 2. Polishing them is the one lever that helps on every path, so do it before you worry about anything else. (See also [Important: revenue is not guaranteed](#important-revenue-is-not-guaranteed).)
 
 ---
 
@@ -457,7 +626,7 @@ siglume register .
 siglume register . --draft-only
 ```
 
-Or generate a wrapper directly from a first-party owner operation:
+Or generate a local wrapper scaffold from first-party owner-operation metadata:
 
 ```bash
 siglume init --list-operations
@@ -516,8 +685,11 @@ search, synthesized tool metadata, and mock-friendly invocation wiring.
 
 ## Agent behavior operations
 
-Use the owner-operation surface when you need to inspect or tune an agent's
-charter, approval policy, or delegated budget from external tooling.
+Use owner-operation helpers when you need to inspect or tune an agent's
+charter, approval policy, or delegated budget from authenticated owner-session
+tooling. Some generated wrappers depend on
+`/v1/owner/agents/{agent_id}/operations/execute`; verify that route exists in
+the target platform environment before relying on them outside local tests.
 
 - Python example: [examples/agent_behavior_adapter.py](./examples/agent_behavior_adapter.py)
 - TypeScript example: [examples-ts/agent_behavior_adapter.ts](./examples-ts/agent_behavior_adapter.ts)
@@ -537,18 +709,28 @@ or a blank starter template.
 - Coverage inventory: [docs/sdk/v0.6-operation-inventory.md](./docs/sdk/v0.6-operation-inventory.md)
 - Generated review samples: [examples/generated](./examples/generated)
 
-## Experimental metering
+## Metering And Operation Billing
 
-Use `MeterClient` when you want to record usage events for analytics or future
-usage-based / per-action billing previews.
+Use `PriceModel.USAGE_BASED` or `PriceModel.PER_ACTION` for free-upfront
+capability calls that bill from the execution receipt. Use `MeterClient` only
+when you want to record separate usage events for analytics or deterministic
+invoice previews.
 
 - Python example: [examples/metering_record.py](./examples/metering_record.py)
 - TypeScript example: [examples-ts/metering_record.ts](./examples-ts/metering_record.ts)
 - API notes: [docs/metering.md](./docs/metering.md)
 
-The public platform still accepts only `free` and `subscription` listings at
-registration time. `usage_based` and `per_action` remain planned values, so the
-metering surface is marked experimental and confirms event receipt only.
+The runtime billing path is the capability `ExecutionResult`: return a
+machine-readable `receipt_summary.operation` / `request_type` that matches a
+`pricing_plan` item. The platform creates no payment for a `0`-priced item and
+creates a post-execution payment requirement only for a positive plan-priced
+operation.
+
+After a run, inspect execution evidence with `siglume dev tail`,
+`siglume dev tail --listing-id <listing_id>`, or the Python helpers
+`list_execution_receipts()` and `list_listing_recent_receipts()`. See
+[Developer Observability](./docs/developer-observability.md) for the CLI,
+SDK, privacy boundary, and support checklist.
 
 ## Web3 settlement helpers
 
@@ -574,7 +756,7 @@ your payment adapter without touching a live wallet.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows experimental usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -586,7 +768,7 @@ your payment adapter without touching a live wallet.
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
-| [metering_record.py](./examples/metering_record.py) | client | ✅ | Record experimental usage events and preview future invoice lines |
+| [metering_record.py](./examples/metering_record.py) | client | ✅ | Record usage events and preview invoice lines |
 | [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
 | [embedded_wallet_payment.ts](./examples-ts/embedded_wallet_payment.ts) | `PAYMENT` | ✅ | TypeScript mirror of the embedded-wallet settlement flow |
 | [visual_publisher.py](./examples/visual_publisher.py) | `ACTION` | starter | Generate images and publish social posts |
@@ -614,8 +796,10 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Agent-Readable Listings](docs/agent-readable-listings.md) | Write listing copy (description / examples / price) that agents judge correctly *before* they bind |
 | [Buyer-side SDK](docs/buyer-sdk.md) | Discover and invoke Siglume capabilities from LangChain / Claude-style runtimes |
 | [Agent Behavior Operations](docs/agent-behavior.md) | Inspect owned agents and mirror charter / approval / budget operations, with the example adapter stopping at an approval proposal preview |
-| [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers directly from the owner-operation catalog |
-| [Metering](docs/metering.md) | Record usage events and preview future usage-based invoice lines |
+| [Template Generator](docs/template-generator.md) | Generate `AppAdapter` wrappers from live or bundled owner-operation metadata |
+| [Metering](docs/metering.md) | Implement free-upfront usage/per-action billing and record usage-event analytics |
+| [Platform / API Responsibility Boundary](docs/platform-api-boundary.md) | Understand what Siglume owns vs what your API owns for payment, retries, and side effects |
+| [Developer Observability](docs/developer-observability.md) | Inspect runtime logs, receipts, listing activity, and support identifiers |
 | [Web3 Settlement Helpers](docs/web3-settlement.md) | Read Polygon mandate / receipt data and simulate local settlement flows |
 | [API Reference](openapi/developer-surface.yaml) | OpenAPI spec for the developer surface |
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
@@ -647,17 +831,6 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | `AppTestHarness` | Local sandbox test runner (incl. quote, payment, receipt validation) |
 | `StubProvider` | Mock external APIs for testing |
 
-### AIWorks extension (`siglume_api_sdk_aiworks`)
-
-Separate module for AIWorks job fulfillment. Import only if your app participates in AIWorks.
-
-| Component | What it does |
-|---|---|
-| `JobExecutionContext` | Context provided when fulfilling an AIWorks job |
-| `FulfillmentReceipt` | Structured receipt for job completion |
-| `DeliverableSpec` | What the buyer expects the agent to produce |
-| `BudgetSnapshot` | Budget information from the order |
-
 ## Acceptance bar
 
 Your API gets listed when it passes these three checks:
@@ -679,9 +852,8 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v0.10.3 (beta)** — the platform is launched on Polygon mainnet
-(chainId 137) with all five settlement surfaces (Plan / Partner / API
-Store paid / AIWorks Escrow / Ads) live on-chain, and the SDK has
+This is **v1.2.2 (beta)** — the platform is launched on Polygon mainnet
+(chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship
 as the platform exposes them. Start with a small read-only API to learn

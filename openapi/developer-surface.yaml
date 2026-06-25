@@ -99,8 +99,7 @@ paths:
         The `201` response is the registration receipt consumed by the CLI and
         SDK before optional immediate publish. It includes whether the operation
         created a fresh draft, refreshed an existing draft, or staged an upgrade
-        against an already-published listing, plus seller OAuth readiness when
-        connected-account seeds were provided.
+        against an already-published listing.
 
         `source_code` is still accepted when you want the platform to infer
         fields heuristically. `source_url` is also accepted as the provenance
@@ -233,12 +232,15 @@ paths:
                   description: Override auto-detected name
                 job_to_be_done:
                   type: string
+                  maxLength: 240
                   description: Buyer-facing task this API lets an agent complete.
                 short_description:
                   type: string
-                  description: Concise buyer-facing catalog summary.
+                  maxLength: 60
+                  description: Concise buyer-facing catalog tagline.
                 description:
                   type: string
+                  maxLength: 1000
                   description: Optional long buyer-facing detail shown on the API Store detail page.
                 category:
                   type: string
@@ -259,16 +261,37 @@ paths:
                 seller_social_url:
                   type: string
                   description: Optional official seller social/profile URL, separate from docs_url
+                publisher_type:
+                  type: string
+                  enum: [user, company]
+                  description: Publishing subject. Use `company` with `company_id` to publish under a Siglume company name.
+                company_id:
+                  type: string
+                  description: Siglume company id to publish under when publisher_type is `company`.
+                publisher_company_id:
+                  type: string
+                  description: Alias for company_id.
+                store_vertical:
+                  type: string
+                  enum: [api, game]
+                  description: Required explicit store surface. Use `api` for normal API Store listings and `game` for Game API Store listings.
                 jurisdiction:
                   type: string
                   description: Governing ISO 3166-1 alpha-2 country code for this API
                 price_model:
                   type: string
-                  enum: [free, subscription]
-                  description: Pricing model
+                  enum: [free, subscription, per_request, usage_based, per_action]
+                  description: Pricing model. `usage_based` and `per_action` price operations from pricing_plan. With billing_timing=post they settle after the execution receipt; with billing_timing=prepay they require a quote and direct payment before ACTION execution.
                 price_value_minor:
                   type: integer
-                  description: Price in cents (e.g., 999 for $9.99/month). Minimum 500 for subscriptions.
+                  description: Fixed price in minor currency units. Required for subscription/per_request; optional default hint for usage_based/per_action.
+                pricing_plan:
+                  $ref: '#/components/schemas/PricingPlan'
+                billing_timing:
+                  type: string
+                  enum: [post, prepay]
+                  default: post
+                  description: Billing timing for usage_based/per_action. `post` settles from the execution receipt after the API runs. `prepay` requires a quote/draftToken and confirmed payment before ACTION execution.
                 permission_class:
                   type: string
                   enum: [read-only, recommendation, action, payment]
@@ -305,52 +328,48 @@ paths:
                     type: string
                 required_connected_accounts:
                   type: array
-                  description: Manifest/listing connected-account requirements. Plain strings are API-managed; objects with platform_managed=true require seller OAuth credentials and must match ToolManual.requires_connected_accounts.
+                  description: Manifest/listing connected-account requirements. Use managed_by="api" with an absolute connect_url when an external account authorization flow is required.
                   items:
                     oneOf:
                       - type: string
                       - type: object
-                oauth_credentials:
-                  type: object
-                  description: |
-                    Optional seller-owned OAuth app credentials. Required when
-                    `required_connected_accounts` declares platform-managed
-                    OAuth provider objects. Plain provider strings are
-                    API-managed and do not require this seed. Include these
-                    during the initial registration and during upgrades that add
-                    a new platform-managed provider. The portal OAuth panel is
-                    for rotation / repair after registration, not the initial
-                    setup step.
-                  properties:
-                    items:
-                      type: array
-                      items:
-                        $ref: '#/components/schemas/ListingOAuthCredentialsRequest'
                 runtime_validation:
                   type: object
                   description: |
                     Public runtime checks that Siglume runs before creating the draft.
                     Siglume calls `healthcheck_url` with GET. It calls `invoke_url`
-                    with `invoke_method` (default POST), sends the dedicated review
-                    auth header, and sends `request_payload` as JSON for POST or
-                    query parameters for GET. The live JSON response must contain
-                    every path in `expected_response_fields`, and those paths must
-                    be declared by ToolManual.output_schema. `request_payload` is
-                    the canonical sample request field; compatibility aliases are
-                    also accepted by the server.
-                  anyOf:
-                    - required: [request_payload]
-                    - required: [test_request_body]
-                    - required: [runtime_sample]
-                    - required: [sample_request_payload]
-                    - required: [runtime_sample_request]
+                    with `invoke_method` (default POST), attaches the runtime auth
+                    header, and sends `request_payload` as JSON for POST or query
+                    parameters for GET. The live JSON response must contain every
+                    path in `expected_response_fields`, and those paths must be
+                    declared by ToolManual.output_schema.
+
+                    `runtime_auth_header_name` / `runtime_auth_header_value` carry
+                    the shared secret Siglume attaches when it calls `invoke_url`.
+                    The SAME value is used at registration validation AND at
+                    production runtime invocation — for ACTION / per-action / prepay
+                    APIs it is the trust boundary on live side-effect requests, not a
+                    throwaway test key. Use a strong, random, dedicated secret; keep
+                    it in the Git-ignored `runtime_validation.json`; never reuse your
+                    master API key; rotate it if it leaks. The legacy
+                    `test_auth_header_name` / `test_auth_header_value` aliases are
+                    still accepted. `request_payload` is the canonical sample request
+                    field; compatibility aliases are also accepted by the server.
                   required:
                     - public_base_url
                     - healthcheck_url
                     - invoke_url
-                    - test_auth_header_name
-                    - test_auth_header_value
                     - expected_response_fields
+                  allOf:
+                    - anyOf:
+                        - required: [request_payload]
+                        - required: [test_request_body]
+                        - required: [runtime_sample]
+                        - required: [sample_request_payload]
+                        - required: [runtime_sample_request]
+                    - anyOf:
+                        - required: [runtime_auth_header_name, runtime_auth_header_value]
+                        - required: [test_auth_header_name, test_auth_header_value]
                   properties:
                     public_base_url:
                       type: string
@@ -365,12 +384,28 @@ paths:
                       type: string
                       enum: [GET, POST]
                       description: HTTP method used for the functional test call
+                    runtime_auth_header_name:
+                      type: string
+                      description: |
+                        Name of the runtime auth header Siglume attaches when it
+                        calls invoke_url (e.g. "X-Siglume-Auth"). Used at both
+                        registration validation and production runtime invocation.
+                    runtime_auth_header_value:
+                      type: string
+                      description: |
+                        Value of the runtime auth header — a strong, dedicated shared
+                        secret Siglume sends on every invocation (registration
+                        validation AND production runtime). Keep it in the Git-ignored
+                        runtime_validation.json, never reuse your master API key, and
+                        rotate it if it leaks.
                     test_auth_header_name:
                       type: string
-                      description: Header name used for the dedicated review/test credential
+                      deprecated: true
+                      description: Legacy alias for runtime_auth_header_name. Prefer runtime_auth_header_name in new payloads.
                     test_auth_header_value:
                       type: string
-                      description: Header value used for the dedicated review/test credential
+                      deprecated: true
+                      description: Legacy alias for runtime_auth_header_value. Prefer runtime_auth_header_value in new payloads.
                     request_payload:
                       type: object
                       additionalProperties: true
@@ -459,20 +494,34 @@ paths:
                             metadata:
                               type: object
                               additionalProperties: true
-                  oauth_status:
-                    type: object
-                    description: Seller OAuth seed readiness derived from the submitted oauth_credentials payload.
-                    properties:
-                      configured:
-                        type: boolean
-                      missing_providers:
-                        type: array
-                        items:
-                          type: string
-                    additionalProperties: true
                   review_url:
                     type: string
                     description: Dashboard URL where the seller can inspect the receipt before publishing.
+
+  /market/company-publishers:
+    get:
+      operationId: listCompanyPublishers
+      summary: List companies available for company-name publishing
+      description: |
+        Returns active companies where the authenticated user can publish API
+        Store or Game API Store listings under the company name. Paid company
+        registrations must use a company with `settlement_wallet_ready=true`;
+        resulting net seller revenue is split equally among active formal
+        members captured at revenue-confirmation time.
+      tags: [Capabilities]
+      responses:
+        '200':
+          description: Company publisher candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyPublisherPageEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 
   /market/capabilities/{listingId}/confirm-auto-register:
     post:
@@ -543,6 +592,11 @@ paths:
                       type: string
                     price_value_minor:
                       type: integer
+                    pricing_plan:
+                      $ref: '#/components/schemas/PricingPlan'
+                    billing_timing:
+                      type: string
+                      enum: [post, prepay]
                     dry_run_supported:
                       type: boolean
                     jurisdiction:
@@ -565,6 +619,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConfirmAutoRegisterEnvelope'
+
+  /market/capabilities/{listingId}/company-publish-approval:
+    post:
+      operationId: requestCompanyPublishApproval
+      summary: Request founder approval for a company listing
+      description: |
+        Used by a responsible company member after auto-register creates or
+        updates a company-name listing. Founder users are approved immediately;
+        other active members move the listing to `approval_required` and notify
+        the founder before public publish can continue.
+      tags: [Capabilities]
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyPublishApprovalRequest'
+      responses:
+        '200':
+          description: Updated listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /market/capabilities/{listingId}/company-publish-approval/decision:
+    post:
+      operationId: decideCompanyPublishApproval
+      summary: Approve or reject company listing publication
+      description: |
+        Founder-only decision endpoint for company-name API Store and Game API
+        Store listings. Approved listings may proceed through the normal
+        self-serve publish gate; rejected listings keep the reason so the
+        responsible publisher can reapply.
+      tags: [Capabilities]
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyPublishApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Updated listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppListingEnvelope'
+        '403':
+          description: Founder required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 
   /market/tool-manuals/preview-quality:
     post:
@@ -840,6 +966,7 @@ paths:
     get:
       operationId: listOwnerAgentOperations
       summary: List first-party owner operations for an agent
+      description: Owner/session route for environments where the owner-operation catalog is exposed. It is not a publisher CLI/API-key automation route; pass an authenticated owner session bearer and the target agent_id.
       tags: [OwnerOperations]
       parameters:
         - name: agent_id
@@ -867,6 +994,7 @@ paths:
     post:
       operationId: executeOwnerAgentOperation
       summary: Execute a first-party owner operation
+      description: Owner/session route for environments where the owner-operation execute surface is exposed. It is not a publisher CLI/API-key automation route; pass an authenticated owner session bearer and the target agent_id.
       tags: [OwnerOperations]
       parameters:
         - name: agent_id
@@ -897,7 +1025,7 @@ paths:
     get:
       operationId: listWebhookSubscriptions
       summary: List webhook subscriptions
-      description: List the current developer's webhook subscriptions for marketplace lifecycle events.
+      description: List the current developer's webhook subscriptions for marketplace lifecycle events. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       responses:
         '200':
@@ -915,7 +1043,7 @@ paths:
     post:
       operationId: createWebhookSubscription
       summary: Create webhook subscription
-      description: Register a signed callback URL for subscription, payment, capability, and execution events.
+      description: Register a signed callback URL for subscription, payment, capability, and execution events. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       requestBody:
         required: true
@@ -941,6 +1069,7 @@ paths:
     get:
       operationId: getWebhookSubscription
       summary: Get webhook subscription
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -971,6 +1100,7 @@ paths:
     post:
       operationId: rotateWebhookSubscriptionSecret
       summary: Rotate webhook signing secret
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -995,6 +1125,7 @@ paths:
     post:
       operationId: pauseWebhookSubscription
       summary: Pause webhook subscription
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1019,6 +1150,7 @@ paths:
     post:
       operationId: resumeWebhookSubscription
       summary: Resume webhook subscription
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1043,7 +1175,7 @@ paths:
     get:
       operationId: listWebhookDeliveries
       summary: List webhook deliveries
-      description: Inspect recent webhook deliveries, filter by subscription, event type, or delivery status.
+      description: Inspect recent webhook deliveries, filter by subscription, event type, or delivery status. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: subscription_id
@@ -1076,6 +1208,7 @@ paths:
     post:
       operationId: redeliverWebhookDelivery
       summary: Redeliver webhook event
+      description: Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       parameters:
         - name: delivery_id
@@ -1100,7 +1233,7 @@ paths:
     post:
       operationId: sendWebhookTestDelivery
       summary: Queue a test webhook delivery
-      description: Queue one of the supported webhook event types to validate your endpoint wiring before going live.
+      description: Queue one of the supported webhook event types to validate your endpoint wiring before going live. Current production auth is a signed-in Developer Portal/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Webhooks]
       requestBody:
         required: true
@@ -1180,9 +1313,9 @@ paths:
         immediately when the self-serve checks pass; it does not enqueue
         a separate manual review step.
 
-        Both free and subscription listings are supported.
-        Use `price_model=free` for free APIs, or `price_model=subscription`
-        for paid APIs with Polygon payout wallets (93.4% developer share).
+        Free, subscription, per_request, usage_based, and per_action listings are supported.
+        Use `price_model=usage_based` or `price_model=per_action` when the API must run
+        before the exact billable amount is known. Paid models require Polygon payout wallets.
       parameters:
         - name: listingId
           in: path
@@ -1280,158 +1413,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 
-  /market/connected-accounts:
-    get:
-      operationId: listConnectedAccounts
-      summary: List connected external accounts
-      parameters:
-        - name: provider_key
-          in: query
-          schema: { type: string }
-        - name: environment
-          in: query
-          schema: { type: string, enum: [sandbox, live] }
-        - name: cursor
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Connected accounts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountPageEnvelope'
-    post:
-      operationId: createConnectedAccount
-      summary: Connect an external account
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConnectedAccountRequest'
-      responses:
-        '201':
-          description: Connected
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountEnvelope'
-
-  /me/connected-accounts/oauth/authorize:
-    post:
-      operationId: startConnectedAccountOAuth
-      summary: Begin the buyer OAuth flow for a specific listing
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConnectedAccountOAuthAuthorizeRequest'
-      responses:
-        '201':
-          description: Authorization URL generated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountOAuthStartEnvelope'
-
-  /me/connected-accounts/oauth/callback:
-    post:
-      operationId: completeConnectedAccountOAuth
-      summary: Complete the buyer OAuth flow with provider callback params
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConnectedAccountOAuthCallbackRequest'
-      responses:
-        '200':
-          description: Connected-account lifecycle summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
-
-  /me/connected-accounts/{accountId}/refresh:
-    post:
-      operationId: refreshConnectedAccount
-      summary: Refresh a connected account without exposing provider tokens
-      parameters:
-        - name: accountId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Refreshed connected-account lifecycle summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
-
-  /me/connected-accounts/{accountId}/revoke:
-    post:
-      operationId: revokeConnectedAccount
-      summary: Revoke a connected account and return lifecycle metadata
-      parameters:
-        - name: accountId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Revoked connected-account lifecycle summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConnectedAccountLifecycleEnvelope'
-
-  /market/capabilities/{listingId}/oauth-credentials:
-    get:
-      operationId: getListingOAuthCredentialsStatus
-      summary: Read the post-registration seller OAuth credential status for a listing
-      parameters:
-        - name: listingId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Listing OAuth credential status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
-    put:
-      operationId: setListingOAuthCredentials
-      summary: Rotate or repair seller-owned OAuth client credentials for a listing
-      parameters:
-        - name: listingId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ListingOAuthCredentialsRequest'
-      responses:
-        '200':
-          description: Listing OAuth credential status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListingOAuthCredentialsStatusEnvelope'
-
   /market/sandbox/sessions:
     post:
       operationId: createSandboxSession
@@ -1457,6 +1438,7 @@ paths:
     get:
       operationId: listUsageEvents
       summary: Query usage events
+      description: Current production auth is a signed-in owner/session bearer. CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       parameters:
         - name: capability_key
           in: query
@@ -1491,7 +1473,7 @@ paths:
     post:
       operationId: recordUsageEvents
       summary: Record usage events
-      description: Experimental analytics / pre-billing ingest for future usage-based flows. The public platform still accepts only free and subscription price models for registration.
+      description: Usage analytics and metering ingest for usage_based and per_action flows. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       requestBody:
         required: true
         content:
@@ -1522,7 +1504,7 @@ paths:
     post:
       operationId: getWeb3SwapQuote
       summary: Get a cross-currency swap quote
-      description: Returns a live 0x quote when the platform is configured, with a deterministic mock fallback in local environments.
+      description: Returns a live 0x quote when the platform is configured, with a deterministic mock fallback in local environments. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Web3]
       requestBody:
         required: true
@@ -1554,6 +1536,7 @@ paths:
     get:
       operationId: listPolygonMandates
       summary: List Polygon payment mandates
+      description: List payment mandates for the signed-in owner account. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Web3]
       parameters:
         - name: status
@@ -1586,6 +1569,7 @@ paths:
     get:
       operationId: listSettlementReceipts
       summary: List Web3 settlement receipts
+      description: List settlement receipts for the signed-in owner account. Current production auth is a signed-in owner/session bearer; CLI tokens (cli_...) and MCP tokens (mcpsk_.../mcpoa_...) are not accepted by this route.
       tags: [Web3]
       parameters:
         - name: receipt_kind
@@ -1677,6 +1661,71 @@ paths:
 
 components:
   schemas:
+    PricingPlanItem:
+      type: object
+      additionalProperties: true
+      required: [key, price_minor]
+      properties:
+        key:
+          type: string
+          description: Stable operation key emitted in receipts, e.g. text_post or reply.
+        label:
+          type: string
+          description: Buyer-facing operation label.
+        price_minor:
+          type: integer
+          minimum: 0
+          description: Display price in minor currency units for this operation. JPY/JPYC paid operations must be 0 or at least 15.
+        amount_minor:
+          type: integer
+          minimum: 0
+          description: Alias for price_minor.
+        currency:
+          type: string
+          description: ISO currency or settlement token display code, e.g. JPY, USD, JPYC, USDC.
+        unit_label:
+          type: string
+        description:
+          type: string
+        receipt_code:
+          type: string
+          description: Optional receipt-side code that maps execution results to this row.
+
+    PricingPlan:
+      type: object
+      additionalProperties: true
+      description: |
+        Buyer-facing pricing plan. For usage_based/per_action listings, use
+        this to show operation-specific prices while keeping invocation free
+        up front. pricing_plan.items is required for usage_based/per_action.
+        Example items: connection check = 0 JPY, text post = 15 JPY, URL post = 20 JPY,
+        reply = 30 JPY. The execution receipt identifies the operation/request
+        type, but the matching pricing_plan item is authoritative for the
+        actual amount charged. For JPY/JPYC operation billing, 0 is allowed for
+        free operations and positive amounts must be at least 15 minor units.
+      properties:
+        billing_model:
+          type: string
+          enum: [free, subscription, per_request, usage_based, per_action]
+        display_name:
+          type: string
+        summary:
+          type: string
+        description:
+          type: string
+        currency:
+          type: string
+        unit_label:
+          type: string
+        free_upfront_invocation:
+          type: boolean
+        fallback_note:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingPlanItem'
+
     EnvelopeMeta:
       type: object
       required: [request_id, trace_id]
@@ -1702,13 +1751,16 @@ components:
         Listing request for the developer surface.
 
         Listing request for the Siglume developer surface.
-        Both free and subscription models are live. Use `price_model=free`
-        for free APIs, or `price_model=subscription` for paid APIs with a Polygon payout wallet.
+        Free, subscription, usage_based, and per_action models are live.
+        Use `price_model=free` for free APIs, `subscription` for recurring paid APIs,
+        or `usage_based` / `per_action` for free upfront invocation with post-execution
+        billing declared by the API result. Paid models require a Polygon payout wallet.
       properties:
         capability_key: { type: string, minLength: 1, maxLength: 128 }
         name: { type: string, minLength: 1, maxLength: 255 }
         description:
           type: string
+          maxLength: 1000
           description: |
             Long-form buyer-facing sales copy shown on the API detail page.
             Complements `short_description` (one-liner) with the full pitch:
@@ -1716,8 +1768,8 @@ components:
             connected accounts, quotas. Plain text. The Tool Manual is
             agent-facing at runtime and is not shown to buyers — put buyer
             copy here.
-        job_to_be_done: { type: string }
-        short_description: { type: string }
+        job_to_be_done: { type: string, maxLength: 240 }
+        short_description: { type: string, maxLength: 60 }
         category: { type: string, enum: [commerce, booking, crm, finance, document, communication, monitoring, creative, productivity, summarization, other] }
         permission_class: { type: string, enum: [read-only, action, payment, recommendation], description: "Supported tiers: read-only / action / payment. `recommendation` is a deprecated alias of read-only kept for backward compatibility; do not use in new manifests." }
         approval_mode: { type: string, enum: [auto, budget-bounded, always-ask, deny] }
@@ -1731,17 +1783,28 @@ components:
         permission_scopes: { type: array, items: { type: string } }
         price_model:
           type: string
-          enum: [free, subscription]
-          description: Pricing model. Only free and subscription are currently accepted by the public registration flow.
+          enum: [free, subscription, per_request, usage_based, per_action]
+          description: Pricing model. `usage_based` and `per_action` price operations from pricing_plan. With billing_timing=post they settle after the execution receipt; with billing_timing=prepay they require a quote and direct payment before ACTION execution.
         price_value_minor:
           type: integer
           minimum: 0
-          description: Price in minor currency units. Use 0 for free listings.
+          description: Fixed price in minor currency units. Use 0 for free and for post-execution models where each execution declares its own amount.
+        pricing_plan:
+          $ref: '#/components/schemas/PricingPlan'
+        billing_timing:
+          type: string
+          enum: [post, prepay]
+          default: post
+          description: Billing timing for usage_based/per_action. Use prepay for irreversible side effects.
         currency: { type: string, default: USD }
         docs_url: { type: string, description: "Public API usage guide; not a generic seller homepage." }
         support_contact: { type: string, description: "Real support email address or public support URL." }
         seller_homepage_url: { type: string, description: "Optional official seller homepage, separate from docs_url." }
         seller_social_url: { type: string, description: "Optional official seller social/profile URL, separate from docs_url." }
+        publisher_type: { type: string, enum: [user, company], description: "Publishing subject. Use company with company_id for company-name listings." }
+        company_id: { type: string, description: "Siglume company id when publisher_type is company." }
+        publisher_company_id: { type: string, description: "Alias for company_id." }
+        store_vertical: { type: string, enum: [api, game], description: "Store surface: api for API Store or game for Game API Store." }
         jurisdiction: { type: string, description: Governing ISO 3166-1 alpha-2 country code for the API }
         input_shape_summary: { type: string }
         output_shape_summary: { type: string }
@@ -1773,6 +1836,82 @@ components:
         sandbox_support: { type: string }
         status: { type: string }
         visibility: { type: string }
+
+    CompanyPublisher:
+      type: object
+      properties:
+        company_id: { type: string }
+        id: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string }
+        icon_image_url: { type: string, nullable: true }
+        is_founder: { type: boolean }
+        membership_role: { type: string, nullable: true }
+        membership_status: { type: string, nullable: true }
+        can_publish: { type: boolean }
+        can_approve: { type: boolean }
+        approval_required: { type: boolean }
+        paid_listing_allowed:
+          type: boolean
+          description: True when the candidate can publish paid listings without falling back to a personal wallet.
+        disabled_reasons:
+          type: array
+          items: { type: string }
+        company_terms_version: { type: string }
+        active_listing_count: { type: integer }
+        pending_approval_count: { type: integer }
+        settlement_wallet_ready:
+          type: boolean
+          description: True when a verified company settlement wallet exists for paid company listings.
+        settlement_wallets:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    CompanyPublisherPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyPublisher'
+        company_terms_version: { type: string }
+
+    CompanyPublisherPageEnvelope:
+      type: object
+      required: [data, meta, error]
+      properties:
+        data:
+          $ref: '#/components/schemas/CompanyPublisherPage'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - type: 'null'
+
+    CompanyPublishApprovalRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          description: Optional note shown in the company event log.
+
+    CompanyPublishApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, approved, reject, rejected]
+        reason:
+          type: string
+          description: Required by product policy when rejecting, shown to the responsible publisher.
+        note:
+          type: string
+          description: Alias for reason.
 
     AppListingPage:
       type: object
@@ -1814,6 +1953,9 @@ components:
         dry_run_supported: { type: boolean }
         price_model: { type: string }
         price_value_minor: { type: integer }
+        pricing_plan:
+          $ref: '#/components/schemas/PricingPlan'
+        billing_timing: { type: string, enum: [post, prepay] }
         currency: { type: string }
         fulfillment_kind: { type: string }
         status: { type: string }
@@ -1824,6 +1966,23 @@ components:
         seller_display_name: { type: string, nullable: true }
         seller_homepage_url: { type: string, nullable: true }
         seller_social_url: { type: string, nullable: true }
+        publisher_type: { type: string, enum: [user, company], nullable: true }
+        seller_type: { type: string, enum: [user, company], nullable: true }
+        publisher_company_id: { type: string, nullable: true }
+        company_id: { type: string, nullable: true }
+        publisher_company_name: { type: string, nullable: true }
+        company_name: { type: string, nullable: true }
+        company_publish_status:
+          type: string
+          nullable: true
+          enum: [not_required, approval_required, approval_requested, approved, rejected]
+        company_publish_rejection_reason: { type: string, nullable: true }
+        company_terms_version: { type: string, nullable: true }
+        store_revenue_total_net_minor:
+          type: integer
+          nullable: true
+          description: Lifetime company store net revenue after platform/payment/refund/adjustment deductions.
+        store_revenue_last_confirmed_at: { type: string, format: date-time, nullable: true }
         required_connected_accounts:
           type: array
           items:
@@ -1927,158 +2086,6 @@ components:
         agent_id: { type: string }
         binding_status: { type: string, default: active }
 
-    ConnectedAccountRequest:
-      type: object
-      required: [provider_key, account_role]
-      properties:
-        provider_key: { type: string }
-        account_role: { type: string }
-        external_account_ref: { type: string }
-        display_name: { type: string }
-        environment: { type: string, enum: [sandbox, live], default: live }
-        connection_status: { type: string, default: connected }
-        scopes: { type: array, items: { type: string } }
-        metadata: { type: object }
-
-    ConnectedAccountOAuthAuthorizeRequest:
-      type: object
-      required: [listing_id, redirect_uri]
-      properties:
-        listing_id: { type: string }
-        redirect_uri: { type: string, format: uri }
-        scopes:
-          type: array
-          items: { type: string }
-        account_role: { type: string, nullable: true }
-
-    ConnectedAccountOAuthStart:
-      type: object
-      properties:
-        authorize_url: { type: string, format: uri }
-        state: { type: string }
-        provider_key: { type: string }
-        scopes:
-          type: array
-          items: { type: string }
-        pkce_method: { type: string, nullable: true }
-
-    ConnectedAccountOAuthStartEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountOAuthStart'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ConnectedAccountOAuthCallbackRequest:
-      type: object
-      required: [state, code]
-      properties:
-        state: { type: string }
-        code: { type: string }
-
-    ConnectedAccountLifecycle:
-      type: object
-      properties:
-        connected_account_id: { type: string }
-        provider_key: { type: string }
-        expires_at: { type: string, format: date-time, nullable: true }
-        scopes:
-          type: array
-          items: { type: string }
-        refreshed_at: { type: string, format: date-time, nullable: true }
-        connection_status: { type: string, nullable: true }
-        provider_revoked: { type: boolean, nullable: true }
-        revoked_at: { type: string, format: date-time, nullable: true }
-
-    ConnectedAccountLifecycleEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountLifecycle'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ListingOAuthCredentialsRequest:
-      type: object
-      required: [provider_key, client_id, client_secret, authorize_url, token_url]
-      properties:
-        provider_key: { type: string }
-        client_id: { type: string }
-        client_secret: { type: string }
-        authorize_url: { type: string, format: uri }
-        token_url: { type: string, format: uri }
-        revoke_url: { type: string, format: uri, nullable: true }
-        display_name: { type: string, nullable: true }
-        scope_separator: { type: string, nullable: true, default: ' ' }
-        token_endpoint_auth: { type: string, nullable: true }
-        pkce_required: { type: boolean, nullable: true }
-        refresh_supported: { type: boolean, nullable: true }
-        available_scopes:
-          type: array
-          items: { type: string }
-        required_scopes:
-          type: array
-          items: { type: string }
-
-    ListingOAuthCredentialsStatus:
-      type: object
-      properties:
-        listing_id: { type: string }
-        provider_key: { type: string }
-        configured: { type: boolean }
-        required_scopes:
-          type: array
-          items: { type: string }
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              provider_key: { type: string }
-              configured: { type: boolean }
-              authorize_url: { type: string, nullable: true }
-              token_url: { type: string, nullable: true }
-              revoke_url: { type: string, nullable: true }
-              display_name: { type: string, nullable: true }
-              scope_separator: { type: string, nullable: true }
-              token_endpoint_auth: { type: string, nullable: true }
-              pkce_required: { type: boolean, nullable: true }
-              refresh_supported: { type: boolean, nullable: true }
-              available_scopes:
-                type: array
-                items: { type: string }
-              required_scopes:
-                type: array
-                items: { type: string }
-              updated_at:
-                anyOf:
-                  - type: string
-                  - type: 'null'
-
-    ListingOAuthCredentialsStatusEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ListingOAuthCredentialsStatus'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
     ApprovalChallengeRequest:
       type: object
       required: [agent_id, capability_key, task_type]
@@ -2156,7 +2163,7 @@ components:
         binding_status: { type: string, enum: [active, paused, removed] }
         created_by_user_id: { type: string, nullable: true }
         disabled_at: { type: string, format: date-time, nullable: true }
-        selected_connected_accounts: { type: object }
+        metadata: { type: object }
         metadata: { type: object }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -2175,60 +2182,6 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/GrantBindingResult'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ConnectedAccount:
-      type: object
-      properties:
-        id: { type: string }
-        connected_account_id: { type: string }
-        owner_user_id: { type: string }
-        provider_key: { type: string }
-        account_role: { type: string }
-        external_account_ref: { type: string }
-        display_name: { type: string }
-        environment: { type: string, enum: [sandbox, live] }
-        connection_status: { type: string }
-        scopes: { type: array, items: { type: string } }
-        metadata: { type: object }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
-
-    ConnectedAccountPage:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConnectedAccount'
-        next_cursor: { type: string, nullable: true }
-        limit: { type: integer }
-        offset: { type: integer }
-
-    ConnectedAccountEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccount'
-        meta:
-          $ref: '#/components/schemas/EnvelopeMeta'
-        error:
-          anyOf:
-            - $ref: '#/components/schemas/ErrorResponse'
-            - type: 'null'
-
-    ConnectedAccountPageEnvelope:
-      type: object
-      required: [data, meta, error]
-      properties:
-        data:
-          $ref: '#/components/schemas/ConnectedAccountPage'
         meta:
           $ref: '#/components/schemas/EnvelopeMeta'
         error:
@@ -2809,10 +2762,6 @@ components:
             oneOf:
               - type: string
               - type: object
-        connected_accounts:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConnectedAccount'
         stub_providers_enabled: { type: boolean }
         simulated_receipts: { type: boolean }
         approval_simulator: { type: boolean }
@@ -2882,7 +2831,8 @@ components:
       required: [receipt_id]
       description: |
         Opaque reference to a CapabilityExecutionReceipt. Set by the runtime,
-        not by the app developer. Use to link AIWorks JobDeliverables.
+        not by the app developer. Use to correlate logs, receipts, and support
+        traces for one API execution.
       properties:
         receipt_id: { type: string, description: "UUID of CapabilityExecutionReceipt" }
         trace_id: { type: string, nullable: true }
@@ -2929,7 +2879,7 @@ components:
         job_to_be_done:
           type: string
           minLength: 10
-          maxLength: 500
+          maxLength: 240
         summary_for_model:
           type: string
           minLength: 10

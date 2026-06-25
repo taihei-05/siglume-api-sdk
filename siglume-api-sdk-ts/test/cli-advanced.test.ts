@@ -78,6 +78,7 @@ async function createEchoProject(validManual = true): Promise<string> {
     '      name: "Echo Helper",',
     '      job_to_be_done: "Return the provided input in a structured echo response.",',
     "      category: AppCategory.OTHER,",
+    "      store_vertical: 'api' as const,",
     "      permission_class: PermissionClass.READ_ONLY,",
     "      approval_mode: ApprovalMode.AUTO,",
     "      dry_run_supported: true,",

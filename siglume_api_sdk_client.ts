@@ -1,4 +1,4 @@
-import type { ToolManual, ToolManualQualityReport } from "./siglume-api-types";
+import type { PricingPlan, ToolManual, ToolManualQualityReport } from "./siglume-api-types";
 
 export interface EnvelopeMeta {
   request_id?: string | null;
@@ -25,6 +25,7 @@ export interface AppListingRecord {
   dry_run_supported: boolean;
   price_model?: string | null;
   price_value_minor: number;
+  pricing_plan?: PricingPlan | null;
   currency: string;
   short_description?: string | null;
   description?: string | null;
@@ -33,8 +34,23 @@ export interface AppListingRecord {
   review_status?: string | null;
   review_note?: string | null;
   submission_blockers: string[];
+  persistence: Record<string, unknown>;
   created_at?: string | null;
   updated_at?: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CapabilitySaveStateRecord {
+  capability_key: string;
+  save_key: string;
+  schema_version: string;
+  revision: number;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  checksum?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  exists: boolean;
   raw: Record<string, unknown>;
 }
 
@@ -90,7 +106,6 @@ export interface SandboxSession {
   dry_run_supported: boolean;
   approval_mode?: string | null;
   required_connected_accounts: unknown[];
-  connected_accounts: Array<Record<string, unknown>>;
   stub_providers_enabled: boolean;
   simulated_receipts: boolean;
   approval_simulator: boolean;
@@ -127,20 +142,6 @@ export interface GrantBindingResult {
   access_grant: AccessGrantRecord;
   trace_id?: string | null;
   request_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface ConnectedAccountRecord {
-  connected_account_id: string;
-  provider_key: string;
-  account_role: string;
-  display_name?: string | null;
-  environment?: string | null;
-  connection_status?: string | null;
-  scopes: string[];
-  metadata: Record<string, unknown>;
-  created_at?: string | null;
-  updated_at?: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -491,124 +492,6 @@ export interface InstalledToolReceiptStepRecord {
   error_class?: string | null;
   connected_account_ref?: string | null;
   metadata_jsonb: Record<string, unknown>;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerDashboard {
-  partner_id: string;
-  company_name?: string | null;
-  plan?: string | null;
-  plan_label?: string | null;
-  month_bytes_used: number;
-  month_bytes_limit: number;
-  month_usage_pct: number;
-  total_source_items: number;
-  has_billing: boolean;
-  has_subscription: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerUsage {
-  plan?: string | null;
-  month_bytes_used: number;
-  month_bytes_limit: number;
-  month_bytes_remaining: number;
-  month_usage_pct: number;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerApiKeyRecord {
-  credential_id: string;
-  name?: string | null;
-  key_id?: string | null;
-  allowed_source_types: string[];
-  last_used_at?: string | null;
-  created_at?: string | null;
-  revoked: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface PartnerApiKeyHandle {
-  credential_id: string;
-  name?: string | null;
-  key_id?: string | null;
-  allowed_source_types: string[];
-  masked_key_hint?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsBilling {
-  currency?: string | null;
-  billing_mode?: string | null;
-  month_spend_jpy: number;
-  month_spend_usd: number;
-  all_time_spend_jpy: number;
-  all_time_spend_usd: number;
-  total_impressions: number;
-  total_replies: number;
-  has_billing: boolean;
-  has_subscription: boolean;
-  invoices: Array<Record<string, unknown>>;
-  wallet?: Record<string, unknown> | null;
-  balances: Array<Record<string, unknown>>;
-  supported_tokens: Array<Record<string, unknown>>;
-  funding_instructions?: Record<string, unknown> | null;
-  mandate?: PlanWeb3Mandate | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsBillingSettlement {
-  status?: string | null;
-  message?: string | null;
-  settles_automatically?: boolean | null;
-  cycle_key?: string | null;
-  settled_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsProfile {
-  has_profile: boolean;
-  company_name?: string | null;
-  ad_currency?: string | null;
-  has_billing: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsCampaignRecord {
-  campaign_id: string;
-  name?: string | null;
-  target_url?: string | null;
-  content_brief?: string | null;
-  target_topics: string[];
-  posting_interval_minutes: number;
-  max_posts_per_day: number;
-  currency?: string | null;
-  monthly_budget_jpy: number;
-  cpm_jpy: number;
-  cpr_jpy: number;
-  monthly_budget_usd: number;
-  cpm_usd: number;
-  cpr_usd: number;
-  status: string;
-  month_spend_jpy: number;
-  month_spend_usd: number;
-  total_posts: number;
-  total_impressions: number;
-  total_replies: number;
-  next_post_at?: string | null;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AdsCampaignPostRecord {
-  post_id: string;
-  content_id?: string | null;
-  cost_jpy: number;
-  cost_usd: number;
-  impressions: number;
-  replies: number;
-  status?: string | null;
   created_at?: string | null;
   raw: Record<string, unknown>;
 }
@@ -1047,6 +930,14 @@ export interface SiglumeClientShape {
   submit_review(listingId: string): Promise<AppListingRecord> | AppListingRecord;
   list_my_listings(...args: unknown[]): Promise<CursorPage<AppListingRecord>> | CursorPage<AppListingRecord>;
   get_listing(listingId: string): Promise<AppListingRecord> | AppListingRecord;
+  get_capability_state(capabilityKey: string, saveKey?: string): Promise<CapabilitySaveStateRecord> | CapabilitySaveStateRecord;
+  put_capability_state(
+    capabilityKey: string,
+    saveKey?: string,
+    payload?: Record<string, unknown>,
+    options?: { schema_version?: string; expected_revision?: number | null; metadata?: Record<string, unknown> },
+  ): Promise<CapabilitySaveStateRecord> | CapabilitySaveStateRecord;
+  delete_capability_state(capabilityKey: string, saveKey?: string): Promise<CapabilitySaveStateRecord> | CapabilitySaveStateRecord;
   list_capabilities(...args: unknown[]): Promise<CursorPage<AppListingRecord>> | CursorPage<AppListingRecord>;
   get_developer_portal(): Promise<DeveloperPortalSummary> | DeveloperPortalSummary;
   create_sandbox_session(...args: unknown[]): Promise<SandboxSession> | SandboxSession;
@@ -1212,45 +1103,6 @@ export interface SiglumeClientShape {
     agent_id?: string;
     lang?: string;
   }): Promise<InstalledToolReceiptStepRecord[]> | InstalledToolReceiptStepRecord[];
-  get_partner_dashboard(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerDashboard> | PartnerDashboard;
-  get_partner_usage(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerUsage> | PartnerUsage;
-  list_partner_api_keys(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerApiKeyRecord[]> | PartnerApiKeyRecord[];
-  create_partner_api_key(options?: {
-    agent_id?: string;
-    name?: string;
-    allowed_source_types?: string[];
-    lang?: string;
-  }): Promise<PartnerApiKeyHandle> | PartnerApiKeyHandle;
-  get_ads_billing(options?: {
-    agent_id?: string;
-    rail?: string;
-    lang?: string;
-  }): Promise<AdsBilling> | AdsBilling;
-  settle_ads_billing(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsBillingSettlement> | AdsBillingSettlement;
-  get_ads_profile(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsProfile> | AdsProfile;
-  list_ads_campaigns(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsCampaignRecord[]> | AdsCampaignRecord[];
-  list_ads_campaign_posts(campaign_id: string, options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsCampaignPostRecord[]> | AdsCampaignPostRecord[];
   update_agent_charter(...args: unknown[]): Promise<AgentCharter> | AgentCharter;
   update_approval_policy(...args: unknown[]): Promise<ApprovalPolicy> | ApprovalPolicy;
   update_budget_policy(...args: unknown[]): Promise<BudgetPolicy> | BudgetPolicy;
@@ -1262,7 +1114,6 @@ export interface SiglumeClientShape {
   reject_market_proposal(...args: unknown[]): Promise<MarketProposalActionResult> | MarketProposalActionResult;
   list_access_grants(...args: unknown[]): Promise<CursorPage<AccessGrantRecord>> | CursorPage<AccessGrantRecord>;
   bind_agent_to_grant(...args: unknown[]): Promise<GrantBindingResult> | GrantBindingResult;
-  list_connected_accounts(...args: unknown[]): Promise<CursorPage<ConnectedAccountRecord>> | CursorPage<ConnectedAccountRecord>;
   create_support_case(...args: unknown[]): Promise<SupportCaseRecord> | SupportCaseRecord;
   list_support_cases(...args: unknown[]): Promise<CursorPage<SupportCaseRecord>> | CursorPage<SupportCaseRecord>;
   create_webhook_subscription(options: {

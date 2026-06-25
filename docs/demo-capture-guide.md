@@ -1,4 +1,4 @@
-# Demo Capture Guide
+﻿# Demo Capture Guide
 
 Use this guide to record the SDK story in a way that matches the current beta
 surfaces and the actual route split in the web app.
@@ -14,10 +14,10 @@ The current beta separates buyer and seller flows:
 
 Paid subscription publishing is live in production on Polygon mainnet
 (chainId 137); see `PAYMENT_MIGRATION.md` for the deployed contract
-addresses. Record the embedded-wallet payout flow from Wallet at
-`/owner/credits/payout`, where only the payout token (USDC vs JPYC) can
-be changed. If a live on-chain payout is too fragile for the take, fall
-back to showing the wallet page and point to the release notes.
+addresses. Show that the manifest explicitly declares `currency="USD"` or
+`currency="JPY"`; USD listings settle in USDC, and JPY listings settle in
+JPYC. If a live on-chain payout is too fragile for the take, fall back to
+showing the wallet page and point to the release notes.
 
 ## Recommended demo flow
 

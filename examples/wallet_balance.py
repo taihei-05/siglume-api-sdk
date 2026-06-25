@@ -48,13 +48,16 @@ class WalletBalanceApp(AppAdapter):
             name="Wallet Balance",
             job_to_be_done="Read the owner's connected wallet balance on Ethereum or Polygon without moving funds.",
             category=AppCategory.FINANCE,
+            store_vertical="api",
             permission_class=PermissionClass.READ_ONLY,
             approval_mode=ApprovalMode.AUTO,
             dry_run_supported=True,
             required_connected_accounts=["metamask"],
             price_model=PriceModel.FREE,
+            currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
-            short_description="Read native-token or ERC-20 balances from a connected MetaMask wallet.",
+            short_description="Read balances from a connected MetaMask wallet.",
             example_prompts=[
                 "Check my Polygon wallet balance.",
                 "What's my USDC balance on Polygon right now?",
@@ -78,11 +81,7 @@ class WalletBalanceApp(AppAdapter):
             balance = 250.0 if token_symbol == "USDC" else 18.75
             usd_price = TOKEN_PRICES.get(token_symbol, 1.25)
         usd_equivalent = round(balance * usd_price, 2)
-        provider_key = (
-            ctx.connected_accounts.get("metamask").provider_key
-            if ctx.connected_accounts.get("metamask")
-            else "metamask"
-        )
+        provider_key = "metamask"  # Publisher resolves the owner wallet from ctx.owner_user_id.
         return ExecutionResult(
             success=True,
             execution_kind=ctx.execution_kind,

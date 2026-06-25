@@ -41,16 +41,6 @@ import {
   NetworkDiscoveryWrapperApp,
   runNetworkDiscoveryExample,
 } from "../../examples-ts/network_discovery_wrapper";
-import {
-  AdsCampaignWrapperApp,
-  buildToolManual as buildAdsCampaignToolManual,
-  runAdsCampaignExample,
-} from "../../examples-ts/ads_campaign_wrapper";
-import {
-  buildToolManual as buildPartnerDashboardToolManual,
-  PartnerDashboardWrapperApp,
-  runPartnerDashboardExample,
-} from "../../examples-ts/partner_dashboard_wrapper";
 import { buildStubs as buildCrmStubs, buildToolManual as buildCrmToolManual, CrmSyncApp, runCrmSyncExample } from "../../examples-ts/crm_sync";
 import { buildToolManual as buildNewsDigestToolManual, NewsDigestApp, runNewsDigestExample } from "../../examples-ts/news_digest";
 import {
@@ -109,20 +99,6 @@ const EXAMPLES = [
     createHarness: () => new AppTestHarness(new MarketProposalsWrapperApp()),
     createManual: () => buildMarketProposalsToolManual(),
     taskType: "stage_market_proposal_negotiation",
-  },
-  {
-    name: "partner_dashboard_wrapper",
-    permissionClass: PermissionClass.ACTION,
-    createHarness: () => new AppTestHarness(new PartnerDashboardWrapperApp()),
-    createManual: () => buildPartnerDashboardToolManual(),
-    taskType: "prepare_partner_source_onboarding",
-  },
-  {
-    name: "ads_campaign_wrapper",
-    permissionClass: PermissionClass.READ_ONLY,
-    createHarness: () => new AppTestHarness(new AdsCampaignWrapperApp()),
-    createManual: () => buildAdsCampaignToolManual(),
-    taskType: "review_ads_campaign_health",
   },
   {
     name: "network_discovery_wrapper",
@@ -281,29 +257,6 @@ describe("TypeScript example suite", () => {
     expect(lines[5]).toBe("summary: Browsed 2 network items for market signal discovery and hydrated claim clm_market_signal with evidence evd_press_release.");
   });
 
-  it("returns stable summary lines for partner_dashboard_wrapper", async () => {
-    const lines = await runPartnerDashboardExample();
-
-    expect(lines[0]).toBe("tool_manual_valid: true 0");
-    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
-    expect(lines[2]).toBe("dashboard: plan=starter usage=10.0 keys=2");
-    expect(lines[3]).toBe("created_key: cred_partner_3 hint=src_partner_3.********");
-    expect(lines[4]).toBe("dry_run: true");
-    expect(lines[5]).toBe("action: true");
-    expect(lines[6]).toContain("raw ingest_key is available only via POST /v1/partner/keys");
-  });
-
-  it("returns stable summary lines for ads_campaign_wrapper", async () => {
-    const lines = await runAdsCampaignExample();
-
-    expect(lines[0]).toBe("tool_manual_valid: true 0");
-    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
-    expect(lines[2]).toBe("campaigns_loaded: 2 first=cmp_ads_1");
-    expect(lines[3]).toBe("billing_profile: web3/usd profile=true");
-    expect(lines[4]).toBe("dry_run: true");
-    expect(lines[5]).toBe("summary: Loaded 2 ads campaigns for campaign pacing review; billing mode web3 with 1 recent posts for the first campaign.");
-  });
-
   it("returns stable summary lines for news_digest", async () => {
     const lines = await runNewsDigestExample();
 
@@ -331,7 +284,7 @@ describe("TypeScript example suite", () => {
   it("returns stable summary lines for metering_record", async () => {
     const lines = await runMeteringRecordExample();
 
-    expect(lines[0]).toContain("experimental_note: usage_based / per_action remain planned");
+    expect(lines[0]).toContain("metering_note: usage_based / per_action are live price models");
     expect(lines[1]).toBe("record_status: accepted=true replayed=false external_id=evt_usage_001");
     expect(lines[2]).toBe("batch_items: 2 last_period=202604");
     expect(lines[3]).toBe("preview_subtotal_minor: 7615");

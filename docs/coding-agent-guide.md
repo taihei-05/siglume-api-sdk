@@ -1,4 +1,4 @@
-# Coding Agent Guide
+﻿# Coding Agent Guide
 
 Use this file when a human asks a coding agent to build a Siglume API Store
 project. The goal is a small, publishable first API, not a complex platform
@@ -21,6 +21,39 @@ Good first API constraints:
 Avoid `ACTION`, `PAYMENT`, OAuth, and subscription pricing until the first API
 passes the local loop and the human understands the publish flow.
 
+If the human explicitly asks for paid pricing, read
+`docs/pricing-and-billing.md` and `docs/platform-api-boundary.md` first. Treat
+the live choices as:
+
+- free call: `price_model="free"`
+- subscription: `price_model="subscription"`
+- operation-based usage billing: `price_model="usage_based"` or
+  `"per_action"` plus `pricing_plan.items`
+
+For operation-based JPY/JPYC billing, free operations use `0` and paid
+operations must be at least `15` minor units. Use `billing_timing="prepay"` for
+irreversible side effects such as posting, sending, or other actions that must
+not run before payment succeeds.
+
+If the human asks for developer-funded reward or incentive payouts, read
+`docs/web3-settlement.md` and `docs/webhooks.md` before implementing anything.
+Do not assume `SIGLUME_API_KEY`, `cli_...`, `X-API-Key`, or
+`X-Siglume-API-Key` can call MCP Gateway. Reward payout execution uses
+`https://mcp.siglume.com/` with `Authorization: Bearer mcpsk_...` and
+`tools/call market_create_reward_payout`. `SIGLUME_API_KEY` is still used for
+Developer Surface work such as registration, validation, and listing
+automation. Webhook subscription routes currently require an authenticated
+Developer Portal/session context, not a CLI token. The `agent_id` is needed to
+issue the MCP token for the target agent; it is not a reward-payout argument.
+
+Keep the platform/API boundary strict. Siglume owns payment, authorization,
+operation price lookup, platform idempotency, retry state, and reconciliation
+state. The API owns external-provider behavior and the committed evidence that
+the side effect happened. Do not implement provider-specific success logic in
+platform-facing assumptions. A live action must not return draft-only,
+preview-only, ambiguous, or `status="ready"` output as a delivered result; it
+must return a stable provider id/URL or an explicit failure/no-op result.
+
 ## Files to create or update
 
 Create or update these files in the generated project:
@@ -34,12 +67,13 @@ Create or update these files in the generated project:
 Prepare, but do not commit real secrets in:
 
 - `runtime_validation.json`
-- `oauth_credentials.json`
 - `.env`
 
 `runtime_validation.json` can contain placeholders during scaffolding. After
-deployment, ask the human for the real public URLs and dedicated review/test
-key.
+deployment, ask the human for the real public URLs and the runtime auth header
+shared secret (`runtime_auth_header_name` / `runtime_auth_header_value`) — a
+strong, dedicated value Siglume sends on every call to `invoke_url`, at both
+registration validation and production runtime.
 
 ## Required local loop
 
@@ -62,8 +96,8 @@ After the local loop passes, tell the human exactly what is still needed:
 - invoke method
 - sample request payload
 - expected response fields
-- dedicated review/test auth header name
-- dedicated review/test auth header value
+- runtime auth header name (`runtime_auth_header_name`)
+- runtime auth header value (`runtime_auth_header_value`) — a strong, dedicated shared secret, not your master API key
 
 Then ask the human to fill the local, Git-ignored `runtime_validation.json`.
 If production credentials are needed, ask the human to run the command locally
@@ -92,7 +126,7 @@ publish. Use `--json` when another tool needs machine-readable output.
 
 Never commit:
 
-- real review/test keys
+- the real runtime auth header secret
 - OAuth client secrets
 - browser session tokens
 - `.env` files
@@ -119,7 +153,7 @@ The human can paste this into the coding agent:
 You are helping me build a Siglume Agent API Store project.
 
 Read README.md, GETTING_STARTED.md, docs/coding-agent-guide.md,
-docs/publish-flow.md, and examples/hello_echo.py.
+docs/platform-api-boundary.md, docs/publish-flow.md, and examples/hello_echo.py.
 
 My API idea is:
 [describe the API in plain language]
@@ -129,7 +163,7 @@ Do not add OAuth, payment, wallet, posting, or write actions for the first
 version.
 
 Create adapter.py, tool_manual.json, README.md, and any useful local tests.
-Keep runtime_validation.json, oauth_credentials.json, .env, and all real secrets
+Keep runtime_validation.json, .env, and all real secrets
 Git-ignored. Do not put real secrets in source code or committed docs.
 
 Make the project pass:

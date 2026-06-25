@@ -12,6 +12,7 @@ Developers implement the AppAdapter protocol and register it with Siglume.
 from __future__ import annotations
 
 import abc
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +22,12 @@ from typing import Any, Mapping
 # ISO 3166-1 alpha-2 country code, optionally with a sub-region suffix.
 # Examples: "US", "US-CA", "JP", "GB", "DE", "SG".
 _JURISDICTION_PATTERN = re.compile(r"^[A-Z]{2}(-[A-Z0-9]{1,3})?$")
+MINIMUM_JPY_OPERATION_PRICE_MINOR = 15
+_MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = {"JPY", "JPYC"}
+LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60
+LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240
+LISTING_DESCRIPTION_MAX_LENGTH = 1000
+_MAX_SAVE_DATA_SCHEMA_BYTES = 8192
 
 
 # ── Permission & Execution Models ──
@@ -63,16 +70,17 @@ class Environment(str, Enum):
 class PriceModel(str, Enum):
     """Pricing models for agent APIs.
 
-    Live: free, subscription (USD).
-    Planned: one_time, bundle, usage_based, per_action.
+    Live: free, subscription, per_request, usage_based, per_action.
+    Planned: one_time, bundle.
     Platform fee: 6.6%. Developer keeps 93.4%.
     """
     FREE = "free"                    # No charge.
     SUBSCRIPTION = "subscription"    # Monthly recurring (USD).
+    PER_REQUEST = "per_request"      # One direct payment requirement per invocation.
     ONE_TIME = "one_time"            # Planned: single purchase.
     BUNDLE = "bundle"                # Planned: bundled package.
-    USAGE_BASED = "usage_based"      # Planned: per-use metering.
-    PER_ACTION = "per_action"        # Planned: per-successful-action.
+    USAGE_BASED = "usage_based"      # Free upfront; execution declares billable usage.
+    PER_ACTION = "per_action"        # Free upfront; successful actions declare charges.
 
 
 class AppCategory(str, Enum):
@@ -86,7 +94,154 @@ class AppCategory(str, Enum):
     OTHER = "other"
 
 
+class StoreVertical(str, Enum):
+    API = "api"
+    GAME = "game"
+
+
+class PersistenceMode(str, Enum):
+    NONE = "none"
+    LOCAL = "local"
+    PLATFORM = "platform"
+    DEVELOPER_SERVER = "developer_server"
+
+
 # ── Data Transfer Objects ──
+
+class ListingCurrency(str, Enum):
+    USD = "USD"
+    JPY = "JPY"
+
+
+@dataclass
+class PersistencePolicy:
+    mode: PersistenceMode | str = PersistenceMode.NONE
+    schema_version: str = "1"
+    scope: str = "user_capability"
+    restore_required: bool = False
+    max_bytes: int | None = None
+    endpoint: str | None = None
+    description: str = ""
+    save_data_schema: dict[str, Any] | None = None
+
+
+def _normalize_persistence_mapping(value: PersistencePolicy | Mapping[str, Any] | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, PersistencePolicy):
+        mode = value.mode.value if isinstance(value.mode, PersistenceMode) else str(value.mode)
+        result: dict[str, Any] = {
+            "mode": mode,
+            "schema_version": value.schema_version,
+            "scope": value.scope,
+            "restore_required": bool(value.restore_required),
+        }
+        if value.max_bytes is not None:
+            result["max_bytes"] = value.max_bytes
+        if value.endpoint is not None:
+            result["endpoint"] = value.endpoint
+        if value.description:
+            result["description"] = value.description
+        if value.save_data_schema is not None:
+            result["save_data_schema"] = value.save_data_schema
+        return result
+    if isinstance(value, Mapping):
+        return dict(value)
+    raise ValueError("AppManifest.persistence must be a PersistencePolicy or mapping.")
+
+
+def _persistence_mode_to_string(value: Any) -> str:
+    raw = value.value if isinstance(value, PersistenceMode) else value
+    return str(raw or "").strip().lower()
+
+
+def _validate_save_data_schema(schema: Any, *, field_name: str) -> None:
+    if not isinstance(schema, Mapping):
+        raise ValueError(f"{field_name} must be a JSON Schema object.")
+    try:
+        schema_size = len(json.dumps(dict(schema), ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be JSON-serializable.") from None
+    if schema_size > _MAX_SAVE_DATA_SCHEMA_BYTES:
+        raise ValueError(f"{field_name} must be at most {_MAX_SAVE_DATA_SCHEMA_BYTES} bytes.")
+    schema_type = schema.get("type")
+    if schema_type != "object":
+        raise ValueError(f"{field_name}.type must be 'object'.")
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping) or not properties:
+        raise ValueError(f"{field_name}.properties must be a non-empty object.")
+    required = schema.get("required")
+    if required is not None:
+        if not isinstance(required, list) or not all(isinstance(item, str) for item in required):
+            raise ValueError(f"{field_name}.required must be an array of strings when provided.")
+        missing = [item for item in required if item not in properties]
+        if missing:
+            raise ValueError(
+                f"{field_name}.required references undefined properties: {', '.join(missing)}."
+            )
+
+
+def _validate_pricing_plan_floor(plan: Any, *, default_currency: str) -> None:
+    """Validate operation-level prices before the platform rejects the manifest."""
+    if plan is None:
+        return
+    if not isinstance(plan, Mapping):
+        raise ValueError("AppManifest.pricing_plan must be a dict/object when provided.")
+    raw_items = plan.get("items")
+    if raw_items is None:
+        return
+    if not isinstance(raw_items, list):
+        raise ValueError("AppManifest.pricing_plan.items must be a list when provided.")
+    plan_currency = str(plan.get("currency") or default_currency or "").strip().upper()
+    seen_keys: set[str] = set()
+    for index, item in enumerate(raw_items):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}] must be a dict/object.")
+        item_key = str(
+            item.get("key")
+            or item.get("operation")
+            or item.get("operation_key")
+            or item.get("request_type")
+            or item.get("receipt_code")
+            or item.get("action")
+            or ""
+        ).strip()
+        if not item_key:
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}].key is required.")
+        if item_key in seen_keys:
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}].key duplicates {item_key!r}.")
+        seen_keys.add(item_key)
+        amount_raw = None
+        for key in ("price_minor", "amount_minor", "cost_minor", "value_minor"):
+            if key in item and item.get(key) is not None:
+                amount_raw = item.get(key)
+                break
+        if amount_raw is None:
+            raise ValueError(f"AppManifest.pricing_plan.items[{index}].price_minor is required.")
+        try:
+            amount_minor = int(amount_raw)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be an integer."
+            ) from None
+        if amount_minor < 0:
+            raise ValueError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be zero or positive."
+            )
+        currency = str(item.get("currency") or plan_currency or default_currency or "").strip().upper()
+        if (
+            currency in _MINIMUM_JPY_OPERATION_PRICE_CURRENCIES
+            and 0 < amount_minor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+        ):
+            raise ValueError(
+                f"AppManifest.pricing_plan.items[{index}].price_minor must be 0 or at least "
+                f"{MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing."
+            )
+
+
+def _pricing_plan_has_items(plan: Any) -> bool:
+    return isinstance(plan, Mapping) and isinstance(plan.get("items"), list) and bool(plan.get("items"))
+
 
 @dataclass
 class AppManifest:
@@ -103,16 +258,20 @@ class AppManifest:
     capability_key: str                    # unique identifier e.g. "amazon-purchase-assistant"
     version: str = "0.1.0"
     name: str = ""                         # display name
-    job_to_be_done: str = ""               # what this app enables the agent to do
+    job_to_be_done: str = ""               # buyer-facing task summary, max 240 chars
     category: AppCategory = AppCategory.OTHER  # e.g. "commerce", "booking", "crm"
     permission_class: PermissionClass = PermissionClass.READ_ONLY
     approval_mode: ApprovalMode = ApprovalMode.AUTO
     dry_run_supported: bool = False
-    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. ["amazon"] or {"provider_key": "slack", "platform_managed": True}
+    required_connected_accounts: list[Any] = field(default_factory=list)  # e.g. {"provider_key": "slack", "managed_by": "api", "connect_url": "https://api.example.com/oauth/start"}
     permission_scopes: list[str] = field(default_factory=list)
     price_model: PriceModel = PriceModel.FREE
-    price_value_minor: int = 0             # in minor currency units (e.g. cents/yen)
-    currency: str = "USD"
+    price_value_minor: int = 0             # minor units for `currency` (USD cents, JPY yen)
+    pricing_plan: dict[str, Any] | None = None  # optional buyer-facing operation price table
+    billing_timing: str = "post"           # "post" (execute then settle) or "prepay" (quote then pay before action)
+    currency: ListingCurrency | str | None = None  # REQUIRED: "USD" -> USDC, "JPY" -> JPYC
+    allow_free_trial: bool | None = None   # REQUIRED: True/False must be an explicit publisher choice
+    free_trial_duration_days: int = 30     # 1-90 when allow_free_trial=True
     # REQUIRED. No default — every AppManifest must explicitly declare the
     # country whose law governs the offering. Ambiguous / missing values are
     # rejected at construction time and at platform registration.
@@ -124,26 +283,97 @@ class AppManifest:
     # calculation under JP vs US building codes) is the buyer's judgment,
     # not something the platform enforces. The platform surfaces `jurisdiction`
     # as a flag icon so buyers can make informed decisions.
-    short_description: str = ""
-    description: str = ""                  # optional long buyer-facing detail for the API Store page
+    short_description: str = ""            # catalog tagline, max 60 chars
+    description: str = ""                  # optional long buyer-facing detail, max 1000 chars
     docs_url: str = ""                     # public API usage guide; not a seller homepage
     support_contact: str = ""              # real support email address or public support URL
     seller_homepage_url: str = ""          # optional official seller homepage, separate from docs_url
     seller_social_url: str = ""            # optional official seller social/profile URL
+    publisher_type: str | None = None      # "user" (default) or "company"
+    company_id: str | None = None          # required when publisher_type is "company"
+    publisher_company_id: str | None = None  # alias accepted by the platform
+    store_vertical: StoreVertical | None = None  # REQUIRED: "api" for normal API Store, "game" for API games
     compatibility_tags: list[str] = field(default_factory=list)
     latency_tier: str = "normal"           # fast, normal, slow
     example_prompts: list[str] = field(default_factory=list)
+    persistence: PersistencePolicy | dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
-        # Currency: the API Store is USD-unified. Non-USD submissions
-        # are rejected at registration. Enforce here so developers get a clear
-        # error at adapter-construction time rather than a 422 at register.
-        if self.currency and self.currency.upper() != "USD":
+        if self.currency is None or str(self.currency).strip() == "":
             raise ValueError(
-                f"AppManifest.currency must be 'USD' — the API Store is "
-                f"USD-unified regardless of jurisdiction. Got: {self.currency!r}"
+                "AppManifest.currency is REQUIRED. Choose 'USD' for USDC "
+                "settlement or 'JPY' for JPYC settlement."
             )
-        self.currency = "USD"
+        currency = self.currency.value if isinstance(self.currency, ListingCurrency) else str(self.currency).strip().upper()
+        if currency not in {ListingCurrency.USD.value, ListingCurrency.JPY.value}:
+            raise ValueError(
+                "AppManifest.currency must be 'USD' or 'JPY'. "
+                f"Got: {self.currency!r}"
+            )
+        self.currency = ListingCurrency(currency)
+        _validate_pricing_plan_floor(self.pricing_plan, default_currency=currency)
+        billing_timing = str(self.billing_timing or "post").strip().lower()
+        if billing_timing not in {"post", "prepay"}:
+            raise ValueError("AppManifest.billing_timing must be 'post' or 'prepay'.")
+        self.billing_timing = billing_timing
+        price_model_value = self.price_model.value if isinstance(self.price_model, PriceModel) else str(self.price_model or "")
+        if price_model_value in {PriceModel.USAGE_BASED.value, PriceModel.PER_ACTION.value} and not _pricing_plan_has_items(
+            self.pricing_plan
+        ):
+            raise ValueError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.")
+        for field_name, max_length in (
+            ("short_description", LISTING_SHORT_DESCRIPTION_MAX_LENGTH),
+            ("job_to_be_done", LISTING_JOB_TO_BE_DONE_MAX_LENGTH),
+            ("description", LISTING_DESCRIPTION_MAX_LENGTH),
+        ):
+            value = getattr(self, field_name)
+            if value and len(value) > max_length:
+                raise ValueError(f"AppManifest.{field_name} must be at most {max_length} characters.")
+
+        if self.allow_free_trial is None:
+            raise ValueError(
+                "AppManifest.allow_free_trial is REQUIRED. Pass True to let Plus/Pro buyers "
+                "start a free trial of your paid API (counts against their monthly quota, "
+                "Plus 3 / Pro 10, lifetime once per buyer per listing). Pass False to disable. "
+                "Publishers can flip this later in the Developer Portal - no default is "
+                "applied because monetization strategy is a conscious choice."
+            )
+        if self.allow_free_trial:
+            if not isinstance(self.free_trial_duration_days, int) or isinstance(self.free_trial_duration_days, bool):
+                raise ValueError(
+                    "AppManifest.free_trial_duration_days must be an int when allow_free_trial=True"
+                )
+            if not (1 <= self.free_trial_duration_days <= 90):
+                raise ValueError(
+                    "AppManifest.free_trial_duration_days must be between 1 and 90 when "
+                    f"allow_free_trial=True, got: {self.free_trial_duration_days}"
+                )
+
+        if self.store_vertical is None or str(self.store_vertical).strip() == "":
+            raise ValueError(
+                "AppManifest.store_vertical is REQUIRED. Choose 'api' for "
+                "normal API Store listings or 'game' for API games."
+            )
+        vertical = self.store_vertical.value if isinstance(self.store_vertical, StoreVertical) else str(self.store_vertical).strip().lower()
+        if vertical not in {StoreVertical.API.value, StoreVertical.GAME.value}:
+            raise ValueError(
+                "AppManifest.store_vertical must be 'api' or 'game'. "
+                f"Got: {self.store_vertical!r}"
+            )
+        self.store_vertical = StoreVertical(vertical)
+        self._validate_persistence_contract()
+
+        company_id = (self.company_id or self.publisher_company_id or "").strip()
+        publisher_type = (self.publisher_type or "user").strip().lower()
+        if publisher_type not in {"user", "company"}:
+            raise ValueError("AppManifest.publisher_type must be 'user' or 'company'.")
+        if publisher_type == "company" and not company_id:
+            raise ValueError("AppManifest.company_id is required when publisher_type='company'.")
+        if publisher_type == "user" and company_id:
+            raise ValueError("AppManifest.company_id cannot be combined with publisher_type='user'.")
+        self.publisher_type = publisher_type
+        self.company_id = company_id or None
+        self.publisher_company_id = company_id or None
 
         if not self.jurisdiction:
             raise ValueError(
@@ -171,14 +401,31 @@ class AppManifest:
                 f"(optionally -subregion), got: {self.data_residency!r}"
             )
 
-
-@dataclass
-class ConnectedAccountRef:
-    """Opaque reference to a connected account. Does NOT contain raw credentials."""
-    provider_key: str
-    session_token: str  # short-lived, scoped token managed by Siglume
-    scopes: list[str] = field(default_factory=list)
-    environment: Environment = Environment.LIVE
+    def _validate_persistence_contract(self) -> None:
+        policy = _normalize_persistence_mapping(self.persistence)
+        if not policy:
+            return
+        mode = _persistence_mode_to_string(policy.get("mode"))
+        if not mode:
+            mode = "platform" if self.store_vertical == StoreVertical.GAME else "none"
+            policy["mode"] = mode
+        if mode not in {item.value for item in PersistenceMode}:
+            raise ValueError(
+                "AppManifest.persistence.mode must be one of: none, local, "
+                "platform, developer_server."
+            )
+        schema = policy.get("save_data_schema")
+        if self.store_vertical == StoreVertical.GAME and mode != PersistenceMode.NONE.value:
+            if schema is None:
+                raise ValueError(
+                    "AppManifest.persistence.save_data_schema is REQUIRED when "
+                    "store_vertical='game' and persistence.mode is not 'none'. "
+                    "Declare the JSON Schema for the game's save data."
+                )
+        if schema is not None:
+            _validate_save_data_schema(schema, field_name="AppManifest.persistence.save_data_schema")
+        if policy is not self.persistence:
+            self.persistence = policy
 
 
 @dataclass
@@ -191,7 +438,6 @@ class ExecutionContext:
     source_type: str | None = None
     environment: Environment = Environment.LIVE
     execution_kind: ExecutionKind = ExecutionKind.DRY_RUN
-    connected_accounts: dict[str, ConnectedAccountRef] = field(default_factory=dict)
     budget_remaining_minor: int | None = None
     trace_id: str | None = None
     idempotency_key: str | None = None
@@ -202,8 +448,8 @@ class ExecutionContext:
 # ── Execution Contract Types ──
 # Structured types for describing what happened during execution.
 # These replace (or complement) the free-form receipt_summary dict
-# so that receipts are machine-readable and can link to AIWorks
-# deliverables, audit trails, and rollback review.
+# so that receipts are machine-readable and can link to artifacts,
+# audit trails, and rollback review.
 
 @dataclass
 class ExecutionArtifact:
@@ -272,7 +518,7 @@ class ReceiptRef:
     """Opaque reference to a CapabilityExecutionReceipt on the platform.
 
     Returned by the runtime after execution completes — not set by the app
-    developer. Use this to link AIWorks JobDeliverables to execution receipts
+    developer. Use this to link platform-side artifacts to execution receipts
     via ``execution_receipt_id``.
 
     Note: the link is a string reference (not a foreign key constraint),
@@ -389,7 +635,7 @@ class ToolManual:
     """
     # ── Required (all permission classes) ──
     tool_name: str                                      # 3-64 chars, [A-Za-z0-9_]
-    job_to_be_done: str                                 # 10-500 chars
+    job_to_be_done: str                                 # 10-240 chars
     summary_for_model: str                              # 10-300 chars, factual
     trigger_conditions: list[str]                       # 3-8 items, 10-200 chars each
     do_not_use_when: list[str]                          # 1-5 items
@@ -622,7 +868,7 @@ def validate_tool_manual(
 
     # ── string length checks ──
     for fld, mn, mx in [
-        ("job_to_be_done", 10, 500),
+        ("job_to_be_done", 10, 240),
         ("summary_for_model", 10, 300),
     ]:
         v = manual.get(fld)
@@ -956,7 +1202,6 @@ class AppTestHarness:
         self,
         execution_kind: ExecutionKind,
         task_type: str = "default",
-        connected_accounts: dict[str, ConnectedAccountRef] | None = None,
         **kwargs,
     ) -> ExecutionResult:
         """Internal helper — build context and run execute().
@@ -964,18 +1209,12 @@ class AppTestHarness:
         All public execute_* methods delegate here so that changes to
         context construction are made in one place.
         """
-        if connected_accounts is None:
-            connected_accounts = {
-                k: ConnectedAccountRef(provider_key=k, session_token=f"stub-token-{k}")
-                for k in self.stubs
-            }
         ctx = ExecutionContext(
             agent_id="test-agent-001",
             owner_user_id="test-owner-001",
             task_type=task_type,
             environment=Environment.SANDBOX,
             execution_kind=execution_kind,
-            connected_accounts=connected_accounts,
             **kwargs,
         )
         return await self.app.execute(ctx)
@@ -1018,6 +1257,18 @@ class AppTestHarness:
             issues.append(
                 "example_prompts must include at least 2 distinct non-empty sample prompts"
             )
+        try:
+            _validate_pricing_plan_floor(m.pricing_plan, default_currency=str(m.currency.value if isinstance(m.currency, ListingCurrency) else m.currency))
+        except ValueError as exc:
+            issues.append(str(exc))
+        billing_timing = str(getattr(m, "billing_timing", "post") or "post").strip().lower()
+        if billing_timing not in {"post", "prepay"}:
+            issues.append("billing_timing must be 'post' or 'prepay'")
+        price_model_value = m.price_model.value if isinstance(m.price_model, PriceModel) else str(m.price_model or "")
+        if price_model_value in {PriceModel.USAGE_BASED.value, PriceModel.PER_ACTION.value} and not _pricing_plan_has_items(
+            m.pricing_plan
+        ):
+            issues.append("pricing_plan.items is required for usage_based/per_action pricing")
         if m.permission_class in (PermissionClass.ACTION, PermissionClass.PAYMENT):
             if not m.dry_run_supported:
                 issues.append("action/payment apps should support dry_run")
@@ -1082,31 +1333,16 @@ class AppTestHarness:
 
         return issues
 
-    async def simulate_connected_account_missing(
-        self, task_type: str = "default", **kwargs,
-    ) -> ExecutionResult:
-        """Execute with NO connected accounts to test graceful degradation.
-
-        Apps that declare required_connected_accounts should handle the case
-        where an account is missing (e.g., return an error or fallback).
-        """
-        return await self._execute(
-            ExecutionKind.DRY_RUN, task_type,
-            connected_accounts={},  # intentionally empty
-            **kwargs,
-        )
-
     def simulate_metering(
         self,
         record: Any,
         *,
         execution_result: ExecutionResult | None = None,
     ) -> dict[str, Any]:
-        """Preview how a usage record would map to a future invoice line.
+        """Preview how a usage record would map to an invoice line.
 
-        This is an experimental analytics / pre-billing helper. It validates the
-        usage payload shape locally and returns a deterministic preview. It does
-        not create a charge.
+        This helper validates the usage payload shape locally and returns a
+        deterministic preview. It does not create a charge.
         """
         try:
             from siglume_api_sdk.metering import _normalize_usage_record as _normalize
@@ -1150,7 +1386,7 @@ class AppTestHarness:
             }
 
         return {
-            "experimental": usage_based_matches or per_action_matches,
+            "experimental": False,
             "usage_record": usage_record,
             "invoice_line_preview": invoice_line_preview,
         }

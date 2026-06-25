@@ -51,7 +51,7 @@ export interface MeteringSimulationResult {
 export type MeterClientOptions = SiglumeClientOptions;
 
 /**
- * Experimental analytics / pre-billing wrapper for usage-event ingest.
+ * Analytics wrapper for usage-event ingest and invoice previews.
  */
 export class MeterClient {
   readonly experimental = true;

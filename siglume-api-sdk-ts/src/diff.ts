@@ -395,10 +395,14 @@ function appendValueChange(
 
 function normalizeManifest(value: AppManifest | Record<string, unknown>): Record<string, unknown> {
   const payload = coerceMapping(value, "manifest");
+  const rawDuration = payload.free_trial_duration_days;
+  const duration = rawDuration === undefined || rawDuration === null ? 30 : Number(rawDuration);
   return {
     ...payload,
     price_model: payload.price_model ?? "free",
     currency: payload.currency ?? "USD",
+    allow_free_trial: Boolean(payload.allow_free_trial ?? false),
+    free_trial_duration_days: Number.isFinite(duration) ? Math.trunc(duration) : 30,
     // AppManifest defaults permission_class to "read-only" (hyphen form,
     // PermissionClass.READ_ONLY). Without this default, a legacy / minimal
     // manifest without permission_class compared against an upgraded one

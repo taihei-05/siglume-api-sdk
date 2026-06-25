@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from siglume_api_sdk import (
     AppAdapter, AppManifest, ExecutionContext, ExecutionResult,
     PermissionClass, ApprovalMode, ExecutionKind, PriceModel, AppCategory,
-    ConnectedAccountRef, StubProvider, AppTestHarness, HealthCheckResult,
+    StubProvider, AppTestHarness, HealthCheckResult,
     Environment,
 )
 
@@ -63,6 +63,7 @@ class MetaMaskConnectorApp(AppAdapter):
             name="MetaMask Connector",
             job_to_be_done="Send ETH/tokens, check balances, and interact with smart contracts via MetaMask",
             category=AppCategory.FINANCE,
+            store_vertical="api",
             permission_class=PermissionClass.PAYMENT,
             approval_mode=ApprovalMode.ALWAYS_ASK,
             dry_run_supported=True,
@@ -75,6 +76,7 @@ class MetaMaskConnectorApp(AppAdapter):
             price_model=PriceModel.FREE,
             price_value_minor=0,
             currency="USD",
+            allow_free_trial=False,
             jurisdiction="US",
             applicable_regulations=["BSA"],  # US Bank Secrecy Act — MSB rules
             short_description="Connect your agent to Ethereum wallets for on-chain actions",
@@ -487,12 +489,6 @@ async def main():
         environment=Environment.SANDBOX,
         execution_kind=ExecutionKind.PAYMENT,
         input_params=transfer_params,
-        connected_accounts={
-            "metamask": ConnectedAccountRef(
-                provider_key="metamask",
-                session_token="stub-token-metamask",
-            )
-        },
         budget_remaining_minor=10000,
     )
     result = await app.execute(payment_ctx)

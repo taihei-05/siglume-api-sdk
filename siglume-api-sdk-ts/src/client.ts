@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AccessGrantRecord,
   AccountAlert,
   AccountContentDeleteResult,
@@ -10,27 +10,21 @@ import type {
   AccountPlanCancellation,
   AccountPreferences,
   AccountWatchlist,
-  AdsBilling,
-  AdsBillingSettlement,
-  AdsCampaignPostRecord,
-  AdsCampaignRecord,
-  AdsProfile,
   AgentCharter,
   AgentRecord,
   AgentThreadRecord,
   AgentTopicSubscription,
   AppListingRecord,
   AppManifest,
+  CompanyPublisherRecord,
   ApprovalPolicy,
   BundleListingRecord,
   BundleMember,
-  ConnectedAccountLifecycleResult,
-  ConnectedAccountOAuthStart,
   AutoRegistrationReceipt,
   BillingPortalLink,
   BudgetPolicy,
   CapabilityBindingRecord,
-  ConnectedAccountRecord,
+  CapabilitySaveStateRecord,
   CursorPage,
   DeveloperPortalSummary,
   EnvelopeMeta,
@@ -47,10 +41,6 @@ import type {
   MarketProposalActionResult,
   MarketProposalRecord,
   MarketNeedRecord,
-  PartnerApiKeyHandle,
-  PartnerApiKeyRecord,
-  PartnerDashboard,
-  PartnerUsage,
   NetworkClaimRecord,
   NetworkContentDetail,
   NetworkContentSummary,
@@ -66,18 +56,8 @@ import type {
   ToolManualIssue,
   ToolManualQualityReport,
   UsageEventRecord,
-  WorksCategoryRecord,
-  WorksOwnerDashboard,
-  WorksOwnerDashboardAgent,
-  WorksOwnerDashboardOrder,
-  WorksOwnerDashboardPitch,
-  WorksOwnerDashboardStats,
-  WorksPosterDashboard,
-  WorksPosterDashboardJob,
-  WorksPosterDashboardOrder,
-  WorksPosterDashboardStats,
-  WorksRegistrationRecord,
 } from "./types";
+import { MINIMUM_JPY_OPERATION_PRICE_MINOR } from "./types";
 import { SiglumeAPIError, SiglumeClientError, SiglumeNotFoundError } from "./errors";
 import {
   type QueuedWebhookEvent,
@@ -117,6 +97,10 @@ import {
 
 export const DEFAULT_SIGLUME_API_BASE = "https://siglume.com/v1";
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+const MINIMUM_JPY_OPERATION_PRICE_CURRENCIES = new Set(["JPY", "JPYC"]);
+const LISTING_SHORT_DESCRIPTION_MAX_LENGTH = 60;
+const LISTING_JOB_TO_BE_DONE_MAX_LENGTH = 240;
+const LISTING_DESCRIPTION_MAX_LENGTH = 1000;
 
 type FetchLike = typeof fetch;
 
@@ -133,6 +117,139 @@ export interface SiglumeClientOptions {
   timeout_ms?: number;
   max_retries?: number;
   fetch?: FetchLike;
+}
+
+function validateManifestPersistenceContract(payload: Record<string, unknown>): void {
+  const vertical = String(payload.store_vertical ?? "").trim().toLowerCase();
+  const persistence = payload.persistence;
+  if (persistence === undefined || persistence === null) {
+    return;
+  }
+  if (!isRecord(persistence)) {
+    throw new SiglumeClientError("AppManifest.persistence must be an object.");
+  }
+  const mode = String(persistence.mode ?? (vertical === "game" ? "platform" : "none"))
+    .trim()
+    .toLowerCase();
+  if (!["none", "local", "platform", "developer_server"].includes(mode)) {
+    throw new SiglumeClientError(
+      "AppManifest.persistence.mode must be one of: none, local, platform, developer_server.",
+    );
+  }
+  const schema = persistence.save_data_schema;
+  if (vertical === "game" && mode !== "none" && schema === undefined) {
+    throw new SiglumeClientError(
+      "AppManifest.persistence.save_data_schema is required when store_vertical='game' and persistence.mode is not 'none'.",
+    );
+  }
+  if (schema !== undefined) {
+    validateSaveDataSchema(schema, "AppManifest.persistence.save_data_schema");
+  }
+}
+
+function validateSaveDataSchema(schema: unknown, fieldName: string): void {
+  if (!isRecord(schema)) {
+    throw new SiglumeClientError(`${fieldName} must be a JSON Schema object.`);
+  }
+  const schemaSize = new TextEncoder().encode(JSON.stringify(schema)).length;
+  if (schemaSize > 8192) {
+    throw new SiglumeClientError(`${fieldName} must be at most 8192 bytes.`);
+  }
+  if (schema.type !== "object") {
+    throw new SiglumeClientError(`${fieldName}.type must be 'object'.`);
+  }
+  const properties = schema.properties;
+  if (!isRecord(properties) || Object.keys(properties).length === 0) {
+    throw new SiglumeClientError(`${fieldName}.properties must be a non-empty object.`);
+  }
+  if (schema.required !== undefined) {
+    if (!Array.isArray(schema.required) || !schema.required.every((item) => typeof item === "string")) {
+      throw new SiglumeClientError(`${fieldName}.required must be an array of strings when provided.`);
+    }
+    const missing = schema.required.filter((item) => !(item in properties));
+    if (missing.length > 0) {
+      throw new SiglumeClientError(`${fieldName}.required references undefined properties: ${missing.join(", ")}.`);
+    }
+  }
+}
+
+function validatePricingPlanFloor(plan: unknown, defaultCurrency: string): void {
+  if (plan === undefined || plan === null) {
+    return;
+  }
+  if (!isRecord(plan)) {
+    throw new SiglumeClientError("AppManifest.pricing_plan must be an object when provided.");
+  }
+  const items = plan.items;
+  if (items === undefined || items === null) {
+    return;
+  }
+  if (!Array.isArray(items)) {
+    throw new SiglumeClientError("AppManifest.pricing_plan.items must be an array when provided.");
+  }
+  const planCurrency = String(plan.currency ?? defaultCurrency ?? "").trim().toUpperCase();
+  const seenKeys = new Set<string>();
+  items.forEach((item, index) => {
+    if (!isRecord(item)) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}] must be an object.`);
+    }
+    const itemKey = String(
+      item.key ?? item.operation ?? item.operation_key ?? item.request_type ?? item.receipt_code ?? item.action ?? "",
+    ).trim();
+    if (!itemKey) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].key is required.`);
+    }
+    if (seenKeys.has(itemKey)) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].key duplicates ${itemKey}.`);
+    }
+    seenKeys.add(itemKey);
+    const amountRaw = item.price_minor ?? item.amount_minor ?? item.cost_minor ?? item.value_minor;
+    if (amountRaw === undefined || amountRaw === null) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].price_minor is required.`);
+    }
+    const amountMinor =
+      typeof amountRaw === "number" ? amountRaw : typeof amountRaw === "string" && amountRaw.trim() ? Number(amountRaw) : NaN;
+    if (!Number.isInteger(amountMinor)) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].price_minor must be an integer.`);
+    }
+    if (amountMinor < 0) {
+      throw new SiglumeClientError(`AppManifest.pricing_plan.items[${index}].price_minor must be zero or positive.`);
+    }
+    const currency = String(item.currency ?? planCurrency ?? defaultCurrency ?? "").trim().toUpperCase();
+    if (
+      MINIMUM_JPY_OPERATION_PRICE_CURRENCIES.has(currency) &&
+      amountMinor > 0 &&
+      amountMinor < MINIMUM_JPY_OPERATION_PRICE_MINOR
+    ) {
+      throw new SiglumeClientError(
+        `AppManifest.pricing_plan.items[${index}].price_minor must be 0 or at least ${MINIMUM_JPY_OPERATION_PRICE_MINOR} for JPY/JPYC operation billing.`,
+      );
+    }
+  });
+}
+
+function pricingPlanHasItems(plan: unknown): boolean {
+  return isRecord(plan) && Array.isArray(plan.items) && plan.items.length > 0;
+}
+
+function validateListingTextLengths(payload: Record<string, unknown>): void {
+  const limits: Record<string, number> = {
+    short_description: LISTING_SHORT_DESCRIPTION_MAX_LENGTH,
+    job_to_be_done: LISTING_JOB_TO_BE_DONE_MAX_LENGTH,
+    description: LISTING_DESCRIPTION_MAX_LENGTH,
+  };
+  for (const [fieldName, maxLength] of Object.entries(limits)) {
+    const value = payload[fieldName];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== "string") {
+      throw new SiglumeClientError(`AppManifest.${fieldName} must be a string when provided.`);
+    }
+    // Count Unicode code points (Array.from), not UTF-16 code units, so the
+    // limit matches the Python SDK / OpenAPI maxLength for non-BMP text (emoji).
+    if (Array.from(value).length > maxLength) {
+      throw new SiglumeClientError(`AppManifest.${fieldName} must be at most ${maxLength} characters.`);
+    }
+  }
 }
 
 type PendingConfirmation = {
@@ -152,7 +269,6 @@ export interface SiglumeClientShape {
       source_code?: string;
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
-      oauth_credentials?: Record<string, unknown> | unknown[];
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
     },
@@ -165,6 +281,20 @@ export interface SiglumeClientShape {
   submit_review(listing_id: string): Promise<AppListingRecord>;
   list_my_listings(options?: { status?: string; limit?: number; cursor?: string }): Promise<CursorPage<AppListingRecord>>;
   get_listing(listing_id: string): Promise<AppListingRecord>;
+  list_company_publishers(): Promise<CompanyPublisherRecord[]>;
+  request_company_publish_approval(listing_id: string, note?: string): Promise<AppListingRecord>;
+  decide_company_publish_approval(
+    listing_id: string,
+    options: { decision: "approve" | "reject"; reason?: string },
+  ): Promise<AppListingRecord>;
+  get_capability_state(capability_key: string, save_key?: string): Promise<CapabilitySaveStateRecord>;
+  put_capability_state(
+    capability_key: string,
+    save_key?: string,
+    payload?: Record<string, unknown>,
+    options?: { schema_version?: string; expected_revision?: number | null; metadata?: Record<string, unknown> },
+  ): Promise<CapabilitySaveStateRecord>;
+  delete_capability_state(capability_key: string, save_key?: string): Promise<CapabilitySaveStateRecord>;
   list_capabilities(options?: {
     mine?: boolean;
     status?: string;
@@ -204,35 +334,7 @@ export interface SiglumeClientShape {
   remove_bundle_capability(bundle_id: string, capability_listing_id: string): Promise<BundleListingRecord>;
   submit_bundle_for_review(bundle_id: string): Promise<BundleListingRecord>;
 
-  // Connected accounts (v0.7 track 3)
-  start_connected_account_oauth(input: {
-    listing_id: string;
-    redirect_uri: string;
-    scopes?: string[];
-    account_role?: string;
-  }): Promise<ConnectedAccountOAuthStart>;
-  set_listing_oauth_credentials(
-    listing_id: string,
-    input: {
-      provider_key: string;
-      client_id: string;
-      client_secret: string;
-      authorize_url: string;
-      token_url: string;
-      revoke_url?: string;
-      display_name?: string;
-      scope_separator?: string;
-      token_endpoint_auth?: string;
-      pkce_required?: boolean;
-      refresh_supported?: boolean;
-      available_scopes?: string[];
-      required_scopes?: string[];
-    },
-  ): Promise<Record<string, unknown>>;
-  get_listing_oauth_credentials_status(listing_id: string): Promise<Record<string, unknown>>;
-  complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>>;
-  refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
-  revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult>;
+  // Connected accounts: publisher APIs own external OAuth and token storage.
 
   get_developer_portal(): Promise<DeveloperPortalSummary>;
   create_sandbox_session(options: { agent_id: string; capability_key: string }): Promise<SandboxSession>;
@@ -354,30 +456,6 @@ export interface SiglumeClientShape {
     status?: string;
     lang?: string;
   }): Promise<MarketNeedRecord>;
-  list_works_categories(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<WorksCategoryRecord[]>;
-  get_works_registration(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<WorksRegistrationRecord>;
-  register_for_works(options?: {
-    agent_id?: string;
-    tagline?: string;
-    description?: string;
-    categories?: string[];
-    capabilities?: string[];
-    lang?: string;
-  }): Promise<WorksRegistrationRecord>;
-  get_works_owner_dashboard(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<WorksOwnerDashboard>;
-  get_works_poster_dashboard(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<WorksPosterDashboard>;
   list_market_proposals(options?: {
     agent_id?: string;
     status?: string;
@@ -502,45 +580,6 @@ export interface SiglumeClientShape {
     receipt_id: string,
     options?: { agent_id?: string; lang?: string },
   ): Promise<InstalledToolReceiptStepRecord[]>;
-  get_partner_dashboard(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerDashboard>;
-  get_partner_usage(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerUsage>;
-  list_partner_api_keys(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<PartnerApiKeyRecord[]>;
-  create_partner_api_key(options?: {
-    agent_id?: string;
-    name?: string;
-    allowed_source_types?: string[];
-    lang?: string;
-  }): Promise<PartnerApiKeyHandle>;
-  get_ads_billing(options?: {
-    agent_id?: string;
-    rail?: string;
-    lang?: string;
-  }): Promise<AdsBilling>;
-  settle_ads_billing(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsBillingSettlement>;
-  get_ads_profile(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsProfile>;
-  list_ads_campaigns(options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsCampaignRecord[]>;
-  list_ads_campaign_posts(campaign_id: string, options?: {
-    agent_id?: string;
-    lang?: string;
-  }): Promise<AdsCampaignPostRecord[]>;
   update_agent_charter(
     agent_id: string,
     charter_text: string,
@@ -573,12 +612,6 @@ export interface SiglumeClientShape {
     grant_id: string,
     options: { agent_id: string; binding_status?: string },
   ): Promise<GrantBindingResult>;
-  list_connected_accounts(options?: {
-    provider_key?: string;
-    environment?: string;
-    limit?: number;
-    cursor?: string;
-  }): Promise<CursorPage<ConnectedAccountRecord>>;
   create_support_case(
     subject: string,
     body: string,
@@ -787,6 +820,17 @@ function buildUrl(baseUrl: string, path: string, params?: RequestOptions["params
 }
 
 function parseListing(data: Record<string, unknown>): AppListingRecord {
+  const metadata = isRecord(data.metadata) ? data.metadata : {};
+  const pricing_plan = isRecord(data.pricing_plan)
+    ? data.pricing_plan
+    : isRecord(metadata.pricing_plan)
+      ? metadata.pricing_plan
+      : null;
+  const persistence = isRecord(data.persistence)
+    ? data.persistence
+    : isRecord(metadata.persistence)
+      ? metadata.persistence
+      : {};
   return {
     listing_id: String(data.listing_id ?? data.id ?? ""),
     capability_key: String(data.capability_key ?? ""),
@@ -799,7 +843,11 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     dry_run_supported: Boolean(data.dry_run_supported ?? false),
     price_model: stringOrNull(data.price_model),
     price_value_minor: Number(data.price_value_minor ?? 0),
+    pricing_plan: pricing_plan as AppListingRecord["pricing_plan"],
+    billing_timing: String(data.billing_timing ?? metadata.billing_timing ?? "post"),
     currency: String(data.currency ?? "USD"),
+    allow_free_trial: Boolean(data.allow_free_trial ?? false),
+    free_trial_duration_days: Number(data.free_trial_duration_days ?? 30),
     short_description: stringOrNull(data.short_description),
     description: stringOrNull(data.description),
     docs_url: stringOrNull(data.docs_url),
@@ -807,13 +855,64 @@ function parseListing(data: Record<string, unknown>): AppListingRecord {
     seller_display_name: stringOrNull(data.seller_display_name),
     seller_homepage_url: stringOrNull(data.seller_homepage_url),
     seller_social_url: stringOrNull(data.seller_social_url),
+    publisher_type: stringOrNull(data.publisher_type),
+    publisher_company_id: stringOrNull(data.publisher_company_id),
+    company_id: stringOrNull(data.company_id),
+    company_name: stringOrNull(data.company_name),
+    company_publish_status: stringOrNull(data.company_publish_status),
+    company_terms_version: stringOrNull(data.company_terms_version),
     review_status: stringOrNull(data.review_status),
     review_note: stringOrNull(data.review_note),
     submission_blockers: Array.isArray(data.submission_blockers)
       ? data.submission_blockers.filter((item): item is string => typeof item === "string")
       : [],
+    persistence: { ...persistence },
     created_at: stringOrNull(data.created_at),
     updated_at: stringOrNull(data.updated_at),
+    raw: { ...data },
+  };
+}
+
+function parseCompanyPublisher(data: Record<string, unknown>): CompanyPublisherRecord {
+  const wallets = Array.isArray(data.settlement_wallets)
+    ? data.settlement_wallets.filter((item): item is Record<string, unknown> => isRecord(item))
+    : [];
+  return {
+    company_id: String(data.company_id ?? data.id ?? ""),
+    name: String(data.name ?? ""),
+    status: String(data.status ?? ""),
+    description: stringOrNull(data.description),
+    is_founder: Boolean(data.is_founder ?? false),
+    membership_role: stringOrNull(data.membership_role),
+    membership_status: stringOrNull(data.membership_status),
+    can_publish: Boolean(data.can_publish ?? true),
+    can_approve: Boolean(data.can_approve ?? false),
+    approval_required: Boolean(data.approval_required ?? false),
+    paid_listing_allowed: Boolean(data.paid_listing_allowed ?? false),
+    disabled_reasons: Array.isArray(data.disabled_reasons)
+      ? data.disabled_reasons.filter((item): item is string => typeof item === "string")
+      : [],
+    company_terms_version: stringOrNull(data.company_terms_version),
+    active_listing_count: Number(data.active_listing_count ?? 0),
+    pending_approval_count: Number(data.pending_approval_count ?? 0),
+    settlement_wallet_ready: Boolean(data.settlement_wallet_ready ?? false),
+    settlement_wallets: wallets.map((item) => ({ ...item })),
+    raw: { ...data },
+  };
+}
+
+function parseCapabilitySaveState(data: Record<string, unknown>): CapabilitySaveStateRecord {
+  return {
+    capability_key: String(data.capability_key ?? ""),
+    save_key: String(data.save_key ?? ""),
+    schema_version: String(data.schema_version ?? "1"),
+    revision: Number(data.revision ?? 0),
+    payload: toRecord(data.payload),
+    metadata: toRecord(data.metadata),
+    checksum: stringOrNull(data.checksum),
+    updated_at: stringOrNull(data.updated_at),
+    created_at: stringOrNull(data.created_at),
+    exists: Boolean(data.exists ?? false),
     raw: { ...data },
   };
 }
@@ -827,21 +926,6 @@ function parseBundleMember(data: Record<string, unknown>): BundleMember {
     status: stringOrNull(data.status),
     added_at: stringOrNull(data.added_at),
     link_id: stringOrNull(data.link_id),
-  };
-}
-
-function parseConnectedAccountLifecycle(data: Record<string, unknown>): ConnectedAccountLifecycleResult {
-  return {
-    connected_account_id: String(data.connected_account_id ?? ""),
-    provider_key: String(data.provider_key ?? ""),
-    expires_at: stringOrNull(data.expires_at),
-    scopes: Array.isArray(data.scopes)
-      ? data.scopes.filter((s): s is string => typeof s === "string")
-      : [],
-    refreshed_at: stringOrNull(data.refreshed_at),
-    connection_status: stringOrNull(data.connection_status),
-    provider_revoked: typeof data.provider_revoked === "boolean" ? data.provider_revoked : null,
-    revoked_at: stringOrNull(data.revoked_at),
   };
 }
 
@@ -930,22 +1014,6 @@ function parseBinding(data: Record<string, unknown>): CapabilityBindingRecord {
     access_grant_id: String(data.access_grant_id ?? ""),
     agent_id: String(data.agent_id ?? ""),
     binding_status: String(data.binding_status ?? ""),
-    created_at: stringOrNull(data.created_at),
-    updated_at: stringOrNull(data.updated_at),
-    raw: { ...data },
-  };
-}
-
-function parseConnectedAccount(data: Record<string, unknown>): ConnectedAccountRecord {
-  return {
-    connected_account_id: String(data.connected_account_id ?? data.id ?? ""),
-    provider_key: String(data.provider_key ?? ""),
-    account_role: String(data.account_role ?? ""),
-    display_name: stringOrNull(data.display_name),
-    environment: stringOrNull(data.environment),
-    connection_status: stringOrNull(data.connection_status),
-    scopes: Array.isArray(data.scopes) ? data.scopes.filter((item): item is string => typeof item === "string") : [],
-    metadata: toRecord(data.metadata),
     created_at: stringOrNull(data.created_at),
     updated_at: stringOrNull(data.updated_at),
     raw: { ...data },
@@ -1313,304 +1381,6 @@ function toRecordList(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => ({ ...item }))
     : [];
-}
-
-function parsePartnerDashboard(data: Record<string, unknown>): PartnerDashboard {
-  return {
-    partner_id: String(data.partner_id ?? data.user_id ?? ""),
-    company_name: stringOrNull(data.company_name) ?? undefined,
-    plan: stringOrNull(data.plan) ?? undefined,
-    plan_label: stringOrNull(data.plan_label) ?? undefined,
-    month_bytes_used: Math.trunc(Number(data.month_bytes_used ?? 0)),
-    month_bytes_limit: Math.trunc(Number(data.month_bytes_limit ?? 0)),
-    month_usage_pct: Number(data.month_usage_pct ?? 0),
-    total_source_items: Math.trunc(Number(data.total_source_items ?? 0)),
-    has_billing: Boolean(data.has_billing ?? false),
-    has_subscription: Boolean(data.has_subscription ?? false),
-    raw: { ...data },
-  };
-}
-
-function parsePartnerUsage(data: Record<string, unknown>): PartnerUsage {
-  return {
-    plan: stringOrNull(data.plan) ?? undefined,
-    month_bytes_used: Math.trunc(Number(data.month_bytes_used ?? 0)),
-    month_bytes_limit: Math.trunc(Number(data.month_bytes_limit ?? 0)),
-    month_bytes_remaining: Math.trunc(Number(data.month_bytes_remaining ?? 0)),
-    month_usage_pct: Number(data.month_usage_pct ?? 0),
-    raw: { ...data },
-  };
-}
-
-function parsePartnerApiKey(data: Record<string, unknown>): PartnerApiKeyRecord {
-  return {
-    credential_id: String(data.credential_id ?? data.id ?? ""),
-    name: stringOrNull(data.name) ?? undefined,
-    key_id: stringOrNull(data.key_id) ?? undefined,
-    allowed_source_types: Array.isArray(data.allowed_source_types)
-      ? data.allowed_source_types.filter((item): item is string => typeof item === "string")
-      : [],
-    last_used_at: stringOrNull(data.last_used_at) ?? undefined,
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    revoked: Boolean(data.revoked ?? false),
-    raw: { ...data },
-  };
-}
-
-function parsePartnerApiKeyHandle(data: Record<string, unknown>): PartnerApiKeyHandle {
-  const raw = Object.fromEntries(
-    Object.entries(data).filter(([key]) => key !== "ingest_key" && key !== "full_key"),
-  ) as Record<string, unknown>;
-  return {
-    credential_id: String(raw.credential_id ?? raw.id ?? ""),
-    name: stringOrNull(raw.name) ?? undefined,
-    key_id: stringOrNull(raw.key_id) ?? undefined,
-    allowed_source_types: Array.isArray(raw.allowed_source_types)
-      ? raw.allowed_source_types.filter((item): item is string => typeof item === "string")
-      : [],
-    masked_key_hint: stringOrNull(raw.masked_key_hint) ?? undefined,
-    raw,
-  };
-}
-
-function parseAdsBilling(data: Record<string, unknown>): AdsBilling {
-  return {
-    currency: stringOrNull(data.currency) ?? undefined,
-    billing_mode: stringOrNull(data.billing_mode) ?? undefined,
-    month_spend_jpy: Math.trunc(Number(data.month_spend_jpy ?? 0)),
-    month_spend_usd: Math.trunc(Number(data.month_spend_usd ?? 0)),
-    all_time_spend_jpy: Math.trunc(Number(data.all_time_spend_jpy ?? 0)),
-    all_time_spend_usd: Math.trunc(Number(data.all_time_spend_usd ?? 0)),
-    total_impressions: Math.trunc(Number(data.total_impressions ?? 0)),
-    total_replies: Math.trunc(Number(data.total_replies ?? 0)),
-    has_billing: Boolean(data.has_billing ?? false),
-    has_subscription: Boolean(data.has_subscription ?? false),
-    invoices: toRecordList(data.invoices),
-    wallet: isRecord(data.wallet) ? { ...data.wallet } : null,
-    balances: toRecordList(data.balances),
-    supported_tokens: toRecordList(data.supported_tokens),
-    funding_instructions: isRecord(data.funding_instructions) ? { ...data.funding_instructions } : null,
-    mandate: isRecord(data.mandate) ? parsePlanWeb3Mandate(data.mandate) : null,
-    raw: { ...data },
-  };
-}
-
-function parseAdsBillingSettlement(data: Record<string, unknown>): AdsBillingSettlement {
-  return {
-    status: stringOrNull(data.status) ?? undefined,
-    message: stringOrNull(data.message ?? data.detail) ?? undefined,
-    settles_automatically: typeof data.settles_automatically === "boolean"
-      ? data.settles_automatically
-      : (typeof data.auto_settles === "boolean" ? data.auto_settles : undefined),
-    cycle_key: stringOrNull(data.cycle_key) ?? undefined,
-    settled_at: stringOrNull(data.settled_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseAdsProfile(data: Record<string, unknown>): AdsProfile {
-  return {
-    has_profile: Boolean(data.has_profile ?? false),
-    company_name: stringOrNull(data.company_name) ?? undefined,
-    ad_currency: stringOrNull(data.ad_currency) ?? undefined,
-    has_billing: Boolean(data.has_billing ?? false),
-    raw: { ...data },
-  };
-}
-
-function parseAdsCampaign(data: Record<string, unknown>): AdsCampaignRecord {
-  return {
-    campaign_id: String(data.campaign_id ?? data.id ?? ""),
-    name: stringOrNull(data.name) ?? undefined,
-    target_url: stringOrNull(data.target_url) ?? undefined,
-    content_brief: stringOrNull(data.content_brief) ?? undefined,
-    target_topics: Array.isArray(data.target_topics)
-      ? data.target_topics.filter((item): item is string => typeof item === "string")
-      : [],
-    posting_interval_minutes: Math.trunc(Number(data.posting_interval_minutes ?? 360)),
-    max_posts_per_day: Math.trunc(Number(data.max_posts_per_day ?? 4)),
-    currency: stringOrNull(data.currency) ?? undefined,
-    monthly_budget_jpy: Math.trunc(Number(data.monthly_budget_jpy ?? 0)),
-    cpm_jpy: Math.trunc(Number(data.cpm_jpy ?? 0)),
-    cpr_jpy: Math.trunc(Number(data.cpr_jpy ?? 0)),
-    monthly_budget_usd: Math.trunc(Number(data.monthly_budget_usd ?? 0)),
-    cpm_usd: Math.trunc(Number(data.cpm_usd ?? 0)),
-    cpr_usd: Math.trunc(Number(data.cpr_usd ?? 0)),
-    status: String(data.status ?? "active").trim().toLowerCase() || "active",
-    month_spend_jpy: Math.trunc(Number(data.month_spend_jpy ?? 0)),
-    month_spend_usd: Math.trunc(Number(data.month_spend_usd ?? 0)),
-    total_posts: Math.trunc(Number(data.total_posts ?? 0)),
-    total_impressions: Math.trunc(Number(data.total_impressions ?? 0)),
-    total_replies: Math.trunc(Number(data.total_replies ?? 0)),
-    next_post_at: stringOrNull(data.next_post_at) ?? undefined,
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseAdsCampaignPost(data: Record<string, unknown>): AdsCampaignPostRecord {
-  return {
-    post_id: String(data.post_id ?? data.id ?? ""),
-    content_id: stringOrNull(data.content_id) ?? undefined,
-    cost_jpy: Math.trunc(Number(data.cost_jpy ?? 0)),
-    cost_usd: Math.trunc(Number(data.cost_usd ?? 0)),
-    impressions: Math.trunc(Number(data.impressions ?? 0)),
-    replies: Math.trunc(Number(data.replies ?? 0)),
-    status: stringOrNull(data.status) ?? undefined,
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseWorksCategory(data: Record<string, unknown>): WorksCategoryRecord {
-  return {
-    key: String(data.key ?? ""),
-    name_ja: stringOrNull(data.name_ja) ?? undefined,
-    name_en: stringOrNull(data.name_en) ?? undefined,
-    description_ja: stringOrNull(data.description_ja) ?? undefined,
-    description_en: stringOrNull(data.description_en) ?? undefined,
-    icon_url: stringOrNull(data.icon_url) ?? undefined,
-    open_job_count: Math.trunc(Number(data.open_job_count ?? 0)),
-    display_order: Math.trunc(Number(data.display_order ?? 0)),
-    raw: { ...data },
-  };
-}
-
-function parseWorksRegistration(data: Record<string, unknown>): WorksRegistrationRecord {
-  const result = isRecord(data.result) ? data.result : {};
-  const status = String(data.status ?? "completed").trim().toLowerCase() || "completed";
-  return {
-    agent_id: String(result.agent_id ?? data.agent_id ?? ""),
-    works_registered: typeof result.works_registered === "boolean" ? result.works_registered : Boolean(result.works_registered ?? false),
-    tagline: stringOrNull(result.tagline) ?? undefined,
-    categories: Array.isArray(result.categories)
-      ? result.categories.filter((item): item is string => typeof item === "string")
-      : [],
-    capabilities: Array.isArray(result.capabilities)
-      ? result.capabilities.filter((item): item is string => typeof item === "string")
-      : [],
-    description: stringOrNull(result.description) ?? undefined,
-    execution_status: status,
-    approval_required: typeof data.approval_required === "boolean" ? data.approval_required : status === "approval_required",
-    intent_id: stringOrNull(data.intent_id) ?? undefined,
-    approval_status: stringOrNull(data.approval_status) ?? undefined,
-    approval_snapshot_hash: stringOrNull(data.approval_snapshot_hash) ?? undefined,
-    approval_preview: toRecord(result.preview),
-    raw: { ...data },
-  };
-}
-
-function parseWorksOwnerDashboardAgent(data: Record<string, unknown>): WorksOwnerDashboardAgent {
-  return {
-    agent_id: String(data.id ?? data.agent_id ?? ""),
-    name: stringOrNull(data.name) ?? undefined,
-    reputation: toRecord(data.reputation),
-    capabilities: Array.isArray(data.capabilities)
-      ? data.capabilities.filter((item): item is string => typeof item === "string")
-      : [],
-    raw: { ...data },
-  };
-}
-
-function parseWorksOwnerDashboardPitch(data: Record<string, unknown>): WorksOwnerDashboardPitch {
-  return {
-    proposal_id: String(data.proposal_id ?? data.id ?? ""),
-    need_id: stringOrNull(data.need_id) ?? undefined,
-    title: stringOrNull(data.title) ?? undefined,
-    title_en: stringOrNull(data.title_en) ?? undefined,
-    status: stringOrNull(data.status) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseWorksOwnerDashboardOrder(data: Record<string, unknown>): WorksOwnerDashboardOrder {
-  return {
-    order_id: String(data.order_id ?? data.id ?? ""),
-    need_id: stringOrNull(data.need_id) ?? undefined,
-    title: stringOrNull(data.title) ?? undefined,
-    title_en: stringOrNull(data.title_en) ?? undefined,
-    status: stringOrNull(data.status) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseWorksOwnerDashboardStats(data: Record<string, unknown>): WorksOwnerDashboardStats {
-  return {
-    total_agents: Math.trunc(Number(data.total_agents ?? 0)),
-    total_pending: Math.trunc(Number(data.total_pending ?? 0)),
-    total_active: Math.trunc(Number(data.total_active ?? 0)),
-    raw: { ...data },
-  };
-}
-
-function parseWorksOwnerDashboard(data: Record<string, unknown>): WorksOwnerDashboard {
-  return {
-    agents: Array.isArray(data.agents)
-      ? data.agents.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardAgent(item))
-      : [],
-    pending_pitches: Array.isArray(data.pending_pitches)
-      ? data.pending_pitches.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardPitch(item))
-      : [],
-    active_orders: Array.isArray(data.active_orders)
-      ? data.active_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardOrder(item))
-      : [],
-    completed_orders: Array.isArray(data.completed_orders)
-      ? data.completed_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksOwnerDashboardOrder(item))
-      : [],
-    stats: isRecord(data.stats) ? parseWorksOwnerDashboardStats(data.stats) : parseWorksOwnerDashboardStats({}),
-    raw: { ...data },
-  };
-}
-
-function parseWorksPosterDashboardJob(data: Record<string, unknown>): WorksPosterDashboardJob {
-  return {
-    job_id: String(data.id ?? data.job_id ?? ""),
-    title: stringOrNull(data.title) ?? undefined,
-    title_en: stringOrNull(data.title_en) ?? undefined,
-    proposal_count: Math.trunc(Number(data.proposal_count ?? 0)),
-    created_at: stringOrNull(data.created_at) ?? undefined,
-    raw: { ...data },
-  };
-}
-
-function parseWorksPosterDashboardOrder(data: Record<string, unknown>): WorksPosterDashboardOrder {
-  return {
-    order_id: String(data.order_id ?? data.id ?? ""),
-    need_id: stringOrNull(data.need_id) ?? undefined,
-    title: stringOrNull(data.title) ?? undefined,
-    title_en: stringOrNull(data.title_en) ?? undefined,
-    status: stringOrNull(data.status) ?? undefined,
-    has_deliverable: typeof data.has_deliverable === "boolean" ? data.has_deliverable : Boolean(data.has_deliverable ?? false),
-    deliverable_count: Math.trunc(Number(data.deliverable_count ?? 0)),
-    awaiting_buyer_action: typeof data.awaiting_buyer_action === "boolean"
-      ? data.awaiting_buyer_action
-      : Boolean(data.awaiting_buyer_action ?? false),
-    raw: { ...data },
-  };
-}
-
-function parseWorksPosterDashboardStats(data: Record<string, unknown>): WorksPosterDashboardStats {
-  return {
-    total_posted: Math.trunc(Number(data.total_posted ?? 0)),
-    total_completed: Math.trunc(Number(data.total_completed ?? 0)),
-    raw: { ...data },
-  };
-}
-
-function parseWorksPosterDashboard(data: Record<string, unknown>): WorksPosterDashboard {
-  return {
-    open_jobs: Array.isArray(data.open_jobs)
-      ? data.open_jobs.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksPosterDashboardJob(item))
-      : [],
-    in_progress_orders: Array.isArray(data.in_progress_orders)
-      ? data.in_progress_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksPosterDashboardOrder(item))
-      : [],
-    completed_orders: Array.isArray(data.completed_orders)
-      ? data.completed_orders.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksPosterDashboardOrder(item))
-      : [],
-    stats: isRecord(data.stats) ? parseWorksPosterDashboardStats(data.stats) : parseWorksPosterDashboardStats({}),
-    raw: { ...data },
-  };
 }
 
 function parseMarketProposal(data: Record<string, unknown>): MarketProposalRecord {
@@ -2083,7 +1853,6 @@ export class SiglumeClient implements SiglumeClientShape {
       source_code?: string;
       source_url?: string;
       runtime_validation?: Record<string, unknown>;
-      oauth_credentials?: Record<string, unknown> | unknown[];
       source_context?: Record<string, unknown>;
       input_form_spec?: Record<string, unknown>;
     } = {},
@@ -2107,15 +1876,6 @@ export class SiglumeClient implements SiglumeClientShape {
     }
     if (options.runtime_validation) {
       payload.runtime_validation = coerceMapping(options.runtime_validation, "runtime_validation");
-    }
-    if (options.oauth_credentials) {
-      payload.oauth_credentials = Array.isArray(options.oauth_credentials)
-        ? {
-            items: options.oauth_credentials.map((item, index) =>
-              coerceMapping(item, `oauth_credentials[${index}]`),
-            ),
-          }
-        : coerceMapping(options.oauth_credentials, "oauth_credentials");
     }
     if (options.source_context) {
       payload.source_context = coerceMapping(options.source_context, "source_context");
@@ -2142,21 +1902,105 @@ export class SiglumeClient implements SiglumeClientShape {
       "support_contact",
       "seller_homepage_url",
       "seller_social_url",
+      "publisher_type",
+      "company_id",
+      "publisher_company_id",
+      "store_vertical",
       "jurisdiction",
       "price_model",
       "price_value_minor",
+      "pricing_plan",
+      "billing_timing",
+      "currency",
+      "allow_free_trial",
+      "free_trial_duration_days",
       "permission_class",
       "approval_mode",
       "dry_run_supported",
       "required_connected_accounts",
       "permission_scopes",
       "compatibility_tags",
+      "persistence",
     ]) {
       const value = manifestPayload[fieldName];
       if (value !== undefined && value !== null) {
         payload[fieldName] = value;
       }
     }
+    if (
+      payload.pricing_plan !== undefined &&
+      (typeof payload.pricing_plan !== "object" || Array.isArray(payload.pricing_plan))
+    ) {
+      throw new SiglumeClientError("AppManifest.pricing_plan must be an object when provided.");
+    }
+    if (payload.billing_timing !== undefined && payload.billing_timing !== null) {
+      const billingTiming = String(payload.billing_timing || "post").trim().toLowerCase();
+      if (billingTiming !== "post" && billingTiming !== "prepay") {
+        throw new SiglumeClientError("AppManifest.billing_timing must be 'post' or 'prepay'.");
+      }
+      payload.billing_timing = billingTiming;
+    }
+    if (payload.store_vertical === undefined || payload.store_vertical === null) {
+      throw new SiglumeClientError(
+        "AppManifest.store_vertical is required. Choose 'api' for normal API Store listings or 'game' for API games.",
+      );
+    }
+    const currency = String(payload.currency ?? "").trim().toUpperCase();
+    if (!currency) {
+      throw new SiglumeClientError(
+        "AppManifest.currency is required. Choose 'USD' for USDC settlement or 'JPY' for JPYC settlement.",
+      );
+    }
+    if (currency !== "USD" && currency !== "JPY") {
+      throw new SiglumeClientError(`AppManifest.currency must be 'USD' or 'JPY'. Got ${String(payload.currency)}.`);
+    }
+    payload.currency = currency;
+    if (payload.pricing_plan !== undefined) {
+      validatePricingPlanFloor(payload.pricing_plan, currency);
+    }
+    validateListingTextLengths(payload);
+    const priceModel = String(payload.price_model ?? "free").trim().toLowerCase();
+    if ((priceModel === "usage_based" || priceModel === "per_action") && !pricingPlanHasItems(payload.pricing_plan)) {
+      throw new SiglumeClientError("AppManifest.pricing_plan.items is required for usage_based/per_action pricing.");
+    }
+    if (payload.allow_free_trial === undefined || payload.allow_free_trial === null) {
+      throw new SiglumeClientError(
+        "AppManifest.allow_free_trial is required. Pass true to offer a Plus/Pro buyer free trial or false to disable trials.",
+      );
+    }
+    if (Boolean(payload.allow_free_trial)) {
+      const duration = payload.free_trial_duration_days ?? 30;
+      if (typeof duration !== "number" || !Number.isInteger(duration)) {
+        throw new SiglumeClientError(
+          "AppManifest.free_trial_duration_days must be an integer when allow_free_trial=true.",
+        );
+      }
+      if (duration < 1 || duration > 90) {
+        throw new SiglumeClientError(
+          `AppManifest.free_trial_duration_days must be between 1 and 90 when allow_free_trial=true, got: ${duration}.`,
+        );
+      }
+    }
+    const explicitPublisherType = payload.publisher_type !== undefined && payload.publisher_type !== null;
+    const companyId = String(payload.company_id ?? "").trim() || String(payload.publisher_company_id ?? "").trim();
+    const publisherType = String(payload.publisher_type ?? "user").trim().toLowerCase();
+    if (publisherType !== "user" && publisherType !== "company") {
+      throw new SiglumeClientError("AppManifest.publisher_type must be 'user' or 'company'.");
+    }
+    if (publisherType === "company" && !companyId) {
+      throw new SiglumeClientError("AppManifest.company_id is required when publisher_type='company'.");
+    }
+    if (publisherType === "user" && companyId) {
+      throw new SiglumeClientError("AppManifest.company_id cannot be combined with publisher_type='user'.");
+    }
+    if (explicitPublisherType || companyId) {
+      payload.publisher_type = publisherType;
+    }
+    if (companyId) {
+      payload.company_id = companyId;
+      payload.publisher_company_id = companyId;
+    }
+    validateManifestPersistenceContract(payload);
     // Strip `version` from the embedded manifest sub-dict too so the
     // platform's reject-on-manifest-version check cannot trip on the SDK's
     // local-tracking default. The SDK's AppManifest.version is local-only
@@ -2196,7 +2040,6 @@ export class SiglumeClient implements SiglumeClientShape {
       auto_manifest: toRecord(data.auto_manifest),
       confidence: toRecord(data.confidence),
       validation_report: toRecord(data.validation_report),
-      oauth_status: toRecord(data.oauth_status),
       review_url: stringOrNull(data.review_url),
       trace_id: meta.trace_id,
       request_id: meta.request_id,
@@ -2296,6 +2139,67 @@ export class SiglumeClient implements SiglumeClientShape {
   async get_listing(listing_id: string): Promise<AppListingRecord> {
     const [data] = await this.request("GET", `/market/capabilities/${listing_id}`);
     return parseListing(data);
+  }
+
+  async list_company_publishers(): Promise<CompanyPublisherRecord[]> {
+    const [data] = await this.request("GET", "/market/company-publishers");
+    return Array.isArray(data.items)
+      ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseCompanyPublisher)
+      : [];
+  }
+
+  async request_company_publish_approval(listing_id: string, note?: string): Promise<AppListingRecord> {
+    const [data] = await this.request("POST", `/market/capabilities/${listing_id}/company-publish-approval`, {
+      json_body: note ? { note } : {},
+    });
+    return parseListing(data);
+  }
+
+  async decide_company_publish_approval(
+    listing_id: string,
+    options: { decision: "approve" | "reject"; reason?: string },
+  ): Promise<AppListingRecord> {
+    const [data] = await this.request("POST", `/market/capabilities/${listing_id}/company-publish-approval/decision`, {
+      json_body: {
+        decision: options.decision,
+        ...(options.reason ? { reason: options.reason } : {}),
+      },
+    });
+    return parseListing(data);
+  }
+
+  async get_capability_state(
+    capability_key: string,
+    save_key = "default",
+  ): Promise<CapabilitySaveStateRecord> {
+    const [data] = await this.request("GET", `/market/capability-state/${capability_key}/${save_key}`);
+    return parseCapabilitySaveState(data);
+  }
+
+  async put_capability_state(
+    capability_key: string,
+    save_key = "default",
+    payload: Record<string, unknown> = {},
+    options: { schema_version?: string; expected_revision?: number | null; metadata?: Record<string, unknown> } = {},
+  ): Promise<CapabilitySaveStateRecord> {
+    const body: Record<string, unknown> = {
+      payload: toRecord(payload),
+      schema_version: options.schema_version ?? "1",
+      metadata: toRecord(options.metadata),
+    };
+    if (options.expected_revision !== undefined && options.expected_revision !== null) {
+      body.expected_revision = Math.trunc(options.expected_revision);
+    }
+    const [data] = await this.request("PUT", `/market/capability-state/${capability_key}/${save_key}`, { json_body: body });
+    return parseCapabilitySaveState(data);
+  }
+
+  async delete_capability_state(
+    capability_key: string,
+    save_key = "default",
+  ): Promise<CapabilitySaveStateRecord> {
+    const [data] = await this.request("DELETE", `/market/capability-state/${capability_key}/${save_key}`);
+    return parseCapabilitySaveState(data);
   }
 
   // ----- Capability bundles (v0.7 track 2) ---------------------------------
@@ -2398,97 +2302,9 @@ export class SiglumeClient implements SiglumeClientShape {
 
   // ----- end bundles -------------------------------------------------------
 
-  // ----- Connected accounts (v0.7 track 3) ---------------------------------
-  // `resolve()` is intentionally NOT wrapped: runtime-only, never over the wire.
-
-  async start_connected_account_oauth(input: {
-    listing_id: string;
-    redirect_uri: string;
-    scopes?: string[];
-    account_role?: string;
-  }): Promise<ConnectedAccountOAuthStart> {
-    const body: Record<string, unknown> = {
-      listing_id: input.listing_id,
-      redirect_uri: input.redirect_uri,
-    };
-    if (input.scopes !== undefined) body.scopes = input.scopes;
-    if (input.account_role !== undefined) body.account_role = input.account_role;
-    const [data] = await this.request("POST", "/me/connected-accounts/oauth/authorize", {
-      json_body: body,
-    });
-    return {
-      authorize_url: String(data.authorize_url ?? ""),
-      state: String(data.state ?? ""),
-      provider_key: String(data.provider_key ?? ""),
-      scopes: Array.isArray(data.scopes)
-        ? data.scopes.filter((s: unknown): s is string => typeof s === "string")
-        : [],
-      pkce_method: stringOrNull(data.pkce_method),
-    };
-  }
-
-  async complete_connected_account_oauth(input: { state: string; code: string }): Promise<Record<string, unknown>> {
-    const [data] = await this.request("POST", "/me/connected-accounts/oauth/callback", {
-      json_body: { state: input.state, code: input.code },
-    });
-    return { ...data };
-  }
-
-  async refresh_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
-    const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/refresh`);
-    return parseConnectedAccountLifecycle(data);
-  }
-
-  async revoke_connected_account(account_id: string): Promise<ConnectedAccountLifecycleResult> {
-    const [data] = await this.request("POST", `/me/connected-accounts/${account_id}/revoke`);
-    return parseConnectedAccountLifecycle(data);
-  }
-
-  async set_listing_oauth_credentials(
-    listing_id: string,
-    input: {
-      provider_key: string;
-      client_id: string;
-      client_secret: string;
-      authorize_url: string;
-      token_url: string;
-      revoke_url?: string;
-      display_name?: string;
-      scope_separator?: string;
-      token_endpoint_auth?: string;
-      pkce_required?: boolean;
-      refresh_supported?: boolean;
-      available_scopes?: string[];
-      required_scopes?: string[];
-    },
-  ): Promise<Record<string, unknown>> {
-    const body: Record<string, unknown> = {
-      provider_key: input.provider_key,
-      client_id: input.client_id,
-      client_secret: input.client_secret,
-      authorize_url: input.authorize_url,
-      token_url: input.token_url,
-    };
-    if (input.revoke_url !== undefined) body.revoke_url = input.revoke_url;
-    if (input.display_name !== undefined) body.display_name = input.display_name;
-    if (input.scope_separator !== undefined) body.scope_separator = input.scope_separator;
-    if (input.token_endpoint_auth !== undefined) body.token_endpoint_auth = input.token_endpoint_auth;
-    if (input.pkce_required !== undefined) body.pkce_required = input.pkce_required;
-    if (input.refresh_supported !== undefined) body.refresh_supported = input.refresh_supported;
-    if (input.available_scopes !== undefined) body.available_scopes = input.available_scopes;
-    if (input.required_scopes !== undefined) body.required_scopes = input.required_scopes;
-    const [data] = await this.request("PUT", `/market/capabilities/${listing_id}/oauth-credentials`, {
-      json_body: body,
-    });
-    return { ...data };
-  }
-
-  async get_listing_oauth_credentials_status(listing_id: string): Promise<Record<string, unknown>> {
-    const [data] = await this.request("GET", `/market/capabilities/${listing_id}/oauth-credentials`);
-    return { ...data };
-  }
-
-  // ----- end connected accounts --------------------------------------------
+  // ----- Connected accounts ------------------------------------------------
+  // Architecture B: publisher APIs own external OAuth and token storage.
+  // The SDK no longer exposes platform OAuth or listing credential APIs.
 
   async get_developer_portal(): Promise<DeveloperPortalSummary> {
     const [data, meta] = await this.request("GET", "/market/developer/portal");
@@ -2523,9 +2339,6 @@ export class SiglumeClient implements SiglumeClientShape {
       dry_run_supported: Boolean(data.dry_run_supported ?? false),
       approval_mode: stringOrNull(data.approval_mode),
       required_connected_accounts: Array.isArray(data.required_connected_accounts) ? data.required_connected_accounts : [],
-      connected_accounts: Array.isArray(data.connected_accounts)
-        ? data.connected_accounts.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => ({ ...item }))
-        : [],
       stub_providers_enabled: Boolean(data.stub_providers_enabled ?? false),
       simulated_receipts: Boolean(data.simulated_receipts ?? false),
       approval_simulator: Boolean(data.approval_simulator ?? false),
@@ -3305,128 +3118,6 @@ export class SiglumeClient implements SiglumeClientShape {
     return parseMarketNeed(execution.result);
   }
 
-  // `works.*` also uses the public owner-operation execute route. The
-  // categories list returns a top-level array in `result`, so these
-  // wrappers call the execute endpoint directly instead of relying on
-  // execute_owner_operation()'s object-only `result` parser.
-  async list_works_categories(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<WorksCategoryRecord[]> {
-    const [data] = await this.requestOwnerOperation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "works.categories.list",
-      {},
-      { lang: options.lang },
-    );
-    return Array.isArray(data.result)
-      ? data.result.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseWorksCategory(item))
-      : [];
-  }
-
-  async get_works_registration(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<WorksRegistrationRecord> {
-    const [data] = await this.requestOwnerOperation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "works.registration.get",
-      {},
-      { lang: options.lang },
-    );
-    return parseWorksRegistration(data);
-  }
-
-  async register_for_works(options: {
-    agent_id?: string;
-    tagline?: string;
-    description?: string;
-    categories?: string[];
-    capabilities?: string[];
-    lang?: string;
-  } = {}): Promise<WorksRegistrationRecord> {
-    const payload: Record<string, unknown> = {};
-    if (options.tagline !== undefined) {
-      payload.tagline = String(options.tagline).trim();
-    }
-    if (options.description !== undefined) {
-      payload.description = String(options.description).trim();
-    }
-    if (options.categories !== undefined) {
-      if (!Array.isArray(options.categories)) {
-        throw new SiglumeClientError("categories must be a list of strings.");
-      }
-      const normalizedCategories: string[] = [];
-      for (const item of options.categories) {
-        if (typeof item !== "string") {
-          throw new SiglumeClientError("categories must contain only strings.");
-        }
-        const normalized = item.trim();
-        if (normalized) {
-          normalizedCategories.push(normalized);
-        }
-      }
-      payload.categories = normalizedCategories;
-    }
-    if (options.capabilities !== undefined) {
-      if (!Array.isArray(options.capabilities)) {
-        throw new SiglumeClientError("capabilities must be a list of strings.");
-      }
-      const normalizedCapabilities: string[] = [];
-      for (const item of options.capabilities) {
-        if (typeof item !== "string") {
-          throw new SiglumeClientError("capabilities must contain only strings.");
-        }
-        const normalized = item.trim();
-        if (normalized) {
-          normalizedCapabilities.push(normalized);
-        }
-      }
-      payload.capabilities = normalizedCapabilities;
-    }
-    const [data] = await this.requestOwnerOperation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "works.registration.register",
-      payload,
-      { lang: options.lang },
-    );
-    return parseWorksRegistration(data);
-  }
-
-  async get_works_owner_dashboard(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<WorksOwnerDashboard> {
-    const [data] = await this.requestOwnerOperation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "works.owner_dashboard.get",
-      {},
-      { lang: options.lang },
-    );
-    return parseWorksOwnerDashboard(isRecord(data.result) ? data.result : {});
-  }
-
-  async get_works_poster_dashboard(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<WorksPosterDashboard> {
-    const [data] = await this.requestOwnerOperation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "works.poster_dashboard.get",
-      {},
-      { lang: options.lang },
-    );
-    return parseWorksPosterDashboard(isRecord(data.result) ? data.result : {});
-  }
-
   async list_installed_tools(
     options: {
       agent_id?: string;
@@ -3659,179 +3350,6 @@ export class SiglumeClient implements SiglumeClientShape {
     );
     return Array.isArray(data.result)
       ? data.result.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseInstalledToolReceiptStep(item))
-      : [];
-  }
-
-  async get_partner_dashboard(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<PartnerDashboard> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.dashboard.get",
-      {},
-      { lang: options.lang },
-    );
-    return parsePartnerDashboard(execution.result);
-  }
-
-  async get_partner_usage(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<PartnerUsage> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.usage.get",
-      {},
-      { lang: options.lang },
-    );
-    return parsePartnerUsage(execution.result);
-  }
-
-  async list_partner_api_keys(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<PartnerApiKeyRecord[]> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.keys.list",
-      {},
-      { lang: options.lang },
-    );
-    return Array.isArray(execution.result.keys)
-      ? execution.result.keys.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parsePartnerApiKey(item))
-      : [];
-  }
-
-  async create_partner_api_key(
-    options: {
-      agent_id?: string;
-      name?: string;
-      allowed_source_types?: string[];
-      lang?: string;
-    } = {},
-  ): Promise<PartnerApiKeyHandle> {
-    const payload: Record<string, unknown> = {};
-    if (options.name !== undefined) {
-      const normalizedName = String(options.name).trim();
-      if (!normalizedName) {
-        throw new SiglumeClientError("name cannot be empty.");
-      }
-      payload.name = normalizedName;
-    }
-    if (options.allowed_source_types !== undefined) {
-      if (!Array.isArray(options.allowed_source_types)) {
-        throw new SiglumeClientError("allowed_source_types must be a list of strings.");
-      }
-      payload.allowed_source_types = options.allowed_source_types.flatMap((item) => {
-        if (typeof item !== "string") {
-          throw new SiglumeClientError("allowed_source_types must contain only strings.");
-        }
-        const normalizedItem = item.trim();
-        return normalizedItem ? [normalizedItem] : [];
-      });
-    }
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "partner.keys.create",
-      payload,
-      { lang: options.lang },
-    );
-    return parsePartnerApiKeyHandle(execution.result);
-  }
-
-  async get_ads_billing(
-    options: {
-      agent_id?: string;
-      rail?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsBilling> {
-    const payload: Record<string, unknown> = {};
-    if (options.rail !== undefined && String(options.rail).trim()) {
-      payload.rail = String(options.rail).trim().toLowerCase();
-    }
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.billing.get",
-      payload,
-      { lang: options.lang },
-    );
-    return parseAdsBilling(execution.result);
-  }
-
-  async settle_ads_billing(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsBillingSettlement> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.billing.settle",
-      {},
-      { lang: options.lang },
-    );
-    return parseAdsBillingSettlement(execution.result);
-  }
-
-  async get_ads_profile(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsProfile> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.profile.get",
-      {},
-      { lang: options.lang },
-    );
-    return parseAdsProfile(execution.result);
-  }
-
-  async list_ads_campaigns(
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsCampaignRecord[]> {
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.campaigns.list",
-      {},
-      { lang: options.lang },
-    );
-    return Array.isArray(execution.result.campaigns)
-      ? execution.result.campaigns.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseAdsCampaign(item))
-      : [];
-  }
-
-  async list_ads_campaign_posts(
-    campaign_id: string,
-    options: {
-      agent_id?: string;
-      lang?: string;
-    } = {},
-  ): Promise<AdsCampaignPostRecord[]> {
-    const normalizedCampaignId = String(campaign_id ?? "").trim();
-    if (!normalizedCampaignId) {
-      throw new SiglumeClientError("campaign_id is required.");
-    }
-    const execution = await this.execute_owner_operation(
-      await this.resolveOwnerOperationAgentId(options.agent_id),
-      "ads.campaign_posts.list",
-      { campaign_id: normalizedCampaignId },
-      { lang: options.lang },
-    );
-    return Array.isArray(execution.result.posts)
-      ? execution.result.posts.filter((item): item is Record<string, unknown> => isRecord(item)).map((item) => parseAdsCampaignPost(item))
       : [];
   }
 
@@ -4288,35 +3806,6 @@ export class SiglumeClient implements SiglumeClientShape {
       request_id: meta.request_id,
       raw: { ...data },
     };
-  }
-
-  async list_connected_accounts(options: {
-    provider_key?: string;
-    environment?: string;
-    limit?: number;
-    cursor?: string;
-  } = {}): Promise<CursorPageResult<ConnectedAccountRecord>> {
-    const params = {
-      provider_key: options.provider_key,
-      environment: options.environment,
-      limit: Math.max(1, Math.min(Math.trunc(options.limit ?? 50), 100)),
-      cursor: options.cursor,
-    };
-    const [data, meta] = await this.request("GET", "/market/connected-accounts", { params });
-    const items = Array.isArray(data.items)
-      ? data.items.filter((item): item is Record<string, unknown> => isRecord(item)).map(parseConnectedAccount)
-      : [];
-    const next_cursor = stringOrNull(data.next_cursor);
-    return new CursorPageResult({
-      items,
-      next_cursor,
-      limit: typeof data.limit === "number" ? data.limit : params.limit,
-      offset: typeof data.offset === "number" ? data.offset : null,
-      meta,
-      fetchNext: next_cursor
-        ? (cursor) => this.list_connected_accounts({ ...options, cursor })
-        : undefined,
-    });
   }
 
   async create_support_case(

@@ -1,4 +1,4 @@
-# Owner Approval Policy Update Wrapper
+﻿# Owner Approval Policy Update Wrapper
 
 This starter wraps the first-party Siglume owner operation `owner.approval_policy.update`.
 
@@ -15,16 +15,16 @@ This starter wraps the first-party Siglume owner operation `owner.approval_polic
 - `stubs.py`: mock fallback used when `SIGLUME_API_KEY` is not set
 - `manifest.json`: reviewable manifest snapshot
 - `tool_manual.json`: machine-generated ToolManual scaffold
-- `runtime_validation.json`: local public endpoint and review-key checks used by auto-register
-- `.gitignore`: keeps runtime review keys and OAuth client secrets out of Git
+- `runtime_validation.json`: local public endpoint + runtime auth header checks used by auto-register
+- `.gitignore`: keeps the runtime auth secret and OAuth client secrets out of Git
 - `tests/test_adapter.py`: smoke test for `AppTestHarness`
 
 Before registering, replace all generated placeholders:
 - In `adapter.py` and `manifest.json`, replace `docs_url` and `support_contact` with your public documentation and support contact.
-- In the local `runtime_validation.json`, replace the public URL and review-key placeholders.
-- If the API uses seller-side OAuth, create a local `oauth_credentials.json` next to the adapter.
-- Do not commit real review keys or OAuth client secrets; the generated `.gitignore` excludes those files.
-- Because `runtime_validation.json` is ignored, GitHub samples do not commit review-key values.
+- In the local `runtime_validation.json`, replace the public URL and runtime auth header placeholders (runtime_auth_header_name/value).
+- If the API uses external OAuth, implement the OAuth flow and secret storage in the publisher API.
+- Do not commit the real runtime auth secret or OAuth client secrets; the generated `.gitignore` excludes those files.
+- Because `runtime_validation.json` is ignored, GitHub samples do not commit runtime auth secret values.
 
 ## Commands
 

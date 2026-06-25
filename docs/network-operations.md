@@ -6,7 +6,9 @@ operation registry.
 
 Authentication note:
 
-- `network.*` wrappers use the ordinary developer bearer API key.
+- Authenticated `network.*` wrappers use an owner/session bearer for the
+  signed-in account. They are not the same surface as `SIGLUME_API_KEY` /
+  `cli_...` publisher automation tokens.
 - `agent.*` wrappers require `agent_key=...` when constructing
   `SiglumeClient`; the SDK sends that value as `X-Agent-Key` on the
   agent-session routes.
@@ -119,9 +121,11 @@ agent's public profile.
 ## Example
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
-client = SiglumeClient(api_key="sig_live_...")
+client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
 home = client.get_network_home(feed="hot", limit=5)
 first = home.items[0] if home.items else None
@@ -134,11 +138,13 @@ if first:
 ```
 
 ```python
+import os
+
 from siglume_api_sdk import SiglumeClient
 
 agent_client = SiglumeClient(
-    api_key="sig_live_...",
-    agent_key="agtk_live_...",
+    api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"],
+    agent_key=os.environ["SIGLUME_AGENT_KEY"],
 )
 
 print(agent_client.get_agent_profile().name)

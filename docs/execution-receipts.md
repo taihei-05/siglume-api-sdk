@@ -11,6 +11,17 @@ Receipts help owners and operators answer:
 - what external action was taken
 - how to debug failures
 
+To view receipts after a run, use the matching surface:
+
+- owner account runs: `siglume dev tail` or SDK `list_execution_receipts()`;
+  the SDK helper reads owner-scoped receipts and currently requires an
+  owner/session bearer, not a publisher CLI token.
+- publisher listing runs: `siglume dev tail --listing-id <listing_id>` or SDK
+  `list_listing_recent_receipts()`; this seller-scoped surface accepts the
+  publisher automation credential and returns privacy-redacted receipts.
+
+See [Developer Observability](./developer-observability.md).
+
 ## Two approaches: legacy and structured
 
 ### Legacy: `receipt_summary` (free-form dict)
@@ -65,7 +76,7 @@ result = ExecutionResult(
 |-----------|-----|
 | Simple read-only API | `receipt_summary` is fine |
 | Action/payment API | Use `artifacts` + `side_effects` |
-| Need to link to AIWorks deliverables | Use `receipt_ref` (set by runtime) |
+| Need to correlate a runtime execution receipt | Use `receipt_ref` (set by runtime) |
 | Owner approval required | Use `approval_hint` |
 
 ## Structured types reference
@@ -99,7 +110,7 @@ Describes what external state changed.
 
 ### ReceiptRef
 
-Opaque reference to a `CapabilityExecutionReceipt`. **Set by the runtime, not by the app developer.** Use this to link AIWorks `JobDeliverable.execution_receipt_id`.
+Opaque reference to a `CapabilityExecutionReceipt`. **Set by the runtime, not by the app developer.** Use this to correlate logs, receipts, and support traces for one API execution.
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -146,5 +157,33 @@ result = ExecutionResult(
 - Do not include secrets or raw tokens
 - Include identifiers that help support investigate problems
 - When the API is in `dry_run`, return a preview receipt instead of a fake live one
-- Use `SideEffectRecord.reversible` honestly — it affects rollback review
+- Use `SideEffectRecord.reversible` honestly; it affects rollback review
 - Always include `external_id` when the provider returns one
+
+## Operation billing receipts
+
+For `price_model="usage_based"` or `price_model="per_action"`, the receipt is
+also the billing selector. Return the operation/request type that actually ran:
+
+```python
+return ExecutionResult(
+    success=True,
+    output={"posted": True},
+    units_consumed=1,
+    amount_minor=15,
+    currency="JPY",
+    receipt_summary={
+        "operation": "text_only",
+        "amount_minor": 15,
+        "currency": "JPY",
+    },
+)
+```
+
+The operation must match a `pricing_plan.items[].key`. The plan item is
+authoritative for the charge. If the receipt reports a conflicting positive
+amount, the platform rejects the call instead of charging the arbitrary amount.
+For free/no-op operations, return `amount_minor=0`; the platform creates no
+payment for a `0`-priced plan item.
+
+See [Pricing And Billing](./pricing-and-billing.md) for the full contract.

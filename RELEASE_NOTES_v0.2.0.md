@@ -61,7 +61,7 @@ v0.2.0 is the first SDK-visible output of the broader Stripe Connect → Polygon
 
 The two-axis model this migration has been operating under:
 
-- **Axis 1 — subscription purchase** (Plan / Partner / API Store / AIWorks escrow / Ads): migrated to Polygon server-side. Does not cross the SDK contract; no SDK change required.
+- **Axis 1 — subscription purchase**: migrated to Polygon server-side. Does not cross the SDK contract; no SDK change required.
 - **Axis 2 — tool-execution settlement**: gated by `SettlementMode`. **This is the axis that moved in v0.2.0.** The enum expansion is the trigger.
 
 ## What remains reserved

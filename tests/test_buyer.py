@@ -129,6 +129,25 @@ def test_get_listing_resolves_capability_key_and_synthesizes_tool_manual() -> No
     assert listing.experimental is True
 
 
+def test_get_listing_falls_back_to_active_capability_key_lookup() -> None:
+    active_listing = dict(load_fixture_listings()[0])
+    active_listing["status"] = "active"
+    requested_statuses: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_statuses.append(str(request.url.params.get("status") or ""))
+        if request.url.params.get("status") == "active":
+            return httpx.Response(200, json=envelope({"items": [active_listing], "next_cursor": None, "limit": 20, "offset": 0}))
+        return httpx.Response(200, json=envelope({"items": [], "next_cursor": None, "limit": 20, "offset": 0}))
+
+    client = build_client(handler)
+    listing = client.get_listing("currency-converter-v2")
+
+    assert requested_statuses[:2] == ["published", "active"]
+    assert listing.listing_id == "lst_currency"
+    assert listing.status == "active"
+
+
 def test_subscribe_returns_access_grant_without_binding_when_bind_is_disabled() -> None:
     listings = load_fixture_listings()
 
@@ -158,6 +177,53 @@ def test_subscribe_returns_access_grant_without_binding_when_bind_is_disabled() 
     assert subscription.access_grant_id == "grant_123"
     assert subscription.binding_id is None
     assert subscription.trace_id == "trc_purchase"
+
+
+def test_start_trial_returns_access_grant_without_binding_when_bind_is_disabled() -> None:
+    listings = load_fixture_listings()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/market/capabilities":
+            return httpx.Response(200, json=envelope({"items": listings, "next_cursor": None, "limit": 20, "offset": 0}))
+        if request.url.path == "/v1/market/capabilities/lst_currency/start-trial":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "purchase_status": "trial_started",
+                        "access_grant": {
+                            "id": "grant_trial",
+                            "capability_listing_id": "lst_currency",
+                            "grant_status": "active",
+                        },
+                    },
+                    trace_id="trc_trial",
+                ),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = build_client(handler)
+    subscription = client.start_trial(capability_key="currency-converter-v2", bind_agent=False)
+
+    assert subscription.access_grant_id == "grant_trial"
+    assert subscription.purchase_status == "trial_started"
+    assert subscription.binding_id is None
+    assert subscription.trace_id == "trc_trial"
+
+
+def test_get_trial_quota_returns_raw_quota_payload() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/market/me/trial-quota":
+            return httpx.Response(
+                200,
+                json=envelope({"plan": "plus", "monthly_limit": 3, "used_this_month": 1, "remaining": 2}),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = build_client(handler)
+    quota = client.get_trial_quota()
+
+    assert quota["remaining"] == 2
 
 
 def test_subscribe_binds_agent_when_default_agent_id_is_present() -> None:
@@ -351,3 +417,120 @@ def test_invoke_preserves_legitimate_zero_amount_and_units() -> None:
     assert result.amount_minor == 0
     # Zero units_consumed must be preserved; the old code replaced it with 1.
     assert result.units_consumed == 0
+
+
+def test_invoke_with_direct_payment_uses_sdrp_route_and_separates_control_fields() -> None:
+    listing = dict(load_fixture_listings()[0])
+    listing.update(
+        {
+            "id": "lst_direct",
+            "capability_key": "paid-lookup",
+            "price_model": "per_request",
+            "price_value_minor": 10,
+            "currency": "JPY",
+        }
+    )
+    seen_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_paths.append(request.url.path)
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        if request.url.path == "/v1/market/capabilities":
+            return httpx.Response(200, json=envelope({"items": [listing], "next_cursor": None, "limit": 20, "offset": 0}))
+        if request.url.path == "/v1/market/capabilities/lst_direct/purchase":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "purchase_status": "created",
+                        "access_grant": {
+                            "id": "grant_direct",
+                            "capability_listing_id": "lst_direct",
+                            "grant_status": "active",
+                        },
+                    }
+                ),
+            )
+        if request.url.path == "/v1/market/access-grants/grant_direct/bind-agent":
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "access_grant": {
+                            "id": "grant_direct",
+                            "capability_listing_id": "lst_direct",
+                            "grant_status": "active",
+                        },
+                        "binding": {
+                            "id": "binding_direct",
+                            "access_grant_id": "grant_direct",
+                            "agent_id": "agent_123",
+                            "binding_status": "active",
+                        },
+                    }
+                ),
+            )
+        if request.url.path == "/v1/sdrp/direct-payments/requirements" and request.method == "POST":
+            assert body["input"] == {"query": "x"}
+            assert "direct_payment_requirement_id" not in body["input"]
+            return httpx.Response(
+                201,
+                json=envelope(
+                    {
+                        "requirement_id": "dpr_test",
+                        "status": "transaction_prepared",
+                        "transaction_request": {
+                            "to": "0xDirectPaymentHub",
+                            "metadata_jsonb": {"direct_payment_requirement_id": "dpr_test"},
+                        },
+                    }
+                ),
+            )
+        if request.url.path == "/v1/market/web3/transactions/execute-prepared":
+            assert body["receipt_kind"] == "sdrp_direct_payment"
+            return httpx.Response(200, json=envelope({"receipt": {"receipt_id": "rcpt_test", "tx_status": "finalized"}}))
+        if request.url.path == "/v1/sdrp/direct-payments/requirements/dpr_test/verify":
+            assert body["receipt_id"] == "rcpt_test"
+            return httpx.Response(
+                200,
+                json=envelope({"requirement_id": "dpr_test", "status": "confirmed", "transaction_request": {}}),
+            )
+        if request.url.path == "/v1/sdrp/direct-payments/requirements/dpr_test/execute":
+            assert body["input"] == {"query": "x"}
+            assert "direct_payment_requirement_id" not in body["input"]
+            assert body["metadata"]["direct_payment_requirement_id"] == "dpr_test"
+            return httpx.Response(
+                200,
+                json=envelope(
+                    {
+                        "requirement": {"requirement_id": "dpr_test", "status": "spent", "transaction_request": {}},
+                        "execution": {"execution_status": "executed"},
+                        "capability_result": {
+                            "accepted": True,
+                            "result": {"accepted": True},
+                            "usage_event": {"units_consumed": 1, "amount_minor": 10, "currency": "JPY"},
+                            "receipt": {"amount_minor": 10, "currency": "JPY", "execution_kind": "action"},
+                        },
+                    }
+                ),
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = build_client(handler, default_agent_id="agent_123")
+    result = client.invoke_with_direct_payment(
+        capability_key="paid-lookup",
+        input={"query": "x"},
+        currency="JPY",
+        token_symbol="JPYC",
+    )
+
+    assert result.requirement.status == "spent"
+    assert result.capability_result == {
+        "accepted": True,
+        "result": {"accepted": True},
+        "usage_event": {"units_consumed": 1, "amount_minor": 10, "currency": "JPY"},
+        "receipt": {"amount_minor": 10, "currency": "JPY", "execution_kind": "action"},
+    }
+    assert "/v1/sdrp/direct-payments/requirements" in seen_paths
+    assert "/v1/sdrp/direct-payments/requirements/dpr_test/execute" in seen_paths
+    assert "/v1/internal/market/capability/execute" not in seen_paths

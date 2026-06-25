@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import click
 
+from siglume_api_sdk.cli.commands.scan_cmd import scan_path
 from siglume_api_sdk.cli.project import render_json, run_registration
 
 
@@ -9,16 +10,50 @@ from siglume_api_sdk.cli.project import render_json, run_registration
 @click.option("--confirm", is_flag=True, help="Explicitly confirm the registration. This is the default unless --draft-only is set.")
 @click.option("--draft-only", is_flag=True, help="Create or refresh the draft without confirming publication.")
 @click.option("--submit-review", is_flag=True, help="Legacy alias: publish immediately if your environment still routes through submit-review.")
+@click.option("--yes", is_flag=True, help="Skip local scan confirmation prompts.")
+@click.option("--company", "company_id", default="", help="Publish under a Siglume company name; revenue is split equally among active members.")
+@click.option("--company-slug", default="", help="Publish under a Siglume company by matching the slugified company name.")
 @click.option("--json", "json_output", is_flag=True, help="Emit machine-readable JSON.")
 @click.argument("path", required=False, default=".")
-def register_command(confirm: bool, draft_only: bool, submit_review: bool, json_output: bool, path: str) -> None:
+def register_command(
+    confirm: bool,
+    draft_only: bool,
+    submit_review: bool,
+    yes: bool,
+    company_id: str,
+    company_slug: str,
+    json_output: bool,
+    path: str,
+) -> None:
     if draft_only and confirm:
         raise click.ClickException("--draft-only cannot be combined with --confirm.")
     if draft_only and submit_review:
         raise click.ClickException("--draft-only cannot be combined with --submit-review.")
 
     should_confirm = confirm or (not draft_only and not submit_review)
-    result = run_registration(path, confirm=should_confirm, submit_review=submit_review)
+    scan_result = scan_path(path)
+    risky_publish = scan_result["risk_level"] != "clean" and (should_confirm or submit_review)
+    if risky_publish and not yes and json_output:
+        raise click.ClickException(
+            "Local prompt-injection scan found suspicious capability metadata; "
+            "review it or pass --yes to continue."
+        )
+    if risky_publish and not yes:
+        click.secho(
+            f"Local prompt-injection scan returned {scan_result['risk_level']}.",
+            fg="yellow",
+        )
+        for pattern in scan_result["matched_patterns"]:
+            click.echo(f"- {pattern}")
+        click.confirm("Continue publishing anyway?", abort=True)
+    result = run_registration(
+        path,
+        confirm=should_confirm,
+        submit_review=submit_review,
+        company_id=company_id,
+        company_slug=company_slug,
+    )
+    result["local_prompt_injection_scan"] = scan_result
     if json_output:
         click.echo(render_json(result))
         return
@@ -40,10 +75,6 @@ def register_command(confirm: bool, draft_only: bool, submit_review: bool, json_
     click.echo(f"receipt_status: {receipt['status']}")
     if receipt.get("listing_status"):
         click.echo(f"listing_status: {receipt['listing_status']}")
-    if receipt.get("oauth_status"):
-        oauth_status = receipt["oauth_status"]
-        if isinstance(oauth_status, dict):
-            click.echo(f"oauth_configured: {bool(oauth_status.get('configured'))}")
     if receipt.get("review_url"):
         click.echo(f"review_url: {receipt['review_url']}")
     if receipt.get("trace_id"):

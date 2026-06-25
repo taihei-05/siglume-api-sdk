@@ -10,10 +10,82 @@
     "name",
     "job_to_be_done",
     "category",
+    "store_vertical",
     "permission_class",
     "approval_mode",
     "price_model",
+    "currency",
+    "allow_free_trial",
     "jurisdiction"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "store_vertical": { "const": "game" },
+          "persistence": {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "enum": ["local", "platform", "developer_server"]
+              }
+            }
+          }
+        },
+        "required": ["store_vertical", "persistence"]
+      },
+      "then": {
+        "properties": {
+          "persistence": {
+            "required": ["save_data_schema"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publisher_type": { "const": "company" }
+        },
+        "required": ["publisher_type"]
+      },
+      "then": {
+        "anyOf": [
+          { "required": ["company_id"] },
+          { "required": ["publisher_company_id"] }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publisher_type": { "const": "user" }
+        },
+        "required": ["publisher_type"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["company_id"] },
+            { "required": ["publisher_company_id"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "not": { "required": ["publisher_type"] }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["company_id"] },
+            { "required": ["publisher_company_id"] }
+          ]
+        }
+      }
+    }
   ],
   "properties": {
     "capability_key": {
@@ -31,7 +103,9 @@
     },
     "job_to_be_done": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "Buyer-facing task this API lets an agent complete. Keep this focused on what the buyer can do."
     },
     "category": {
       "type": "string",
@@ -78,12 +152,18 @@
           {
             "type": "object",
             "additionalProperties": true,
+            "required": ["provider_key", "managed_by", "connect_url"],
             "properties": {
               "provider_key": {
                 "type": "string"
               },
-              "platform_managed": {
-                "type": "boolean"
+              "managed_by": {
+                "type": "string",
+                "enum": ["api"]
+              },
+              "connect_url": {
+                "type": "string",
+                "format": "uri"
               },
               "required_scopes": {
                 "type": "array",
@@ -112,18 +192,61 @@
         "usage_based",
         "per_action"
       ],
-      "description": "Pricing model. Free and subscription are live. Other models (one_time, bundle, usage_based, per_action) are planned."
+      "description": "Pricing model. Free, subscription, usage_based, and per_action are live. one_time and bundle are reserved."
     },
     "price_value_minor": {
       "type": "integer",
       "minimum": 0,
       "default": 0
     },
+    "pricing_plan": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Buyer-facing operation price table for usage_based/per_action listings. Use 0 for free operations; positive JPY/JPYC operation prices must be at least 15 minor units.",
+      "properties": {
+        "display_name": { "type": "string" },
+        "currency": { "type": "string" },
+        "free_upfront_invocation": { "type": "boolean" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["key", "price_minor"],
+            "properties": {
+              "key": { "type": "string" },
+              "label": { "type": "string" },
+              "price_minor": { "type": "integer", "minimum": 0 },
+              "amount_minor": { "type": "integer", "minimum": 0 },
+              "currency": { "type": "string" },
+              "description": { "type": "string" },
+              "receipt_code": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "billing_timing": {
+      "type": "string",
+      "enum": ["post", "prepay"],
+      "default": "post",
+      "description": "Operation billing timing for usage_based/per_action listings. Use 'post' to execute then settle; use 'prepay' to quote and collect payment before irreversible live actions."
+    },
     "currency": {
       "type": "string",
-      "const": "USD",
-      "default": "USD",
-      "description": "The Siglume Agent API Store is USD-unified. All listings — free, subscription, or one-time — are priced in US dollars. Stripe Connect destination charges, payouts, and platform-fee accounting all operate on USD amounts. Submitting a non-USD currency will be rejected by the platform at registration time. Developers outside the US (any jurisdiction value) still price in USD here."
+      "enum": ["USD", "JPY"],
+      "description": "Required listing currency. USD listings settle in USDC; JPY listings settle in JPYC. price_value_minor uses this currency's minor unit: cents for USD, yen for JPY."
+    },
+    "allow_free_trial": {
+      "type": "boolean",
+      "description": "Required publisher opt-in/out for Plus/Pro buyer free trials. Set true to offer a trial for this paid API, false to disable."
+    },
+    "free_trial_duration_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 90,
+      "default": 30,
+      "description": "Trial duration in days when allow_free_trial is true."
     },
     "jurisdiction": {
       "type": "string",
@@ -133,7 +256,7 @@
     "applicable_regulations": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Optional list of specific regulatory frameworks the API claims compliance with (e.g. 'GDPR', 'CCPA', 'PCI-DSS', 'HIPAA', '資金決済法', '特定商取引法'). Advisory only — platform does not audit these claims."
+      "description": "Optional list of specific regulatory frameworks the API claims compliance with (e.g. 'GDPR', 'CCPA', 'PCI-DSS', 'HIPAA', payment services rules, commerce transaction rules). Advisory only; platform does not audit these claims."
     },
     "data_residency": {
       "type": "string",
@@ -141,11 +264,14 @@
       "description": "Optional ISO 3166-1 alpha-2 code indicating where user data is stored/processed. If omitted, defaults to jurisdiction."
     },
     "short_description": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 60,
+      "description": "Buyer-facing catalog tagline shown on listing cards and the detail header."
     },
     "description": {
       "type": "string",
-      "description": "Optional long buyer-facing detail shown on the API Store detail page. Use it for how to ask for the API in chat, AI Works fit, limits, approval behavior, and expected results."
+      "maxLength": 1000,
+      "description": "Optional long buyer-facing detail shown on the API Store detail page. Use it for how to ask for the API in chat, limits, approval behavior, and expected results."
     },
     "docs_url": {
       "type": "string",
@@ -165,6 +291,29 @@
       "type": "string",
       "format": "uri",
       "description": "Optional official seller social/profile URL. This is separate from docs_url."
+    },
+    "publisher_type": {
+      "type": "string",
+      "enum": ["user", "company"],
+      "description": "Publishing subject. Omit or use 'user' for individual publishing; use 'company' with company_id to publish under a Siglume company name."
+    },
+    "company_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Siglume company id to publish under when publisher_type is 'company'."
+    },
+    "publisher_company_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Alias for company_id."
+    },
+    "store_vertical": {
+      "type": "string",
+      "enum": [
+        "api",
+        "game"
+      ],
+      "description": "Explicit store surface. Use 'api' for normal API Store listings and 'game' for API games that should appear in the game store."
     },
     "compatibility_tags": {
       "type": "array",
@@ -188,6 +337,63 @@
       },
       "minItems": 2,
       "description": "At least 2 distinct non-empty sample prompts. Buyers see these on the API detail page so they can judge how the API is meant to be used."
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional save-state contract. API games should use mode='platform' so user progress is stored by Siglume, not by a transient client session.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["none", "local", "platform", "developer_server"]
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "default": "1"
+        },
+        "scope": {
+          "type": "string",
+          "default": "user_capability"
+        },
+        "restore_required": {
+          "type": "boolean",
+          "default": false
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "save_data_schema": {
+          "type": "object",
+          "description": "JSON Schema for persisted game save data. Required when store_vertical='game' and persistence.mode is local, platform, or developer_server.",
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "properties": {
+              "type": "object",
+              "minProperties": 1
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["type", "properties"]
+        }
+      },
+      "required": ["mode"]
     }
   }
 }
