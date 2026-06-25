@@ -647,6 +647,13 @@ class ToolManual:
     usage_hints: list[str] = field(default_factory=list)
     result_hints: list[str] = field(default_factory=list)
     error_hints: list[str] = field(default_factory=list)
+    # Optional structured capability flags an agent can read to judge fit BEFORE
+    # binding, e.g. {"reply_thread": False, "scheduled_one_time": True,
+    # "unattended_autopay": True, "images_max": 4}. Surfaced verbatim on the
+    # discovery surface (market_get_capability) so agents stop mis-judging what a
+    # capability can/can't do. Keep values flat (bool/int/str); express anything
+    # richer in usage_hints / do_not_use_when prose.
+    supports: dict[str, Any] = field(default_factory=dict)
 
     # ── Required for action / payment ──
     approval_summary_template: str | None = None
@@ -682,6 +689,7 @@ class ToolManual:
             "usage_hints": self.usage_hints,
             "result_hints": self.result_hints,
             "error_hints": self.error_hints,
+            "supports": self.supports,
         }
         if self.permission_class in (
             ToolManualPermissionClass.ACTION,

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-06-25
+
+### Added
+
+- **`ToolManual.supports`** — an optional structured capability-flags dict
+  (e.g. `{"reply_thread": false, "scheduled_one_time": true, "images_max": 4}`).
+  It is serialized into the published tool manual and surfaced verbatim on the
+  Siglume API Store discovery responses (`market_get_capability`), so a calling
+  agent can judge what a capability can and cannot do **before** binding it,
+  instead of inferring from human-facing marketing copy. Read forward-compatibly
+  (defaults to `{}`); existing manuals are unaffected.
+
 ### Fixed
 
 - **"How your API actually gets selected" now matches the live execution model.**

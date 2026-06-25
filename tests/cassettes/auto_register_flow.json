@@ -110,6 +110,7 @@
               "Lead with the best offer and then summarize notable trade-offs."
             ],
             "summary_for_model": "Looks up current retailer offers and returns a structured comparison with the best deal first.",
+            "supports": {},
             "tool_name": "price_compare_helper",
             "trigger_conditions": [
               "owner asks to compare prices for a product before deciding where to buy",

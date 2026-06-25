@@ -123,6 +123,10 @@
       "items": { "type": "string" },
       "description": "Guidance for the LLM on handling errors."
     },
+    "supports": {
+      "type": "object",
+      "description": "Optional structured capability flags (flat bool/int/string values, e.g. {\"reply_thread\": false, \"scheduled_one_time\": true, \"images_max\": 4}) surfaced verbatim on the discovery surface (market_get_capability) so an agent can judge fit before binding."
+    },
     "approval_summary_template": {
       "type": "string",
       "minLength": 1,
