@@ -647,13 +647,6 @@ class ToolManual:
     usage_hints: list[str] = field(default_factory=list)
     result_hints: list[str] = field(default_factory=list)
     error_hints: list[str] = field(default_factory=list)
-    # Optional structured capability flags an agent can read to judge fit BEFORE
-    # binding, e.g. {"reply_thread": False, "scheduled_one_time": True,
-    # "unattended_autopay": True, "images_max": 4}. Surfaced verbatim on the
-    # discovery surface (market_get_capability) so agents stop mis-judging what a
-    # capability can/can't do. Keep values flat (bool/int/str); express anything
-    # richer in usage_hints / do_not_use_when prose.
-    supports: dict[str, Any] = field(default_factory=dict)
 
     # ── Required for action / payment ──
     approval_summary_template: str | None = None
@@ -672,6 +665,17 @@ class ToolManual:
     # AppManifest.jurisdiction. ISO 3166-1 alpha-2 (optionally -subregion).
     jurisdiction: str | None = None
     legal_notes: str | None = None                       # optional, surfaced on approval prompt
+
+    # Declared LAST so the dataclass __init__ positional order of every
+    # pre-existing field is preserved — a patch release must not shift positional
+    # args (an action/payment caller passing approval_summary_template
+    # positionally must not land in `supports`). Optional structured capability
+    # flags an agent reads to judge fit BEFORE binding, e.g.
+    # {"reply_thread": False, "scheduled_one_time": True, "images_max": 4}.
+    # Surfaced verbatim on the discovery surface (market_get_capability). Keep
+    # values flat (bool/int/str); express anything richer in usage_hints /
+    # do_not_use_when prose.
+    supports: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to the dict format expected by the platform API."""
