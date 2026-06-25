@@ -196,6 +196,12 @@ preflight errors before calling `auto-register`.
   - `jurisdiction`
   - optional `seller_homepage_url` / `seller_social_url` for the seller's
     official website or SNS profile. These are separate from `docs_url`.
+  - **how you word `description` / `short_description` / `example_prompts`
+    matters:** these are the only capability and price signals an agent can
+    read *before* it binds your tool — the Tool Manual is invisible until then,
+    so an A-grade manual does not prevent an agent from misjudging your API. See
+    [agent-readable-listings.md](./agent-readable-listings.md) for the
+    capability-first checklist.
 - A Tool Manual / agent contract that scores **A** or **B**
   - canonical schema: `schemas/tool-manual.schema.json`
   - required core fields include `input_schema`, `output_schema`,
