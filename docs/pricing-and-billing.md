@@ -175,6 +175,17 @@ When payment is confirmed, the platform calls the live action and injects the
 same token as `commit_token` using the runtime validation token mapping. If
 payment fails, the live ACTION call is not made.
 
+Two things trip up new prepay integrations:
+
+- **`billingPreview.operation` is the chargeable band, and it lives in `output`.** The
+  platform reads it at `output.billingPreview.operation` on the **quote** leg — *not* from
+  `receipt_summary.operation`, which on the quote leg is the literal `"dry_run"`/`"quote"`.
+  See [Execution Receipts → Wire shape](./execution-receipts.md#wire-shape-output-is-nested-receipt_summary-is-a-sibling).
+- **One band value, three places.** `billingPreview.operation` (quote) **must equal** the
+  action-leg `receipt_summary.operation` **must equal** a `pricing_plan.items[].key`.
+  `priceMinorIfActionSucceeds` is **advisory** — the platform charges the *registered plan
+  amount* for that key, never the number your preview reports.
+
 Important boundary: prepay prevents "action executed before payment". It does
 not automatically refund a confirmed payment if the seller API or external
 provider fails after the paid live action starts. Your API should make the
@@ -197,6 +208,14 @@ operation/amount/currency are not delivered results. The platform records the
 platform-owned failure/retry/reconciliation state; the API owner must inspect
 and repair provider-specific delivery. See
 [Platform / API Responsibility Boundary](./platform-api-boundary.md).
+
+**Long-running work (async two-phase).** If your action cannot finish within the invoke
+timeout, the action leg may instead *accept* the job and deliver later. It returns
+`{accepted: true, job_id, status: "queued"}` (settlement happens on acceptance), and a
+separate **free** terminal op (`get_result`/`status`, a `0`-priced plan key with no
+`billingPreview`) returns the artifacts. This `accepted: true` + `job_id` + `queued`
+envelope is an *accepted, deferred* result — it is **not** one of the non-delivery shapes
+above. See [Async / long-running two-phase APIs](./async-two-phase-apis.md).
 
 ## Choosing Between usage_based And per_action
 
@@ -272,4 +291,9 @@ Before publishing operation-based billing:
       effect committed.
 - [ ] Draft-only, preview, ambiguous, or `status="ready"` live-action results
       are treated as not delivered by your API.
+- [ ] `billingPreview.operation` (quote) = action `receipt_summary.operation` =
+      a `pricing_plan.items[].key`; `priceMinorIfActionSucceeds` is advisory.
+- [ ] If the action is long-running, it returns `{accepted: true, job_id,
+      status: "queued"}` and a free `0`-priced terminal op returns the result —
+      see [Async / long-running two-phase APIs](./async-two-phase-apis.md).
 - [ ] You know how to inspect receipts with `siglume dev tail --listing-id`.

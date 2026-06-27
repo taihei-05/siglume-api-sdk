@@ -180,10 +180,31 @@ return ExecutionResult(
 )
 ```
 
-The operation must match a `pricing_plan.items[].key`. The plan item is
-authoritative for the charge. If the receipt reports a conflicting positive
-amount, the platform rejects the call instead of charging the arbitrary amount.
-For free/no-op operations, return `amount_minor=0`; the platform creates no
+On the **chargeable** leg, the operation must match a `pricing_plan.items[].key`.
+The plan item is authoritative for the charge. If the receipt reports a conflicting
+positive amount, the platform rejects the call instead of charging the arbitrary
+amount. For free/no-op operations, return `amount_minor=0`; the platform creates no
 payment for a `0`-priced plan item.
 
-See [Pricing And Billing](./pricing-and-billing.md) for the full contract.
+`receipt_summary.operation` means different things on different legs — do not put the
+chargeable band on a free leg:
+
+| Leg | `receipt_summary.operation` | `amount_minor` |
+|---|---|---|
+| `quote` / `dry_run` | the leg's **own** op (`"quote"` / `"dry_run"`) — **not** the band | `0` |
+| `action` (the chargeable leg) | the **executed band** (a `pricing_plan` key) | the plan price |
+| a free op (`get_result`, `health`, a status poll) | that op's **own** name (a `0`-priced key) | `0` |
+
+### Wire shape: `output` is nested, `receipt_summary` is a sibling
+
+The platform keeps everything your handler returns under `output={...}` **nested**, and
+hoists `receipt_summary` to a **sibling top-level key**. So the chargeable-band hint on a
+prepay quote is read at **`result.output.billingPreview.operation`**, while
+`receipt_summary` is read at **`result.receipt_summary`** (top level). Putting
+`billingPreview` at the top level still works (the platform reads both), but the nested
+shape is the contract. (Source: `normalizeExecutionResult` /`buildExecutionResult` in the
+TS SDK.)
+
+See [Pricing And Billing](./pricing-and-billing.md) for the full contract, and
+[Async / long-running two-phase APIs](./async-two-phase-apis.md) for deferred-settlement
+jobs (`quote → accepted+job_id → free get_result`).

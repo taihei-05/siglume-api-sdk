@@ -52,7 +52,10 @@ state. The API owns external-provider behavior and the committed evidence that
 the side effect happened. Do not implement provider-specific success logic in
 platform-facing assumptions. A live action must not return draft-only,
 preview-only, ambiguous, or `status="ready"` output as a delivered result; it
-must return a stable provider id/URL or an explicit failure/no-op result.
+must return a stable provider id/URL or an explicit failure/no-op result. (A
+long-running action may instead *accept* the job — `{accepted: true, job_id,
+status: "queued"}` — and deliver later via a free terminal op; see
+[Async / long-running two-phase APIs](./async-two-phase-apis.md).)
 
 ## Files to create or update
 

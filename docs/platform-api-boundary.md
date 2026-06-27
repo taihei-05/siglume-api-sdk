@@ -106,6 +106,14 @@ or reconciliation state, but it must not invent provider-specific success. The
 API owner must inspect the provider and return or repair the provider-side
 evidence.
 
+**Exception — accepted long-running jobs.** An action that cannot finish inline may
+*accept* the work and deliver later. Returning `{accepted: true, job_id, status: "queued"}`
+(with the chargeable band in `receipt_summary`) is an **accepted, deferred** result, not a
+non-delivery: the platform settles on acceptance and the buyer collects the artifacts via a
+separate **free** terminal op (`get_result`/`status`). This is the *only* affirmative
+"not-yet-delivered" shape — `accepted: false`, `status: "ready"`, and draft/preview bodies
+remain non-deliveries. See [Async / long-running two-phase APIs](./async-two-phase-apis.md).
+
 ## Idempotency expectations
 
 Every action/payment API must support idempotency.

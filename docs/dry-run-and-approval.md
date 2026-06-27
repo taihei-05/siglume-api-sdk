@@ -73,6 +73,13 @@ succeeded. Return committed evidence only after the external action happened,
 and make retries with the same token/idempotency key return the same committed
 provider id instead of creating a duplicate side effect.
 
+If the action is long-running (it cannot finish within the invoke timeout), it may
+instead **accept** the job: return `{accepted: true, job_id, status: "queued"}` (the
+charge settles on acceptance) and deliver the result later through a separate **free**
+terminal op. There is no `job`/`result` execution kind — the terminal op is a `0`-priced
+`pricing_plan` item invoked as `action`. See
+[Async / long-running two-phase APIs](./async-two-phase-apis.md).
+
 See [Platform / API Responsibility Boundary](./platform-api-boundary.md) for
 the complete contract.
 

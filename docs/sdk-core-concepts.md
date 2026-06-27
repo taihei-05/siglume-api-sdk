@@ -80,7 +80,10 @@ For action/payment APIs, the API response is the delivery contract. Return
 committed evidence only after the live action committed, and make retries with
 the same token or idempotency key return the same provider id/URL without
 duplicating the side effect. Draft-only, preview, ambiguous, failed, or
-`status="ready"` results are not delivered results. See
+`status="ready"` results are not delivered results. (A long-running action may
+instead *accept* the job and deliver later: `{accepted: true, job_id,
+status: "queued"}` is an accepted-deferred result, not a non-delivery — see
+[Async / long-running two-phase APIs](./async-two-phase-apis.md).) See
 [Platform / API Responsibility Boundary](./platform-api-boundary.md).
 
 ## Tool manual
