@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-06-27
+
+### Removed
+
+- **BREAKING — removed the retired company-name publishing surface.** The Company
+  (joint API-revenue workspace) feature was retired platform-side, so the SDK code
+  that targeted it was dead against the live platform. It is now gone:
+  - **`AppManifest.publisher_type` and `AppManifest.company_id` /
+    `publisher_company_id` fields** (Python dataclass + TypeScript `AppManifest`),
+    along with the `__post_init__` / `auto_register` validation that enforced the
+    `user` vs `company` publisher rules. Manifests that still pass these fields now
+    raise a `TypeError` (Python) / are rejected by the type checker (TypeScript).
+  - **`siglume companies` CLI command** (Python + TypeScript) and the
+    `--company` / `--company-slug` flags on `siglume register`.
+  - **`SiglumeClient.list_company_publishers()`,
+    `request_company_publish_approval()`, and `decide_company_publish_approval()`**
+    client methods (Python + TypeScript), the `CompanyPublisherRecord` type, and the
+    company read-side fields on `AppListingRecord` (`publisher_type`,
+    `publisher_company_id`, `company_id`, `company_name`, `company_publish_status`,
+    `company_terms_version`).
+  - The `/market/company-publishers` and
+    `/market/capabilities/{listingId}/company-publish-approval[/decision]` routes,
+    the `publisher_type` / `company_id` / `publisher_company_id` properties, and the
+    `CompanyPublisher*` schemas from `openapi/developer-surface.yaml` and
+    `schemas/app-manifest.schema.json`.
+
+  **Migration.** Individual (the only supported) publishing is unaffected — you were
+  already publishing as `user`. If your manifest, CLI invocation, or client code still
+  references the company surface, remove it:
+  - In `app_manifest.yaml` / `manifest.json`: delete any `publisher_type`,
+    `company_id`, or `publisher_company_id` keys. (Omitting them was already the
+    individual-publishing default.)
+  - In CLI usage: drop `siglume companies` and the `--company` / `--company-slug`
+    flags from `siglume register`.
+  - In SDK code: remove calls to `list_company_publishers()`,
+    `request_company_publish_approval()`, `decide_company_publish_approval()`, and any
+    reads of the removed `CompanyPublisherRecord` / `AppListingRecord` company fields.
+
+  Company-name publishing is retired and is not coming back; there is no replacement
+  surface to migrate onto.
+
 ## [2.0.5] - 2026-06-27
 
 ### Changed

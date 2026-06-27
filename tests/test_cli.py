@@ -689,61 +689,6 @@ def test_preflight_runs_registration_checks_without_creating_draft(monkeypatch, 
     assert FakeClient.auto_register_called is False
 
 
-def test_register_rejects_disabled_free_company_before_auto_register(monkeypatch, tmp_path) -> None:
-    runner = CliRunner()
-    project_dir = tmp_path / "disabled-free-company"
-    _write_register_project(project_dir)
-
-    class FakeClient:
-        auto_register_called = False
-
-        def __init__(self, api_key: str) -> None:
-            self.api_key = api_key
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def preview_quality_score(self, manual):
-            from siglume_api_sdk import ToolManualQualityReport
-
-            return ToolManualQualityReport(
-                overall_score=93,
-                grade="A",
-                issues=[],
-                keyword_coverage_estimate=74,
-                improvement_suggestions=[],
-                publishable=True,
-                validation_ok=True,
-            )
-
-        def list_company_publishers(self):
-            return [
-                SimpleNamespace(
-                    company_id="co_blocked",
-                    name="Blocked Labs",
-                    settlement_wallet_ready=False,
-                    can_publish=False,
-                    disabled_reasons=["founder_required"],
-                )
-            ]
-
-        def auto_register(self, *args, **kwargs):
-            FakeClient.auto_register_called = True
-            raise AssertionError("auto_register should not run")
-
-    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
-    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
-
-    result = runner.invoke(main, ["register", str(project_dir), "--company", "co_blocked", "--draft-only", "--json"])
-
-    assert result.exit_code == 1
-    assert "founder_required" in result.output
-    assert FakeClient.auto_register_called is False
-
-
 def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "human-output"

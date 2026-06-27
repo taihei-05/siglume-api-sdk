@@ -139,9 +139,6 @@ export interface AppManifest {
   support_contact?: string;
   seller_homepage_url?: string;
   seller_social_url?: string;
-  publisher_type?: "user" | "company";
-  company_id?: string;
-  publisher_company_id?: string;
   store_vertical: StoreVertical;
   compatibility_tags?: string[];
   example_prompts?: string[];
@@ -359,39 +356,12 @@ export interface AppListingRecord {
   seller_display_name?: string | null;
   seller_homepage_url?: string | null;
   seller_social_url?: string | null;
-  publisher_type?: string | null;
-  publisher_company_id?: string | null;
-  company_id?: string | null;
-  company_name?: string | null;
-  company_publish_status?: string | null;
-  company_terms_version?: string | null;
   review_status?: string | null;
   review_note?: string | null;
   submission_blockers: string[];
   persistence: Record<string, unknown>;
   created_at?: string | null;
   updated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface CompanyPublisherRecord {
-  company_id: string;
-  name: string;
-  status: string;
-  description?: string | null;
-  is_founder: boolean;
-  membership_role?: string | null;
-  membership_status?: string | null;
-  can_publish: boolean;
-  can_approve: boolean;
-  approval_required: boolean;
-  paid_listing_allowed: boolean;
-  disabled_reasons: string[];
-  company_terms_version?: string | null;
-  active_listing_count: number;
-  pending_approval_count: number;
-  settlement_wallet_ready: boolean;
-  settlement_wallets: Array<Record<string, unknown>>;
   raw: Record<string, unknown>;
 }
 

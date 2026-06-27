@@ -289,9 +289,6 @@ class AppManifest:
     support_contact: str = ""              # real support email address or public support URL
     seller_homepage_url: str = ""          # optional official seller homepage, separate from docs_url
     seller_social_url: str = ""            # optional official seller social/profile URL
-    publisher_type: str | None = None      # "user" (default) or "company"
-    company_id: str | None = None          # required when publisher_type is "company"
-    publisher_company_id: str | None = None  # alias accepted by the platform
     store_vertical: StoreVertical | None = None  # REQUIRED: "api" for normal API Store, "game" for API games
     compatibility_tags: list[str] = field(default_factory=list)
     latency_tier: str = "normal"           # fast, normal, slow
@@ -362,18 +359,6 @@ class AppManifest:
             )
         self.store_vertical = StoreVertical(vertical)
         self._validate_persistence_contract()
-
-        company_id = (self.company_id or self.publisher_company_id or "").strip()
-        publisher_type = (self.publisher_type or "user").strip().lower()
-        if publisher_type not in {"user", "company"}:
-            raise ValueError("AppManifest.publisher_type must be 'user' or 'company'.")
-        if publisher_type == "company" and not company_id:
-            raise ValueError("AppManifest.company_id is required when publisher_type='company'.")
-        if publisher_type == "user" and company_id:
-            raise ValueError("AppManifest.company_id cannot be combined with publisher_type='user'.")
-        self.publisher_type = publisher_type
-        self.company_id = company_id or None
-        self.publisher_company_id = company_id or None
 
         if not self.jurisdiction:
             raise ValueError(

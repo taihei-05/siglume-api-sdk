@@ -67,8 +67,6 @@ siglume score . --remote
 siglume preflight .         # checks blockers without creating a draft
 siglume register .          # preflight + auto-register + confirm/publish
 siglume register . --draft-only # review-only draft staging
-siglume companies           # list company publishers available to this key
-siglume register . --company company_123
 ```
 
 `siglume register` reads `tool_manual.json`, the local Git-ignored
@@ -166,12 +164,6 @@ After live or sandbox execution, inspect receipts with `siglume dev tail`,
 `siglume dev tail --listing-id <listing_id>`, or the SDK receipt helpers. The
 publisher listing view is privacy-redacted. See
 [`../docs/developer-observability.md`](../docs/developer-observability.md).
-
-Company-name publishing is founder-only in the Phase 2 MVP. Use
-`publisher_type: "company"` with `company_id` in `app_manifest.yaml`, or pass
-`--company <company_id>` to the CLI. Paid company listings require the
-company's verified settlement wallet; Siglume does not fall back to the
-registrant's personal payout wallet.
 
 Game APIs use the same publishing flow. To make a listing eligible for the
 dedicated Game API Store entry point, include explicit game-oriented
