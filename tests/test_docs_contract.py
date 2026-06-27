@@ -306,8 +306,37 @@ def test_pricing_docs_match_live_operation_billing_contract() -> None:
     assert "not delivered results" in docs
     assert "committed provider evidence" in docs
     assert "same committed provider id" in docs
+    assert "same `direct_payment_requirement_id`" in normalized_docs
+    assert "does not create a second payment" in normalized_docs
+    assert "DRAFT_NOT_COMMITTED" in docs
     assert "Do not describe a `usage_based` or `per_action` listing as free just because" in docs
     assert schema["properties"]["billing_timing"]["enum"] == ["post", "prepay"]
+
+
+def test_runtime_identity_header_contract_is_documented() -> None:
+    docs = "\n".join(
+        [
+            _read("README.md"),
+            _read("GETTING_STARTED.md"),
+            _read("SECURITY.md"),
+            _read("docs/connected-accounts.md"),
+            _read("docs/publish-flow.md"),
+            _read("siglume-api-sdk-ts/README.md"),
+        ]
+    )
+    normalized_docs = " ".join(docs.split())
+
+    assert "X-Siglume-Auth" in docs
+    assert "X-Siglume-Platform-User-Id" in docs
+    assert "X-Siglume-Agent-Id" in docs
+    assert "X-Siglume-Intent-Id" in docs
+    assert "X-Siglume-Binding-Id" in docs
+    assert "X-Siglume-Listing-Id" in docs
+    assert "`X-Siglume-Owner-Id` is not a supported runtime header" in docs
+    assert "fail closed" in docs
+    assert "X-Siglume-Identity-Token" in docs
+    assert "not currently a public JWT/JWKS verification contract" in normalized_docs
+    assert "runtime auth header as the channel trust boundary" in normalized_docs
 
 
 def test_developer_observability_docs_explain_logs_receipts_and_privacy() -> None:

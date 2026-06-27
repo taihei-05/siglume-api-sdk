@@ -278,6 +278,7 @@ No permission needed. No issue to claim. Just build and register.
   - declare the provider in `required_connected_accounts` with `managed_by: "api", connect_url: "https://api.example.com/oauth/start"`
   - implement authorization, token storage, refresh, revocation, and user-to-token mapping in the publisher API
   - Siglume passes identity context during invocation but never stores or leases external user tokens
+  - runtime identity headers are `X-Siglume-Platform-User-Id` for the buyer / agent owner and `X-Siglume-Agent-Id` for the executing agent; `X-Siglume-Owner-Id` is not a supported runtime header
 - Siglume blocks draft creation if the public API cannot be reached or the
   functional test does not match the declared response shape.
 - Siglume also blocks draft creation when the Tool Manual contract is incomplete

@@ -75,6 +75,14 @@ Handle it accordingly:
   your API source repository.
 - Have your API runtime treat the incoming header as the trust boundary: reject
   any `invoke_url` request whose header does not match the configured secret.
+- After the runtime auth header matches, treat `X-Siglume-Platform-User-Id` as
+  the PF-provided buyer / agent-owner user id for tenant and connected-account
+  mapping. `X-Siglume-Owner-Id` is not a supported runtime header; do not fall
+  back to a shared default user when the platform user id is missing.
+- `X-Siglume-Identity-Token`, when present on API Store runtime calls, is an
+  opaque Siglume context token. It is not currently a public JWT/JWKS
+  verification contract, so do not make JWKS verification a required publisher
+  runtime dependency until this SDK documents that contract.
 - Rotate the secret if it is ever exposed (shell history, screenshots, logs,
   commits, or chat). Rotating means generating a new value and re-registering /
   updating the listing so Siglume sends the new secret.
