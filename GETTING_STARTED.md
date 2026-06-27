@@ -1108,6 +1108,32 @@ per-action / prepay APIs it is the trust boundary on live side-effect requests.
 Keep it in the Git-ignored `runtime_validation.json`, use a strong random
 value, never reuse your master API key, and rotate it if it leaks.
 
+### Runtime invocation identity headers
+
+Production runtime calls include Siglume identity context alongside the runtime
+auth header. Verify `X-Siglume-Auth` (or your configured
+`runtime_auth_header_name`) first; then use the identity headers to select the
+right tenant, connected account, or publisher-side token record.
+
+| Header | How to use it |
+|---|---|
+| `X-Siglume-Platform-User-Id` | Buyer / agent-owner platform user id. Use this for per-user tenant mapping. |
+| `X-Siglume-Agent-Id` | Agent id executing the call. |
+| `X-Siglume-Intent-Id` | Execution intent id for audit logs and idempotency correlation. |
+| `X-Siglume-Binding-Id` | Installed-tool binding id. |
+| `X-Siglume-Listing-Id` | Listing id being invoked. |
+
+Do not read `X-Siglume-Owner-Id`; `X-Siglume-Owner-Id` is not a supported
+runtime header. If `X-Siglume-Platform-User-Id` is required for your API and is
+missing, fail closed instead of falling back to a shared default user.
+
+`X-Siglume-Identity-Token`, when present, is an opaque Siglume context token on
+the API Store runtime path. It is not currently a public JWT/JWKS verification
+contract. Treat the runtime auth header as the channel trust boundary; after it
+matches, treat `X-Siglume-Platform-User-Id` as the PF-provided buyer identity.
+Do not require publishers to verify a JWKS until the SDK documents that issuer,
+audience, key endpoint, and rotation behavior.
+
 `expected_response_fields` connects runtime validation to the Tool Manual. If
 your runtime returns `status`, `postText`, `draftToken`, and `dailyLimit`, then
 those fields must be in `tool_manual.output_schema.properties`, and the fields

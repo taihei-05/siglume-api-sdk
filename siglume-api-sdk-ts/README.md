@@ -81,6 +81,11 @@ includes runtime checks, contract checks, external OAuth declaration checks, pri
 rules, and a mandatory fail-closed LLM legal review for law compliance plus
 public-order / morals compliance.
 
+At production runtime, verify your configured runtime auth header first
+(commonly `X-Siglume-Auth`). Then map `X-Siglume-Platform-User-Id` to the
+buyer / agent-owner tenant or token record and use `X-Siglume-Agent-Id` for
+agent-scoped audit. `X-Siglume-Owner-Id` is not a supported runtime header.
+
 ## Usage-Based And Per-Action Billing
 
 For the canonical pricing reference, see

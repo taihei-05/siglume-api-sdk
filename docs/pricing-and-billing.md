@@ -224,6 +224,21 @@ separate **free** terminal op (`get_result`/`status`, a `0`-priced plan key with
 envelope is an *accepted, deferred* result — it is **not** one of the non-delivery shapes
 above. See [Async / long-running two-phase APIs](./async-two-phase-apis.md).
 
+If a paid live action fails with a recoverable delivery result such as
+`DRAFT_NOT_COMMITTED`, the platform does not mark the direct payment requirement
+as spent. The buyer/client should retry the execute step with the same
+`direct_payment_requirement_id` and the same API input after the publisher-side
+issue is fixed. Do not create a new direct payment requirement for that retry.
+The existing requirement and request hash bind the retry to the already
+confirmed payment, so a successful retry reuses the paid requirement and does
+not create a second payment.
+
+If the action is permanently impossible to commit, return a clear non-retriable
+failure from the runtime and handle any customer adjustment outside the
+automatic prepay path. Siglume records the platform failure/reconciliation state,
+but it does not automatically refund a confirmed on-chain payment merely because
+the publisher API could not commit its product-specific side effect.
+
 ## Choosing Between usage_based And per_action
 
 Use `per_action` when the price is tied to a named operation/request type:
@@ -293,6 +308,10 @@ Before publishing operation-based billing:
 - [ ] Free/no-op operations return `amount_minor=0`.
 - [ ] Irreversible side effects use `billing_timing="prepay"`.
 - [ ] The quote/dry-run path returns `billingPreview.operation` and `draftToken`.
+- [ ] Free preview, status, health, or no-op operations return `amount_minor=0`
+      and either no `billingPreview` or a `billingPreview.operation` matching a
+      `0`-priced `pricing_plan` item. If the preview returns a positive-priced
+      operation such as `start_job`, the platform will prepay that operation.
 - [ ] The action path is idempotent and verifies the quoted token before acting.
 - [ ] The action path returns committed provider evidence only after the side
       effect committed.

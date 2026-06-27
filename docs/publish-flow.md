@@ -287,6 +287,10 @@ The intended advanced flow is:
    - manifest hints
    - Tool Manual files
    - deployment endpoints and runtime auth header secret settings
+   - runtime identity handling: verify `X-Siglume-Auth`, then map
+     `X-Siglume-Platform-User-Id` to your publisher-side tenant or token record
+     and use `X-Siglume-Agent-Id` for agent-scoped audit. Do not use
+     `X-Siglume-Owner-Id`; it is not a supported runtime header.
    - external OAuth `connect_url` metadata when the API requires it
 3. It generates the registration payload.
 4. If only one language is present in the buyer-facing listing text
