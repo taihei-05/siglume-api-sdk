@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-06-27
+
+### Added
+
+- **`docs/async-two-phase-apis.md`** — a guide for building async / long-running
+  two-phase paid APIs (deferred settlement). Documents the three legs
+  (`quote billingPreview → action {accepted, job_id, status:"queued"} → free
+  get_result`), the `ExecutionResult` wire shape (publisher `output` is **nested**
+  at `output.billingPreview` while `receipt_summary` is hoisted to a sibling
+  top-level key), the job-acceptance envelope contract, and the rule that a free
+  terminal op (`get_result`/`health`) is a `0`-priced `pricing_plan` item run as
+  `action` — there is no `terminal`/`job` `ExecutionKind`.
+- **`examples/async_transcription.py`** — a runnable `AppAdapter` implementing all
+  three async legs with a matching `pricing_plan`.
+
+### Changed
+
+- Clarified the per-leg `receipt_summary.operation` semantics in
+  `docs/execution-receipts.md` (quote leg = its own `"quote"`/`"dry_run"` op, not
+  the chargeable band) and added an `ExecutionResult` wire-shape section.
+- `docs/pricing-and-billing.md`: stated the `billingPreview.operation` =
+  action-leg `receipt_summary.operation` = `pricing_plan` key invariant, and that
+  `priceMinorIfActionSucceeds` is advisory (the registered plan amount is charged).
+- Reconciled the "not delivered" rules in `docs/platform-api-boundary.md`,
+  `docs/dry-run-and-approval.md`, `docs/sdk-core-concepts.md`, and
+  `docs/coding-agent-guide.md` with a narrow carve-out for the legitimate
+  `accepted:true + job_id + queued` deferred-acceptance result.
+
 ## [2.0.2] - 2026-06-25
 
 ### Added

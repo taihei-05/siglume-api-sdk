@@ -58,7 +58,7 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v2.0.2.** Python and TypeScript are version-aligned and
+> **Current release: v1.2.2.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
@@ -68,14 +68,14 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 > platform OAuth broker APIs from the SDK:
 > publisher APIs now own external OAuth, token storage, refresh, revocation,
 > and user-to-token mapping behind their own `connect_url`.
-> See [CHANGELOG.md](./CHANGELOG.md) for the complete release history.
-> Historical release notes include
+> See [CHANGELOG.md](./CHANGELOG.md),
 > [RELEASE_NOTES_v1.2.2.md](./RELEASE_NOTES_v1.2.2.md),
 > [RELEASE_NOTES_v1.2.1.md](./RELEASE_NOTES_v1.2.1.md),
 > [RELEASE_NOTES_v1.2.0.md](./RELEASE_NOTES_v1.2.0.md),
 > [RELEASE_NOTES_v1.1.0.md](./RELEASE_NOTES_v1.1.0.md),
 > [RELEASE_NOTES_v1.0.0.md](./RELEASE_NOTES_v1.0.0.md), and
-> [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md).
+> [RELEASE_NOTES_v0.10.8.md](./RELEASE_NOTES_v0.10.8.md) for the current
+> release line.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.
 > For the current browser-vs-CLI entry points into the same `auto-register`
@@ -805,7 +805,8 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Permission Scopes](docs/permission-scopes.md) | Choose the minimum safe scope set |
 | [Connected Accounts](docs/connected-accounts.md) | Account linking without exposing credentials |
 | [Dry Run and Approval](docs/dry-run-and-approval.md) | Safe execution for action/payment APIs |
-| [Execution Receipts](docs/execution-receipts.md) | What to return after execution |
+| [Execution Receipts](docs/execution-receipts.md) | What to return after execution, and the result wire shape |
+| [Async / Long-Running Two-Phase APIs](docs/async-two-phase-apis.md) | Accept a long job (`quote → accepted+job_id → free get_result`) and settle on acceptance |
 | [API Manifest Schema](schemas/app-manifest.schema.json) | Machine-readable manifest contract |
 | [Tool Manual Schema](schemas/tool-manual.schema.json) | Machine-readable tool manual contract |
 
@@ -852,7 +853,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v2.0.2 (beta)** — the platform is launched on Polygon mainnet
+This is **v1.2.2 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship

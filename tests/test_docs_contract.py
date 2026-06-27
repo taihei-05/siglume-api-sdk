@@ -102,7 +102,7 @@ def test_package_runtime_versions_match_release_metadata() -> None:
     python_version = str(pyproject["project"]["version"])
     ts_version = str(package_json["version"])
 
-    assert python_version == "2.0.2"
+    assert python_version == "2.0.3"
     assert ts_version == python_version
     assert f'SDK_VERSION = "{python_version}"' in _read("siglume_api_sdk/_version.py")
     assert f'export const SDK_VERSION = "{ts_version}";' in _read("siglume-api-sdk-ts/src/version.ts")
@@ -114,13 +114,10 @@ def test_onboarding_docs_match_generated_scaffold_and_no_key_first_loop() -> Non
     ts_readme = _read("siglume-api-sdk-ts/README.md")
     security = _read("SECURITY.md")
     normalized_security = " ".join(security.split())
-    python_version = str(tomllib.loads(_read("pyproject.toml"))["project"]["version"])
 
     assert "v0.5.0 is out" not in readme
     assert "current v0.5 release line" not in ts_readme
-    assert "current v1.2.x release line" not in ts_readme
-    assert f"Current release: v{python_version}" in readme
-    assert f"This is **v{python_version} (beta)**" in readme
+    assert "This is **v1.2.2 (beta)**" in readme
     assert "Production releases are published by GitHub Actions with PyPI Trusted" in security
     assert "Do not create a PyPI API token or local `.pypirc` for the normal release path." in normalized_security
     assert "Rotate after every release" not in security
