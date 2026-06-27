@@ -7,7 +7,8 @@ Thanks for your interest in contributing!
 ### 1. Publishing your own API to the API Store
 
 This is the most common contribution. You build an API, register it on
-the platform, and it gets listed in the store after admin review.
+the platform, and it goes live in the store immediately once the automated
+self-serve checks pass — there is no human admin review.
 
 **You do NOT submit a PR to this repo to publish an API.**
 
@@ -16,8 +17,8 @@ The registration flow is:
 1. Build your API with `AppAdapter`
 2. Test locally with `AppTestHarness`
 3. Register via `POST /v1/market/capabilities/auto-register`
-4. Confirm with your [tool manual](GETTING_STARTED.md#13-tool-manual-guide) → quality check runs automatically
-5. Admin reviews → published to the API Store
+4. Confirm with your [tool manual](GETTING_STARTED.md#13-tool-manual-guide) → quality checks run automatically
+5. Automated self-serve checks (AppTestHarness, Tool Manual grade, runtime validation, pricing/payout rules, and a fail-closed automated legal review) pass → published to the API Store
 
 See [GETTING_STARTED.md](GETTING_STARTED.md) for the full guide.
 
