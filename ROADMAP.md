@@ -37,7 +37,7 @@ top-level forwarding of `description` / `permission_scopes` /
 `AppManifest.version` is stripped from outbound payloads; use
 `confirm_registration(..., version_bump=...)` to control
 `release_semver`. See
-[RELEASE_NOTES_v0.10.0.md](./RELEASE_NOTES_v0.10.0.md).
+[RELEASE_NOTES_v0.10.0.md](./release-notes/RELEASE_NOTES_v0.10.0.md).
 
 ### v0.9.x — semver control + listing detail polish
 
@@ -45,8 +45,8 @@ top-level forwarding of `description` / `permission_scopes` /
 sellers step the published `release_semver` past the auto-incrementing
 patch. `AppListing` documents the `version` and `active_agent_count`
 fields the detail endpoint already returns. See
-[RELEASE_NOTES_v0.9.0.md](./RELEASE_NOTES_v0.9.0.md) /
-[RELEASE_NOTES_v0.9.1.md](./RELEASE_NOTES_v0.9.1.md).
+[RELEASE_NOTES_v0.9.0.md](./release-notes/RELEASE_NOTES_v0.9.0.md) /
+[RELEASE_NOTES_v0.9.1.md](./release-notes/RELEASE_NOTES_v0.9.1.md).
 
 ### v0.8.0 — example_prompts ≥ 2 enforced
 
@@ -54,7 +54,7 @@ fields the detail endpoint already returns. See
 `auto_register` / `confirm_auto_register`; client-side preflight
 mirrors the server rule so the failure surfaces before the network
 round-trip. See
-[RELEASE_NOTES_v0.8.0.md](./RELEASE_NOTES_v0.8.0.md).
+[RELEASE_NOTES_v0.8.0.md](./release-notes/RELEASE_NOTES_v0.8.0.md).
 
 ### v0.7.x — capability bundles + seller-owned connected-account OAuth
 
@@ -72,8 +72,8 @@ Plus production-onboarding hardening across v0.7.2 → v0.7.6:
 auto-register payload alignment, runtime-validation contract checks,
 register CLI preflight, jurisdiction enforcement, and `SIGLUME_API_KEY`
 fallback. See
-[RELEASE_NOTES_v0.7.0.md](./RELEASE_NOTES_v0.7.0.md) through
-[RELEASE_NOTES_v0.7.6.md](./RELEASE_NOTES_v0.7.6.md).
+[RELEASE_NOTES_v0.7.0.md](./release-notes/RELEASE_NOTES_v0.7.0.md) through
+[RELEASE_NOTES_v0.7.6.md](./release-notes/RELEASE_NOTES_v0.7.6.md).
 
 ### v0.6.0 — first-party operation wrapper parity
 
@@ -82,7 +82,7 @@ operation families, with paging, approval-required handling, and handle-only
 secret hiding in the SDK contract. Production availability still depends on the
 target platform exposing the owner-operation execute route; generated wrappers
 are not a guarantee that `/v1/owner/agents/{agent_id}/operations/execute` is
-enabled in every environment. See [RELEASE_NOTES_v0.6.0.md](./RELEASE_NOTES_v0.6.0.md).
+enabled in every environment. See [RELEASE_NOTES_v0.6.0.md](./release-notes/RELEASE_NOTES_v0.6.0.md).
 
 ### v0.5.0 and later — platform integration, metering, and operation billing
 
@@ -91,8 +91,8 @@ API Store / Game API Store operation-billing models. `usage_based` and
 `per_action` listings are supported when they include `pricing_plan.items`;
 free operations use `0`, positive JPY/JPYC operation prices must be at least
 15 minor units, and runtime billing selects the matching plan item from the
-execution receipt. See [RELEASE_NOTES_v0.5.0.md](./RELEASE_NOTES_v0.5.0.md),
-[RELEASE_NOTES_v1.2.1.md](./RELEASE_NOTES_v1.2.1.md), and
+execution receipt. See [RELEASE_NOTES_v0.5.0.md](./release-notes/RELEASE_NOTES_v0.5.0.md),
+[RELEASE_NOTES_v1.2.1.md](./release-notes/RELEASE_NOTES_v1.2.1.md), and
 [docs/pricing-and-billing.md](./docs/pricing-and-billing.md).
 
 ### v0.4.0 — multi-runtime + quality + ecosystem
@@ -101,7 +101,7 @@ Python + TypeScript parity, offline ToolManual grader, LLM-assisted
 drafting, manifest / tool-manual diff, tool-schema exporter
 (Anthropic / OpenAI / MCP), recording harness, buyer-side SDK
 (experimental), seven starter examples. See
-[RELEASE_NOTES_v0.4.0.md](./RELEASE_NOTES_v0.4.0.md).
+[RELEASE_NOTES_v0.4.0.md](./release-notes/RELEASE_NOTES_v0.4.0.md).
 
 ### v0.2.0 — first SDK-visible step of the on-chain payment migration
 

@@ -88,7 +88,7 @@ def test_docs_do_not_advertise_removed_register_flags() -> None:
             _read("README.md"),
             _read("GETTING_STARTED.md"),
             _read("docs/publish-flow.md"),
-            _read("RELEASE_NOTES_v0.7.5.md"),
+            _read("release-notes/RELEASE_NOTES_v0.7.5.md"),
         ]
     )
 

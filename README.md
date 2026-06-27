@@ -79,10 +79,10 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 > your API from its Tool Manual over MCP; Siglume resolves and dispatches (no
 > platform tool-selection loop on the connector path).
 > See [CHANGELOG.md](./CHANGELOG.md),
-> [RELEASE_NOTES_v3.0.0.md](./RELEASE_NOTES_v3.0.0.md),
-> [RELEASE_NOTES_v2.0.5.md](./RELEASE_NOTES_v2.0.5.md),
-> [RELEASE_NOTES_v2.0.4.md](./RELEASE_NOTES_v2.0.4.md), and
-> [RELEASE_NOTES_v2.0.3.md](./RELEASE_NOTES_v2.0.3.md) for the current
+> [RELEASE_NOTES_v3.0.0.md](./release-notes/RELEASE_NOTES_v3.0.0.md),
+> [RELEASE_NOTES_v2.0.5.md](./release-notes/RELEASE_NOTES_v2.0.5.md),
+> [RELEASE_NOTES_v2.0.4.md](./release-notes/RELEASE_NOTES_v2.0.4.md), and
+> [RELEASE_NOTES_v2.0.3.md](./release-notes/RELEASE_NOTES_v2.0.3.md) for the current
 > release line.
 >
 > See [Getting Started](GETTING_STARTED.md) to publish your first API in ~15 minutes.

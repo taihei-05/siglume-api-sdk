@@ -65,9 +65,9 @@ This release is additive. Existing 0.2.x public API consumers keep working.
 
 ## Files to read first
 
-- [GETTING_STARTED.md](./GETTING_STARTED.md)
-- [README.md](./README.md)
-- [CHANGELOG.md](./CHANGELOG.md)
+- [GETTING_STARTED.md](../GETTING_STARTED.md)
+- [README.md](../README.md)
+- [CHANGELOG.md](../CHANGELOG.md)
 
 ## Notes
 
