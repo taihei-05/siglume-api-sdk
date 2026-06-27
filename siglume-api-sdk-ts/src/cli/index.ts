@@ -6,7 +6,6 @@ import {
   createSupportCaseReport,
   diffJsonFiles,
   getUsageReport,
-  listCompanyPublishersReport,
   listOperationCatalog,
   runPreflight,
   runHarness,
@@ -34,25 +33,6 @@ function renderOperationTable(operations: Array<Record<string, unknown>>): strin
     String(item.summary ?? ""),
   ]);
   const headers = ["operation_key", "permission_class", "summary"];
-  const widths = headers.map((header, index) =>
-    Math.max(header.length, ...rows.map((row) => row[index]?.length ?? 0)),
-  );
-  return [
-    headers.map((header, index) => header.padEnd(widths[index] ?? header.length)).join("  "),
-    widths.map((width) => "-".repeat(width)).join("  "),
-    ...rows.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? cell.length)).join("  ")),
-  ];
-}
-
-function renderCompanyTable(companies: Array<Record<string, unknown>>): string[] {
-  const rows = companies.map((item) => [
-    String(item.company_id ?? item.id ?? ""),
-    String(item.name ?? ""),
-    String(item.membership_role ?? (item.is_founder ? "founder" : "")),
-    String(item.settlement_wallet_ready === true ? "ready" : "not_ready"),
-    String(item.pending_approval_count ?? 0),
-  ]);
-  const headers = ["company_id", "name", "role", "settlement", "pending"];
   const widths = headers.map((header, index) =>
     Math.max(header.length, ...rows.map((row) => row[index]?.length ?? 0)),
   );
@@ -283,38 +263,15 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
     });
 
   program
-    .command("companies")
-    .description("List Siglume companies available for company-name publishing.")
-    .option("--json", "emit machine-readable JSON", false)
-    .action(async (options: { json?: boolean }) => {
-      const report = await listCompanyPublishersReport(deps);
-      if (options.json) {
-        emit(stdout, renderJson(report));
-        return;
-      }
-      const companies = Array.isArray(report.companies)
-        ? report.companies.filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
-        : [];
-      if (companies.length === 0) {
-        emit(stdout, "No company publishers available for this API key.");
-        return;
-      }
-      emit(stdout, "Company publishers");
-      renderCompanyTable(companies).forEach((line) => emit(stdout, line));
-    });
-
-  program
     .command("register")
     .option("--confirm", "explicitly confirm the registration; this is the default unless --draft-only is set", false)
     .option("--draft-only", "create or refresh the draft without confirming publication", false)
     .option("--submit-review", "legacy alias: publish immediately if your environment still routes through submit-review", false)
-    .option("--company <companyId>", "publish under a Siglume company name; revenue is split equally among active members", "")
-    .option("--company-slug <slug>", "publish under a Siglume company by matching the slugified company name", "")
     .option("--json", "emit machine-readable JSON", false)
     .argument("[path]", ".", "project path")
     .action(async (
       path: string,
-      options: { confirm?: boolean; draftOnly?: boolean; submitReview?: boolean; company?: string; companySlug?: string; json?: boolean; ["draft-only"]?: boolean; ["submit-review"]?: boolean; ["company-slug"]?: string },
+      options: { confirm?: boolean; draftOnly?: boolean; submitReview?: boolean; json?: boolean; ["draft-only"]?: boolean; ["submit-review"]?: boolean },
     ) => {
       const draftOnly = Boolean(options.draftOnly);
       if (draftOnly && options.confirm) {
@@ -328,8 +285,6 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         confirm: shouldConfirm,
         draft_only: draftOnly,
         submit_review: options.submitReview,
-        company_id: options.company,
-        company_slug: options.companySlug,
       }, deps);
       if (options.json) {
         emit(stdout, renderJson(report));

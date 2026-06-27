@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -797,67 +796,6 @@ def test_auto_register_hoists_input_form_spec_from_tool_manual() -> None:
         )
 
     assert receipt.listing_id == "lst_form"
-
-
-def test_auto_register_forwards_company_publisher_identifiers() -> None:
-    manifest = asdict(build_manifest())
-    manifest["publisher_type"] = "company"
-    manifest["publisher_company_id"] = "co_123"
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/v1/market/capabilities/auto-register"
-        payload = json.loads(request.content.decode("utf-8"))
-        assert payload["publisher_type"] == "company"
-        assert payload["company_id"] == "co_123"
-        assert payload["publisher_company_id"] == "co_123"
-        return httpx.Response(
-            201,
-            json=envelope(
-                {
-                    "listing_id": "lst_company",
-                    "status": "draft",
-                    "auto_manifest": {"capability_key": manifest["capability_key"]},
-                    "confidence": {},
-                }
-            ),
-        )
-
-    with build_client(handler) as client:
-        receipt = client.auto_register(
-            manifest,
-            build_tool_manual(),
-            runtime_validation=build_runtime_validation(),
-        )
-
-    assert receipt.listing_id == "lst_company"
-
-
-def test_auto_register_rejects_company_identifiers_without_company_publisher_type() -> None:
-    manifest = asdict(build_manifest())
-    manifest.pop("publisher_type", None)
-    manifest["company_id"] = "co_123"
-
-    with build_client(lambda request: pytest.fail("auto_register should fail before transport")) as client:
-        with pytest.raises(SiglumeClientError, match="cannot be combined with publisher_type='user'"):
-            client.auto_register(
-                manifest,
-                build_tool_manual(),
-                runtime_validation=build_runtime_validation(),
-            )
-
-
-def test_auto_register_rejects_user_publisher_with_company_identifiers() -> None:
-    manifest = asdict(build_manifest())
-    manifest["publisher_type"] = "user"
-    manifest["company_id"] = "co_123"
-
-    with build_client(lambda request: pytest.fail("auto_register should fail before transport")) as client:
-        with pytest.raises(SiglumeClientError, match="cannot be combined with publisher_type='user'"):
-            client.auto_register(
-                manifest,
-                build_tool_manual(),
-                runtime_validation=build_runtime_validation(),
-            )
 
 
 def test_cursor_pages_follow_next_cursor_for_listings_and_usage() -> None:

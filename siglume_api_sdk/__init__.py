@@ -84,7 +84,6 @@ from .client import (  # noqa: E402, F401
     BudgetPolicy,
     CapabilityBindingRecord,
     CapabilitySaveStateRecord,
-    CompanyPublisherRecord,
     CursorPage,
     DEFAULT_SIGLUME_API_BASE,
     DeveloperPortalSummary,

@@ -42,49 +42,6 @@
           }
         }
       }
-    },
-    {
-      "if": {
-        "properties": {
-          "publisher_type": { "const": "company" }
-        },
-        "required": ["publisher_type"]
-      },
-      "then": {
-        "anyOf": [
-          { "required": ["company_id"] },
-          { "required": ["publisher_company_id"] }
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "publisher_type": { "const": "user" }
-        },
-        "required": ["publisher_type"]
-      },
-      "then": {
-        "not": {
-          "anyOf": [
-            { "required": ["company_id"] },
-            { "required": ["publisher_company_id"] }
-          ]
-        }
-      }
-    },
-    {
-      "if": {
-        "not": { "required": ["publisher_type"] }
-      },
-      "then": {
-        "not": {
-          "anyOf": [
-            { "required": ["company_id"] },
-            { "required": ["publisher_company_id"] }
-          ]
-        }
-      }
     }
   ],
   "properties": {
@@ -291,21 +248,6 @@
       "type": "string",
       "format": "uri",
       "description": "Optional official seller social/profile URL. This is separate from docs_url."
-    },
-    "publisher_type": {
-      "type": "string",
-      "enum": ["user", "company"],
-      "description": "Publishing subject. Omit or use 'user' for individual publishing; use 'company' with company_id to publish under a Siglume company name."
-    },
-    "company_id": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Siglume company id to publish under when publisher_type is 'company'."
-    },
-    "publisher_company_id": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Alias for company_id."
     },
     "store_vertical": {
       "type": "string",
