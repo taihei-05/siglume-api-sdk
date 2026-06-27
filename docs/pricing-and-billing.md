@@ -192,6 +192,13 @@ provider fails after the paid live action starts. Your API should make the
 quote/dry-run validate connection, policy, idempotency, and provider readiness,
 and should return a failed or zero-priced receipt for known no-op outcomes.
 
+This applies with full force to **async** APIs, where settlement happens on
+**acceptance**: if you return `{accepted: true, job_id}` and the job later fails in your
+worker, the buyer is already charged and the platform does **not** auto-refund — you own
+the refund/repair. Accept conservatively (validate in the free quote leg) and declare your
+policy in `ToolManual.refund_or_cancellation_note`. See
+[Async / long-running two-phase APIs](./async-two-phase-apis.md).
+
 Siglume owns payment, authorization, pricing-plan lookup, idempotency keys,
 slot/retry state, and reconciliation state. Your API owns the external
 side effect and the provider-specific proof that it committed. The platform

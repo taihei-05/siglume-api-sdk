@@ -88,18 +88,38 @@ class AsyncTranscriptionApp(AppAdapter):
         params = ctx.input_params or {}
         job_id = params.get("job_id")
 
-        # LEG 3 — free terminal op: a job_id means "deliver the finished artifacts".
-        # No billingPreview, amount_minor=0, receipt_summary.operation is this op's own name.
+        # LEG 3 — free terminal op (get_result): a job_id means "deliver the result".
+        # Always free (amount_minor=0, no billingPreview); safe to poll any time. It must
+        # report EVERY state — running / succeeded / failed / unknown — not just success.
         if job_id:
-            artifacts = self._load_artifacts(str(job_id))
+            free_receipt = {"operation": "get_result", "amount_minor": 0, "currency": "JPY"}
+            state = self._job_state.get(str(job_id))
+            if state is None:
+                # Unknown / expired job_id. Re-submission would be a NEW paid job.
+                return ExecutionResult(
+                    success=False, execution_kind=ctx.execution_kind,
+                    output={"job_id": job_id, "status": "expired"},
+                    units_consumed=0, amount_minor=0, currency="JPY", receipt_summary=free_receipt,
+                )
+            if state["status"] == "running":
+                # Tell the agent to poll again; no artifacts yet.
+                return ExecutionResult(
+                    success=True, execution_kind=ctx.execution_kind,
+                    output={"job_id": job_id, "status": "running", "progress": state.get("progress", 0.0)},
+                    units_consumed=0, amount_minor=0, currency="JPY", receipt_summary=free_receipt,
+                )
+            if state["status"] == "failed":
+                # Settlement was final on acceptance — report the failure here (still free; do
+                # NOT re-charge) and honor your refund_or_cancellation_note out of band.
+                return ExecutionResult(
+                    success=True, execution_kind=ctx.execution_kind,
+                    output={"job_id": job_id, "status": "failed", "error": state.get("error", {})},
+                    units_consumed=0, amount_minor=0, currency="JPY", receipt_summary=free_receipt,
+                )
             return ExecutionResult(
-                success=True,
-                execution_kind=ctx.execution_kind,
-                output={"job_id": job_id, "status": "succeeded", "artifacts": artifacts},
-                units_consumed=0,
-                amount_minor=0,
-                currency="JPY",
-                receipt_summary={"operation": "get_result", "amount_minor": 0, "currency": "JPY"},
+                success=True, execution_kind=ctx.execution_kind,
+                output={"job_id": job_id, "status": "succeeded", "artifacts": state.get("artifacts", [])},
+                units_consumed=0, amount_minor=0, currency="JPY", receipt_summary=free_receipt,
             )
 
         duration_minutes = float(params.get("duration_minutes") or 12)
@@ -147,19 +167,45 @@ class AsyncTranscriptionApp(AppAdapter):
         return ["transcribe_audio", "get_transcription_result"]
 
     # --- stubs an external dev replaces with real infrastructure ---------------------------
+    def __init__(self) -> None:
+        super().__init__()
+        # Real impl: a durable queue + job store. In-memory here so the example runs.
+        self._jobs_by_token: dict[str, str] = {}   # commit token -> job_id (idempotency)
+        self._job_state: dict[str, dict] = {}       # job_id -> {status, artifacts/error/progress}
+
+    def _commit_token(self, params: dict) -> str:
+        # The platform injects the quoted draftToken as the commit token on the action leg.
+        # Key the enqueue on it so a retry is idempotent. Fall back to a deterministic key.
+        return str(
+            params.get("commit_token")
+            or params.get("draftToken")
+            or self._mint_draft_token(params)
+        )
+
     def _mint_draft_token(self, params: dict) -> str:
-        return "draft_" + str(abs(hash(str(sorted(params.items())))) % (10**12))
+        keyed = {k: v for k, v in params.items() if k not in ("commit_token", "draftToken", "dry_run", "execution_kind")}
+        return "draft_" + str(abs(hash(str(sorted(keyed.items())))) % (10**12))
 
     def _enqueue_job(self, params: dict, band: str) -> str:
-        # Real impl: push to a queue/worker and return a stable id. Stubbed here.
-        return "job_2872b04495de33bbd78cfa77"
+        # IDEMPOTENT: one commit token => at most one job => at most one charge. A retried
+        # action with the same token returns the SAME job_id and does NOT enqueue again.
+        token = self._commit_token(params)
+        existing = self._jobs_by_token.get(token)
+        if existing is not None:
+            return existing
+        job_id = "job_" + token[-24:]
+        self._jobs_by_token[token] = job_id
+        self._job_state[job_id] = {"status": "running", "progress": 0.0, "band": band}
+        # Real impl: push (job_id, params) to your worker queue here.
+        return job_id
 
-    def _load_artifacts(self, job_id: str) -> list[dict]:
-        # Real impl: fetch the finished job's outputs by id. Stubbed here.
-        return [
-            {"type": "transcript", "text": "本日の定例会議を始めます…"},
-            {"type": "srt", "text": "1\n00:00:00,000 --> 00:00:04,000\n本日の定例会議を始めます…\n"},
-        ]
+    # --- worker callbacks (your out-of-band worker calls these as the job progresses) ------
+    def _mark_succeeded(self, job_id: str, artifacts: list[dict]) -> None:
+        self._job_state[job_id] = {"status": "succeeded", "artifacts": artifacts}
+
+    def _mark_failed(self, job_id: str, error: dict) -> None:
+        # The buyer was already charged on acceptance; honor refund_or_cancellation_note.
+        self._job_state[job_id] = {"status": "failed", "error": error}
 
 
 def build_tool_manual() -> ToolManual:
@@ -167,8 +213,9 @@ def build_tool_manual() -> ToolManual:
         tool_name="async_transcription",
         job_to_be_done="Transcribe long audio asynchronously and deliver the transcript when the job completes.",
         summary_for_model=(
-            "Transcribes long audio. The first call accepts the job and returns a job_id (charged per length); "
-            "call again with that job_id to fetch the finished transcript for free."
+            "Transcribes long audio asynchronously. First call accepts the job and returns a job_id "
+            "(charged per length on acceptance). Call again with that job_id for FREE to poll: status=running "
+            "until done, then succeeded with the transcript. Always pass job_id back; result fetch never re-charges."
         ),
         trigger_conditions=[
             "owner wants a transcript of an audio/video file that is too long to transcribe inline",
@@ -195,7 +242,9 @@ def build_tool_manual() -> ToolManual:
             "type": "object",
             "properties": {
                 "summary": {"type": "string", "description": "One-line summary of the job state or transcript."},
-                "status": {"type": "string", "description": "ready (quote) | queued (accepted) | succeeded (result)."},
+                "status": {"type": "string", "description": "ready (quote) | queued (accepted) | running | succeeded | failed | expired."},
+                "error": {"type": "object", "description": "Present when status=failed; the buyer was charged on acceptance, so a refund follows the refund policy."},
+                "progress": {"type": "number", "description": "0..1 progress while status=running."},
                 "accepted": {"type": "boolean", "description": "True when a long job was accepted and queued."},
                 "job_id": {"type": "string", "description": "Stable job handle; pass it back to fetch the transcript."},
                 "artifacts": {"type": "array", "description": "Transcript artifacts, returned by the free get_result call."},
@@ -206,43 +255,80 @@ def build_tool_manual() -> ToolManual:
             "additionalProperties": True,
         },
         usage_hints=[
-            "First call starts the job and returns job_id; it is charged per audio length.",
-            "Then call again with job_id (no audio_url) to fetch the transcript for free.",
+            "First call starts the job and returns job_id; it is charged per audio length, on acceptance.",
+            "Then call again with the same job_id (no audio_url) to poll for free until status=succeeded.",
+            "Retrying the start with the same audio is safe — it returns the same job_id and does not re-charge.",
         ],
         result_hints=[
-            "When status is queued, tell the owner the job was accepted and you will fetch the result with the job_id.",
-            "When artifacts are present, show the transcript; the get_result call is free.",
+            "When status is queued/running, tell the owner the job was accepted and keep polling get_result with the job_id (free).",
+            "When status is succeeded and artifacts are present, show the transcript.",
+            "When status is failed, tell the owner the job failed; they were charged on acceptance and a refund follows the refund policy.",
         ],
-        error_hints=["If a job_id is unknown or expired, ask the owner to re-submit the audio."],
+        error_hints=[
+            "status=expired means the job_id is unknown/aged out; re-submitting the audio is a NEW paid job, so confirm with the owner first.",
+        ],
         approval_summary_template="Transcribe the audio (~{duration_minutes} min) and charge the per-length price.",
         idempotency_support=True,
-        side_effect_summary="Starts an asynchronous transcription job and charges the per-length band on acceptance.",
+        side_effect_summary="Starts an asynchronous transcription job and charges the per-length band on acceptance; the result fetch is free.",
+        refund_or_cancellation_note=(
+            "Charged on acceptance. If a job fails after acceptance, the platform does not auto-refund; "
+            "we issue a credit/refund for the failed run per our support policy. Re-submission is a new paid job."
+        ),
         currency="JPY",
         jurisdiction="JP",
     )
 
 
 async def main() -> None:
-    harness = AppTestHarness(AsyncTranscriptionApp())
+    app = AsyncTranscriptionApp()
+    harness = AppTestHarness(app)
     ok, issues = validate_tool_manual(build_tool_manual())
     print("tool_manual_valid:", ok, len(issues))
     print("manifest_issues:", harness.validate_manifest())
 
+    args = {"audio_url": "https://x/clip.mp3", "duration_minutes": 12}
+
     # Leg 1: quote — the chargeable band must be in output.billingPreview.operation.
-    quote = await harness.execute_quote(task_type="transcribe_audio", input_params={"audio_url": "https://x/clip.mp3", "duration_minutes": 12})
+    quote = await harness.execute_quote(task_type="transcribe_audio", input_params=args)
     band = quote.output["billingPreview"]["operation"]
     print("quote band:", band, "| quote receipt op:", quote.receipt_summary["operation"])
     assert band == "transcribe_0_15" and quote.receipt_summary["operation"] == "quote"
 
     # Leg 2: action — accept the job; receipt op equals the quoted band; charged on acceptance.
-    action = await harness.execute_action(task_type="transcribe_audio", input_params={"audio_url": "https://x/clip.mp3", "duration_minutes": 12})
-    print("action accepted:", action.output["accepted"], "| job_id:", action.output["job_id"], "| action receipt op:", action.receipt_summary["operation"])
+    action = await harness.execute_action(task_type="transcribe_audio", input_params=args)
+    job_id = action.output["job_id"]
+    print("action accepted:", action.output["accepted"], "| job_id:", job_id, "| action receipt op:", action.receipt_summary["operation"])
     assert action.output["status"] == "queued" and action.receipt_summary["operation"] == band
 
-    # Leg 3: get_result — free terminal op, no billingPreview, returns artifacts.
-    result = await harness.execute_action(task_type="get_transcription_result", input_params={"job_id": action.output["job_id"]})
-    print("result op:", result.receipt_summary["operation"], "| amount_minor:", result.amount_minor, "| artifacts:", len(result.output["artifacts"]))
-    assert result.receipt_summary["operation"] == "get_result" and result.amount_minor == 0
+    # Idempotency: a retried action with the same quoted token returns the SAME job_id and
+    # does NOT enqueue a second job or settle a second charge.
+    retry = await harness.execute_action(task_type="transcribe_audio", input_params=args)
+    print("retry job_id == original:", retry.output["job_id"] == job_id, "| jobs enqueued:", len(app._jobs_by_token))
+    assert retry.output["job_id"] == job_id and len(app._jobs_by_token) == 1
+
+    # Leg 3 while STILL RUNNING — free poll, no artifacts yet.
+    running = await harness.execute_action(task_type="get_transcription_result", input_params={"job_id": job_id})
+    print("poll status:", running.output["status"], "| amount_minor:", running.amount_minor)
+    assert running.output["status"] == "running" and running.amount_minor == 0
+
+    # The out-of-band worker finishes the job.
+    app._mark_succeeded(job_id, [{"type": "transcript", "text": "本日の定例会議を始めます…"}])
+
+    # Leg 3 DONE — free, returns artifacts.
+    result = await harness.execute_action(task_type="get_transcription_result", input_params={"job_id": job_id})
+    print("result status:", result.output["status"], "| amount_minor:", result.amount_minor, "| artifacts:", len(result.output["artifacts"]))
+    assert result.output["status"] == "succeeded" and result.receipt_summary["operation"] == "get_result" and result.amount_minor == 0
+
+    # FAILED-after-acceptance path — reported free via get_result (the buyer keeps the charge).
+    app._mark_failed(job_id, {"code": "TRANSCODE_FAILED", "message": "unsupported codec"})
+    failed = await harness.execute_action(task_type="get_transcription_result", input_params={"job_id": job_id})
+    print("failed status:", failed.output["status"], "| amount_minor:", failed.amount_minor)
+    assert failed.output["status"] == "failed" and failed.amount_minor == 0
+
+    # UNKNOWN / expired job_id — free, success=false.
+    expired = await harness.execute_action(task_type="get_transcription_result", input_params={"job_id": "job_unknown"})
+    print("unknown status:", expired.output["status"], "| success:", expired.success, "| amount_minor:", expired.amount_minor)
+    assert expired.output["status"] == "expired" and expired.success is False and expired.amount_minor == 0
 
 
 if __name__ == "__main__":

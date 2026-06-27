@@ -112,7 +112,11 @@ evidence.
 non-delivery: the platform settles on acceptance and the buyer collects the artifacts via a
 separate **free** terminal op (`get_result`/`status`). This is the *only* affirmative
 "not-yet-delivered" shape — `accepted: false`, `status: "ready"`, and draft/preview bodies
-remain non-deliveries. See [Async / long-running two-phase APIs](./async-two-phase-apis.md).
+remain non-deliveries. Settlement is **final on acceptance**: if the job later fails in your
+worker, the buyer has **already been charged** and the platform does **not** auto-refund —
+refund/repair is the publisher's responsibility (report the failure through `get_result` and
+honor your `ToolManual.refund_or_cancellation_note`). See
+[Async / long-running two-phase APIs](./async-two-phase-apis.md).
 
 ## Idempotency expectations
 

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-06-27
+
+### Changed
+
+- **`docs/async-two-phase-apis.md` — completeness pass on the failure/edge paths.**
+  A completeness audit found the happy path was correct but the failure paths an
+  async API actually hits were missing. Added:
+  - **Idempotent acceptance** — the accept leg must dedupe on the quoted token so a
+    platform retry returns the same `job_id` and never double-charges.
+  - **`get_result` for every state** — `running` (poll again), `succeeded`, `failed`,
+    and unknown/`expired`, all free, with concrete wire shapes.
+  - **Failure after acceptance** — settlement is final on acceptance, the platform does
+    **not** auto-refund, and refund/repair is the publisher's responsibility (declare it
+    in `ToolManual.refund_or_cancellation_note`).
+  - The **full accepted-status set** (`queued`/`accepted`/`processing`/`pending`/
+    `running`/`in_progress`/`deferred`/`scheduled`), the **poll** lifecycle (no
+    completion webhook), `job_id` retention, and the **one-tool-or-two** input-dispatch note.
+- **`examples/async_transcription.py`** now demonstrates idempotent acceptance (same
+  token ⇒ same `job_id`, one charge), the running/succeeded/failed/expired `get_result`
+  states, and a `refund_or_cancellation_note`.
+- Reconciled the remaining synchronous-only "not delivered" prose in `GETTING_STARTED.md`
+  and the `README.md` narrative with the async carve-out, and added `async_transcription.py`
+  to the README example-templates index. Extended the refund boundary in
+  `platform-api-boundary.md` / `pricing-and-billing.md` to the async accept-then-fail case.
+
 ## [2.0.3] - 2026-06-27
 
 ### Added
