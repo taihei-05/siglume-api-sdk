@@ -402,7 +402,9 @@ product-specific side effect and the provider-specific proof that it committed.
 The platform does not infer whether an X post, email, CRM write, booking, or
 other external action happened. The live action response must return committed
 evidence only after the side effect committed; draft-only, preview, ambiguous,
-or `status="ready"` results are not delivered results. See
+or `status="ready"` results are not delivered results. (A long-running action may
+instead *accept* the job and deliver later via a free `get_result` — see
+[docs/async-two-phase-apis.md](./docs/async-two-phase-apis.md).) See
 [docs/platform-api-boundary.md](./docs/platform-api-boundary.md).
 
 Use `pricing_plan` to show buyer-facing operation prices in API Store and Game
@@ -756,7 +758,7 @@ your payment adapter without touching a live wallet.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `async_transcription.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -767,6 +769,7 @@ your payment adapter without touching a live wallet.
 | [email_sender.py](./examples/email_sender.py) | `ACTION` | ✅ | Preview and send email with explicit approval and idempotency hints |
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
+| [async_transcription.py](./examples/async_transcription.py) | `ACTION` (prepay / async) | ✅ | Accept a long job (`quote → {accepted, job_id} → free get_result`), settling on acceptance, with idempotent accept + running/failed states |
 | [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
 | [metering_record.py](./examples/metering_record.py) | client | ✅ | Record usage events and preview invoice lines |
 | [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |

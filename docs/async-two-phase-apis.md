@@ -102,16 +102,90 @@ platform reads it as *accepted, deferred* — not as a failure or a non-delivery
 |---|---|---|
 | `accepted` | yes — `true` | the job was admitted and will be worked |
 | `job_id` | yes | stable handle; the buyer's agent passes it back to your terminal op |
-| `status` | yes — `"queued"` (or `processing`/`running`/`pending`) | the job is not yet done |
+| `status` | yes — any non-terminal value (see below) | the job is not yet done |
 
 Set `receipt_summary.operation` to the **chargeable band** and `amount_minor` to the plan
 price — settlement happens on acceptance, because you have committed to doing the work.
+
+**Accepted non-terminal `status` values.** The platform treats any of these as
+accepted-deferred (mirrors the platform's `normalize_api_outcome`): `queued`, `accepted`,
+`processing`, `pending`, `running`, `in_progress`, `deferred`, `scheduled`. Use whichever
+your job system natively emits — they are equivalent. The real test is not the literal
+string but the triple **`accepted: true` + a `job_id` + a non-terminal `status`**.
 
 This is distinct from the non-delivery shapes in
 [Ambiguous results](./platform-api-boundary.md#ambiguous-results): `accepted: false`,
 `success: false`, a draft-only/`status: "ready"` body, or a band/amount that disagrees
 with the quote are **not** accepted. The async carve-out is narrow and explicit:
 `accepted: true` **with** a `job_id` **and** a non-terminal `status` ⇒ accepted-deferred.
+
+## Idempotent acceptance (leg 2 must not double-charge)
+
+Settlement happens on **acceptance**, so the accept leg must be idempotent: the platform
+can retry it (transient timeout, network error), and a naive accept leg would enqueue a
+**second** job and settle a **second** charge. Key the enqueue on the quoted
+`draftToken` / commit token (or the platform idempotency key): if a job already exists for
+that token, return the **same `job_id`** and the **same accepted envelope** verbatim — do
+not enqueue again and do not create a second settlement.
+
+> Rule: one quoted token ⇒ at most one accepted job ⇒ at most one charge. A retried action
+> with the same token is a no-op that re-returns the original `{accepted, job_id, status}`.
+> See [Platform / API boundary → Idempotency](./platform-api-boundary.md#idempotency-expectations).
+
+## Leg 3 states: running, done, failed, expired
+
+`get_result` is **free** (a `0`-priced key, no `billingPreview`) and read-only, so it is
+safe to call **any time and any number of times** after acceptance. For a multi-minute job
+the agent will usually call it **before** the work finishes, so you must define every state
+— not just success. All four are free (`amount_minor: 0`, no `billingPreview`):
+
+```jsonc
+// STILL RUNNING — the agent should poll again later. No artifacts yet.
+{ "success": true, "execution_kind": "action",
+  "output": { "job_id": "job_...", "status": "running", "progress": 0.4 },   // artifacts absent
+  "amount_minor": 0, "receipt_summary": { "operation": "get_result", "amount_minor": 0 } }
+
+// DONE — the real artifacts.
+{ "success": true, "execution_kind": "action",
+  "output": { "job_id": "job_...", "status": "succeeded", "artifacts": [ /* … */ ] },
+  "amount_minor": 0, "receipt_summary": { "operation": "get_result", "amount_minor": 0 } }
+
+// FAILED after acceptance — report failure HERE (still free; do NOT re-charge). See next section.
+{ "success": true, "execution_kind": "action",
+  "output": { "job_id": "job_...", "status": "failed", "error": { "code": "TRANSCODE_FAILED", "message": "…" } },
+  "amount_minor": 0, "receipt_summary": { "operation": "get_result", "amount_minor": 0 } }
+
+// UNKNOWN / EXPIRED job_id — you own retention; re-submission is a NEW paid job.
+{ "success": false, "execution_kind": "action",
+  "output": { "job_id": "job_...", "status": "expired" },
+  "amount_minor": 0, "receipt_summary": { "operation": "get_result", "amount_minor": 0 } }
+```
+
+`job_id` lifetime is **yours** to define — the platform does not retain results. Pick a
+retention window long enough for realistic collection (a long render/report may be fetched
+hours later) and document it. Tell the agent (in `result_hints`) to **poll** `get_result`
+until `status` is terminal; the platform does **not** push a "job finished" event (the
+`execution.*` webhooks fire on the *accept* leg, not on out-of-band worker completion).
+
+## When the job fails after you accepted (and charged)
+
+This is the single most important async-specific obligation. Because the platform settled
+on **acceptance**, a job that fails in your worker leaves the buyer **already charged**, and
+**the platform does NOT automatically refund it** — there is no platform refund/chargeback
+API. The synchronous "failed action ⇒ no charge" intuition does **not** apply here.
+
+So a failed accepted job is **your** responsibility to make right:
+
+- **Report the failure** through the free `get_result` leg (the `status: "failed"` shape
+  above) so the agent and owner can see it. Do not silently strand the job.
+- **Honor your refund/repair policy.** The platform will not reverse the charge for you. If
+  you intend to make the buyer whole, you must do it yourself (e.g. your own credit/reverse
+  payment, or a support-case resolution). Declare that policy up front in your
+  `ToolManual.refund_or_cancellation_note` so buyers know it before they pay.
+- **Prefer to fail at the quote/accept boundary.** Validate inputs, provider readiness, and
+  capacity in the **quote** leg (free) and reject there (`success:false`/`accepted:false`)
+  rather than accepting and charging for work you cannot complete. You only settle when you
+  return `accepted: true`, so accept conservatively.
 
 ## There is no "terminal" or "job" ExecutionKind
 
@@ -126,6 +200,15 @@ without a second charge.
 > Declare every terminal op as a `0`-priced key in `pricing_plan.items` (e.g.
 > `{"key": "get_result", "price_minor": 0}`). A free op that is missing from the plan
 > still runs free, but listing it keeps your plan self-documenting and your receipts valid.
+
+**One tool or two?** A single tool can serve both the enqueue and the `get_result` legs —
+dispatch on your **own input** (e.g. a `job_id` present ⇒ deliver; band params present ⇒
+enqueue), exactly as the worked example does. The platform does **not** route legs for you
+by `execution_kind`; leg selection is entirely your input dispatch, and the buyer's agent
+chooses which call to make from your `ToolManual`. (You may also publish two separate tools
+if you prefer.) Either way, make the `job_id` round-trip and the "result fetch is free"
+fact explicit in `summary_for_model` / `usage_hints` / `result_hints` and the `job_id`
+input description, or agents may never collect the result and the paid job is stranded.
 
 ## Worked example
 
@@ -143,9 +226,12 @@ item, a chargeable `transcribe_0_15` band, and a `0`-priced `get_result`). Its
 2. Buyer approves → platform calls **leg 2 (action)** with the same `draftToken` →
    you start the job and return `{accepted, job_id, status:"queued"}` → platform
    **settles** the charge and records the job as accepted.
-3. Your worker finishes the job out of band.
-4. Agent calls your **free terminal op** (`get_result` with the `job_id`) → **leg 3**
-   returns the artifacts → no charge.
+3. Your worker runs the job out of band. The agent **polls** your free terminal op
+   (`get_result` with the `job_id`) — the platform sends no "finished" event — and gets a
+   `running` response until the work completes. Every poll is free.
+4. When the job finishes, `get_result` returns the artifacts (`status: "succeeded"`) → no
+   charge. If it **failed**, `get_result` returns `status: "failed"` — the buyer was already
+   charged on acceptance, so honor your refund policy (see above).
 
 ## Checklist
 
@@ -157,13 +243,24 @@ Before publishing an async two-phase API, in addition to the
       **equals** a `pricing_plan.items[].key`. (One value, three places.)
 - [ ] The quote-leg `receipt_summary.operation` is `"quote"`/`"dry_run"` with `amount_minor=0` —
       it does **not** carry the chargeable band.
-- [ ] The action leg returns `{accepted: true, job_id, status: "queued"}` (not the finished
-      result) with the chargeable band + price in `receipt_summary`.
-- [ ] `job_id` is stable and is what the terminal op accepts.
+- [ ] The action leg returns `{accepted: true, job_id, <non-terminal status>}` (not the
+      finished result) with the chargeable band + price in `receipt_summary`. Any of
+      `queued`/`accepted`/`processing`/`pending`/`running`/`in_progress`/`deferred`/`scheduled`
+      counts.
+- [ ] **The accept leg is idempotent**: a retry with the same quoted token returns the
+      **same `job_id`** and does **not** enqueue a second job or settle a second charge.
+- [ ] `job_id` is stable, has a documented retention window, and is what the terminal op accepts.
 - [ ] The terminal op (`get_result`/`status`) is a `0`-priced `pricing_plan` key, returns
-      `amount_minor=0`, carries **no** `billingPreview`, and returns the real artifacts.
-- [ ] A genuine failure on any leg returns `success=false` / `accepted=false` — never a
-      silent `status:"queued"` for work you did not accept.
+      `amount_minor=0`, carries **no** `billingPreview`, and is safe to call any time.
+- [ ] `get_result` defines **all** states — `running` (poll again), `succeeded` (artifacts),
+      `failed`, and unknown/`expired` — not just success.
+- [ ] **Failure after acceptance**: you report it via `get_result` and honor your own
+      refund/repair policy (the platform does **not** auto-refund a settled charge); declare
+      that policy in `ToolManual.refund_or_cancellation_note`.
+- [ ] The `ToolManual` makes the `job_id` round-trip + "result fetch is free" explicit so
+      agents collect the result.
+- [ ] A genuine failure on the quote/accept leg returns `success=false` / `accepted=false` —
+      never a silent accepted `status` for work you did not accept.
 
 ## Related
 

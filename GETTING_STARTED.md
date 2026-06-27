@@ -795,7 +795,10 @@ API owns the provider-specific action and the proof that it committed. The
 platform does not infer whether an X post, email, CRM write, booking, or other
 external action happened. Your live action response must return committed
 evidence only after the side effect committed; draft-only, preview, ambiguous,
-or `status="ready"` responses are not delivered results. Read
+or `status="ready"` responses are not delivered results. (A long-running action may
+instead *accept* the job and deliver later — `{accepted: true, job_id, status: "queued"}`
+is an accepted-deferred result, not a non-delivery; see
+[Async / long-running two-phase APIs](docs/async-two-phase-apis.md).) Read
 [Platform / API Responsibility Boundary](docs/platform-api-boundary.md) before
 building paid action APIs.
 
