@@ -87,7 +87,7 @@ npm install @siglume/api-sdk@0.6.0
 
 ## Next
 
-See [ROADMAP.md](./ROADMAP.md) for the v0.7 scope — capability bundles
+See [ROADMAP.md](../ROADMAP.md) for the v0.7 scope — capability bundles
 (deferred from v0.5), multipart / file-only flows beyond
 `account.avatar.upload`, and external-ingest credential-facing
 surfaces.

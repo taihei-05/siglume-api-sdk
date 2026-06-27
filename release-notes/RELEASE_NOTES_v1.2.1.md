@@ -12,7 +12,7 @@ development reference. Some pages still described `usage_based` and
 
 ## What's fixed
 
-- Added [docs/pricing-and-billing.md](docs/pricing-and-billing.md), the
+- Added [docs/pricing-and-billing.md](../docs/pricing-and-billing.md), the
   canonical guide for:
   - free API calls
   - subscription APIs

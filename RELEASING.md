@@ -44,7 +44,7 @@ Before cutting a version tag:
 - [ ] `main` is green (CI passing on Python 3.11 and 3.12)
 - [ ] `CHANGELOG.md` has a new section `## [X.Y.Z] -- YYYY-MM-DD` with **Added / Changed / Deprecated / Removed / Fixed / Security** sub-sections as appropriate
 - [ ] Version in `pyproject.toml` (`[project].version`) matches the tag you're about to cut
-- [ ] `RELEASE_NOTES_vX.Y.Z.md` exists at the repo root, written as the GitHub Release body (highlights, revenue model, quick start, what's next, honest note)
+- [ ] `release-notes/RELEASE_NOTES_vX.Y.Z.md` exists, written as the GitHub Release body (highlights, revenue model, quick start, what's next, honest note). Per-version release notes live under `release-notes/`; `CHANGELOG.md` at the repo root remains the canonical consolidated history.
 - [ ] `examples/hello_price_compare.py` and `examples/x_publisher.py` still run end-to-end against `AppTestHarness`
 - [ ] `docs/` and `README.md` are coherent with the shipped `siglume_api_sdk.py` surface (no references to removed symbols)
 - [ ] There is **no** stale `siglume_app_sdk` / `siglume-app-sdk` / `siglume-app-types` reference (`grep -rn` expects zero matches)
@@ -216,7 +216,7 @@ Use **annotated tags** (with `-a -m`) so `git log` shows the release info clearl
 ```bash
 git tag -a vX.Y.Z -m "Release vX.Y.Z — <headline>"
 git push origin vX.Y.Z
-gh release create vX.Y.Z --title "vX.Y.Z — <headline>" --notes-file RELEASE_NOTES_vX.Y.Z.md dist/*.whl dist/*.tar.gz
+gh release create vX.Y.Z --title "vX.Y.Z — <headline>" --notes-file release-notes/RELEASE_NOTES_vX.Y.Z.md dist/*.whl dist/*.tar.gz
 ```
 
 (The `gh release create` form above attaches artifacts in one call — no separate `gh release upload` needed.)
@@ -236,7 +236,7 @@ For bug fixes, repeat the full flow with the next patch version. Update:
 
 1. `pyproject.toml` → bump patch version
 2. `CHANGELOG.md` → add a new `[X.Y.Z+1]` section
-3. Create `RELEASE_NOTES_vX.Y.Z+1.md` (can be terse for patch releases)
+3. Create `release-notes/RELEASE_NOTES_vX.Y.Z+1.md` (can be terse for patch releases)
 4. Rebuild + upload + tag + Release
 
 ## Post-release patches (`.post` releases)
