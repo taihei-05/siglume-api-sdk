@@ -6,6 +6,29 @@ what is explicitly out of scope. For the per-release changelog, see
 
 ## Shipped
 
+### v2.x — async two-phase APIs + surface cleanup
+
+- **2.0.3–2.0.5** — the async / long-running two-phase API guide and runnable example
+  (quote → accepted job + `job_id` → free `get_result`), its failure/edge completeness
+  (idempotent acceptance, settlement-on-acceptance with publisher-owned refund, all
+  `get_result` states), and a documentation freshness pass. See
+  [docs/async-two-phase-apis.md](./docs/async-two-phase-apis.md).
+- **2.0.2** — `ToolManual.supports`, a structured capability-flags dict surfaced on
+  Store discovery so agents judge a capability before binding.
+- **2.0.1** — removed the retired job-fulfillment extension from the public packages.
+- **2.0.0 (BREAKING)** — removed the legacy advertising / partner-dashboard and
+  advertiser Ads SDK surface; external OAuth is fully publisher-owned (token storage,
+  refresh, revocation, user-to-token mapping live behind your `connect_url`). See
+  [CHANGELOG.md](./CHANGELOG.md).
+
+### v1.x — operation billing + listing copy
+
+Live `usage_based` / `per_action` operation billing with `pricing_plan.items`,
+`billing_timing` (`post` / `prepay`), the canonical
+[Pricing and Billing](./docs/pricing-and-billing.md) guide,
+[Developer Observability](./docs/developer-observability.md), and long-form
+buyer-facing `description`. v1.0.0 removed the platform OAuth broker APIs from the SDK.
+
 ### v0.10.0 — buyer-facing copy + platform-controlled release semver
 
 `AppManifest.description` (long-form buyer-facing sales copy) and the
@@ -130,11 +153,11 @@ Platform prerequisites:
 
 ### External-ingest credential-facing surfaces
 
-Beyond today's `partner.keys.create` and
-`admin.source_credentials.issue` (both handle-only via the bus),
-several external-ingest integrations need their own credential
+Several external-ingest integrations need their own credential
 contracts — provider-specific auth refresh, scope rotation, and
-operational telemetry for partner-run data feeds.
+operational telemetry for data-feed integrations — expressed as
+listing-declared OAuth contracts that keep the handle-only secret
+discipline (the bus never emits the raw secret).
 
 What the SDK will add once the platform ships the contract:
 

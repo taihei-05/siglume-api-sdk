@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-06-27
+
+### Changed
+
+- **Documentation freshness pass — the SDK now reflects the current (2.0.x) reality.**
+  A full staleness audit found several current-state claims six releases behind:
+  - README "Current release" and "Project status" blocks were frozen at **v1.2.2** and
+    framed v1.0.0's OAuth-broker removal as the headline; both now read **2.0.5** and lead
+    with the 2.0.x line (2.0.0 BREAKING ads/partner removal, 2.0.1 job-fulfillment removal,
+    2.0.2 `ToolManual.supports`, 2.0.3–2.0.5 async two-phase). The release-notes link list
+    now points at the 2.0.x notes.
+  - Removed the documented **Company-name publishing** path (`siglume companies`,
+    `--company`/`--company-slug`, `publisher_type: "company"`/`company_id`) from `README.md`
+    and `GETTING_STARTED.md` — the Company feature is retired platform-side, so the docs no
+    longer present it as a working flow. (The vestigial CLI flags/manifest fields are dead
+    against the platform and are slated for removal in a future major.)
+  - `CONTRIBUTING.md`: corrected "listed after admin review" → the actual self-serve publish
+    (automated checks + fail-closed legal review; **no human admin review**).
+  - `ROADMAP.md`: added the missing 1.x/2.x **Shipped** history and dropped the retired
+    `partner.keys.create` / `admin.source_credentials.issue` surface (removed in 2.0.0) from
+    the external-ingest track.
+  - Fixed a dead `docs/sdk/v0.6-operation-inventory.md` link, a blank line that split the
+    README example-templates table, and annotated `RECOMMENDATION` as a deprecated alias of
+    `READ_ONLY` in the README enum table.
+
 ## [2.0.4] - 2026-06-27
 
 ### Changed
