@@ -1499,6 +1499,7 @@ def run_registration(
     path: str | Path,
     *,
     confirm: bool,
+    confirm_visibility: str = "public",
     submit_review: bool,
 ) -> dict[str, Any]:
     project = load_project(path)
@@ -1522,7 +1523,7 @@ def run_registration(
         if portal_preflight is not None:
             result["developer_portal_preflight"] = portal_preflight
         if confirm:
-            confirmation = client.confirm_registration(receipt.listing_id)
+            confirmation = client.confirm_registration(receipt.listing_id, visibility=confirm_visibility)
             result["confirmation"] = to_jsonable(confirmation)
             if submit_review:
                 result["submit_review_skipped"] = True

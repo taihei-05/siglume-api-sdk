@@ -66,6 +66,7 @@ siglume validate .
 siglume score . --remote
 siglume preflight .         # checks blockers without creating a draft
 siglume register .          # preflight + auto-register + confirm/publish
+siglume register . --private-confirm # confirm release, keep listing hidden for production testing
 siglume register . --draft-only # review-only draft staging
 ```
 
@@ -75,8 +76,9 @@ Git-ignored because they hold the runtime auth header shared secret. SDK / HTTP 
 `source_url`, `source_context`, and `input_form_spec` directly to
 `auto-register`. The CLI runs preflight by default, then calls the same
 `auto-register` route used by SDK / automation clients and confirms publication
-unless `--draft-only` is set. Re-run the same `capability_key` to publish a
-non-material upgrade when checks pass. The server-side publish gate
+unless `--draft-only` is set. Use `--private-confirm` to create the executable
+release while keeping the listing hidden for seller-owned production testing.
+Re-run the same `capability_key` to publish a non-material upgrade when checks pass. The server-side publish gate
 includes runtime checks, contract checks, external OAuth declaration checks, pricing / payout
 rules, and a mandatory fail-closed LLM legal review for law compliance plus
 public-order / morals compliance.

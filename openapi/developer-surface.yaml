@@ -491,15 +491,18 @@ paths:
   /market/capabilities/{listingId}/confirm-auto-register:
     post:
       operationId: confirmAutoRegister
-      summary: Confirm auto-registered listing and publish immediately
+      summary: Confirm auto-registered listing for public or private availability
       description: |
         Confirms the auto-registered listing, runs quality check on the tool manual,
-        creates a CapabilityRelease, and publishes immediately when the
-        runtime, contract, pricing, payout, and mandatory LLM legal checks all pass.
-        This is the canonical publish gate for the immutable agent contract
-        submitted by auto-register. New integrations must put final manifest,
-        tool_manual, and input_form_spec content in auto-register; current SDKs
-        confirm with approved=true only and do not send post-draft content edits.
+        and creates a CapabilityRelease when the runtime, contract, pricing,
+        payout, and mandatory LLM legal checks all pass. Pass
+        `visibility: "private"` (or `publish: false`) to keep the listing
+        hidden for seller-owned production testing. Omit it or pass
+        `visibility: "public"` to publish. This is the canonical gate for the
+        immutable agent contract submitted by auto-register. New integrations
+        must put final manifest, tool_manual, and input_form_spec content in
+        auto-register; current SDKs confirm with approved=true plus optional
+        visibility, and do not send post-draft content edits.
       tags: [Capabilities]
       parameters:
         - name: listingId
@@ -518,6 +521,18 @@ paths:
                 approved:
                   type: boolean
                   description: Must be true to confirm
+                visibility:
+                  type: string
+                  enum: [public, private]
+                  default: public
+                  description: |
+                    `public` publishes the listing to the API Store. `private`
+                    creates the executable release but keeps the listing hidden
+                    so the seller can test it in production before publishing.
+                publish:
+                  type: boolean
+                  deprecated: true
+                  description: Compatibility alias. Use `visibility`; false maps to private and true maps to public.
                 version_bump:
                   type: string
                   enum: [patch, minor, major]
@@ -579,7 +594,7 @@ paths:
                       $ref: '#/components/schemas/ToolManual'
       responses:
         '200':
-          description: Listing confirmed and published
+          description: Listing confirmed for public or private availability
           content:
             application/json:
               schema:
@@ -1855,6 +1870,10 @@ components:
           type: string
         status:
           type: string
+        visibility:
+          type: string
+          enum: [public, private]
+          nullable: true
         message:
           type: string
         checklist:

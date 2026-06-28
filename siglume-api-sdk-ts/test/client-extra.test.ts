@@ -167,7 +167,7 @@ describe("SiglumeClient extra branches", () => {
     expect(receipt.trace_id).toBe("trc_1");
     expect(requests[0]?.body.source_url).toBe("https://github.com/example/repo");
     expect(requests[0]?.body.source_code).toBeUndefined();
-    expect(requests[1]?.body).toEqual({ approved: true });
+    expect(requests[1]?.body).toEqual({ approved: true, visibility: "public" });
     expect(confirmation.status).toBe("active");
     expect((confirmation.release as { release_status?: string }).release_status).toBe("published");
     expect(confirmation.quality.grade).toBe("B");

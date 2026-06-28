@@ -227,6 +227,7 @@ class RegistrationConfirmation:
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
     message: str = ""
     checklist: dict[str, bool] = field(default_factory=dict)
+    visibility: str | None = None
 
 
 @dataclass
@@ -2570,12 +2571,18 @@ class SiglumeClient:
         manifest: "AppManifest | Mapping[str, Any] | None" = None,
         tool_manual: "ToolManual | Mapping[str, Any] | None" = None,
         version_bump: str | None = None,
+        visibility: str = "public",
     ) -> RegistrationConfirmation:
         # Registration content is immutable after auto-register. Keep the
         # historical keyword arguments source-compatible, but do not send them
         # as post-draft overrides.
         _ = (manifest, tool_manual)
         payload: dict[str, Any] = {"approved": True}
+        if visibility not in ("public", "private"):
+            raise SiglumeClientError(
+                f"visibility must be one of ['public', 'private'], got {visibility!r}"
+            )
+        payload["visibility"] = visibility
         if version_bump is not None:
             # Platform accepts "patch" (default), "minor", or "major". Any
             # other value is rejected server-side. Validate client-side too
@@ -2596,6 +2603,7 @@ class SiglumeClient:
         return RegistrationConfirmation(
             listing_id=str(data.get("listing_id") or listing_id),
             status=str(data.get("status") or ""),
+            visibility=_string_or_none(data.get("visibility")),
             message=str(data.get("message") or ""),
             checklist={str(key): bool(value) for key, value in _to_dict(data.get("checklist")).items()},
             release=_to_dict(data.get("release")),

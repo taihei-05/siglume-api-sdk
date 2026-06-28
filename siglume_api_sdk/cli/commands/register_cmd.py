@@ -8,6 +8,7 @@ from siglume_api_sdk.cli.project import render_json, run_registration
 
 @click.command("register")
 @click.option("--confirm", is_flag=True, help="Explicitly confirm the registration. This is the default unless --draft-only is set.")
+@click.option("--private-confirm", is_flag=True, help="Confirm the registration for private production testing without publishing it.")
 @click.option("--draft-only", is_flag=True, help="Create or refresh the draft without confirming publication.")
 @click.option("--submit-review", is_flag=True, help="Legacy alias: publish immediately if your environment still routes through submit-review.")
 @click.option("--yes", is_flag=True, help="Skip local scan confirmation prompts.")
@@ -15,6 +16,7 @@ from siglume_api_sdk.cli.project import render_json, run_registration
 @click.argument("path", required=False, default=".")
 def register_command(
     confirm: bool,
+    private_confirm: bool,
     draft_only: bool,
     submit_review: bool,
     yes: bool,
@@ -23,12 +25,21 @@ def register_command(
 ) -> None:
     if draft_only and confirm:
         raise click.ClickException("--draft-only cannot be combined with --confirm.")
+    if draft_only and private_confirm:
+        raise click.ClickException("--draft-only cannot be combined with --private-confirm.")
+    if confirm and private_confirm:
+        raise click.ClickException("--confirm cannot be combined with --private-confirm.")
     if draft_only and submit_review:
         raise click.ClickException("--draft-only cannot be combined with --submit-review.")
+    if private_confirm and submit_review:
+        raise click.ClickException("--private-confirm cannot be combined with --submit-review.")
 
-    should_confirm = confirm or (not draft_only and not submit_review)
+    should_confirm = confirm or private_confirm or (not draft_only and not submit_review)
+    confirm_visibility = "private" if private_confirm else "public"
     scan_result = scan_path(path)
-    risky_publish = scan_result["risk_level"] != "clean" and (should_confirm or submit_review)
+    risky_publish = scan_result["risk_level"] != "clean" and (
+        (confirm_visibility == "public" and should_confirm) or submit_review
+    )
     if risky_publish and not yes and json_output:
         raise click.ClickException(
             "Local prompt-injection scan found suspicious capability metadata; "
@@ -45,17 +56,26 @@ def register_command(
     result = run_registration(
         path,
         confirm=should_confirm,
+        confirm_visibility=confirm_visibility,
         submit_review=submit_review,
     )
     result["local_prompt_injection_scan"] = scan_result
+    if private_confirm and isinstance(result.get("confirmation"), dict) and not result["confirmation"].get("visibility"):
+        result["confirmation"]["visibility"] = "private"
     if json_output:
         click.echo(render_json(result))
         return
 
     receipt = result["receipt"]
     registration_mode = receipt.get("registration_mode")
-    published = "confirmation" in result or "review" in result
-    if published and registration_mode == "upgrade":
+    confirmation_visibility = None
+    if isinstance(result.get("confirmation"), dict):
+        confirmation_visibility = result["confirmation"].get("visibility")
+    published = confirmation_visibility != "private" and ("confirmation" in result or "review" in result)
+    privately_confirmed = confirmation_visibility == "private"
+    if privately_confirmed:
+        click.secho("Registration privately confirmed.", fg="green")
+    elif published and registration_mode == "upgrade":
         click.secho("Upgrade registered.", fg="green")
     elif published:
         click.secho("Registration accepted.", fg="green")
@@ -83,8 +103,13 @@ def register_command(
     if "confirmation" in result:
         confirmation = result["confirmation"]
         quality = confirmation["quality"]
-        click.secho("Listing published.", fg="green")
+        if confirmation.get("visibility") == "private":
+            click.secho("Listing confirmed privately for production testing.", fg="green")
+        else:
+            click.secho("Listing published.", fg="green")
         click.echo(f"confirmation_status: {confirmation['status']}")
+        if confirmation.get("visibility"):
+            click.echo(f"confirmation_visibility: {confirmation['visibility']}")
         release = confirmation.get("release")
         if isinstance(release, dict) and release.get("release_status"):
             click.echo(f"release_status: {release['release_status']}")

@@ -52,12 +52,16 @@ There is no normal human review step in the self-serve publish flow anymore.
    mandatory LLM legal checks.
 9. If the checks pass, `siglume register .` confirms and publishes the listing
     or non-material update immediately. Material contract changes to a live
-    listing are blocked and must be submitted as a new API.
+     listing are blocked and must be submitted as a new API.
 10. Use `siglume register . --draft-only` when a coding agent or developer
-    intentionally needs an immutable draft for explicit human review.
-11. The draft can then be published by rerunning plain `siglume register .` or
-    calling `confirm-auto-register`.
-12. After live or sandbox execution, use `siglume dev tail` or
+     intentionally needs an immutable draft for explicit human review.
+11. Use `siglume register . --private-confirm` or
+    `confirm-auto-register` with `visibility: "private"` when the seller needs
+    to test the confirmed release in production while the listing stays hidden.
+12. The hidden confirmed listing can then be published by rerunning plain
+    `siglume register .` or calling `confirm-auto-register` with
+    `visibility: "public"`.
+13. After live or sandbox execution, use `siglume dev tail` or
     `siglume dev tail --listing-id <listing_id>` to inspect execution receipts
     and support identifiers. See [Developer Observability](developer-observability.md).
 
@@ -83,7 +87,8 @@ There is no normal human review step in the self-serve publish flow anymore.
  8. Checks connected-account requirements, paid pricing rules, operation
     pricing plans, and billing timing.
 9. Persists a private draft only if those checks pass. The CLI then confirms it
-   by default unless `--draft-only` was requested.
+   by default unless `--draft-only` was requested. `--private-confirm` creates
+   the executable release but leaves the listing hidden.
 10. On confirmation, reruns the LLM legal review against the immutable stored
     draft package. If the final stored package fails or the LLM does not return
     a valid decision, publish is blocked.
@@ -307,10 +312,12 @@ The intended advanced flow is:
    - `runtime_validation`
    - external OAuth `connect_url` metadata when required
    - optional `input_form_spec`
-6. `siglume register .` confirms and publishes by default when immediate
-   publish is approved.
-7. Use `siglume register . --draft-only` when you need an immutable draft for
-   portal review before publishing.
+6. `siglume register . --private-confirm` confirms the release without public
+   API Store visibility so the seller can test it in production.
+7. `siglume register .` confirms and publishes by default when immediate
+   public publish is approved.
+8. Use `siglume register . --draft-only` when you need an immutable draft for
+   portal review before confirming.
 
 This is the recommended path for AI-assisted registration because it avoids
 manual browser form entry and keeps the registration contract close to the
@@ -341,10 +348,11 @@ then show the API-key production loop:
 siglume validate .
 siglume score . --remote
 siglume preflight .
-siglume register . --draft-only
+siglume register . --private-confirm
 
-Do not run plain siglume register . unless I explicitly approve immediate
-publish.
+Do not run plain siglume register . unless I explicitly approve immediate public
+publish. Use siglume register . --draft-only instead of --private-confirm only
+when I ask for a review draft without creating the executable release.
 ```
 
 ## Where the schema lives

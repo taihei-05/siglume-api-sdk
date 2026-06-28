@@ -530,20 +530,23 @@ siglume validate .
 siglume score . --remote
 siglume preflight .              # checks blockers without creating a draft
 siglume register .                # preflight + auto-register + confirm/publish
+siglume register . --private-confirm # confirm release, keep listing hidden for production testing
 siglume register . --draft-only   # review-only draft staging
 ```
 
 Useful flags:
 
 - `--draft-only`: create or refresh the immutable draft without confirming publication
+- `--private-confirm`: create the executable release but keep the listing hidden so the seller can test it in production before publishing
 - `--confirm`: explicit compatibility alias; confirmation is already the default
 - `--submit-review`: legacy alias for older environments
 - `--json`: emit machine-readable JSON
 
 Coding agents may run `siglume validate .`, `siglume score . --remote`,
-`siglume preflight .`, and `siglume register . --draft-only` to create the
-review draft. They should not run `siglume register .` unless the human
-explicitly approves immediate publish.
+`siglume preflight .`, and `siglume register . --private-confirm` to create a
+non-public, production-testable release. Use `--draft-only` when you only want
+an immutable review draft. They should not run plain `siglume register .` unless
+the human explicitly approves immediate public publish.
 
 If the listing is already live, re-run the same `capability_key` to publish a
 non-material upgrade when the checks pass. Use `--draft-only` if you
@@ -562,9 +565,11 @@ draft; it does not edit the manual. See [Section 13](#13-tool-manual-guide).
 - Portal route: use `/owner/publish` to inspect the immutable CLI /
   automation result; submitted content is not editable in the portal
 - CLI / engine route: send the final tool manual during `auto-register`, then
-  use `confirm-auto-register` only to approve the immutable draft
+  use `confirm-auto-register` only to approve the immutable draft. Pass
+  `visibility: "private"` when you need to test in production while the listing
+  remains hidden.
 - Canonical schema: `schemas/tool-manual.schema.json`
-- Canonical publish gate: `confirm-auto-register`
+- Canonical confirmation gate: `confirm-auto-register`
 - You must send the full `tool_manual` during `auto-register`
 - SDK / HTTP automation can include `source_url` plus optional
   `source_context` to register directly from GitHub provenance
@@ -974,24 +979,19 @@ Open the `review_url` returned by the CLI, or go to
 `https://siglume.com/owner/publish`. Submitted listing content is read-only in
 the portal. If you need to change the API contract, update the local project and
 rerun `siglume register .` with the same `capability_key`. Use
-`siglume register . --draft-only` when you intentionally need an immutable draft
-before publishing.
+`siglume register . --private-confirm` when you want to test the confirmed
+release in production while it stays hidden, or `--draft-only` when you
+intentionally need an immutable draft before confirming.
 
-### Step 3: Legacy/manual direct REST sandbox fallback
+### Step 3: Manual direct REST sandbox fallback
 
-The direct sandbox REST endpoints currently use a normal signed-in browser
-session token. This is a beta/manual testing surface, not the recommended
-automation path. Do not use browser tokens in docs, CI, coding-engine prompts,
-or production scripts. Do not paste browser session tokens or production API
-keys into a coding-agent chat. If credentials are needed, run the command
-locally or use a short-lived, project-scoped CLI token.
-
-If you must test the sandbox endpoints manually, sign in to siglume.com and copy
-the browser session token from DevTools -> Application -> Cookies.
+The direct sandbox REST endpoint accepts the same `SIGLUME_API_KEY` / CLI token
+style as `auto-register`. This is a beta/manual testing surface; for normal
+diagnostics prefer `siglume dev tail`.
 
 ```bash
 curl -X POST https://siglume.com/v1/market/sandbox/sessions \
-  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": "YOUR_AGENT_ID",
@@ -1005,12 +1005,12 @@ Then verify the sandbox run through usage data:
 
 ```bash
 curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=my-api" \
-  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN"
+  -H "Authorization: Bearer $SIGLUME_API_KEY"
 ```
 
 For normal developer diagnostics, prefer `siglume dev tail` or
 `siglume dev tail --listing-id LISTING_ID`; those commands expose recent
-execution receipts without relying on browser-session sandbox endpoints.
+execution receipts without relying on raw REST calls.
 
 Sandbox mode is isolated from live data. No real payments or side effects occur.
 When you are ready to go live, publish through `siglume register .` and the
@@ -1941,9 +1941,15 @@ Example request payload:
 
 ```json
 {
-  "approved": true
+  "approved": true,
+  "visibility": "private"
 }
 ```
+
+Use `visibility: "private"` for production testing before public launch. The
+server creates the `CapabilityRelease` and runtime adapter, but the listing stays
+hidden from the API Store. Use `visibility: "public"` or omit the field when you
+are ready to publish.
 
 Example response:
 
@@ -2069,12 +2075,12 @@ Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` explicitly before using these helper
 ### Sandbox testing with public endpoints
 
 After confirmation, create a sandbox session for your capability key only if you
-need the manual beta sandbox route. These endpoints currently require a
-signed-in browser session token, not `SIGLUME_API_KEY`.
+need the manual beta sandbox route. This endpoint accepts the same
+`SIGLUME_API_KEY` / CLI token style as `auto-register`.
 
 ```bash
 curl -X POST https://siglume.com/v1/market/sandbox/sessions \
-  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN" \
+  -H "Authorization: Bearer $SIGLUME_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": "YOUR_AGENT_ID",
@@ -2086,7 +2092,7 @@ Then verify the sandbox run through usage data:
 
 ```bash
 curl "https://siglume.com/v1/market/usage?environment=sandbox&capability_key=price-compare-helper" \
-  -H "Authorization: Bearer $SIGLUME_BROWSER_TOKEN"
+  -H "Authorization: Bearer $SIGLUME_API_KEY"
 ```
 
 For published listings, use `siglume dev tail --listing-id LISTING_ID` to view

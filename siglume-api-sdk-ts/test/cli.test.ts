@@ -40,6 +40,7 @@ function createMockClient() {
       return {
         listing_id: "lst_123",
         status: "active",
+        visibility: "public",
         release: { release_status: "published" },
         quality: {
           overall_score: 84,
@@ -651,6 +652,45 @@ describe("siglume CLI", () => {
     expect(stdout.join("\n")).not.toContain("Listing published.");
   });
 
+  it("confirms privately when --private-confirm is set", async () => {
+    const projectDir = await createTestProject();
+    const stdout: string[] = [];
+    let capturedVisibility: unknown;
+    const clientFactory = () => ({
+      ...createMockClient(),
+      async confirm_registration(_listingId: string, options?: { visibility?: string }) {
+        capturedVisibility = options?.visibility;
+        return {
+          listing_id: "lst_123",
+          status: "hidden",
+          release: { release_status: "published" },
+          quality: {
+            overall_score: 92,
+            grade: "A",
+            issues: [],
+            improvement_suggestions: [],
+            raw: {},
+          },
+          raw: {},
+        };
+      },
+    });
+
+    const registerExit = await runCli(["register", projectDir, "--private-confirm"], {
+      stdout: (line) => stdout.push(line),
+      client_factory: clientFactory as unknown as (api_key: string, base_url?: string) => SiglumeClientShape,
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
+
+    expect(registerExit).toBe(0);
+    expect(capturedVisibility).toBe("private");
+    expect(stdout.join("\n")).toContain("Registration privately confirmed.");
+    expect(stdout.join("\n")).toContain("Listing confirmed privately for production testing.");
+    expect(stdout.join("\n")).toContain("confirmation_status: hidden");
+    expect(stdout.join("\n")).toContain("confirmation_visibility: private");
+    expect(stdout.join("\n")).not.toContain("Listing published.");
+  });
+
   it("rejects --draft-only combined with publish flags", async () => {
     const projectDir = await createTestProject();
     const stderr: string[] = [];
@@ -663,11 +703,17 @@ describe("siglume CLI", () => {
       stderr: (line) => stderr.push(line),
       env: { SIGLUME_API_KEY: "sig_test_key" },
     });
+    const privateConfirmExit = await runCli(["register", projectDir, "--draft-only", "--private-confirm"], {
+      stderr: (line) => stderr.push(line),
+      env: { SIGLUME_API_KEY: "sig_test_key" },
+    });
 
     expect(confirmExit).toBe(1);
     expect(submitExit).toBe(1);
+    expect(privateConfirmExit).toBe(1);
     expect(stderr.join("\n")).toContain("--draft-only cannot be combined with --confirm.");
     expect(stderr.join("\n")).toContain("--draft-only cannot be combined with --submit-review.");
+    expect(stderr.join("\n")).toContain("--draft-only cannot be combined with --private-confirm.");
   });
 
   it("runs preflight without creating a draft", async () => {
