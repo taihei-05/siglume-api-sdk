@@ -158,7 +158,7 @@ Constraints:
 - Keep runtime_validation.json, .env, and real secrets Git-ignored.
 - Do not put real secrets in source code or committed docs.
 - Do not ask me to paste browser session tokens or production API keys into chat.
-- Do not run `siglume register .` unless I explicitly approve immediate publish; use `siglume register . --draft-only` for review-only staging.
+- Do not run `siglume register .` unless I explicitly approve immediate public publish; use `siglume register . --private-confirm` when I want production testing while the listing stays hidden, or `siglume register . --draft-only` for review-only staging.
 - Make the project pass:
   siglume test .
   siglume score . --offline
@@ -193,9 +193,10 @@ This is the main use case. You build an API, register it, and earn revenue.
 4. Keep `tool_manual.json` and the local, Git-ignored `runtime_validation.json` next to your adapter
 5. Run `siglume test .` and `siglume score . --offline`
 6. Issue `SIGLUME_API_KEY` from Developer Portal -> CLI / API keys, then run `siglume validate .`, `siglume score . --remote`, and `siglume preflight .`
-7. Run `siglume register .` to auto-register and publish when the checks pass
-8. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
-9. Review the result in the developer portal or CLI output
+7. Run `siglume register . --private-confirm` when you want to confirm the release and test it in production while the listing stays hidden
+8. Run `siglume register .` to auto-register and publish when the checks pass and immediate public launch is approved
+9. Use `siglume register . --draft-only` instead when you explicitly want an immutable review draft
+10. Review the result in the developer portal or CLI output
 11. Agent owners subscribe → you earn 93.4% of revenue (settlement mechanism: see [PAYMENT_MIGRATION.md](./PAYMENT_MIGRATION.md))
 ```
 
@@ -262,7 +263,7 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json` and local Git-ignored `runtime_validation.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json` and local Git-ignored `runtime_validation.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--private-confirm` or `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
 | Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; change content by rerunning the CLI / `auto-register` with the same `capability_key`. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
@@ -289,8 +290,10 @@ No permission needed. No issue to claim. Just build and register.
   - paid APIs must satisfy minimum price and verified Polygon payout readiness
 - The canonical agent contract is the Tool Manual in
   `schemas/tool-manual.schema.json`.
-- `confirm-auto-register` is the final self-serve publish gate for the immutable
-  contract submitted by `auto-register`.
+- `confirm-auto-register` is the final self-serve confirmation gate for the
+  immutable contract submitted by `auto-register`. It publishes by default, or
+  keeps the listing hidden for seller-owned production testing when confirmed
+  with `visibility: "private"`.
 - Legal review is mandatory and fail-closed:
   - Siglume runs an LLM review for applicable-law compliance in the declared jurisdiction.
   - Siglume runs an LLM review for public-order / morals compliance.
@@ -318,14 +321,18 @@ siglume validate .
 siglume score . --remote
 siglume preflight .              # checks blockers without creating a draft
 siglume register .                # preflight + auto-register + confirm/publish
+siglume register . --private-confirm # confirm release, keep listing hidden for production testing
 siglume register . --draft-only   # review-only draft staging
 ```
 
 `siglume register` now runs manifest validation and remote Tool Manual quality
 preview before auto-registering. It confirms and publishes by default when the
-self-serve checks pass. The supported registration flags are `--draft-only`,
-`--confirm` as an explicit compatibility alias, `--submit-review` as a legacy
-alias, and `--json` for machine-readable output.
+self-serve checks pass. Use `--private-confirm` to create the executable release
+without public API Store visibility; the seller can then create a sandbox session
+and test against production before publishing. The supported registration flags
+are `--private-confirm`, `--draft-only`, `--confirm` as an explicit
+compatibility alias, `--submit-review` as a legacy alias, and `--json` for
+machine-readable output.
 
 For upgrades, run the same commands again with the same `capability_key`.
 `siglume register` publishes the next release immediately when the checks pass;

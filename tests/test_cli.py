@@ -728,11 +728,13 @@ def test_register_human_output_includes_review_and_trace_metadata(monkeypatch, t
                 request_id="req_reg",
             )
 
-        def confirm_registration(self, listing_id: str):
+        def confirm_registration(self, listing_id: str, **kwargs):
             assert listing_id == "lst_123"
+            assert kwargs == {"visibility": "public"}
             return SimpleNamespace(
                 listing_id=listing_id,
                 status="active",
+                visibility="public",
                 release={"release_status": "published"},
                 quality=SimpleNamespace(overall_score=91, grade="A"),
             )
@@ -786,7 +788,7 @@ def test_register_draft_only_stops_after_auto_register(monkeypatch, tmp_path) ->
         def auto_register(self, manifest, tool_manual, **kwargs):
             return SimpleNamespace(listing_id="lst_draft", status="draft")
 
-        def confirm_registration(self, listing_id: str):
+        def confirm_registration(self, listing_id: str, **kwargs):
             raise AssertionError("draft-only must not confirm registration")
 
     monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
@@ -800,6 +802,69 @@ def test_register_draft_only_stops_after_auto_register(monkeypatch, tmp_path) ->
     assert "Listing published." not in result.output
 
 
+def test_register_private_confirm_keeps_listing_non_public(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "private-confirm"
+    _write_register_project(project_dir)
+
+    class FakeClient:
+        captured_visibility: str | None = None
+
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=92,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=72,
+                improvement_suggestions=[],
+                publishable=True,
+                validation_ok=True,
+            )
+
+        def auto_register(self, manifest, tool_manual, **kwargs):
+            return SimpleNamespace(
+                listing_id="lst_private",
+                status="draft",
+                registration_mode="create",
+                listing_status="draft",
+            )
+
+        def confirm_registration(self, listing_id: str, **kwargs):
+            assert listing_id == "lst_private"
+            FakeClient.captured_visibility = kwargs.get("visibility")
+            return SimpleNamespace(
+                listing_id=listing_id,
+                status="hidden",
+                visibility="private",
+                release={"release_status": "published"},
+                quality=SimpleNamespace(overall_score=92, grade="A"),
+            )
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--private-confirm"])
+
+    assert result.exit_code == 0, result.output
+    assert FakeClient.captured_visibility == "private"
+    assert "Registration privately confirmed." in result.output
+    assert "Listing confirmed privately for production testing." in result.output
+    assert "confirmation_status: hidden" in result.output
+    assert "confirmation_visibility: private" in result.output
+    assert "Listing published." not in result.output
+
+
 def test_register_draft_only_conflicts_with_publish_flags(tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "draft-only-conflict"
@@ -807,11 +872,14 @@ def test_register_draft_only_conflicts_with_publish_flags(tmp_path) -> None:
 
     confirm_result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--confirm"])
     submit_result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--submit-review"])
+    private_confirm_result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--private-confirm"])
 
     assert confirm_result.exit_code == 1
     assert "--draft-only cannot be combined with --confirm" in confirm_result.output
     assert submit_result.exit_code == 1
     assert "--draft-only cannot be combined with --submit-review" in submit_result.output
+    assert private_confirm_result.exit_code == 1
+    assert "--draft-only cannot be combined with --private-confirm" in private_confirm_result.output
 
 
 def test_register_submit_review_human_output_uses_publish_wording(monkeypatch, tmp_path) -> None:
@@ -901,11 +969,13 @@ def test_register_confirm_human_output_includes_release_status(monkeypatch, tmp_
                 request_id="req_confirm_reg",
             )
 
-        def confirm_registration(self, listing_id: str):
+        def confirm_registration(self, listing_id: str, **kwargs):
             assert listing_id == "lst_confirm"
+            assert kwargs == {"visibility": "public"}
             return {
                 "listing_id": listing_id,
                 "status": "active",
+                "visibility": "public",
                 "release": {"release_status": "published"},
                 "quality": {"overall_score": 84, "grade": "B"},
             }
@@ -1297,10 +1367,11 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
                 validation_ok=True,
             )
 
-        def confirm_registration(self, listing_id: str):
+        def confirm_registration(self, listing_id: str, **kwargs):
             return SimpleNamespace(
                 listing_id=listing_id,
                 status="active",
+                visibility=kwargs.get("visibility"),
                 quality=SimpleNamespace(overall_score=85, grade="B"),
             )
 

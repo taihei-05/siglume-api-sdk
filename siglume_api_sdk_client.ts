@@ -76,6 +76,7 @@ export interface RegistrationQuality {
 export interface RegistrationConfirmation {
   listing_id: string;
   status: string;
+  visibility?: string | null;
   release: Record<string, unknown>;
   quality: RegistrationQuality;
   trace_id?: string | null;

@@ -302,6 +302,7 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
 
         if request.url.path == "/v1/market/capabilities/lst_123/confirm-auto-register":
             assert body["approved"] is True
+            assert body["visibility"] == "public"
             assert "overrides" not in body
             return httpx.Response(
                 200,
@@ -309,6 +310,7 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
                     {
                         "listing_id": "lst_123",
                         "status": "active",
+                        "visibility": "public",
                         "message": "Listing published automatically after the self-serve checks passed.",
                         "checklist": {"docs_url": True, "seller_onboarding": True},
                         "release": {"release_id": "rel_123", "release_status": "published"},
@@ -352,6 +354,7 @@ def test_auto_register_and_confirm_registration_return_typed_objects(tmp_path: P
     assert receipt.listing_status == "active"
     assert confirmation.listing_id == "lst_123"
     assert confirmation.status == "active"
+    assert confirmation.visibility == "public"
     assert confirmation.message.startswith("Listing published automatically")
     assert confirmation.checklist["docs_url"] is True
     assert confirmation.quality.overall_score == 84
@@ -370,6 +373,43 @@ def test_confirm_registration_rejects_non_string_version_bump() -> None:
     with build_client(handler) as client:
         with pytest.raises(SiglumeClientError, match="version_bump must be one of"):
             client.confirm_registration("lst_123", version_bump=[])  # type: ignore[arg-type]
+
+
+def test_confirm_registration_accepts_private_visibility() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        assert request.url.path == "/v1/market/capabilities/lst_123/confirm-auto-register"
+        assert body == {"approved": True, "visibility": "private"}
+        return httpx.Response(
+            200,
+            json=envelope(
+                {
+                    "listing_id": "lst_123",
+                    "status": "hidden",
+                    "visibility": "private",
+                    "message": "Listing confirmed privately.",
+                    "checklist": {"docs_url": True},
+                    "release": {"release_id": "rel_123", "release_status": "published"},
+                    "quality": {"overall_score": 88, "grade": "A", "issues": [], "improvement_suggestions": []},
+                }
+            ),
+        )
+
+    with build_client(handler) as client:
+        confirmation = client.confirm_registration("lst_123", visibility="private")
+
+    assert confirmation.status == "hidden"
+    assert confirmation.visibility == "private"
+    assert confirmation.release["release_id"] == "rel_123"
+
+
+def test_confirm_registration_rejects_invalid_visibility() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"Validation should fail before transport: {request.method} {request.url}")
+
+    with build_client(handler) as client:
+        with pytest.raises(SiglumeClientError, match="visibility must be one of"):
+            client.confirm_registration("lst_123", visibility="team")  # type: ignore[arg-type]
 
 
 

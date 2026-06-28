@@ -75,7 +75,8 @@ def test_readme_keeps_coding_agent_prompt() -> None:
     assert "Start as a FREE and READ_ONLY API" in readme
     assert "siglume preflight ." in readme
     assert "siglume register . --draft-only" in readme
-    assert "Do not run `siglume register .` unless I explicitly approve immediate publish" in readme
+    assert "Do not run `siglume register .` unless I explicitly approve immediate public publish" in readme
+    assert "siglume register . --private-confirm" in readme
     assert "## Default beginner path" in agent_guide
     assert "Start with a free, read-only API" in agent_guide
     assert "Do not run plain siglume register . unless I explicitly approve immediate" in agent_guide
@@ -88,7 +89,7 @@ def test_docs_do_not_advertise_removed_register_flags() -> None:
             _read("README.md"),
             _read("GETTING_STARTED.md"),
             _read("docs/publish-flow.md"),
-            _read("release-notes/RELEASE_NOTES_v0.7.5.md"),
+            _read_optional("release-notes/RELEASE_NOTES_v0.7.5.md"),
         ]
     )
 
@@ -179,7 +180,9 @@ def test_public_docs_keep_submitted_registration_content_immutable() -> None:
     assert '"overrides": {' not in docs
     assert "Submitted listing content is read-only in the portal." in docs
     assert "confirmation approves the submitted draft but does\n  not edit its content" in docs
-    assert "current SDKs\n        confirm with approved=true only" in openapi
+    assert 'visibility: "private"' in openapi
+    assert "approved=true plus optional\n        visibility" in openapi
+    assert "do not send post-draft content edits" in openapi
     assert "deprecated: true" in openapi
 
 

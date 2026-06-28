@@ -432,6 +432,7 @@ export interface RegistrationQuality {
 export interface RegistrationConfirmation {
   listing_id: string;
   status: string;
+  visibility?: string | null;
   message?: string | null;
   checklist?: Record<string, boolean>;
   release: Record<string, unknown>;

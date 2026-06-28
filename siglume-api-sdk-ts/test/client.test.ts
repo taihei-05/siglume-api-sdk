@@ -232,11 +232,14 @@ describe("SiglumeClient", () => {
           );
         }
         if (url.pathname === "/v1/market/capabilities/lst_123/confirm-auto-register") {
+          expect(body.approved).toBe(true);
+          expect(body.visibility).toBe("public");
           return new Response(
             JSON.stringify(
               envelope({
                 listing_id: "lst_123",
                 status: "active",
+                visibility: "public",
                 message: "Listing published automatically after the self-serve checks passed.",
                 checklist: { docs_url: true, seller_onboarding: true },
                 release: { release_id: "rel_123", release_status: "published" },
@@ -266,6 +269,7 @@ describe("SiglumeClient", () => {
     expect(receipt.listing_status).toBe("active");
     expect(confirmation.listing_id).toBe("lst_123");
     expect(confirmation.status).toBe("active");
+    expect(confirmation.visibility).toBe("public");
     expect(confirmation.message).toBe("Listing published automatically after the self-serve checks passed.");
     expect(confirmation.checklist).toEqual({ docs_url: true, seller_onboarding: true });
     expect((confirmation.release as { release_status?: string }).release_status).toBe("published");
@@ -273,6 +277,39 @@ describe("SiglumeClient", () => {
     expect(confirmation.trace_id).toBe("trc_confirm");
     expect(requests[0]?.path).toBe("/v1/market/capabilities/auto-register");
     expect(requests[1]?.path).toBe("/v1/market/capabilities/lst_123/confirm-auto-register");
+  });
+
+  it("confirms registration privately when requested", async () => {
+    const client = new SiglumeClient({
+      api_key: "sig_test_key",
+      base_url: "https://api.example.test/v1",
+      fetch: async (input, init) => {
+        const url = requestUrl(input);
+        const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+        expect(url.pathname).toBe("/v1/market/capabilities/lst_123/confirm-auto-register");
+        expect(body).toEqual({ approved: true, visibility: "private" });
+        return new Response(
+          JSON.stringify(
+            envelope({
+              listing_id: "lst_123",
+              status: "hidden",
+              visibility: "private",
+              message: "Listing confirmed privately.",
+              checklist: { docs_url: true },
+              release: { release_id: "rel_123", release_status: "published" },
+              quality: { overall_score: 91, grade: "A", issues: [], improvement_suggestions: [] },
+            }),
+          ),
+          { status: 200 },
+        );
+      },
+    });
+
+    const confirmation = await client.confirm_registration("lst_123", { visibility: "private" });
+
+    expect(confirmation.status).toBe("hidden");
+    expect(confirmation.visibility).toBe("private");
+    expect((confirmation.release as { release_id?: string }).release_id).toBe("rel_123");
   });
 
   it("requires an explicit listing currency before auto_register", async () => {

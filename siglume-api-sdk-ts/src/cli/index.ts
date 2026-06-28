@@ -265,24 +265,36 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
   program
     .command("register")
     .option("--confirm", "explicitly confirm the registration; this is the default unless --draft-only is set", false)
+    .option("--private-confirm", "confirm the registration for private production testing without publishing it", false)
     .option("--draft-only", "create or refresh the draft without confirming publication", false)
     .option("--submit-review", "legacy alias: publish immediately if your environment still routes through submit-review", false)
     .option("--json", "emit machine-readable JSON", false)
     .argument("[path]", ".", "project path")
     .action(async (
       path: string,
-      options: { confirm?: boolean; draftOnly?: boolean; submitReview?: boolean; json?: boolean; ["draft-only"]?: boolean; ["submit-review"]?: boolean },
+      options: { confirm?: boolean; privateConfirm?: boolean; draftOnly?: boolean; submitReview?: boolean; json?: boolean; ["private-confirm"]?: boolean; ["draft-only"]?: boolean; ["submit-review"]?: boolean },
     ) => {
       const draftOnly = Boolean(options.draftOnly);
+      const privateConfirm = Boolean(options.privateConfirm);
       if (draftOnly && options.confirm) {
         throw new SiglumeProjectError("--draft-only cannot be combined with --confirm.");
+      }
+      if (draftOnly && privateConfirm) {
+        throw new SiglumeProjectError("--draft-only cannot be combined with --private-confirm.");
+      }
+      if (options.confirm && privateConfirm) {
+        throw new SiglumeProjectError("--confirm cannot be combined with --private-confirm.");
       }
       if (draftOnly && options.submitReview) {
         throw new SiglumeProjectError("--draft-only cannot be combined with --submit-review.");
       }
-      const shouldConfirm = Boolean(options.confirm) || (!draftOnly && !options.submitReview);
+      if (privateConfirm && options.submitReview) {
+        throw new SiglumeProjectError("--private-confirm cannot be combined with --submit-review.");
+      }
+      const shouldConfirm = Boolean(options.confirm) || privateConfirm || (!draftOnly && !options.submitReview);
       const report = await runRegistration(path, {
         confirm: shouldConfirm,
+        confirm_visibility: privateConfirm ? "private" : "public",
         draft_only: draftOnly,
         submit_review: options.submitReview,
       }, deps);
@@ -298,8 +310,12 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
           trace_id?: string | null;
           request_id?: string | null;
         };
-        const published = Boolean(report.confirmation || report.review);
-        if (published && receipt.registration_mode === "upgrade") {
+        const confirmationSummary = report.confirmation as { visibility?: string | null } | undefined;
+        const privatelyConfirmed = confirmationSummary?.visibility === "private";
+        const published = !privatelyConfirmed && Boolean(report.confirmation || report.review);
+        if (privatelyConfirmed) {
+          emit(stdout, "Registration privately confirmed.");
+        } else if (published && receipt.registration_mode === "upgrade") {
           emit(stdout, "Upgrade registered.");
         } else if (published) {
           emit(stdout, "Registration accepted.");
@@ -319,10 +335,12 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         if (report.confirmation) {
           const confirmation = report.confirmation as {
             status?: string | null;
+            visibility?: string | null;
             release?: { release_status?: string | null } | null;
           };
-          emit(stdout, "Listing published.");
+          emit(stdout, confirmation.visibility === "private" ? "Listing confirmed privately for production testing." : "Listing published.");
           if (confirmation.status) emit(stdout, `confirmation_status: ${confirmation.status}`);
+          if (confirmation.visibility) emit(stdout, `confirmation_visibility: ${confirmation.visibility}`);
           if (confirmation.release?.release_status) emit(stdout, `release_status: ${confirmation.release.release_status}`);
         } else if (report.review) {
           const review = report.review as { status?: string | null };

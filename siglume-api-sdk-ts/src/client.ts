@@ -274,7 +274,12 @@ export interface SiglumeClientShape {
   ): Promise<AutoRegistrationReceipt>;
   confirm_registration(
     listing_id: string,
-    options?: { manifest?: AppManifest | Record<string, unknown>; tool_manual?: ToolManual | Record<string, unknown> },
+    options?: {
+      manifest?: AppManifest | Record<string, unknown>;
+      tool_manual?: ToolManual | Record<string, unknown>;
+      version_bump?: "patch" | "minor" | "major";
+      visibility?: "public" | "private";
+    },
   ): Promise<RegistrationConfirmation>;
   preview_quality_score(tool_manual: ToolManual | Record<string, unknown>): Promise<ToolManualQualityReport>;
   submit_review(listing_id: string): Promise<AppListingRecord>;
@@ -1989,6 +1994,7 @@ export class SiglumeClient implements SiglumeClientShape {
       manifest?: AppManifest | Record<string, unknown>;
       tool_manual?: ToolManual | Record<string, unknown>;
       version_bump?: "patch" | "minor" | "major";
+      visibility?: "public" | "private";
     } = {},
   ): Promise<RegistrationConfirmation> {
     // Registration content is immutable after auto-register. Keep the
@@ -1996,8 +2002,12 @@ export class SiglumeClient implements SiglumeClientShape {
     // post-draft overrides. `version_bump` (optional) opts into a
     // minor/major semver bump on the newly-created CapabilityRelease;
     // platform defaults to "patch" when omitted.
-    const { version_bump: versionBump } = options;
+    const { version_bump: versionBump, visibility = "public" } = options;
     const payload: Record<string, unknown> = { approved: true };
+    if (visibility !== "public" && visibility !== "private") {
+      throw new Error(`visibility must be one of ["public","private"], got ${JSON.stringify(visibility)}`);
+    }
+    payload.visibility = visibility;
     if (versionBump !== undefined) {
       const allowed = ["patch", "minor", "major"] as const;
       if (!(allowed as readonly string[]).includes(versionBump)) {
@@ -2017,6 +2027,7 @@ export class SiglumeClient implements SiglumeClientShape {
     return {
       listing_id: String(data.listing_id ?? listing_id),
       status: String(data.status ?? ""),
+      visibility: stringOrNull(data.visibility),
       message: stringOrNull(data.message),
       checklist,
       release: toRecord(data.release),
