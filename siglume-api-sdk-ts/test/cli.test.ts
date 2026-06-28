@@ -663,7 +663,6 @@ describe("siglume CLI", () => {
         return {
           listing_id: "lst_123",
           status: "hidden",
-          visibility: "private",
           release: { release_status: "published" },
           quality: {
             overall_score: 92,

@@ -298,6 +298,9 @@ export async function runCli(argv: string[], deps: CliRunDependencies = {}): Pro
         draft_only: draftOnly,
         submit_review: options.submitReview,
       }, deps);
+      if (privateConfirm && report.confirmation && !(report.confirmation as { visibility?: unknown }).visibility) {
+        (report.confirmation as { visibility?: string }).visibility = "private";
+      }
       if (options.json) {
         emit(stdout, renderJson(report));
       } else {

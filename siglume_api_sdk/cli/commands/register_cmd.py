@@ -60,6 +60,8 @@ def register_command(
         submit_review=submit_review,
     )
     result["local_prompt_injection_scan"] = scan_result
+    if private_confirm and isinstance(result.get("confirmation"), dict) and not result["confirmation"].get("visibility"):
+        result["confirmation"]["visibility"] = "private"
     if json_output:
         click.echo(render_json(result))
         return

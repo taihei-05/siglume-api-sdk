@@ -846,7 +846,6 @@ def test_register_private_confirm_keeps_listing_non_public(monkeypatch, tmp_path
             return SimpleNamespace(
                 listing_id=listing_id,
                 status="hidden",
-                visibility="private",
                 release={"release_status": "published"},
                 quality=SimpleNamespace(overall_score=92, grade="A"),
             )
