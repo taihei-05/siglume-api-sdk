@@ -271,6 +271,112 @@ def test_mcp_router_cli_explains_missing_owner_api_key() -> None:
     assert "upstream MCP bearer token" in result.output
 
 
+def test_mcp_router_import_registry_dry_run_does_not_require_api_key(monkeypatch) -> None:
+    candidate = {
+        "registry_name": "example.com/docs",
+        "name": "Example Docs",
+        "description": "Example remote docs MCP.",
+        "base_url": "https://example.com/mcp",
+        "transport": "streamable-http",
+        "probe": {"ok": True, "tool_count": 2, "sample_tools": ["search", "get_doc"]},
+    }
+    monkeypatch.setattr(
+        mcp_router_module,
+        "_discover_registry_candidates",
+        lambda **_kwargs: ([candidate], {"auth_required": 3}),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["mcp-router", "import-registry", "--dry-run", "--json"],
+        env={"SIGLUME_API_KEY": ""},
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["dry_run"] is True
+    assert payload["candidates"][0]["base_url"] == "https://example.com/mcp"
+    assert payload["skip_counts"]["auth_required"] == 3
+
+
+def test_mcp_router_import_registry_auto_registers_candidates(monkeypatch) -> None:
+    calls: dict[str, object] = {"registered": []}
+    candidate = {
+        "registry_name": "example.com/docs",
+        "name": "Example Docs",
+        "description": "Example remote docs MCP.",
+        "base_url": "https://example.com/mcp",
+        "transport": "streamable-http",
+        "probe": {"ok": True, "tool_count": 2, "sample_tools": ["search", "get_doc"]},
+    }
+    monkeypatch.setattr(
+        mcp_router_module,
+        "_discover_registry_candidates",
+        lambda **_kwargs: ([candidate], {}),
+    )
+
+    class FakeClient:
+        def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
+            calls["api_key"] = api_key
+            calls["base_url"] = base_url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def get_mcp_router_account(self) -> dict[str, object]:
+            return {
+                "user_id": "usr_provider",
+                "email": "provider@example.com",
+                "display_name": "Provider",
+            }
+
+        def list_mcp_router_servers(self) -> list[dict[str, object]]:
+            return []
+
+        def register_mcp_router_server(self, **payload):
+            calls["registered"].append(payload)
+            return {
+                "id": "srv_imported",
+                "name": payload["name"],
+                "base_url": payload["base_url"],
+                "status": "active",
+                "short_id": "impdocs",
+                "monetization": payload["monetization"],
+            }
+
+    monkeypatch.setattr(mcp_router_module, "SiglumeClient", FakeClient)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "mcp-router",
+            "import-registry",
+            "--expect-owner-email",
+            "provider@example.com",
+            "--limit",
+            "1",
+            "--yes",
+            "--json",
+        ],
+        env={"SIGLUME_API_KEY": "cli_test.secret"},
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["registered_count"] == 1
+    assert calls["api_key"] == "cli_test.secret"
+    registered = calls["registered"][0]
+    assert registered["name"] == "Example Docs"
+    assert registered["base_url"] == "https://example.com/mcp"
+    assert registered["upstream_auth_mode"] == "none"
+    assert registered["monetization"] == "free"
+
+
 def test_init_command_merges_existing_gitignore() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():
