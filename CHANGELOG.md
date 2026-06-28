@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-06-29
+
+### Added
+
+- **Private registration confirmation.** Python and TypeScript CLIs now support
+  `siglume register . --private-confirm`, which runs the normal registration
+  checks and creates an executable release while keeping the listing hidden for
+  seller production testing.
+- `confirm_registration(..., visibility="private")` in Python and
+  `confirm_registration(listingId, { visibility: "private" })` in TypeScript.
+  The default remains public confirmation.
+
+### Changed
+
+- Publish-flow docs now describe the safe production-testing path:
+  use `--private-confirm` first, test the hidden confirmed release in production,
+  then rerun plain `siglume register .` only when public launch is approved.
+
+### Fixed
+
+- The CLI result normalization keeps private-confirm wording stable even when an
+  older server response omits the confirmation visibility field.
+- Python `RegistrationConfirmation` keeps positional compatibility while adding
+  the optional `visibility` field.
+
 ## [3.0.0] - 2026-06-27
 
 ### Removed
