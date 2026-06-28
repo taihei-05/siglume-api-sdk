@@ -220,7 +220,6 @@ class RegistrationQuality:
 class RegistrationConfirmation:
     listing_id: str
     status: str
-    visibility: str | None = None
     release: dict[str, Any] = field(default_factory=dict)
     quality: RegistrationQuality = field(default_factory=RegistrationQuality)
     trace_id: str | None = None
@@ -228,6 +227,7 @@ class RegistrationConfirmation:
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
     message: str = ""
     checklist: dict[str, bool] = field(default_factory=dict)
+    visibility: str | None = None
 
 
 @dataclass

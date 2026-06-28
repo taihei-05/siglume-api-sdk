@@ -21,6 +21,8 @@ from siglume_api_sdk import (  # noqa: E402
     PersistenceMode,
     PersistencePolicy,
     PriceModel,
+    RegistrationConfirmation,
+    RegistrationQuality,
     ListingCurrency,
     SiglumeAPIError,
     SiglumeClient,
@@ -39,6 +41,20 @@ def envelope(data, *, trace_id: str = "trc_test", request_id: str = "req_test") 
         "meta": {"request_id": request_id, "trace_id": trace_id},
         "error": None,
     }
+
+
+def test_registration_confirmation_positional_order_is_compatible() -> None:
+    quality = RegistrationQuality(overall_score=90, grade="A")
+    confirmation = RegistrationConfirmation(
+        "lst_123",
+        "active",
+        {"release_status": "published"},
+        quality,
+    )
+
+    assert confirmation.release == {"release_status": "published"}
+    assert confirmation.quality is quality
+    assert confirmation.visibility is None
 
 
 def build_manifest() -> AppManifest:
