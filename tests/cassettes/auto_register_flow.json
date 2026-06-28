@@ -159,12 +159,13 @@
         "headers": {
           "accept": "application/json",
           "authorization": "Bearer <REDACTED>",
-          "content-length": "17",
+          "content-length": "39",
           "content-type": "application/json",
           "user-agent": "siglume-api-sdk/fixture"
         },
         "body": {
-          "approved": true
+          "approved": true,
+          "visibility": "public"
         }
       },
       "response": {
@@ -180,6 +181,7 @@
             },
             "listing_id": "lst_123",
             "message": "Listing published automatically after the self-serve checks passed.",
+            "visibility": "public",
             "quality": {
               "grade": "B",
               "improvement_suggestions": [
