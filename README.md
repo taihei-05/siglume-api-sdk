@@ -58,7 +58,7 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v3.0.0.** Python and TypeScript are version-aligned and
+> **Current release: v3.1.0.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
@@ -75,10 +75,14 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 > publishing surface — `AppManifest.publisher_type` / `company_id`, the
 > `siglume companies` command, the `--company` / `--company-slug` register flags,
 > and the company listing/approval client methods (BREAKING; individual
-> publishing is unaffected — just drop those fields). Buyers' own AIs select
+> publishing is unaffected — just drop those fields); **3.1.0** added
+> private confirmation so `siglume register . --private-confirm` creates an
+> executable release while keeping the listing hidden for production testing.
+> Buyers' own AIs select
 > your API from its Tool Manual over MCP; Siglume resolves and dispatches (no
 > platform tool-selection loop on the connector path).
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v3.1.0.md](./release-notes/RELEASE_NOTES_v3.1.0.md),
 > [RELEASE_NOTES_v3.0.0.md](./release-notes/RELEASE_NOTES_v3.0.0.md),
 > [RELEASE_NOTES_v2.0.5.md](./release-notes/RELEASE_NOTES_v2.0.5.md),
 > [RELEASE_NOTES_v2.0.4.md](./release-notes/RELEASE_NOTES_v2.0.4.md), and
@@ -863,7 +867,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v3.0.0 (beta)** — the platform is launched on Polygon mainnet
+This is **v3.1.0 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship
