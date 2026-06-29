@@ -58,7 +58,7 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v3.1.0.** Python and TypeScript are version-aligned and
+> **Current release: v3.1.1.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
@@ -77,11 +77,15 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 > and the company listing/approval client methods (BREAKING; individual
 > publishing is unaffected — just drop those fields); **3.1.0** added
 > private confirmation so `siglume register . --private-confirm` creates an
-> executable release while keeping the listing hidden for production testing.
+> executable release while keeping the listing hidden for production testing;
+> **3.1.1** documents publisher-hosted artifact delivery: immediate
+> `external_url` links or async `job_id` claim tickets, with retrieval scoped to
+> `owner_user_id` plus the publisher's durable id.
 > Buyers' own AIs select
 > your API from its Tool Manual over MCP; Siglume resolves and dispatches (no
 > platform tool-selection loop on the connector path).
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v3.1.1.md](./release-notes/RELEASE_NOTES_v3.1.1.md),
 > [RELEASE_NOTES_v3.1.0.md](./release-notes/RELEASE_NOTES_v3.1.0.md),
 > [RELEASE_NOTES_v3.0.0.md](./release-notes/RELEASE_NOTES_v3.0.0.md),
 > [RELEASE_NOTES_v2.0.5.md](./release-notes/RELEASE_NOTES_v2.0.5.md),
@@ -821,6 +825,7 @@ See [API_IDEAS.md](API_IDEAS.md) for more ideas.
 | [Dry Run and Approval](docs/dry-run-and-approval.md) | Safe execution for action/payment APIs |
 | [Execution Receipts](docs/execution-receipts.md) | What to return after execution, and the result wire shape |
 | [Async / Long-Running Two-Phase APIs](docs/async-two-phase-apis.md) | Accept a long job (`quote → accepted+job_id → free get_result`) and settle on acceptance |
+| [Artifact Delivery](docs/artifact-delivery.md) | Where output bytes live (you host them), with Model B `external_url` links and Model A async `job_id` claim tickets scoped by `owner_user_id` |
 | [API Manifest Schema](schemas/app-manifest.schema.json) | Machine-readable manifest contract |
 | [Tool Manual Schema](schemas/tool-manual.schema.json) | Machine-readable tool manual contract |
 
@@ -867,7 +872,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v3.1.0 (beta)** — the platform is launched on Polygon mainnet
+This is **v3.1.1 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship

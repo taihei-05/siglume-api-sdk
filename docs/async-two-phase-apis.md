@@ -18,6 +18,11 @@ first — everything there still applies.
 > [Platform / API boundary](./platform-api-boundary.md). Async is only for work that
 > outlives the request.
 
+> This async pattern is **Model A** in [Artifact Delivery](./artifact-delivery.md) — the
+> durable-`job_id` claim-ticket delivery model. That page frames *where output bytes live*
+> (you host them, the platform does not) and contrasts Model A with Model B (an immediate
+> `external_url` link), scoping both on `owner_user_id` + your durable id.
+
 ## The three legs at a glance
 
 | Leg | `execution_kind` | `output` carries | `receipt_summary.operation` | `amount_minor` | Charged? |
