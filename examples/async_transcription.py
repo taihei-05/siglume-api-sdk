@@ -14,6 +14,10 @@ The three legs this adapter implements:
 
 The chargeable band lives in output.billingPreview.operation on the QUOTE leg, and the SAME
 value must reappear as the ACTION-leg receipt_summary.operation and as a pricing_plan key.
+
+For a real large transcript file, host the output yourself and return an external_url as shown
+in examples/artifact_delivery_presigned.py. This runnable example returns small transcript text
+inline to keep the async billing/state machine focused.
 """
 from __future__ import annotations
 

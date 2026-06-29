@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-06-29
+
+### Added
+
+- **Copy-pasteable artifact delivery recipes.** Expanded
+  `docs/artifact-delivery.md` with a complete Model B `execute()` example,
+  boto3 `put_object` / `generate_presigned_url` guidance, Model A skeleton,
+  free reissue/get-result states, and a security checklist.
+- **Runnable signed-URL artifact example.** Added
+  `examples/artifact_delivery_presigned.py`, a runnable `AppAdapter` that
+  returns both `ExecutionArtifact.external_url` and `output.download_url`, stores
+  artifacts by `(owner_user_id, artifact_id)`, and exposes a free owner-scoped
+  `get_artifact` reissue operation.
+
+### Changed
+
+- Clarified the live-runtime identity bridge: production HTTP calls receive
+  `X-Siglume-Platform-User-Id`, while the SDK runtime and `AppTestHarness`
+  surface that same value as `ExecutionContext.owner_user_id`.
+- Cross-linked artifact delivery from Getting Started and the platform/API
+  boundary, and documented that `siglume-handle` remains input-only.
+- Relaxed the Model A wording so large/binary async results are typically
+  returned via `external_url`, while small text artifacts may be returned inline
+  when that is the product contract. `examples/async_transcription.py` now
+  states that its inline transcript is intentionally simplified.
+
 ## [3.1.1] - 2026-06-29
 
 ### Added

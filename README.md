@@ -58,7 +58,7 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v3.1.1.** Python and TypeScript are version-aligned and
+> **Current release: v3.1.2.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
 > capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
@@ -80,11 +80,13 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 > executable release while keeping the listing hidden for production testing;
 > **3.1.1** documents publisher-hosted artifact delivery: immediate
 > `external_url` links or async `job_id` claim tickets, with retrieval scoped to
-> `owner_user_id` plus the publisher's durable id.
+> `owner_user_id` plus the publisher's durable id; **3.1.2** adds copy-pasteable
+> artifact delivery recipes and a runnable signed-URL example.
 > Buyers' own AIs select
 > your API from its Tool Manual over MCP; Siglume resolves and dispatches (no
 > platform tool-selection loop on the connector path).
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v3.1.2.md](./release-notes/RELEASE_NOTES_v3.1.2.md),
 > [RELEASE_NOTES_v3.1.1.md](./release-notes/RELEASE_NOTES_v3.1.1.md),
 > [RELEASE_NOTES_v3.1.0.md](./release-notes/RELEASE_NOTES_v3.1.0.md),
 > [RELEASE_NOTES_v3.0.0.md](./release-notes/RELEASE_NOTES_v3.0.0.md),
@@ -774,7 +776,7 @@ your payment adapter without touching a live wallet.
 
 ## Example templates
 
-`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `async_transcription.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
+`hello_echo.py`, `hello_price_compare.py`, `x_publisher.py`, `calendar_sync.py`, `email_sender.py`, `translation_hub.py`, `payment_quote.py`, `async_transcription.py`, `artifact_delivery_presigned.py`, `polygon_mandate_adapter.py`, and `embedded_wallet_payment.ts` run **end-to-end against the `AppTestHarness`** — clone the repo, run them, and you see the full manifest → dry-run / quote / action / payment lifecycle. `agent_behavior_adapter.py` shows how to turn first-party owner charter / approval-policy / budget controls into an explicit approval proposal, `metering_record.py` shows usage-event ingest plus deterministic invoice previewing, and the Web3 examples show typed settlement reads plus local mandate / receipt simulation. `visual_publisher.py` and `metamask_connector.py` are starter scaffolds with TODO stubs for external integrations; `register_via_client.py` shows the typed HTTP client flow.
 
 | Example | Permission | Runnable e2e | Description |
 |---|---|---|---|
@@ -786,6 +788,7 @@ your payment adapter without touching a live wallet.
 | [translation_hub.py](./examples/translation_hub.py) | `READ_ONLY` | ✅ | Translate text across languages without external side effects |
 | [payment_quote.py](./examples/payment_quote.py) | `PAYMENT` | ✅ | Preview, quote, and complete a USD payment flow |
 | [async_transcription.py](./examples/async_transcription.py) | `ACTION` (prepay / async) | ✅ | Accept a long job (`quote → {accepted, job_id} → free get_result`), settling on acceptance, with idempotent accept + running/failed states |
+| [artifact_delivery_presigned.py](./examples/artifact_delivery_presigned.py) | `ACTION` | ✅ | Return publisher-hosted artifacts via signed `external_url` links and a free owner-scoped reissue op |
 | [agent_behavior_adapter.py](./examples/agent_behavior_adapter.py) | `ACTION` | ✅ | Propose charter / approval-policy / budget changes for owner review |
 | [metering_record.py](./examples/metering_record.py) | client | ✅ | Record usage events and preview invoice lines |
 | [polygon_mandate_adapter.py](./examples/polygon_mandate_adapter.py) | `PAYMENT` | ✅ | Simulate a Polygon mandate payment with embedded-wallet settlement receipts |
@@ -872,7 +875,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v3.1.1 (beta)** — the platform is launched on Polygon mainnet
+This is **v3.1.2 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship
