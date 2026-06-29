@@ -31,6 +31,9 @@ side effects, including:
   other provider-specific action
 - OAuth, token refresh, provider leases, rate limits, and provider errors
 - making the action endpoint idempotent for retries
+- hosting any output files you produce, minting signed download URLs, and
+  enforcing owner-scoped retrieval for those artifacts (see
+  [Artifact Delivery](./artifact-delivery.md))
 - returning a clear result when the action committed
 - returning a clear failure or no-op result when the action did not commit
 

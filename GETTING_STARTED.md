@@ -797,7 +797,10 @@ instead *accept* the job and deliver later — `{accepted: true, job_id, status:
 is an accepted-deferred result, not a non-delivery; see
 [Async / long-running two-phase APIs](docs/async-two-phase-apis.md).) Read
 [Platform / API Responsibility Boundary](docs/platform-api-boundary.md) before
-building paid action APIs.
+building paid action APIs. If your API returns files, read
+[Artifact Delivery](docs/artifact-delivery.md): output bytes are publisher-hosted,
+and durable retrieval must be scoped by `X-Siglume-Platform-User-Id` /
+`ExecutionContext.owner_user_id` plus your `artifact_id` or `job_id`.
 
 ### Generic reward payouts through MCP
 

@@ -27,6 +27,7 @@ EXAMPLE_SPECS = [
     ("account_digests_alerts_wrapper.py", PermissionClass.READ_ONLY),
     ("account_plan_wrapper.py", PermissionClass.READ_ONLY),
     ("agent_behavior_adapter.py", PermissionClass.ACTION),
+    ("artifact_delivery_presigned.py", PermissionClass.ACTION),
     ("calendar_sync.py", PermissionClass.ACTION),
     ("crm_sync.py", PermissionClass.ACTION),
     ("email_sender.py", PermissionClass.ACTION),
@@ -284,5 +285,62 @@ def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> Non
                 f"'native' on {chain} should resolve to {expected_symbol}, got {result.output['token_symbol']}"
             )
             assert result.output["balance"] == expected_balance
+
+    asyncio.run(_run())
+
+
+def test_artifact_delivery_presigned_example_reissues_only_for_matching_owner() -> None:
+    module = _load_module("artifact_delivery_presigned.py")
+    app = module.ArtifactDeliveryPresignedApp()
+
+    async def _run() -> None:
+        from siglume_api_sdk import ExecutionContext, ExecutionKind
+
+        owner_ctx = ExecutionContext(
+            agent_id="agent_test",
+            owner_user_id="owner_a",
+            task_type="render_artifact",
+            input_params={"title": "Owner A report"},
+            execution_kind=ExecutionKind.ACTION,
+        )
+        action = await app.execute(owner_ctx)
+        assert action.success
+        assert len(action.artifacts) == 1
+        assert action.artifacts[0].external_url == action.output["download_url"]
+        artifact_id = action.output["artifact_id"]
+
+        reissue_ctx = ExecutionContext(
+            agent_id="agent_test",
+            owner_user_id="owner_a",
+            task_type="get_artifact",
+            input_params={"artifact_id": artifact_id},
+            execution_kind=ExecutionKind.ACTION,
+        )
+        reissue = await app.execute(reissue_ctx)
+        assert reissue.success
+        assert reissue.output["status"] == "found"
+        assert reissue.amount_minor == 0
+
+        wrong_owner_ctx = ExecutionContext(
+            agent_id="agent_test",
+            owner_user_id="owner_b",
+            task_type="get_artifact",
+            input_params={"artifact_id": artifact_id},
+            execution_kind=ExecutionKind.ACTION,
+        )
+        wrong_owner = await app.execute(wrong_owner_ctx)
+        assert wrong_owner.success is False
+        assert wrong_owner.output["status"] == "expired"
+
+        sentinel_ctx = ExecutionContext(
+            agent_id="agent_test",
+            owner_user_id="siglume",
+            task_type="get_artifact",
+            input_params={"artifact_id": artifact_id},
+            execution_kind=ExecutionKind.ACTION,
+        )
+        sentinel = await app.execute(sentinel_ctx)
+        assert sentinel.success is False
+        assert sentinel.output["status"] == "unauthorized"
 
     asyncio.run(_run())
