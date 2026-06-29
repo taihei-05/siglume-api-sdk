@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-06-29
+
+### Added
+
+- **Artifact delivery docs.** Added `docs/artifact-delivery.md` to make the
+  output-custody contract explicit: Siglume brokers the request and response but
+  does not host output bytes. Publishers host artifacts themselves and choose
+  either Model B (immediate `ExecutionArtifact.external_url`, such as a
+  presigned object-store GET) or Model A (durable `job_id` plus a free
+  `get_result` operation as documented in the async two-phase guide).
+
+### Changed
+
+- Clarified that `external_url` can point to publisher-hosted download bytes,
+  not only provider permalinks, and cross-linked the async two-phase guide as
+  the canonical Model A claim-ticket pattern.
+- Documented the retrieval identity rule for publisher-hosted artifacts:
+  validate `owner_user_id` from `ExecutionContext` together with the
+  publisher-issued durable id (`job_id`, `media_id`, or `artifact_id`), reject
+  missing/sentinel owners, and do not treat `siglume-handle` file inputs as an
+  output-custody mechanism.
+
 ## [3.1.0] - 2026-06-29
 
 ### Added

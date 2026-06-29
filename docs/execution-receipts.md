@@ -89,7 +89,7 @@ Describes what was produced.
 |-------|----------|-------------|
 | `artifact_type` | yes | e.g. "image", "social_post", "calendar_event" |
 | `external_id` | no | Provider-side ID (tweet ID, event ID, etc.) |
-| `external_url` | no | Link to the artifact on the provider |
+| `external_url` | no | Link to the artifact — a provider permalink, **or** a download link to bytes you host yourself (e.g. an S3 presigned GET). See [Artifact Delivery](./artifact-delivery.md). |
 | `title` | no | Human-readable label |
 | `summary` | no | Brief description |
 | `metadata` | no | Extra provider-specific data |
