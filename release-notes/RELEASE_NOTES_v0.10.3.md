@@ -1,7 +1,7 @@
 # Siglume API SDK v0.10.3
 
-v0.10.3 is a documentation-alignment patch release for the `siglume-agent-core`
-v0.9.0 split.
+v0.10.3 is a documentation-alignment patch release for the former public core
+split.
 
 ## What changed
 
