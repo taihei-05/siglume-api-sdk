@@ -14,6 +14,7 @@ const PLATFORM_INJECTED_FIELDS = new Set([
 ]);
 const COMPOSITION_KEYWORDS = new Set(["oneOf", "anyOf", "allOf"]);
 const INPUT_SCHEMA_FORBIDDEN_KEYS = new Set(["patternProperties"]);
+const MAX_PROPERTY_DESCRIPTION_LENGTH = 500;
 
 type ManualInput = ToolManual | Record<string, unknown> | { to_dict(): unknown } | unknown;
 
@@ -86,6 +87,72 @@ function checkSchemaForbiddenRecursive(
     } else if (key === "items" && isRecord(value)) {
       const subPath = path ? `${path}.items` : "items";
       checkSchemaForbiddenRecursive(value, rootField, pushIssue, subPath);
+    }
+  }
+}
+
+function descriptionLength(value: string): number {
+  return Array.from(value).length;
+}
+
+function checkOnePropertyDescriptionLength(
+  text: unknown,
+  rootField: string,
+  pushIssue: (nextIssue: ToolManualIssue) => void,
+  path: string,
+): void {
+  if (typeof text !== "string") {
+    return;
+  }
+  const length = descriptionLength(text);
+  if (length > MAX_PROPERTY_DESCRIPTION_LENGTH) {
+    pushIssue(
+      issue(
+        "INPUT_SCHEMA",
+        `Property description exceeds ${MAX_PROPERTY_DESCRIPTION_LENGTH} chars ` +
+          `(got ${length})${path ? ` at ${path}` : ""}`,
+        rootField,
+      ),
+    );
+  }
+}
+
+function checkPropertyDescriptionLengthsRecursive(
+  schema: unknown,
+  rootField: string,
+  pushIssue: (nextIssue: ToolManualIssue) => void,
+  path = "",
+): void {
+  if (!isRecord(schema)) {
+    return;
+  }
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "properties" && isRecord(value)) {
+      for (const [propertyName, propertyDefinition] of Object.entries(value)) {
+        const propertyPath = path ? `${path}.${propertyName}` : propertyName;
+        if (isRecord(propertyDefinition)) {
+          checkOnePropertyDescriptionLength(
+            propertyDefinition.description,
+            rootField,
+            pushIssue,
+            propertyPath,
+          );
+        }
+        checkPropertyDescriptionLengthsRecursive(propertyDefinition, rootField, pushIssue, propertyPath);
+      }
+    } else if (key === "items" && isRecord(value)) {
+      const itemsPath = path ? `${path}.items` : "items";
+      checkOnePropertyDescriptionLength(value.description, rootField, pushIssue, itemsPath);
+      checkPropertyDescriptionLengthsRecursive(value, rootField, pushIssue, itemsPath);
+    } else if (COMPOSITION_KEYWORDS.has(key) && Array.isArray(value)) {
+      value.forEach((branch, index) => {
+        const branchPath = path ? `${path}.${key}[${index}]` : `${key}[${index}]`;
+        if (isRecord(branch)) {
+          checkOnePropertyDescriptionLength(branch.description, rootField, pushIssue, branchPath);
+        }
+        checkPropertyDescriptionLengthsRecursive(branch, rootField, pushIssue, branchPath);
+      });
     }
   }
 }
@@ -267,6 +334,7 @@ export function validate_tool_manual(manualInput: ManualInput): [boolean, ToolMa
       pushError("INPUT_SCHEMA", "additionalProperties must be false", "input_schema");
     }
     checkSchemaForbiddenRecursive(inputSchema, "input_schema", (nextIssue) => issues.push(nextIssue));
+    checkPropertyDescriptionLengthsRecursive(inputSchema, "input_schema", (nextIssue) => issues.push(nextIssue));
     const properties = inputSchema.properties;
     if (isRecord(properties)) {
       for (const fieldName of Object.keys(properties)) {

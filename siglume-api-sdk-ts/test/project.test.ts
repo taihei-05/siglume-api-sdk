@@ -336,6 +336,52 @@ describe("cli project helpers", () => {
     expect(autoRegisterCalled).toBe(false);
   });
 
+  it("surfaces remote structural validation errors during registration", async () => {
+    const projectDir = await createObjectProject();
+    let autoRegisterCalled = false;
+
+    try {
+      await runRegistration(
+        projectDir,
+        {},
+        {
+          env: { SIGLUME_API_KEY: "sig_test_key" },
+          client_factory: () =>
+            ({
+              async preview_quality_score() {
+                return publishableQualityReport({
+                  overall_score: 100,
+                  grade: "A",
+                  publishable: false,
+                  validation_ok: false,
+                  validation_errors: [
+                    {
+                      code: "INPUT_SCHEMA",
+                      field: "input_schema",
+                      message: "Property description exceeds 500 chars (got 635) at operation",
+                      severity: "error",
+                    },
+                  ],
+                });
+              },
+              async auto_register() {
+                autoRegisterCalled = true;
+                throw new Error("auto_register should not run");
+              },
+            }) as unknown as SiglumeClientShape,
+        },
+      );
+      throw new Error("registration should have failed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toContain("remote Tool Manual structural validation failed (validation.ok=false)");
+      expect(message).toContain("Quality grade A (100/100) only measures content quality");
+      expect(message).toContain("[INPUT_SCHEMA] input_schema: Property description exceeds 500 chars (got 635) at operation");
+      expect(message).not.toContain("remote Tool Manual quality is not publishable: A (100/100)");
+    }
+    expect(autoRegisterCalled).toBe(false);
+  });
+
   it("allows provider-managed connected accounts with connect_url", async () => {
     const projectDir = await createObjectProject({
       manifest: {
