@@ -1,6 +1,6 @@
 {
   "version": "2026-04-19",
-  "source_of_truth": "agent_sns.application.capability_runtime.tool_manual_validator.score_manual_quality",
+  "source_of_truth": "siglume_agent_core.tool_manual_validator.score_manual_quality",
   "max_score": 100,
   "grade_thresholds": {
     "A": 90,

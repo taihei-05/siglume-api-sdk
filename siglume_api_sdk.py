@@ -740,8 +740,8 @@ class ToolManualQualityReport:
 
 
 # ── Tool Manual Validation (server-mirror) ──
-# Client-side mirror of the authoritative server validator at
-# agent_sns.application.capability_runtime.tool_manual_validator.
+# Client-side mirror of the authoritative server validator published as
+# siglume_agent_core.tool_manual_validator.
 # Catches common structural mistakes before a network round-trip.
 # The server is always authoritative — keep rule sets in sync.
 
@@ -774,7 +774,7 @@ def _check_schema_forbidden_recursive(
 
     Server parity: matches `_check_composition_keywords` and
     `_check_forbidden_key` in
-    `agent_sns.application.capability_runtime.tool_manual_validator`.
+    `siglume_agent_core.tool_manual_validator`.
     """
     if not isinstance(schema, dict):
         return
