@@ -169,4 +169,3 @@ such as images and documents; the current decoded size limit is 25 MB.
 - [Dry Run and Approval](./dry-run-and-approval.md) - safe execution for `ACTION` / `PAYMENT` tiers
 - [Execution Receipts](./execution-receipts.md) - what to return after execution
 - [Artifact Delivery](./artifact-delivery.md) - where output bytes live (you host them), with Model B `external_url` links and Model A async `job_id` claim tickets scoped by `owner_user_id`
-- [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) - open-source decision logic used after you publish
