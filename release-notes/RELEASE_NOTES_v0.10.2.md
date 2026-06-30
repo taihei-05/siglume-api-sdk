@@ -13,7 +13,7 @@ selected, or missing demand.
 - Ships the broader `siglume dev` observability surface: planner simulation,
   gap reports, listing stats, miss analysis, keyword suggestions, and execution
   receipt tailing.
-- Cross-links the public SDK docs to `siglume-agent-core`, so publishers can
+- Cross-links the public SDK docs to the then-public core package, so publishers can
   inspect the open-source selection logic behind scoring and simulation.
 - Keeps Python and TypeScript package versions aligned at `0.10.2`.
 

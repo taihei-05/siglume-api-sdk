@@ -392,7 +392,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Docs align with `siglume-agent-core` v0.9.0.** README now documents the
+- **Docs align with the former public core split.** README now documents the
   API Store tool-selection pipeline used by `siglume dev simulate` and
   `siglume dev market-vitals`, with links to the public agent-core selection
   and orchestration modules.
@@ -407,10 +407,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Documentation cross-links to `siglume-agent-core`** — README,
+- **Documentation cross-links to the then-public core package** — README,
   GETTING_STARTED, `docs/publish-flow.md`, and `docs/sdk-core-concepts.md`
   now cross-link to the open-source decision logic at
-  [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core)
+  the then-public core package
   (AGPL-3.0 PyPI package). The README gains a new top-level section
   **"How your API actually gets selected — the algorithm is public"**
   with a 5-stage pipeline diagram (`installed_tool_prefilter` → `tool_selector`

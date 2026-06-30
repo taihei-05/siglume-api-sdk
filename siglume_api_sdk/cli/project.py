@@ -104,6 +104,48 @@ def _remote_quality_ok(report: Any) -> bool:
     return validation_ok and bool(publishable)
 
 
+def _issue_value(issue: Any, name: str, default: Any = None) -> Any:
+    if isinstance(issue, dict):
+        return issue.get(name, default)
+    return getattr(issue, name, default)
+
+
+def _format_remote_quality_issue(issue: Any) -> str:
+    code = str(_issue_value(issue, "code", "") or "")
+    field = str(_issue_value(issue, "field", "") or "")
+    message = str(_issue_value(issue, "message", "") or "remote validation failed")
+    code_prefix = f"[{code}] " if code else ""
+    field_prefix = f"{field}: " if field else ""
+    return f"{code_prefix}{field_prefix}{message}"
+
+
+def _remote_quality_blocking_errors(report: Any) -> list[str]:
+    grade = str(getattr(report, "grade", "?"))
+    score = getattr(report, "overall_score", "?")
+    validation_ok = bool(getattr(report, "validation_ok", True))
+    publishable = getattr(report, "publishable", None)
+    grade_publishable = grade in {"A", "B"}
+    effective_publishable = grade_publishable if publishable is None else bool(publishable)
+    errors: list[str] = []
+
+    if not validation_ok:
+        errors.append(
+            "remote Tool Manual structural validation failed (validation.ok=false). "
+            f"Quality grade {grade} ({score}/100) only measures content quality; "
+            "publication also requires structural validation to pass."
+        )
+        validation_errors = getattr(report, "validation_errors", None) or []
+        for issue in validation_errors:
+            errors.append(_format_remote_quality_issue(issue))
+
+    if not effective_publishable and (validation_ok or not grade_publishable):
+        errors.append(f"remote Tool Manual quality is not publishable: {grade} ({score}/100)")
+
+    if not errors and not _remote_quality_ok(report):
+        errors.append(f"remote Tool Manual quality is not publishable: {grade} ({score}/100)")
+    return errors
+
+
 def build_tool_manual_template(manifest: AppManifest) -> dict[str, Any]:
     job_text = str(manifest.job_to_be_done or manifest.name or manifest.capability_key.replace("-", " "))
     summary_text = str(manifest.short_description or manifest.job_to_be_done or manifest.name or manifest.capability_key.replace("-", " "))
@@ -1476,9 +1518,7 @@ def _registration_preflight(project: LoadedProject, client: SiglumeClient) -> di
     if not manual_valid:
         errors.append("tool_manual.json is not valid for production registration")
     if not _remote_quality_ok(remote_quality):
-        grade = getattr(remote_quality, "grade", "?")
-        score = getattr(remote_quality, "overall_score", "?")
-        errors.append(f"remote Tool Manual quality is not publishable: {grade} ({score}/100)")
+        errors.extend(_remote_quality_blocking_errors(remote_quality))
     preflight = {
         "manifest_issues": manifest_issues,
         "tool_manual_valid": manual_valid,

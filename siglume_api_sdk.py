@@ -740,8 +740,8 @@ class ToolManualQualityReport:
 
 
 # ── Tool Manual Validation (server-mirror) ──
-# Client-side mirror of the authoritative server validator at
-# agent_sns.application.capability_runtime.tool_manual_validator.
+# Client-side mirror of the authoritative Tool Manual validator used by
+# Siglume production.
 # Catches common structural mistakes before a network round-trip.
 # The server is always authoritative — keep rule sets in sync.
 
@@ -758,6 +758,7 @@ _COMPOSITION_KEYWORDS = frozenset({"oneOf", "anyOf", "allOf"})
 # Mirrors server `_check_forbidden_key` sweep; patternProperties is the
 # headline case because loose property globs defeat schema validation.
 _INPUT_SCHEMA_FORBIDDEN_KEYS = frozenset({"patternProperties"})
+_MAX_PROPERTY_DESCRIPTION_LEN = 500
 
 
 def _check_schema_forbidden_recursive(
@@ -773,7 +774,7 @@ def _check_schema_forbidden_recursive(
 
     Server parity: matches `_check_composition_keywords` and
     `_check_forbidden_key` in
-    `agent_sns.application.capability_runtime.tool_manual_validator`.
+    Siglume production.
     """
     if not isinstance(schema, dict):
         return
@@ -809,6 +810,78 @@ def _check_schema_forbidden_recursive(
         elif key == "items" and isinstance(val, dict):
             sub_path = f"{path}.items" if path else "items"
             _check_schema_forbidden_recursive(val, root_field, err_fn, path=sub_path)
+
+
+def _check_one_property_description_length(
+    text: Any,
+    root_field: str,
+    err_fn,
+    path: str,
+) -> None:
+    if not isinstance(text, str):
+        return
+    if len(text) > _MAX_PROPERTY_DESCRIPTION_LEN:
+        location = f" at {path}" if path else ""
+        err_fn(
+            "INPUT_SCHEMA",
+            f"Property description exceeds {_MAX_PROPERTY_DESCRIPTION_LEN} chars "
+            f"(got {len(text)}){location}",
+            root_field,
+        )
+
+
+def _check_property_description_lengths_recursive(
+    schema: Any,
+    root_field: str,
+    err_fn,
+    *,
+    path: str = "",
+) -> None:
+    if not isinstance(schema, dict):
+        return
+
+    for key, val in schema.items():
+        if key == "properties" and isinstance(val, dict):
+            for property_name, property_schema in val.items():
+                property_path = f"{path}.{property_name}" if path else str(property_name)
+                if isinstance(property_schema, dict):
+                    _check_one_property_description_length(
+                        property_schema.get("description"),
+                        root_field,
+                        err_fn,
+                        property_path,
+                    )
+                _check_property_description_lengths_recursive(
+                    property_schema,
+                    root_field,
+                    err_fn,
+                    path=property_path,
+                )
+        elif key == "items" and isinstance(val, dict):
+            items_path = f"{path}.items" if path else "items"
+            _check_one_property_description_length(
+                val.get("description"),
+                root_field,
+                err_fn,
+                items_path,
+            )
+            _check_property_description_lengths_recursive(val, root_field, err_fn, path=items_path)
+        elif key in _COMPOSITION_KEYWORDS and isinstance(val, list):
+            for index, branch in enumerate(val):
+                branch_path = f"{path}.{key}[{index}]" if path else f"{key}[{index}]"
+                if isinstance(branch, dict):
+                    _check_one_property_description_length(
+                        branch.get("description"),
+                        root_field,
+                        err_fn,
+                        branch_path,
+                    )
+                _check_property_description_lengths_recursive(
+                    branch,
+                    root_field,
+                    err_fn,
+                    path=branch_path,
+                )
 
 
 def validate_tool_manual(
@@ -994,6 +1067,7 @@ def validate_tool_manual(
         # _check_forbidden_key recursive sweep. A top-level-only check was
         # letting nested violations through, producing false confidence.
         _check_schema_forbidden_recursive(inp, "input_schema", _err)
+        _check_property_description_lengths_recursive(inp, "input_schema", _err)
         # platform-injected fields (top-level properties only; matches server)
         props = inp.get("properties", {})
         if isinstance(props, dict):

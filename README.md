@@ -494,127 +494,52 @@ required fields, scoring rules, and examples.
 
 ---
 
-## How your API actually gets selected — and what's open source
+## How your API actually gets selected
 
-Once your API is published, **the decision to call it is made by the buyer's agent, not by Siglume.** *How* that decision is reached depends on how the buyer's agent is connected to the store — and there are two paths today that select tools differently:
+Once your API is published, **the decision to call it is made by the buyer's
+agent, not by Siglume.** The primary path today is MCP: the buyer points their
+own AI client at Siglume, Siglume lists your installed tool when account and
+policy checks pass, and the buyer's AI reads your Tool Manual to decide whether
+to call it. Siglume resolves the selected tool and dispatches it to your
+`invoke_url`; it does not ask publishers to run a separate platform planner
+package locally.
 
-**Path 1 — MCP connectors (Claude and other MCP clients), the primary path today.** The buyer points their own AI at Siglume over MCP. Siglume lists your tool to that AI whenever it is installed for the agent, the publisher OAuth is healthy (`account_readiness = ready`), and it is not a `payment`-class or high-risk (`double_confirm`) capability. From there, **the buyer's own AI reads your Tool Manual and decides which tool to call.** Siglume resolves the named tool and dispatches it to your `invoke_url` — it does **not** re-rank your tool with its own keyword selector, and it does **not** run an LLM tool-use loop on your behalf. On this path the keyword pipeline below does not run; your only lever is the Tool Manual.
+Your strongest lever is therefore the Tool Manual:
 
-**Path 2 — Siglume's own server-side tool-use runtime.** The pipeline in the box below is the open-core logic Siglume's first-party runtime imports, and it is exactly what the `siglume dev simulate` dry run executes against the live catalog. Every decision stage is open source — the same code the platform imports from the AGPL-licensed [`siglume-agent-core`](https://github.com/taihei-05/siglume-agent-core) PyPI package. (This SDK itself is MIT-licensed; the OSS claim is about agent-core, not about the SDK code in *this* repo.) Throughout this section, "the planner" / "the orchestrator" refer to this server-side runtime.
+- Write concrete `summary_for_model`, `trigger_conditions`, and
+  `do_not_use_when` entries that match the requests your target buyers would
+  actually make.
+- Keep `input_schema.properties.*.description` short and precise. Long or vague
+  schema descriptions can fail structural validation before quality scoring is
+  considered.
+- Use `usage_hints` and `result_hints` to explain behavior that affects caller
+  decisions, such as async polling, attachment handling, or important limits.
 
-```
-   You publish via siglume-api-sdk  ──►  Buyer agent installs your API
-                                                    │
-                                                    ▼
-   ┌──────────────────────────────────────────────────────────┐
-   │ Pre-publish (you, on your machine)                       │
-   │  • tool_manual_validator   — grade your manual A-F       │  agent-core v0.1
-   │  • dev_simulator           — "would the planner pick     │  agent-core v0.7+
-   │                              my API for this offer?"     │
-   └──────────────────────────────────────────────────────────┘
-                                                    │
-                                                    ▼
-   ┌──────────────────────────────────────────────────────────┐
-   │ Path 2 only - Siglume's own runtime selects              │
-   │  1. installed_tool_prefilter — TF-IDF top-N from the     │  agent-core v0.2
-   │     agent's installed pool                               │
-   │  2. tool_selector            — keyword score + permission│  agent-core v0.3
-   │     gate → top-K candidates  (THE "why was my tool       │
-   │     picked / not picked?" function)                      │
-   │  3. orchestrate_helpers + orchestrate — system-prompt    │  agent-core v0.5/v0.6
-   │     build + multi-turn LLM tool-use loop                 │
-   │  4. provider_adapters        — Anthropic / OpenAI call   │  agent-core v0.1
-   │  5. capability_failure_learning — on failure, write a    │  agent-core v0.4
-   │     learning card so future runs avoid this tool         │
-   └──────────────────────────────────────────────────────────┘
-```
+### Pre-publish checks
 
-> **Which path is your buyer on?** If they connect through an MCP client — the common case for Claude users today — it is **Path 1**: their own AI reads your Tool Manual and decides, and Siglume only lists the tool and dispatches the call. The keyword pipeline in the box above runs only on **Path 2** (Siglume's own runtime and the `siglume dev simulate` dry run). `installed_tool_prefilter` in particular is a prompt-budget helper for that path's prompt build, not a gate that runs on every request. Net: the dry run is a good proxy for "is my Tool Manual concrete enough to be chosen," but a live MCP buyer's AI may weigh it differently — treat the simulator as guidance, not a guarantee.
-
-### Reading list by question
-
-These modules govern **Path 2** (Siglume's own runtime) and the pre-publish tools. On **Path 1** (MCP) there is no Siglume-side selection function to read — the buyer's AI picks from your Tool Manual, so manual quality is the lever, not a platform scorer.
-
-| If you want to know… | Read this in agent-core |
-|---|---|
-| Why my Tool Manual was graded A / B / C / D / F | [`tool_manual_validator`](https://github.com/taihei-05/siglume-agent-core#1-tool_manual_validator-v01) |
-| Why my published API was / wasn't picked **when Siglume's own runtime ran the loop (Path 2)** | [`tool_selector`](https://github.com/taihei-05/siglume-agent-core#4-tool_selector-v03) — `select_tools()` is THE selection function on that path |
-| What happens when an agent has too many installed tools to fit in the prompt | [`installed_tool_prefilter`](https://github.com/taihei-05/siglume-agent-core#3-installed_tool_prefilter-v02) |
-| What rules govern "tool got blocked after a recent failure" | [`capability_failure_learning`](https://github.com/taihei-05/siglume-agent-core#5-capability_failure_learning-v04) |
-| How the LLM tool-use loop runs end-to-end | [`orchestrate`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) |
-| How buyer-supplied input maps into my API's `input_schema` | [`orchestrate_helpers`](https://github.com/taihei-05/siglume-agent-core#6-orchestrate_helpers-and-orchestrate-v05--v06) — `build_orchestrate_system_prompt()` |
-| How to dry-run "would the planner have picked my API for this offer text?" before publishing | [`dev_simulator`](https://github.com/taihei-05/siglume-agent-core#7-dev_simulator-v07) |
-
-### Pre-publish dry run with agent-core
-
-`tool_manual_validator` and `dev_simulator` are designed to run locally before you `siglume register`. They serve **two different questions**:
-
-**(1) Will I pass the publish gate (minimum grade B)?** — offline grading, no API key needed:
+Use the SDK's bundled validator and scorer before `siglume register`:
 
 ```bash
-pip install siglume-agent-core         # no extras needed for the scorer
+siglume validate .
+siglume score . --offline
 ```
 
-```python
-from siglume_agent_core.tool_manual_validator import score_manual_quality
+For scripted checks:
 
-quality = score_manual_quality(my_tool_manual)
+```python
+from siglume_api_sdk import score_tool_manual_offline, validate_tool_manual
+
+valid, issues = validate_tool_manual(my_tool_manual)
+quality = score_tool_manual_offline(my_tool_manual)
+
+print(valid)
+for issue in issues:
+    print(issue.code, issue.field, issue.message)
 print(f"Grade {quality.grade} ({quality.overall_score}/100)")
-# Same scorer that decides if you pass the publish gate.
-# Minimum grade B is required (A or B both publish; C/D/F are blocked).
 ```
 
-**(2) Will the planner actually pick my API once published?** — the **easiest path** is the SDK's wrapped CLI, which does the catalog fetch and the LLM call for you against the live store (rate-limited to 10 calls per publisher per UTC day):
-
-```bash
-siglume dev simulate "translate this English doc to Japanese and post to Notion"
-```
-
-For self-hosted / scripted use you can call the underlying agent-core function directly. It needs an `[anthropic]` extra and you supply the catalog rows + LLM callable yourself:
-
-```bash
-pip install 'siglume-agent-core[anthropic]'
-```
-
-```python
-from siglume_agent_core.dev_simulator import (
-    simulate_planner, LLMSimulateResponse, LLMSimulateToolUseBlock,
-)
-from anthropic import Anthropic
-
-# rows: Sequence[(ProductListingLike, CapabilityReleaseLike)]
-# fetch from your own DB / API; structurally typed Protocols, no SQLAlchemy
-rows = fetch_my_catalog_rows()
-
-def my_anthropic_call(system_prompt, tools, user_msg) -> LLMSimulateResponse:
-    client = Anthropic(timeout=30.0)
-    resp = client.messages.create(
-        model="claude-haiku-4-5-20251001", max_tokens=2048,
-        system=system_prompt, tools=tools,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    blocks = [
-        LLMSimulateToolUseBlock(name=str(b.name), input=dict(b.input or {}))
-        for b in (resp.content or []) if getattr(b, "type", None) == "tool_use"
-    ]
-    return LLMSimulateResponse(tool_use_blocks=blocks)
-
-result = simulate_planner(
-    rows,
-    offer_text="translate this English doc to Japanese and post to Notion",
-    quota_used_today=0, quota_limit=10,
-    llm_call=my_anthropic_call,
-)
-for call in result.predicted_chain:
-    print(call.tool_name, call.listing_title)
-```
-
-If the planner picks your API for the offers your target buyers would write, you're publish-ready. If not, improve the Tool Manual fields the selection pipeline actually reads:
-
-- `tool_selector` runs a keyword-based hard filter (the `tool_selector` step above, Path 2) over your `capability_key`, `display_name`, `description`, and `usage_hints`. If none of those overlap the buyer's request, the LLM never even sees your API as a candidate. Make these four fields concrete and request-shaped.
-- Once your API *is* in the candidate set, the LLM reads a short tool-description string while picking between candidates. That string is sourced from your manual via the fallback chain `tool_prompt_compact` → `compact_prompt` → `description` → `summary_for_model` → listing description / title / `capability_key`. In practice the LLM almost always sees `tool_prompt_compact` (or `compact_prompt`), so polish that field first; `summary_for_model` and the others are only fallbacks if the earlier sources are empty. `trigger_conditions` is captured in the schema for the publish gate's quality check but is not threaded into the LLM-visible tool description today — keep it accurate, but don't expect it to move the planner directly.
-
-These same Tool Manual fields feed both gates that matter to you: the [Acceptance bar](#acceptance-bar) (the pre-publish scorer that decides whether you can *list*) and the selection step that decides whether you actually get *picked* once listed — your buyer's own AI on Path 1, or `tool_selector` on Path 2. Polishing them is the one lever that helps on every path, so do it before you worry about anything else. (See also [Important: revenue is not guaranteed](#important-revenue-is-not-guaranteed).)
+The publish gate requires both structural validation and quality scoring to
+pass. A grade of A or B is not enough if structural validation returns errors.
 
 ---
 

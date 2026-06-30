@@ -103,3 +103,21 @@ def test_forbidden_input_schema_keywords_fail_validation() -> None:
 
     assert ok is False
     assert any(issue.code == "INPUT_SCHEMA" and issue.field == "input_schema.patternProperties" for issue in issues)
+
+
+def test_input_schema_property_description_over_500_chars_fails_validation() -> None:
+    manual = _valid_manual()
+    manual["input_schema"]["properties"]["query"]["description"] = "x" * 501
+
+    ok, issues = validate_tool_manual(manual)
+    report = score_tool_manual_offline(manual)
+
+    assert ok is False
+    assert any(
+        issue.code == "INPUT_SCHEMA"
+        and issue.field == "input_schema"
+        and issue.message == "Property description exceeds 500 chars (got 501) at query"
+        for issue in issues
+    )
+    assert report.validation_ok is False
+    assert report.publishable is False

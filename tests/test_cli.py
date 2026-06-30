@@ -509,6 +509,60 @@ def test_register_blocks_non_publishable_remote_quality(monkeypatch, tmp_path) -
     assert FakeClient.auto_register_called is False
 
 
+def test_register_surfaces_remote_validation_errors(monkeypatch, tmp_path) -> None:
+    runner = CliRunner()
+    project_dir = tmp_path / "remote-validation-blocked"
+    _write_register_project(project_dir)
+
+    class FakeClient:
+        auto_register_called = False
+
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def preview_quality_score(self, manual):
+            from siglume_api_sdk import ToolManualIssue, ToolManualQualityReport
+
+            return ToolManualQualityReport(
+                overall_score=100,
+                grade="A",
+                issues=[],
+                keyword_coverage_estimate=100,
+                improvement_suggestions=[],
+                publishable=False,
+                validation_ok=False,
+                validation_errors=[
+                    ToolManualIssue(
+                        code="INPUT_SCHEMA",
+                        field="input_schema",
+                        message="Property description exceeds 500 chars (got 635) at operation",
+                    )
+                ],
+            )
+
+        def auto_register(self, *args, **kwargs):
+            self.auto_register_called = True
+            raise AssertionError("auto_register should not run after failed preflight")
+
+    monkeypatch.setattr(project_module, "resolve_api_key", lambda: "sig_test_key")
+    monkeypatch.setattr(project_module, "SiglumeClient", FakeClient)
+
+    result = runner.invoke(main, ["register", str(project_dir), "--draft-only", "--json"])
+
+    assert result.exit_code == 1
+    assert "remote Tool Manual structural validation failed (validation.ok=false)" in result.output
+    assert "Quality grade A (100/100) only measures content quality" in result.output
+    assert "[INPUT_SCHEMA] input_schema: Property description exceeds 500 chars (got 635) at operation" in result.output
+    assert "remote Tool Manual quality is not publishable: A (100/100)" not in result.output
+    assert FakeClient.auto_register_called is False
+
+
 def test_register_allows_api_managed_connected_account_without_oauth_seed(monkeypatch, tmp_path) -> None:
     runner = CliRunner()
     project_dir = tmp_path / "api-managed-oauth"
