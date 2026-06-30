@@ -42,6 +42,23 @@ describe("validate_tool_manual", () => {
     expect(issues.some((issue) => issue.field === "input_schema.query.oneOf[1].patternProperties")).toBe(true);
   });
 
+  it("rejects input schema property descriptions over 500 characters", () => {
+    const manual = cloneBase();
+    const inputSchema = manual.input_schema as { properties: Record<string, Record<string, unknown>> };
+    (inputSchema.properties.query as Record<string, unknown>).description = "x".repeat(501);
+
+    const [ok, issues] = validate_tool_manual(manual);
+
+    expect(ok).toBe(false);
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        code: "INPUT_SCHEMA",
+        field: "input_schema",
+        message: "Property description exceeds 500 chars (got 501) at query",
+      }),
+    );
+  });
+
   it("warns about platform-injected input fields", () => {
     const manual = cloneBase();
     (manual.input_schema as Record<string, unknown>).properties = {

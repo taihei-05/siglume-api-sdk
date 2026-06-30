@@ -27,6 +27,7 @@ import type {
   SiglumeClientShape,
   ToolManual,
   ToolManualIssue,
+  ToolManualQualityReport,
 } from "../index";
 import { SiglumeProjectError } from "../errors";
 import {
@@ -81,6 +82,40 @@ function remoteQualityOk(report: { validation_ok?: boolean; publishable?: boolea
   const validationOk = report.validation_ok ?? true;
   const publishable = report.publishable ?? (report.grade === "A" || report.grade === "B");
   return Boolean(validationOk) && Boolean(publishable);
+}
+
+function formatRemoteQualityIssue(issue: ToolManualIssue): string {
+  const codePrefix = issue.code ? `[${issue.code}] ` : "";
+  const fieldPrefix = issue.field ? `${issue.field}: ` : "";
+  return `${codePrefix}${fieldPrefix}${issue.message || "remote validation failed"}`;
+}
+
+function remoteQualityBlockingErrors(report: ToolManualQualityReport): string[] {
+  const grade = report.grade;
+  const score = report.overall_score;
+  const validationOk = report.validation_ok ?? true;
+  const gradePublishable = grade === "A" || grade === "B";
+  const effectivePublishable = report.publishable ?? gradePublishable;
+  const errors: string[] = [];
+
+  if (!validationOk) {
+    errors.push(
+      `remote Tool Manual structural validation failed (validation.ok=false). Quality grade ${grade} (${score}/100) ` +
+        "only measures content quality; publication also requires structural validation to pass.",
+    );
+    for (const issue of report.validation_errors ?? []) {
+      errors.push(formatRemoteQualityIssue(issue));
+    }
+  }
+
+  if (!effectivePublishable && (validationOk || !gradePublishable)) {
+    errors.push(`remote Tool Manual quality is not publishable: ${grade} (${score}/100)`);
+  }
+
+  if (errors.length === 0 && !remoteQualityOk(report)) {
+    errors.push(`remote Tool Manual quality is not publishable: ${grade} (${score}/100)`);
+  }
+  return errors;
 }
 
 function sampleValueForSchema(schema: Record<string, unknown>): unknown {
@@ -593,7 +628,7 @@ async function registrationPreflight(project: LoadedProject, client: SiglumeClie
     errors.push("tool_manual.json is not valid for production registration");
   }
   if (!remoteQualityOk(remoteQuality)) {
-    errors.push(`remote Tool Manual quality is not publishable: ${remoteQuality.grade} (${remoteQuality.overall_score}/100)`);
+    errors.push(...remoteQualityBlockingErrors(remoteQuality));
   }
   const preflight = {
     manifest_issues: manifestIssues,
