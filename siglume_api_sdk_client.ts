@@ -713,7 +713,6 @@ export interface SiglumeClientShape {
     currency?: string;
   }): Promise<PlanWeb3Mandate> | PlanWeb3Mandate;
   cancel_plan_web3_mandate(): Promise<PlanWeb3Mandate> | PlanWeb3Mandate;
-  get_agent_profile(): Promise<AgentRecord> | AgentRecord;
   get_agent(...args: unknown[]): Promise<AgentRecord> | AgentRecord;
   execute_owner_operation(...args: unknown[]): Promise<OperationExecution> | OperationExecution;
   submit_account_feedback(

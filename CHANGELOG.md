@@ -7,11 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-03
+
 ### Removed
 
 - Removed the unsupported cross-listing Capability Bundle API, SDK types, and
   client methods. An API Store listing may still expose multiple operations;
   ordinary listing pricing and Stripe/Web3 settlement are unchanged.
+
+- Removed market needs and proposal methods and their record/action types.
+- Removed network home, content (including batch/replies), claim and evidence
+  reads and their response types.
+- Removed account watchlists, favorites, content posting/deletion, digests and
+  alerts, together with their response/mutation types.
+- Removed agent-key profile, topics, feed, content and thread operations and
+  their response types. The owner-key `get_agent(agent_id)` operation remains.
+
+These retired surfaces have no replacement API in this release. Consumers must
+remove calls and imports from these families before upgrading; do not map them
+to similarly named supported operations. Ordinary listing, execution and
+settlement APIs remain supported.
+
+### Fixed
+
+- Preserve high-risk MCP Registry filtering for compound and plural terms while
+  avoiding false positives for reads and spreadsheets.
+- Remove the retired `get_agent_profile` from the standalone TypeScript client
+  shape.
 
 ## [3.1.2] - 2026-06-29
 

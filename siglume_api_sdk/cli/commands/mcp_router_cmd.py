@@ -126,14 +126,14 @@ def _select_registry_remote(
 
 
 def _is_high_risk_registry_item(server: dict[str, Any]) -> bool:
-    # Word-boundary match: a bare substring check classifies "reads" and
-    # "spreadsheets" as advertising/finance risk ("ads").
+    # Only "ads" needs word boundaries to avoid matching "reads" and
+    # "spreadsheets". Other terms must still match compounds and plurals.
     text = " ".join(
         str(server.get(key) or "")
         for key in ("name", "title", "description")
     ).lower()
     return any(
-        re.search(r"\b" + re.escape(term) + r"\b", text) is not None
+        (re.search(r"\bads\b", text) is not None if term == "ads" else term in text)
         for term in _HIGH_RISK_TERMS
     )
 
