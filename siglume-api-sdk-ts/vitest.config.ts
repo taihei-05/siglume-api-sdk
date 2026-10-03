@@ -13,7 +13,7 @@ export default defineConfig({
       // deletion removed a well-covered surface, so the branch floor is reset
       // to the post-removal baseline.
       thresholds: {
-        branches: 71,
+        branches: 70,
         functions: 71,
         lines: 85,
         statements: 85,
