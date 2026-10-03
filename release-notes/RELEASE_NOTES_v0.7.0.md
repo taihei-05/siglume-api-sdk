@@ -2,6 +2,10 @@
 
 Released: 2026-04-21
 
+> Historical record: the cross-listing Capability Bundle surface described in
+> this release was later classified as an unsupported, unapproved product flow
+> and removed. Current clients must not rely on `/v1/market/bundles`.
+
 ## At a glance
 
 v0.7.0 wraps the two new v0.7 platform tracks in the public

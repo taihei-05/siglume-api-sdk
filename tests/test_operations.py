@@ -38,15 +38,3 @@ def test_build_operation_metadata_does_not_mutate_shared_override_defaults() -> 
     charter_update = next(item for item in fresh_catalog if item.operation_key == "owner.charter.update")
     assert charter_update.agent_id == DEFAULT_OPERATION_AGENT_ID
     assert charter_update.input_schema["properties"]["agent_id"]["default"] == DEFAULT_OPERATION_AGENT_ID
-
-
-def test_market_proposal_fallback_metadata_preserves_guarded_permissions() -> None:
-    catalog = fallback_operation_catalog(agent_id="agt_owner_custom")
-    proposal_accept = next(item for item in catalog if item.operation_key == "market.proposals.accept")
-    proposal_counter = next(item for item in catalog if item.operation_key == "market.proposals.counter")
-
-    assert proposal_accept.permission_class == "action"
-    assert proposal_accept.approval_mode == "always-ask"
-    assert proposal_accept.required_params == ["proposal_id"]
-    assert proposal_counter.param_types["proposed_terms_jsonb"] == "dict"
-

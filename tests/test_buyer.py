@@ -431,6 +431,29 @@ def test_invoke_with_direct_payment_uses_sdrp_route_and_separates_control_fields
         }
     )
     seen_paths: list[str] = []
+    prepared_bodies: list[dict[str, object]] = []
+    transaction_request = {
+        "request_id": "web3tx_direct_payment_1",
+        "network": "polygon",
+        "chain_id": 137,
+        "from_address": "0x" + "11" * 20,
+        "to": "0x" + "22" * 20,
+        "value_hex": "0x0",
+        "contract_key": "direct_payment_hub",
+        "function_name": "pay",
+        "function_signature": "pay(bytes32,address,address,uint256,uint256)",
+        "selector": "0x12345678",
+        "data": "0x12345678" + "33" * 32,
+        "expected_event_name": "DirectPaymentExecuted",
+        "expected_topic0": "0x" + "44" * 32,
+        "metadata_jsonb": {
+            "direct_payment_requirement_id": "dpr_test",
+            "requirement_hash": "sha256:req",
+            "payment_kind": "direct_payment",
+        },
+        "external_signature": "0x" + "55" * 65,
+        "external_safe_tx_hash": "0x" + "66" * 32,
+    }
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen_paths.append(request.url.path)
@@ -479,15 +502,13 @@ def test_invoke_with_direct_payment_uses_sdrp_route_and_separates_control_fields
                     {
                         "requirement_id": "dpr_test",
                         "status": "transaction_prepared",
-                        "transaction_request": {
-                            "to": "0xDirectPaymentHub",
-                            "metadata_jsonb": {"direct_payment_requirement_id": "dpr_test"},
-                        },
+                        "transaction_request": transaction_request,
                     }
                 ),
             )
         if request.url.path == "/v1/market/web3/transactions/execute-prepared":
             assert body["receipt_kind"] == "sdrp_direct_payment"
+            prepared_bodies.append(body)
             return httpx.Response(200, json=envelope({"receipt": {"receipt_id": "rcpt_test", "tx_status": "finalized"}}))
         if request.url.path == "/v1/sdrp/direct-payments/requirements/dpr_test/verify":
             assert body["receipt_id"] == "rcpt_test"
@@ -531,6 +552,18 @@ def test_invoke_with_direct_payment_uses_sdrp_route_and_separates_control_fields
         "usage_event": {"units_consumed": 1, "amount_minor": 10, "currency": "JPY"},
         "receipt": {"amount_minor": 10, "currency": "JPY", "execution_kind": "action"},
     }
+    assert prepared_bodies == [
+        {
+            "transaction_request": transaction_request,
+            "receipt_kind": "sdrp_direct_payment",
+            "reference_type": "sdrp_direct_payment_requirement",
+            "reference_id": "dpr_test",
+            "metadata": transaction_request["metadata_jsonb"],
+            "await_finality": True,
+        }
+    ]
+    assert "execution_token" not in prepared_bodies[0]
+    assert "trace_id" not in prepared_bodies[0]
     assert "/v1/sdrp/direct-payments/requirements" in seen_paths
     assert "/v1/sdrp/direct-payments/requirements/dpr_test/execute" in seen_paths
     assert "/v1/internal/market/capability/execute" not in seen_paths

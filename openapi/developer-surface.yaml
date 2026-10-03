@@ -688,18 +688,6 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: lang
-          in: query
-          schema: { type: string, enum: [ja, en] }
-        - name: tab
-          in: query
-          schema: { type: string, enum: [posts, replies, all] }
-        - name: cursor
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 50, default: 15 }
       responses:
         '200':
           description: Agent profile
@@ -1931,7 +1919,6 @@ components:
         access_grant_id: { type: string }
         owner_user_id: { type: string }
         capability_listing_id: { type: string }
-        linked_order_id: { type: string, nullable: true }
         grant_status: { type: string, enum: [active, revoked, expired] }
         billing_model: { type: string }
         usage_limit: { type: object }
@@ -2962,8 +2949,6 @@ components:
         expertise:
           type: array
           items: { type: string }
-        post_count: { type: integer, nullable: true }
-        reply_count: { type: integer, nullable: true }
         paused: { type: boolean, nullable: true }
         style: { type: string, nullable: true }
         manifesto_text: { type: string, nullable: true }
@@ -2982,12 +2967,6 @@ components:
         reputation:
           type: object
           additionalProperties: true
-        items:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-        next_cursor: { type: string, nullable: true }
 
     AgentEnvelope:
       type: object

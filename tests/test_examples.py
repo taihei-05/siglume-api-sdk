@@ -24,7 +24,6 @@ from siglume_api_sdk import (  # noqa: E402
 
 
 EXAMPLE_SPECS = [
-    ("account_digests_alerts_wrapper.py", PermissionClass.READ_ONLY),
     ("account_plan_wrapper.py", PermissionClass.READ_ONLY),
     ("agent_behavior_adapter.py", PermissionClass.ACTION),
     ("artifact_delivery_presigned.py", PermissionClass.ACTION),
@@ -32,9 +31,6 @@ EXAMPLE_SPECS = [
     ("crm_sync.py", PermissionClass.ACTION),
     ("email_sender.py", PermissionClass.ACTION),
     ("installed_tools_wrapper.py", PermissionClass.READ_ONLY),
-    ("market_needs_wrapper.py", PermissionClass.READ_ONLY),
-    ("market_proposals_wrapper.py", PermissionClass.ACTION),
-    ("network_discovery_wrapper.py", PermissionClass.READ_ONLY),
     ("news_digest.py", PermissionClass.READ_ONLY),
     ("polygon_mandate_adapter.py", PermissionClass.PAYMENT),
     ("translation_hub.py", PermissionClass.READ_ONLY),
@@ -188,19 +184,6 @@ def test_account_plan_wrapper_example_returns_typed_account_context() -> None:
     assert output[4].startswith("summary: Plan plus with ja preferences loaded")
 
 
-def test_market_needs_wrapper_example_returns_typed_need_backlog() -> None:
-    module = _load_module("market_needs_wrapper.py")
-
-    output = asyncio.run(module.run_market_needs_example())
-
-    assert output[0] == "tool_manual_valid: True 0"
-    assert output[1].startswith("quality_grade: ")
-    assert output[2] == "needs_loaded: 2 first=need_demo_1"
-    assert output[3] == "titles: Localize release notes into Japanese|Summarize partner invoices"
-    assert output[4] == "dry_run: True"
-    assert output[5].startswith("summary: Loaded 2 open market needs for translation coverage triage")
-
-
 def test_installed_tools_wrapper_example_returns_installed_tool_snapshot() -> None:
     module = _load_module("installed_tools_wrapper.py")
 
@@ -212,46 +195,6 @@ def test_installed_tools_wrapper_example_returns_installed_tool_snapshot() -> No
     assert output[3] == "receipt_steps: 1 execution=queued"
     assert output[4] == "dry_run: True"
     assert output[5].startswith("summary: Loaded 2 installed tools for installed tool readiness triage")
-
-
-def test_account_digests_alerts_wrapper_example_returns_dashboard_snapshot() -> None:
-    module = _load_module("account_digests_alerts_wrapper.py")
-
-    output = asyncio.run(module.run_account_digests_alerts_example())
-
-    assert output[0] == "tool_manual_valid: True 0"
-    assert output[1].startswith("quality_grade: ")
-    assert output[2] == "watchlist: BTC,ETH,NVDA"
-    assert output[3] == "digests_alerts: 2/2"
-    assert output[4] == "dry_run: True"
-    assert output[5].startswith("summary: Dashboard widget loaded 3 watchlist symbols")
-
-
-def test_network_discovery_wrapper_example_returns_feed_and_claim_snapshot() -> None:
-    module = _load_module("network_discovery_wrapper.py")
-
-    output = asyncio.run(module.run_network_discovery_example())
-
-    assert output[0] == "tool_manual_valid: True 0"
-    assert output[1].startswith("quality_grade: ")
-    assert output[2] == "feed_items: 2 batch_titles=AI infra demand spikes|Chip supply normalizes"
-    assert output[3] == "claim_evidence: clm_market_signal/evd_press_release"
-    assert output[4] == "dry_run: True"
-    assert output[5].startswith("summary: Browsed 2 network items for market signal discovery")
-
-
-def test_market_proposals_wrapper_example_returns_owner_review_intents() -> None:
-    module = _load_module("market_proposals_wrapper.py")
-
-    output = asyncio.run(module.run_market_proposals_example())
-
-    assert output[0] == "tool_manual_valid: True 0"
-    assert output[1].startswith("quality_grade: ")
-    assert output[2] == "proposals_loaded: 2 first=prop_demo_1"
-    assert output[3] == "dry_run: True"
-    assert output[4] == "action: True"
-    assert output[5] == "approval_intents: intent_prop_create_1|intent_prop_counter_1|intent_prop_accept_1"
-    assert output[6] == "summary: Prepared 3 proposal approval requests for opp_demo_1."
 
 
 def test_wallet_balance_example_resolves_native_symbol_to_chain_default() -> None:

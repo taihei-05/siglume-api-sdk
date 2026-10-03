@@ -58,10 +58,10 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 
 > 🎬 **Demo recording in progress** — the image above is a placeholder. The real 90-second screencast (auto-register → review in `/owner/publish` → sandbox agent selection → embedded-wallet payout-token confirmation in `/owner/credits/payout`) will drop in at the same path once captured. See [docs/demo-capture-guide.md](./docs/demo-capture-guide.md) for the script.
 
-> **Current release: v3.1.2.** Python and TypeScript are version-aligned and
+> **Next release: v4.0.0.** Python and TypeScript are version-aligned and
 > cover the current production registration surface: explicit Tool Manual input,
 > runtime validation, publisher-owned external OAuth, paid payout readiness,
-> capability bundles, webhooks, usage metering, typed Web3 settlement helpers,
+> webhooks, usage metering, typed Web3 settlement helpers,
 > operation pricing plans, prepay quote billing (including async / long-running
 > two-phase APIs), developer receipt/log observability, long-form buyer-facing
 > `description`, and platform-controlled release semver via `version_bump`.
@@ -81,11 +81,14 @@ Siglume's public SDK targets the **Agent API Store**: you publish an API once, a
 > **3.1.1** documents publisher-hosted artifact delivery: immediate
 > `external_url` links or async `job_id` claim tickets, with retrieval scoped to
 > `owner_user_id` plus the publisher's durable id; **3.1.2** adds copy-pasteable
-> artifact delivery recipes and a runnable signed-URL example.
+> artifact delivery recipes and a runnable signed-URL example; **4.0.0** removes
+> the unsupported cross-listing Capability Bundle surface. Normal API listings,
+> multi-operation Tool Manuals, pricing models, and settlement rails are unchanged.
 > Buyers' own AIs select
 > your API from its Tool Manual over MCP; Siglume resolves and dispatches (no
 > platform tool-selection loop on the connector path).
 > See [CHANGELOG.md](./CHANGELOG.md),
+> [RELEASE_NOTES_v4.0.0.md](./release-notes/RELEASE_NOTES_v4.0.0.md),
 > [RELEASE_NOTES_v3.1.2.md](./release-notes/RELEASE_NOTES_v3.1.2.md),
 > [RELEASE_NOTES_v3.1.1.md](./release-notes/RELEASE_NOTES_v3.1.1.md),
 > [RELEASE_NOTES_v3.1.0.md](./release-notes/RELEASE_NOTES_v3.1.0.md),
@@ -273,8 +276,8 @@ No permission needed. No issue to claim. Just build and register.
 
 | Route | Best for | Auth | Notes |
 | --- | --- | --- | --- |
-| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json` and local Git-ignored `runtime_validation.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--private-confirm` or `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` to publish an upgrade when checks pass. |
-| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; change content by rerunning the CLI / `auto-register` with the same `capability_key`. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
+| CLI / SDK / automation | Registration and upgrades | `SIGLUME_API_KEY` or `~/.siglume/credentials.toml` | This is the canonical registration route. `siglume register` reads `tool_manual.json` and local Git-ignored `runtime_validation.json`, runs preflight by default, then calls `auto-register` and confirms publication unless `--private-confirm` or `--draft-only` is set. SDK / HTTP automation can pass `source_url`, `source_context`, and `input_form_spec` directly. Re-run the same `capability_key` only for a non-material update; use a new key for a material commercial, authorization, or runtime-contract change. |
+| Developer portal | Review results, blockers, live status | Normal signed-in browser session | Use `/owner/publish` only after CLI / automation has created the draft or staged the upgrade. Submitted listing content is read-only in the portal; rerun the CLI / `auto-register` with the same `capability_key` only for a non-material update. A material commercial, authorization, or runtime-contract change is a new listing with a new key. Seller proceeds settle to the Siglume embedded wallet; payout-token changes live in Wallet at `/owner/credits/payout`. If you need CLI credentials, issue them from the `CLI / API keys` submenu in the portal. |
 
 #### Current publish prerequisites
 
@@ -344,10 +347,12 @@ are `--private-confirm`, `--draft-only`, `--confirm` as an explicit
 compatibility alias, `--submit-review` as a legacy alias, and `--json` for
 machine-readable output.
 
-For upgrades, run the same commands again with the same `capability_key`.
-`siglume register` publishes the next release immediately when the checks pass;
-use `siglume register . --draft-only` if you intentionally want to stage and
-review the upgrade before publishing.
+For a non-material update, run the same commands again with the same
+`capability_key`. A material commercial, authorization, or runtime-contract
+change requires a new listing with a new key. `siglume register` publishes the
+next allowed release immediately when the checks pass; use
+`siglume register . --draft-only` if you intentionally want to stage and review
+the update before publishing.
 
 - **Developer Portal** → [siglume.com/owner/publish](https://siglume.com/owner/publish) (review drafts, blockers, and live status)
 - **Wallet** → [siglume.com/owner/credits/payout](https://siglume.com/owner/credits/payout) (embedded-wallet payout token settings; external payout wallets are not supported)
@@ -800,7 +805,7 @@ write a strong tool manual, and let the value speak for itself.
 
 ## Project status
 
-This is **v3.1.2 (beta)** — the platform is launched on Polygon mainnet
+This is **v4.0.0 (beta)** — the platform is launched on Polygon mainnet
 (chainId 137) with paid API Store settlement live on-chain, and the SDK has
 reached parity with the production registration and operation surface.
 The user base is still growing, and new SDK surfaces continue to ship

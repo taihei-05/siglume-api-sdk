@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 import click
@@ -125,11 +126,16 @@ def _select_registry_remote(
 
 
 def _is_high_risk_registry_item(server: dict[str, Any]) -> bool:
+    # Only "ads" needs word boundaries to avoid matching "reads" and
+    # "spreadsheets". Other terms must still match compounds and plurals.
     text = " ".join(
         str(server.get(key) or "")
         for key in ("name", "title", "description")
     ).lower()
-    return any(term in text for term in _HIGH_RISK_TERMS)
+    return any(
+        (re.search(r"\bads\b", text) is not None if term == "ads" else term in text)
+        for term in _HIGH_RISK_TERMS
+    )
 
 
 def _registry_query_matches(server: dict[str, Any], query: str) -> bool:

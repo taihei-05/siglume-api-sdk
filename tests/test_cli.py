@@ -1564,3 +1564,22 @@ def test_register_support_and_usage_commands(monkeypatch, tmp_path) -> None:
     assert '"support_case_id": "sup_123"' in support_result.output
     assert usage_result.exit_code == 0, usage_result.output
     assert '"count": 1' in usage_result.output
+
+
+def test_mcp_router_registry_filters_inflected_risk_terms_before_probe() -> None:
+    for title in ("Cryptocurrency Payments", "Healthcare", "Banking", "Ads"):
+        candidate, reason = mcp_router_module._candidate_from_registry_item(
+            {"server": {"title": title}},
+            include_auth_required=False,
+            include_high_risk=False,
+        )
+        assert candidate is None
+        assert reason == "high_risk"
+    for title in ("Reads", "Spreadsheets"):
+        assert not mcp_router_module._is_high_risk_registry_item({"title": title})
+    _, reason = mcp_router_module._candidate_from_registry_item(
+        {"server": {"title": "Cryptocurrency Payments"}},
+        include_auth_required=False,
+        include_high_risk=True,
+    )
+    assert reason == "no_remote"

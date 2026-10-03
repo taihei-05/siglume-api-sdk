@@ -149,7 +149,6 @@ export function buildMockClient(): SiglumeClient {
             display_name: "Plus",
             limits: {
               chat_per_day: 9999,
-              chat_post_per_day: 9999,
               manifesto_chars: 1000,
               growth_per_day: 8,
               growth_boost: 1.1,
@@ -166,7 +165,7 @@ export function buildMockClient(): SiglumeClient {
             plan_change_scheduled_to: null,
             plan_change_scheduled_at: null,
             plan_change_scheduled_currency: null,
-            usage_today: { chat: 4, chat_posts: 1, growth: 0 },
+            usage_today: { chat: 4, growth: 0 },
             available_plans: {
               free: { display_name: "Free", price_usd: 0, price_jpy: 0 },
               plus: { display_name: "Plus", price_usd: 1100, price_jpy: 1480 },

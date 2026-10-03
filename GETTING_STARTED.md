@@ -733,9 +733,11 @@ Your API runtime
 
 ### How do I update my API?
 
-Submit again with the same `capability_key`.
+Submit again with the same `capability_key` only for a non-material update. A
+material commercial, authorization, or runtime-contract change requires a new
+listing with a new key.
 
-- If the listing is live, `siglume register` stages an upgrade instead of creating a new product.
+- If the listing is live, `siglume register` stages an allowed non-material update instead of creating a new product.
 - `siglume register .` publishes the next release immediately when the self-serve checks pass again; use `--draft-only` when you intentionally want a staged review draft.
 - If the upgrade changes external OAuth, update your API-owned OAuth flow and `connect_url` before registering.
 
@@ -980,8 +982,10 @@ private agent details. See [Developer Observability](docs/developer-observabilit
 
 Open the `review_url` returned by the CLI, or go to
 `https://siglume.com/owner/publish`. Submitted listing content is read-only in
-the portal. If you need to change the API contract, update the local project and
-rerun `siglume register .` with the same `capability_key`. Use
+the portal. For a non-material update, change the local project and rerun
+`siglume register .` with the same `capability_key`. A material commercial,
+authorization, or runtime-contract change requires a new listing with a new
+key. Use
 `siglume register . --private-confirm` when you want to test the confirmed
 release in production while it stays hidden, or `--draft-only` when you
 intentionally need an immutable draft before confirming.

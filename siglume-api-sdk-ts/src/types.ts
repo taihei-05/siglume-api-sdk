@@ -379,35 +379,6 @@ export interface CapabilitySaveStateRecord {
   raw: Record<string, unknown>;
 }
 
-export interface BundleMember {
-  capability_listing_id: string;
-  capability_key?: string | null;
-  title?: string | null;
-  position: number;
-  status?: string | null;
-  added_at?: string | null;
-  link_id?: string | null;
-}
-
-export interface BundleListingRecord {
-  bundle_id: string;
-  bundle_key: string;
-  display_name: string;
-  status: string;
-  price_model: string;
-  price_value_minor?: number | null;
-  currency: string;
-  description?: string | null;
-  category?: string | null;
-  jurisdiction?: string | null;
-  members: BundleMember[];
-  submitted_at?: string | null;
-  published_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
 export interface AutoRegistrationReceipt {
   listing_id: string;
   status: string;
@@ -550,8 +521,6 @@ export interface AgentRecord {
   agent_type?: string | null;
   status?: string | null;
   expertise: string[];
-  post_count?: number | null;
-  reply_count?: number | null;
   paused?: boolean | null;
   style?: string | null;
   manifesto_text?: string | null;
@@ -560,8 +529,6 @@ export interface AgentRecord {
   growth: Record<string, unknown>;
   plan: Record<string, unknown>;
   reputation: Record<string, unknown>;
-  items: Array<Record<string, unknown>>;
-  next_cursor?: string | null;
   raw: Record<string, unknown>;
 }
 
@@ -619,30 +586,6 @@ export interface BudgetPolicy {
   auto_approve_below_minor: number;
   limits: Record<string, number>;
   metadata: Record<string, unknown>;
-  created_at?: string | null;
-  updated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface MarketNeedRecord {
-  need_id: string;
-  owner_user_id?: string | null;
-  principal_user_id?: string | null;
-  buyer_agent_id?: string | null;
-  charter_id?: string | null;
-  charter_version: number;
-  title?: string | null;
-  problem_statement?: string | null;
-  category_key?: string | null;
-  budget_min_minor?: number | null;
-  budget_max_minor?: number | null;
-  urgency: number;
-  requirement_jsonb: Record<string, unknown>;
-  status: string;
-  source_kind?: string | null;
-  source_ref_id?: string | null;
-  metadata: Record<string, unknown>;
-  detected_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   raw: Record<string, unknown>;
@@ -799,62 +742,6 @@ export interface InstalledToolReceiptStepRecord {
   raw: Record<string, unknown>;
 }
 
-export interface MarketProposalRecord {
-  proposal_id: string;
-  parent_proposal_id?: string | null;
-  opportunity_id?: string | null;
-  listing_id?: string | null;
-  need_id?: string | null;
-  seller_agent_id?: string | null;
-  buyer_agent_id?: string | null;
-  approval_request_id?: string | null;
-  linked_action_proposal_id?: string | null;
-  thread_content_id?: string | null;
-  content_id?: string | null;
-  proposal_kind: string;
-  proposed_terms_jsonb: Record<string, unknown>;
-  status: string;
-  reason_codes: string[];
-  approval_policy_snapshot_jsonb: Record<string, unknown>;
-  delegated_budget_snapshot_jsonb: Record<string, unknown>;
-  explanation: Record<string, unknown>;
-  soft_budget_check: Record<string, unknown>;
-  approved_for_order_at?: string | null;
-  superseded_by_proposal_id?: string | null;
-  expires_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  approval?: Record<string, unknown> | null;
-  linked_order_id?: string | null;
-  order_status?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface MarketProposalActionResult {
-  status: string;
-  approval_required: boolean;
-  intent_id?: string | null;
-  approval_status?: string | null;
-  approval_snapshot_hash?: string | null;
-  message: string;
-  action: string;
-  proposal?: MarketProposalRecord | null;
-  preview: Record<string, unknown>;
-  authorization: Record<string, unknown>;
-  approval_request?: Record<string, unknown> | null;
-  approval_explanation?: Record<string, unknown> | null;
-  published_note_content_id?: string | null;
-  ready_for_order: boolean;
-  order_created: boolean;
-  resulting_order_id?: string | null;
-  order?: Record<string, unknown> | null;
-  funds_locked: boolean;
-  escrow_hold?: Record<string, unknown> | null;
-  trace_id?: string | null;
-  request_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
 export interface AccountPreferences {
   language?: string | null;
   summary_depth?: string | null;
@@ -937,177 +824,7 @@ export interface PlanWeb3Mandate {
   raw: Record<string, unknown>;
 }
 
-export interface AccountWatchlist {
-  symbols: string[];
-  raw: Record<string, unknown>;
-}
-
-export interface FavoriteAgent {
-  agent_id: string;
-  name?: string | null;
-  avatar_url?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface FavoriteAgentMutation {
-  ok: boolean;
-  status?: string | null;
-  agent_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AccountContentPostResult {
-  accepted: boolean;
-  content_id?: string | null;
-  posted_by?: string | null;
-  error?: string | null;
-  limit_reached: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface AccountContentDeleteResult {
-  deleted: boolean;
-  content_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AccountDigestSummary {
-  digest_id: string;
-  title?: string | null;
-  digest_type?: string | null;
-  summary?: string | null;
-  generated_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AccountDigestItem {
-  digest_item_id: string;
-  headline?: string | null;
-  summary?: string | null;
-  confidence: number;
-  trust_state?: string | null;
-  ref_type?: string | null;
-  ref_id?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface AccountDigest {
-  digest_id: string;
-  title?: string | null;
-  digest_type?: string | null;
-  summary?: string | null;
-  generated_at?: string | null;
-  items: AccountDigestItem[];
-  raw: Record<string, unknown>;
-}
-
-export interface AccountAlert {
-  alert_id: string;
-  title?: string | null;
-  summary?: string | null;
-  severity?: string | null;
-  confidence: number;
-  trust_state?: string | null;
-  ref_type?: string | null;
-  ref_id?: string | null;
-  created_at?: string | null;
-  raw: Record<string, unknown>;
-}
-
 export interface AccountFeedbackSubmission {
   accepted: boolean;
-  raw: Record<string, unknown>;
-}
-
-export interface NetworkContentSummary {
-  content_id: string;
-  item_type?: string | null;
-  title?: string | null;
-  summary?: string | null;
-  ref_type?: string | null;
-  ref_id?: string | null;
-  created_at?: string | null;
-  agent_id?: string | null;
-  agent_name?: string | null;
-  agent_avatar?: string | null;
-  message_type?: string | null;
-  trust_state?: string | null;
-  confidence: number;
-  reply_count?: number | null;
-  thread_reply_count?: number | null;
-  impression_count?: number | null;
-  thread_id?: string | null;
-  reply_to?: string | null;
-  reply_to_title?: string | null;
-  reply_to_agent_name?: string | null;
-  stance?: string | null;
-  sentiment: Record<string, unknown>;
-  surface_scores: Array<Record<string, unknown>>;
-  is_ad: boolean;
-  source_uri?: string | null;
-  source_host?: string | null;
-  posted_by?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface NetworkContentDetail {
-  content_id: string;
-  agent_id?: string | null;
-  thread_id?: string | null;
-  message_type?: string | null;
-  visibility?: string | null;
-  title?: string | null;
-  body: Record<string, unknown>;
-  claims: string[];
-  evidence_refs: string[];
-  trust_state?: string | null;
-  confidence: number;
-  created_at?: string | null;
-  presentation: Record<string, unknown>;
-  signal_packet: Record<string, unknown>;
-  posted_by?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface NetworkRepliesPage {
-  replies: NetworkContentSummary[];
-  context_head?: NetworkContentSummary | null;
-  thread_summary?: string | null;
-  thread_surface_scores: Array<Record<string, unknown>>;
-  total_count: number;
-  next_cursor?: string | null;
-  raw: Record<string, unknown>;
-}
-
-export interface NetworkClaimRecord {
-  claim_id: string;
-  claim_type?: string | null;
-  normalized_text?: string | null;
-  confidence: number;
-  trust_state?: string | null;
-  evidence_refs: string[];
-  signal_packet: Record<string, unknown>;
-  raw: Record<string, unknown>;
-}
-
-export interface NetworkEvidenceRecord {
-  evidence_id: string;
-  evidence_type?: string | null;
-  uri?: string | null;
-  excerpt?: string | null;
-  source_reliability: number;
-  signal_packet: Record<string, unknown>;
-  raw: Record<string, unknown>;
-}
-
-export interface AgentTopicSubscription {
-  topic_key: string;
-  priority: number;
-  raw: Record<string, unknown>;
-}
-
-export interface AgentThreadRecord {
-  thread_id: string;
-  items: NetworkContentDetail[];
   raw: Record<string, unknown>;
 }
