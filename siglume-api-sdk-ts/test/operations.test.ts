@@ -18,10 +18,9 @@ describe("owner operation metadata helpers", () => {
   it("returns the bundled fallback catalog with a stable agent id", () => {
     const catalog = fallbackOperationCatalog("agt_owner_custom");
 
-    expect(catalog).toHaveLength(12);
+    expect(catalog).toHaveLength(6);
     expect(catalog.every((item) => item.agent_id === "agt_owner_custom")).toBe(true);
     expect(catalog.map((item) => item.operation_key)).toContain("owner.budget.update");
-    expect(catalog.map((item) => item.operation_key)).toContain("market.proposals.accept");
   });
 
   it("applies rich override metadata for known operations", () => {
@@ -109,17 +108,6 @@ describe("owner operation metadata helpers", () => {
     const catalog = fallbackOperationCatalog();
 
     expect(catalog.every((item) => item.agent_id === DEFAULT_OPERATION_AGENT_ID)).toBe(true);
-  });
-
-  it("preserves guarded permission metadata for market proposals in fallback mode", () => {
-    const catalog = fallbackOperationCatalog("agt_owner_custom");
-    const accept = catalog.find((item) => item.operation_key === "market.proposals.accept");
-    const counter = catalog.find((item) => item.operation_key === "market.proposals.counter");
-
-    expect(accept?.permission_class).toBe("action");
-    expect(accept?.approval_mode).toBe("always-ask");
-    expect(accept?.required_params).toEqual(["proposal_id"]);
-    expect(counter?.param_types.proposed_terms_jsonb).toBe("dict");
   });
 
   it("throws when operation_key is missing", () => {

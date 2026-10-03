@@ -56,14 +56,8 @@ mirrors the server rule so the failure surfaces before the network
 round-trip. See
 [RELEASE_NOTES_v0.8.0.md](./release-notes/RELEASE_NOTES_v0.8.0.md).
 
-### v0.7.x — capability bundles + seller-owned connected-account OAuth
+### v0.7.x — seller-owned connected-account OAuth
 
-Both v0.7 platform tracks landed:
-
-- **Capability bundles** — typed `/v1/market/bundles` wrappers in
-  Python and TypeScript. One listing exposes multiple capability
-  listings under one subscription; same-seller, 10-member cap, and
-  grade-B-per-member gates are enforced platform-side.
 - **Connected-account OAuth (publisher-owned)** — publisher APIs own OAuth,
   token storage, refresh, revocation, and user-to-token mapping. Siglume passes
   identity context only and does not expose token-broker SDK APIs.
@@ -177,11 +171,8 @@ Platform prerequisites:
 - A separate `SiglumeBuyerClient` ecosystem (experimental today;
   the buyer-side contract will continue to go through the existing
   execute endpoint).
-- Platform-admin operations. `admin.api_store.*` internal
-  transport routes are intentionally excluded from the bus — they
-  stay HTTP-only.
-- Rewriting the operation contract. `operation_registry` is
-  authoritative; the SDK mirrors whatever that surface exposes.
+- Platform-administrator operations remain authenticated HTTP control-plane
+  routes. They are not exposed by the public SDK or model/tool router.
 
 ## How to track
 

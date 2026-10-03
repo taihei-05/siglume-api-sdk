@@ -109,6 +109,7 @@ The following live-listing changes are material and are rejected with
 - `price_model`
 - `price_value_minor`
 - `pricing_plan`
+- `billing_timing`, except the current `post` to `prepay` safety upgrade
 - `currency`
 - `price_value_minor_jpy`
 - `dual_currency`
@@ -118,6 +119,8 @@ The following live-listing changes are material and are rejected with
 - `required_connected_accounts`
 - `permission_scopes`
 - `jurisdiction`
+- `publisher_type`
+- `publisher_company_id`
 
 When a material term changes, create a new API listing with a new
 `capability_key`. Siglume does not silently migrate existing buyers or grants to

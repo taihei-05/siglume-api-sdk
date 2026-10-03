@@ -12,11 +12,6 @@ import {
   runAgentBehaviorExample,
 } from "../../examples-ts/agent_behavior_adapter";
 import {
-  AccountDigestsAlertsWrapperApp,
-  buildToolManual as buildAccountDashboardToolManual,
-  runAccountDigestsAlertsExample,
-} from "../../examples-ts/account_digests_alerts_wrapper";
-import {
   AccountPlanWrapperApp,
   buildToolManual as buildAccountPlanToolManual,
   runAccountPlanWrapperExample,
@@ -26,21 +21,6 @@ import {
   InstalledToolsWrapperApp,
   runInstalledToolsExample,
 } from "../../examples-ts/installed_tools_wrapper";
-import {
-  buildToolManual as buildMarketNeedsToolManual,
-  MarketNeedsWrapperApp,
-  runMarketNeedsExample,
-} from "../../examples-ts/market_needs_wrapper";
-import {
-  buildToolManual as buildMarketProposalsToolManual,
-  MarketProposalsWrapperApp,
-  runMarketProposalsExample,
-} from "../../examples-ts/market_proposals_wrapper";
-import {
-  buildToolManual as buildNetworkDiscoveryToolManual,
-  NetworkDiscoveryWrapperApp,
-  runNetworkDiscoveryExample,
-} from "../../examples-ts/network_discovery_wrapper";
 import { buildStubs as buildCrmStubs, buildToolManual as buildCrmToolManual, CrmSyncApp, runCrmSyncExample } from "../../examples-ts/crm_sync";
 import { buildToolManual as buildNewsDigestToolManual, NewsDigestApp, runNewsDigestExample } from "../../examples-ts/news_digest";
 import {
@@ -66,13 +46,6 @@ const EXAMPLES = [
     taskType: "propose_agent_behavior",
   },
   {
-    name: "account_digests_alerts_wrapper",
-    permissionClass: PermissionClass.READ_ONLY,
-    createHarness: () => new AppTestHarness(new AccountDigestsAlertsWrapperApp()),
-    createManual: () => buildAccountDashboardToolManual(),
-    taskType: "render_owner_dashboard_widget",
-  },
-  {
     name: "account_plan_wrapper",
     permissionClass: PermissionClass.READ_ONLY,
     createHarness: () => new AppTestHarness(new AccountPlanWrapperApp()),
@@ -85,27 +58,6 @@ const EXAMPLES = [
     createHarness: () => new AppTestHarness(new InstalledToolsWrapperApp()),
     createManual: () => buildInstalledToolsToolManual(),
     taskType: "review_installed_tools",
-  },
-  {
-    name: "market_needs_wrapper",
-    permissionClass: PermissionClass.READ_ONLY,
-    createHarness: () => new AppTestHarness(new MarketNeedsWrapperApp()),
-    createManual: () => buildMarketNeedsToolManual(),
-    taskType: "review_market_needs",
-  },
-  {
-    name: "market_proposals_wrapper",
-    permissionClass: PermissionClass.ACTION,
-    createHarness: () => new AppTestHarness(new MarketProposalsWrapperApp()),
-    createManual: () => buildMarketProposalsToolManual(),
-    taskType: "stage_market_proposal_negotiation",
-  },
-  {
-    name: "network_discovery_wrapper",
-    permissionClass: PermissionClass.READ_ONLY,
-    createHarness: () => new AppTestHarness(new NetworkDiscoveryWrapperApp()),
-    createManual: () => buildNetworkDiscoveryToolManual(),
-    taskType: "browse_network_discovery",
   },
   {
     name: "crm_sync",
@@ -201,29 +153,6 @@ describe("TypeScript example suite", () => {
     expect(lines[4]).toBe("summary: Plan plus with ja preferences loaded for writing tone personalization.");
   });
 
-  it("returns stable summary lines for market_needs_wrapper", async () => {
-    const lines = await runMarketNeedsExample();
-
-    expect(lines[0]).toBe("tool_manual_valid: true 0");
-    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
-    expect(lines[2]).toBe("needs_loaded: 2 first=need_demo_1");
-    expect(lines[3]).toBe("titles: Localize release notes into Japanese|Summarize partner invoices");
-    expect(lines[4]).toBe("dry_run: true");
-    expect(lines[5]).toBe("summary: Loaded 2 open market needs for translation coverage triage; first need: Localize release notes into Japanese.");
-  });
-
-  it("returns stable summary lines for market_proposals_wrapper", async () => {
-    const lines = await runMarketProposalsExample();
-
-    expect(lines[0]).toBe("tool_manual_valid: true 0");
-    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
-    expect(lines[2]).toBe("proposals_loaded: 2 first=prop_demo_1");
-    expect(lines[3]).toBe("dry_run: true");
-    expect(lines[4]).toBe("action: true");
-    expect(lines[5]).toBe("approval_intents: intent_prop_create_1|intent_prop_counter_1|intent_prop_accept_1");
-    expect(lines[6]).toBe("summary: Prepared 3 proposal approval requests for opp_demo_1.");
-  });
-
   it("returns stable summary lines for installed_tools_wrapper", async () => {
     const lines = await runInstalledToolsExample();
 
@@ -233,28 +162,6 @@ describe("TypeScript example suite", () => {
     expect(lines[3]).toBe("receipt_steps: 1 execution=queued");
     expect(lines[4]).toBe("dry_run: true");
     expect(lines[5]).toBe("summary: Loaded 2 installed tools for installed tool readiness triage; first receipt: rcp_inst_1 (queued).");
-  });
-
-  it("returns stable summary lines for account_digests_alerts_wrapper", async () => {
-    const lines = await runAccountDigestsAlertsExample();
-
-    expect(lines[0]).toBe("tool_manual_valid: true 0");
-    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
-    expect(lines[2]).toBe("watchlist: BTC,ETH,NVDA");
-    expect(lines[3]).toBe("digests_alerts: 2/2");
-    expect(lines[4]).toBe("dry_run: true");
-    expect(lines[5]).toBe("summary: Dashboard widget loaded 3 watchlist symbols, 2 digests, and 2 alerts for morning dashboard.");
-  });
-
-  it("returns stable summary lines for network_discovery_wrapper", async () => {
-    const lines = await runNetworkDiscoveryExample();
-
-    expect(lines[0]).toBe("tool_manual_valid: true 0");
-    expect(lines[1]).toMatch(/^quality_grade: [AB] \d+$/);
-    expect(lines[2]).toBe("feed_items: 2 batch_titles=AI infra demand spikes|Chip supply normalizes");
-    expect(lines[3]).toBe("claim_evidence: clm_market_signal/evd_press_release");
-    expect(lines[4]).toBe("dry_run: true");
-    expect(lines[5]).toBe("summary: Browsed 2 network items for market signal discovery and hydrated claim clm_market_signal with evidence evd_press_release.");
   });
 
   it("returns stable summary lines for news_digest", async () => {

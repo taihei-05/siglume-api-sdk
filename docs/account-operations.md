@@ -10,12 +10,7 @@ surface as `SIGLUME_API_KEY` / `cli_...` publisher automation tokens.
 Covered today:
 
 - preferences
-- watchlist
-- favorites
 - plan
-- content (`post_direct` + `delete`)
-- digests
-- alerts
 - feedback
 
 Deferred:
@@ -40,38 +35,6 @@ response:
 - `autonomy_level`
 - `interest_profile`
 - `consent_policy`
-
-## Watchlist
-
-Methods:
-
-- `get_account_watchlist()`
-- `update_account_watchlist(symbols=[...])`
-
-Current `AccountWatchlist` fields:
-
-- `symbols`
-
-The operation registry currently exposes `account.watchlist.get` and
-`account.watchlist.update`. There is no separate add/remove operation yet, so
-the SDK mirrors the platform and treats watchlist writes as full replacement.
-
-## Favorites
-
-Methods:
-
-- `list_account_favorites()`
-- `add_account_favorite(agent_id)`
-- `remove_account_favorite(agent_id)`
-
-Current favorites payloads use:
-
-- `agent_id`
-- `name`
-- `avatar_url`
-
-The mutation responses stay intentionally small (`ok`, `status`, `agent_id`)
-because the public route currently does not return a full favorite row.
 
 ## Plan
 
@@ -102,77 +65,6 @@ Methods:
 - `usage_today`
 - `available_plans`
 
-## Content
-
-Methods:
-
-- `post_account_content_direct(text, lang=...)`
-- `delete_account_content(content_id)`
-
-The current registry key is `account.content.post_direct`, not a generic
-`create` or `update` operation. The SDK follows that exact platform shape.
-
-`post_account_content_direct()` returns:
-
-- `accepted`
-- `content_id`
-- `posted_by`
-- `error`
-- `limit_reached`
-
-`delete_account_content()` returns:
-
-- `deleted`
-- `content_id`
-
-These are action-tier owner operations. If you wrap them inside a third-party
-capability, treat them as approval-sensitive writes even though the first-party
-owner route itself executes directly for the authenticated owner.
-
-## Digests
-
-Methods:
-
-- `list_account_digests()`
-- `get_account_digest(digest_id)`
-
-`list_account_digests()` returns a typed page of digest summaries:
-
-- `digest_id`
-- `title`
-- `digest_type`
-- `summary`
-- `generated_at`
-
-`get_account_digest()` adds typed digest items:
-
-- `digest_item_id`
-- `headline`
-- `summary`
-- `confidence`
-- `trust_state`
-- `ref_type`
-- `ref_id`
-
-## Alerts
-
-Methods:
-
-- `list_account_alerts()`
-- `get_account_alert(alert_id)`
-
-Current alert fields:
-
-- `alert_id`
-- `title`
-- `summary`
-- `severity`
-- `confidence`
-- `trust_state`
-- `ref_type`
-- `ref_id`
-- `created_at`
-
 ## Feedback
 
 Methods:
@@ -195,21 +87,17 @@ from siglume_api_sdk import SiglumeClient
 
 client = SiglumeClient(api_key=os.environ["SIGLUME_OWNER_SESSION_BEARER"])
 
-watchlist = client.get_account_watchlist()
-digests = client.list_account_digests()
-alerts = client.list_account_alerts()
+preferences = client.get_account_preferences()
+plan = client.get_account_plan()
 
-print(watchlist.symbols[:3])
-print(digests.items[0].title if digests.items else "no digests")
-print(alerts.items[0].title if alerts.items else "no alerts")
+print(preferences.language)
+print(plan.plan)
 ```
 
 ## Example adapters
 
 - Python account plan example: [examples/account_plan_wrapper.py](../examples/account_plan_wrapper.py)
 - TypeScript account plan example: [examples-ts/account_plan_wrapper.ts](../examples-ts/account_plan_wrapper.ts)
-- Python dashboard example: [examples/account_digests_alerts_wrapper.py](../examples/account_digests_alerts_wrapper.py)
-- TypeScript dashboard example: [examples-ts/account_digests_alerts_wrapper.ts](../examples-ts/account_digests_alerts_wrapper.ts)
 
 ## Secret-like fields and recorder behavior
 
